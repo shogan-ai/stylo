@@ -17,7 +17,6 @@
 
 {
 open Lexing
-open Misc
 open Parser
 
 type error =
@@ -35,6 +34,13 @@ type error =
 exception Error of error * Location.t
 
 (* The table of keywords *)
+
+let create_hashtable n l =
+  let t = Hashtbl.create n in
+  List.iter (fun (k,v) -> Hashtbl.add t k v) l;
+  t
+
+let fatal_error = failwith (* not exactly, but good enough *)
 
 let keyword_table =
   create_hashtable 149 [
@@ -421,11 +427,6 @@ let escaped_newlines = ref false
 
 (* Warn about Latin-1 characters used in idents *)
 
-let warn_latin1 lexbuf =
-  Location.deprecated
-    (Location.curr lexbuf)
-    "ISO-Latin1 characters in identifiers"
-
 let handle_docstrings = ref true
 let comment_list = ref []
 
@@ -453,57 +454,6 @@ let int ~maybe_hash lit modifier =
   | unexpected -> fatal_error ("expected # or empty string: " ^ unexpected)
 
 (* Error report *)
-
-open Format
-
-let prepare_error loc = function
-  | Illegal_character c ->
-      Location.errorf ~loc "Illegal character (%s)" (Char.escaped c)
-  | Illegal_escape (s, explanation) ->
-      Location.errorf ~loc
-        "Illegal backslash escape in string or character (%s)%t" s
-        (fun ppf -> match explanation with
-           | None -> ()
-           | Some expl -> fprintf ppf ": %s" expl)
-  | Reserved_sequence (s, explanation) ->
-      Location.errorf ~loc
-        "Reserved character sequence: %s%t" s
-        (fun ppf -> match explanation with
-           | None -> ()
-           | Some expl -> fprintf ppf " %s" expl)
-  | Unterminated_comment _ ->
-      Location.errorf ~loc "Comment not terminated"
-  | Unterminated_string ->
-      Location.errorf ~loc "String literal not terminated"
-  | Unterminated_string_in_comment (_, literal_loc) ->
-      Location.errorf ~loc
-        "This comment contains an unterminated string literal"
-        ~sub:[Location.msg ~loc:literal_loc "String literal begins here"]
-  | Empty_character_literal ->
-      let msg = "Illegal empty character literal ''" in
-      let sub =
-        [Location.msg
-           "@{<hint>Hint@}: Did you mean ' ' or a type variable 'a?"] in
-      Location.error ~loc ~sub msg
-  | Keyword_as_label kwd ->
-      Location.errorf ~loc
-        "%a is a keyword, it cannot be used as label name" Style.inline_code kwd
-  | Invalid_literal s ->
-      Location.errorf ~loc "Invalid literal %s" s
-  | Invalid_directive (dir, explanation) ->
-      Location.errorf ~loc "Invalid lexer directive %S%t" dir
-        (fun ppf -> match explanation with
-           | None -> ()
-           | Some expl -> fprintf ppf ": %s" expl)
-
-let () =
-  Location.register_error_of_exn
-    (function
-      | Error (err, loc) ->
-          Some (prepare_error loc err)
-      | _ ->
-          None
-    )
 
 }
 
@@ -577,8 +527,7 @@ rule token = parse
       { check_label_name lexbuf name;
         LABEL name }
   | "~" (lowercase_latin1 identchar_latin1 * as name) ':'
-      { warn_latin1 lexbuf;
-        LABEL name }
+      { LABEL name }
   | "?"
       { QUESTION }
   | "?" raw_ident_escape (lowercase identchar * as name) ':'
@@ -587,8 +536,7 @@ rule token = parse
       { check_label_name lexbuf name;
         OPTLABEL name }
   | "?" (lowercase_latin1 identchar_latin1 * as name) ':'
-      { warn_latin1 lexbuf;
-        OPTLABEL name }
+      { OPTLABEL name }
   (* Lowercase identifiers are split into 3 cases, and the order matters
      (longest to shortest).
   *)
@@ -610,20 +558,18 @@ rule token = parse
   | (lowercase_latin1 identchar_latin1 * as name)
       ('#' symbolchar_or_hash+ as hashop)
       (* See Note [Lexing hack for hash operators] *)
-      { warn_latin1 lexbuf;
-        enqueue_hashop_from_end_of_lexbuf_window lexbuf ~hashop;
+      { enqueue_hashop_from_end_of_lexbuf_window lexbuf ~hashop;
         LIDENT name }
   | (lowercase_latin1 identchar_latin1 * as name) '#'
       (* See Note [Lexing hack for float#] *)
-      { warn_latin1 lexbuf;
-        enqueue_hash_suffix_from_end_of_lexbuf_window lexbuf;
+      { enqueue_hash_suffix_from_end_of_lexbuf_window lexbuf;
         LIDENT name }
   | lowercase_latin1 identchar_latin1 * as name
-      { warn_latin1 lexbuf; LIDENT name }
+      { LIDENT name }
   | uppercase identchar * as name
       { UIDENT name } (* No capitalized keywords *)
   | uppercase_latin1 identchar_latin1 * as name
-      { warn_latin1 lexbuf; UIDENT name }
+      { UIDENT name }
   (* This matches either an integer literal or a directive. If the text "#2"
      appears at the beginning of a line that lexes as a directive, then it
      should be treated as a directive and not an unboxed int. This is acceptable
@@ -711,9 +657,7 @@ rule token = parse
         in
         COMMENT (s, loc) }
   | "(*)"
-      { if !print_warnings then
-          Location.prerr_warning (Location.curr lexbuf) Warnings.Comment_start;
-        let s, loc = wrap_comment_lexer comment lexbuf in
+      { let s, loc = wrap_comment_lexer comment lexbuf in
         COMMENT (s, loc) }
   | "(*" (('*'*) as stars) "*)"
       { if !handle_docstrings && stars="" then
@@ -722,9 +666,7 @@ rule token = parse
         else
           COMMENT (stars, Location.curr lexbuf) }
   | "*)"
-      { let loc = Location.curr lexbuf in
-        Location.prerr_warning loc Warnings.Comment_not_end;
-        lexbuf.Lexing.lex_curr_pos <- lexbuf.Lexing.lex_curr_pos - 1;
+      { lexbuf.Lexing.lex_curr_pos <- lexbuf.Lexing.lex_curr_pos - 1;
         let curpos = lexbuf.lex_curr_p in
         lexbuf.lex_curr_p <- { curpos with pos_cnum = curpos.pos_cnum - 1 };
         STAR
@@ -973,14 +915,7 @@ and string = parse
         { store_escaped_uchar lexbuf (uchar_for_uchar_escape lexbuf);
           string lexbuf }
   | '\\' _
-      { if not (in_comment ()) then begin
-(*  Should be an error, but we are very lax.
-          error lexbuf (Illegal_escape (Lexing.lexeme lexbuf, None))
-*)
-          let loc = Location.curr lexbuf in
-          Location.prerr_warning loc Warnings.Illegal_backslash;
-        end;
-        store_lexeme lexbuf;
+      { store_lexeme lexbuf;
         string lexbuf
       }
   | newline as nl

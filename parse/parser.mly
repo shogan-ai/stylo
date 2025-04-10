@@ -24,7 +24,9 @@
 
 %{
 
-[@@@ocaml.warning "-60"] module Str = Ast_helper.Str (* For ocamldep *)
+[@@@ocaml.warning "-60"]
+module Parse = struct end (* https://github.com/ocaml/dune/issues/2450 *)
+module Str = Ast_helper.Str (* For ocamldep *)
 [@@@ocaml.warning "+60"]
 
 open Asttypes
@@ -165,9 +167,7 @@ let mkuplus ~oploc name arg =
   | _ ->
      Pexp_apply (mkoperator ~loc:oploc ("~" ^ name), [Nolabel, arg]), []
 
-let mk_attr ~loc name payload =
-  Builtin_attributes.(register_attr Parser name);
-  Attr.mk ~loc name payload
+let mk_attr ~loc name payload = Attr.mk ~loc name payload
 
 let mkpat_with_modes ~loc ~pat ~cty ~modes =
   match pat.ppat_desc with
@@ -281,11 +281,10 @@ let mkstrexp e attrs =
   { pstr_desc = Pstr_eval (e, attrs); pstr_loc = e.pexp_loc }
 
 let syntax_error () =
-  raise Syntaxerr.Escape_error
+  failwith "TODO"
 
-let unclosed opening_name opening_loc closing_name closing_loc =
-  raise(Syntaxerr.Error(Syntaxerr.Unclosed(make_loc opening_loc, opening_name,
-                                           make_loc closing_loc, closing_name)))
+let unclosed _opening_name _opening_loc _closing_name _closing_loc =
+  failwith "TODO"
 
 (* Normal mutable arrays and immutable arrays are parsed identically, just with
    different delimiters.  The parsing is done by the [array_exprs] rule, and the
@@ -346,13 +345,11 @@ module Generic_array = struct
   end
 end
 
-let expecting_loc (loc : Location.t) (nonterm : string) =
-    raise Syntaxerr.(Error(Expecting(loc, nonterm)))
-let expecting (loc : Lexing.position * Lexing.position) nonterm =
-     expecting_loc (make_loc loc) nonterm
+let expecting (_loc : Lexing.position * Lexing.position) _nonterm =
+  failwith "TODO"
 
-let removed_string_set loc =
-  raise(Syntaxerr.Error(Syntaxerr.Removed_string_set(make_loc loc)))
+let removed_string_set _loc =
+  failwith "TODO"
 
 (* Using the function [not_expecting] in a semantic action means that this
    syntactic form is recognized by the parser but is in fact incorrect. This
@@ -367,8 +364,8 @@ let removed_string_set loc =
    incorrect. In order to avoid these problems, the productions that use
    [not_expecting] should be marked with AVOID. *)
 
-let not_expecting loc nonterm =
-    raise Syntaxerr.(Error(Not_expecting(make_loc loc, nonterm)))
+let not_expecting _loc _nonterm =
+  failwith "TODO"
 
 let mkexp_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
   match t with
@@ -446,7 +443,6 @@ let bigarray_untuplify exp =
    case here *)
 let builtin_arraylike_name loc _ ~assign paren_kind n =
   let opname = if assign then "set" else "get" in
-  let opname = if !Clflags.unsafe then "unsafe_" ^ opname else opname in
   let prefix = match paren_kind with
     | Paren -> Lident "Array"
     | Bracket ->
@@ -518,11 +514,8 @@ let indexop_unclosed_error loc_s s loc_e =
   let left, right = paren_to_strings s in
   unclosed left loc_s right loc_e
 
-let lapply ~loc p1 p2 =
-  if !Clflags.applicative_functors
-  then Lapply(p1, p2)
-  else raise (Syntaxerr.Error(
-                  Syntaxerr.Applicative_path (make_loc loc)))
+let lapply ~loc:_ p1 p2 =
+  Lapply(p1, p2)
 
 let make_ghost x =
   if x.loc.loc_ghost
@@ -781,18 +774,18 @@ let mkfunction ~loc ~attrs params body_constraint body =
    and extract the package type during type-checking. In that case,
    the assertions below should be turned into explicit checks. *)
 let package_type_of_module_type pmty =
-  let err loc s =
-    raise (Syntaxerr.Error (Syntaxerr.Invalid_package_type (loc, s)))
+  let err _loc _s =
+    failwith "TODO"
   in
   let map_cstr = function
     | Pwith_type (lid, ptyp) ->
         let loc = ptyp.ptype_loc in
         if ptyp.ptype_params <> [] then
-          err loc Syntaxerr.Parameterized_types;
+          err loc "Syntaxerr.Parameterized_types";
         if ptyp.ptype_cstrs <> [] then
-          err loc Syntaxerr.Constrained_types;
+          err loc "Syntaxerr.Constrained_types";
         if ptyp.ptype_private <> Public then
-          err loc Syntaxerr.Private_types;
+          err loc "Syntaxerr.Private_types";
 
         (* restrictions below are checked by the 'with_constraint' rule *)
         assert (ptyp.ptype_kind = Ptype_abstract);
@@ -804,7 +797,7 @@ let package_type_of_module_type pmty =
         in
         (lid, ty)
     | _ ->
-        err pmty.pmty_loc Not_with_type
+        err pmty.pmty_loc "Not_with_type"
   in
   match pmty with
   | {pmty_desc = Pmty_ident lid} -> (lid, [], pmty.pmty_attributes)
@@ -812,18 +805,18 @@ let package_type_of_module_type pmty =
       begin match inner_attributes with
       | [] -> ()
       | attr :: _ ->
-        err attr.attr_loc Syntaxerr.Misplaced_attribute
+        err attr.attr_loc "Syntaxerr.Misplaced_attribute"
       end;
       (lid, List.map map_cstr cstrs, pmty.pmty_attributes)
   | _ ->
-      err pmty.pmty_loc Neither_identifier_nor_with_type
+      err pmty.pmty_loc "Neither_identifier_nor_with_type"
 
 (* There's no dedicated syntax for module instances. Functor application
    syntax is translated into a module instance expression.
 *)
 let pmod_instance : module_expr -> module_expr_desc =
-  let raise_malformed_instance loc =
-    raise (Syntaxerr.Error (Malformed_instance_identifier loc))
+  let raise_malformed_instance _ =
+    failwith "TODO"
   in
   let head_of_ident (lid : Longident.t Location.loc) =
     match lid with
@@ -876,8 +869,6 @@ let mk_directive ~loc name arg =
 (* CR layouts v2.5: The [unboxed_*] functions will both be improved and lose
    their explicit assert once we have real unboxed literals in Jane syntax; they
    may also get re-inlined at that point *)
-let unboxed_literals_extension = Language_extension.Layouts
-
 type sign = Positive | Negative
 
 let with_sign sign num =
@@ -885,15 +876,11 @@ let with_sign sign num =
   | Positive -> num
   | Negative -> "-" ^ num
 
-let unboxed_int sloc int_loc sign (n, m) =
+let unboxed_int _sloc _int_loc sign (n, m) =
   match m with
   | Some m -> Pconst_unboxed_integer (with_sign sign n, m)
   | None ->
-      if Language_extension.is_enabled unboxed_literals_extension then
-        raise
-          Syntaxerr.(Error(Missing_unboxed_literal_suffix (make_loc int_loc)))
-      else
-        not_expecting sloc "line number directive"
+      failwith "TODO"
 
 let unboxed_float sign (f, m) = Pconst_unboxed_float (with_sign sign f, m)
 
@@ -5258,8 +5245,6 @@ payload:
 ;
 attr_payload:
   payload
-    { Builtin_attributes.mark_payload_attrs_used $1;
-      $1
-    }
+    { $1 }
 ;
 %%

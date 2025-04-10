@@ -30,7 +30,9 @@ type attrs = attribute list
 let default_loc = ref Location.none
 
 let with_default_loc l f =
-  Misc.protect_refs [Misc.R (default_loc, l)] f
+  let orig = !default_loc in
+  default_loc := l;
+  Fun.protect ~finally:(fun () -> default_loc := orig) f
 
 module Const = struct
   let integer ?suffix i = Pconst_integer (i, suffix)
@@ -81,9 +83,9 @@ module Typ = struct
     | _ -> poly ~loc:t.ptyp_loc [] t (* -> ghost? *)
 
   let varify_constructors var_names t =
-    let check_variable vl loc v =
+    let check_variable vl _loc v =
       if List.mem v vl then
-        raise Syntaxerr.(Error(Variable_in_scope(loc,v))) in
+        invalid_arg "varify_constructors" in
     let check_variable_opt vl v =
       Option.iter (fun v -> check_variable vl v.loc v.txt) v
     in
