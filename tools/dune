@@ -1,0 +1,3 @@
+(executable
+  (name strip_comments)
+  (libraries parse))
