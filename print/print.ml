@@ -7,7 +7,7 @@ let stringf fmt = Printf.ksprintf string fmt
 
 let rec longident = function
   | Longident.Lident s -> string s
-  | Ldot (lid, s) -> longident lid ^^ dot ^^ break 0 ^^ string s
+  | Ldot (lid, s) -> longident lid ^^ dot ^^ string s
   | Lapply (l1, l2) ->
     longident l1 ^^ lparen ^^ break 0 ^^ longident l2 ^^ break 0 ^^ rparen
 
