@@ -1255,3 +1255,5 @@ and directive_argument_desc =
   | Pdir_ident of Longident.t
   | Pdir_bool of bool
    *)
+
+let implementation str = separate_map (break 1) structure_item str

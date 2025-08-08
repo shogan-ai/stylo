@@ -1,0 +1,3 @@
+(executable
+  (name stylo)
+  (libraries parse print))
