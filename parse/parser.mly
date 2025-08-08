@@ -811,6 +811,7 @@ let package_type_of_module_type pmty =
   | _ ->
       err pmty.pmty_loc "Neither_identifier_nor_with_type"
 
+      (*
 (* There's no dedicated syntax for module instances. Functor application
    syntax is translated into a module instance expression.
 *)
@@ -851,6 +852,7 @@ let pmod_instance : module_expr -> module_expr_desc =
   in
   fun mexpr -> Pmod_instance (instance_of_module_expr mexpr)
 ;;
+*)
 
 let mk_directive_arg ~loc k =
   { pdira_desc = k;
@@ -1630,11 +1632,11 @@ module_expr:
   | me = paren_module_expr
       { me }
   | me = module_expr attr = attribute
-      { match attr with
+      { (* match attr with
         | { attr_name = { txt = "jane.non_erasable.instances"; loc = _ };
             attr_payload = PStr [];
           } -> mkmod ~loc:$sloc (pmod_instance me)
-        | attr -> Mod.attr me attr
+        | attr -> *) Mod.attr me attr
       }
   | mkmod(
       (* A module identifier. *)

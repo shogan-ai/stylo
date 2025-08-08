@@ -1209,6 +1209,7 @@ and module_expr_desc =
       *)
   | Pmod_unpack of expression  (** [(val E)] *)
   | Pmod_extension of extension  (** [[%id]] *)
+      (*
   | Pmod_instance of module_instance
       (** [Foo(Param1)(Arg1(Param2)(Arg2)) [@jane.non_erasable.instances]]
 
@@ -1220,6 +1221,7 @@ and module_instance =
     pmod_instance_args : (string * module_instance) list
   }
   (** [M(P1)(MI1)...(Pn)(MIn)] *)
+         *)
 
 and structure = structure_item list
 
