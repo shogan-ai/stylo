@@ -129,7 +129,7 @@ let ghexpvar ~loc name =
   ghexp ~loc (Pexp_ident (ghrhs (Lident name) loc))
 
 let mkinfix arg1 op arg2 =
-  Pexp_apply(op, [Nolabel, arg1; Nolabel, arg2])
+  Pexp_infix_apply {op; arg1; arg2}
 
 let neg_string f =
   if String.length f > 0 && f.[0] = '-'

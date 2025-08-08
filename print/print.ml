@@ -373,6 +373,8 @@ and expression_desc = function
     function_constraint constr ^/^ string "->" ^/^
     function_body body
   | Pexp_prefix_apply (op, arg) -> expression op ^^ expression arg
+  | Pexp_infix_apply {op; arg1; arg2} ->
+    expression arg1 ^/^ expression op ^/^ expression arg2
   | Pexp_apply (e, args) ->
     let arg (lbl, e) =
       begin match lbl with
