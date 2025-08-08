@@ -512,6 +512,26 @@ and expression_desc = function
   | Pexp_overwrite (e1, e2) ->
     string "overwrite_" ^/^ expression e1 ^/^ string "with" ^/^ expression e2
   | Pexp_hole -> underscore
+  | Pexp_index_op access ->
+    let left, right =
+      match access.kind with
+      | Paren -> lparen, rparen
+      | Brace -> lbrace, rbrace
+      | Bracket -> lbracket, rbracket
+    in
+    expression access.seq ^/^
+    begin match access.op with
+      | None -> dot
+      | Some (None, op) -> string op
+      | Some (Some lid, op) -> dot ^^ longident lid ^^ string op
+    end ^^
+    left ^^
+    separate_map (semi ^^ break 1) expression access.indices ^^
+    right ^^
+    begin match access.assign with
+      | None -> empty
+      | Some e -> break 1 ^^ string "<-" ^/^ expression e
+    end
 
 and case { pc_lhs; pc_guard; pc_rhs } =
   pattern pc_lhs ^^

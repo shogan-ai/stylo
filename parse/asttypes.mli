@@ -68,3 +68,5 @@ type variance =
 type injectivity =
   | Injective
   | NoInjectivity
+
+type paren_kind = Paren | Brace | Bracket

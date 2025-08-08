@@ -515,6 +515,13 @@ and expression_desc =
     *)
   | Pexp_overwrite of expression * expression (** overwrite_ exp with exp *)
   | Pexp_hole (** _ *)
+  | Pexp_index_op of {
+      kind: paren_kind;
+      op: (Longident.t option * string) option;
+      seq: expression;
+      indices: expression list;
+      assign: expression option
+    }
 
 and case =
     {

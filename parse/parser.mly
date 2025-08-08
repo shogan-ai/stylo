@@ -348,9 +348,6 @@ end
 let expecting (_loc : Lexing.position * Lexing.position) _nonterm =
   failwith "TODO"
 
-let removed_string_set _loc =
-  failwith "TODO"
-
 (* Using the function [not_expecting] in a semantic action means that this
    syntactic form is recognized by the parser but is in fact incorrect. This
    idiom is used in a few places to produce ad hoc syntax error messages. *)
@@ -384,131 +381,11 @@ let mkexp_opt_type_constraint_with_modes ?ghost ~loc ~modes e = function
   | Some c -> mkexp_type_constraint_with_modes ?ghost ~loc ~modes e c
 
 (* Helper functions for desugaring array indexing operators *)
-type paren_kind = Paren | Brace | Bracket
-
-(* We classify the dimension of indices: Bigarray distinguishes
-   indices of dimension 1,2,3, or more. Similarly, user-defined
-   indexing operator behave differently for indices of dimension 1
-   or more.
-*)
-type index_dim =
-  | One
-  | Two
-  | Three
-  | Many
-type ('dot,'index) array_family = {
-
-  name:
-    Lexing.position * Lexing.position -> 'dot -> assign:bool -> paren_kind
-  -> index_dim -> Longident.t Location.loc
-  (*
-    This functions computes the name of the explicit indexing operator
-    associated with a sugared array indexing expression.
-
-    For instance, for builtin arrays, if Clflags.unsafe is set,
-    * [ a.[index] ]     =>  [String.unsafe_get]
-    * [ a.{x,y} <- 1 ]  =>  [ Bigarray.Array2.unsafe_set]
-
-    User-defined indexing operator follows a more local convention:
-    * [ a .%(index)]     => [ (.%()) ]
-    * [ a.![1;2] <- 0 ]  => [(.![;..]<-)]
-    * [ a.My.Map.?(0) => [My.Map.(.?())]
-  *);
-
-  index:
-    Lexing.position * Lexing.position -> paren_kind -> 'index
-    -> index_dim * (arg_label * expression) list
-   (*
-     [index (start,stop) paren index] computes the dimension of the
-     index argument and how it should be desugared when transformed
-     to a list of arguments for the indexing operator.
-     In particular, in both the Bigarray case and the user-defined case,
-     beyond a certain dimension, multiple indices are packed into a single
-     array argument:
-     * [ a.(x) ]       => [ [One, [Nolabel, <<x>>] ]
-     * [ a.{1,2} ]     => [ [Two, [Nolabel, <<1>>; Nolabel, <<2>>] ]
-     * [ a.{1,2,3,4} ] => [ [Many, [Nolabel, <<[|1;2;3;4|]>>] ] ]
-   *);
-
-}
-
-let bigarray_untuplify exp =
-  match exp.pexp_desc with
-  | Pexp_tuple explist when
-        List.for_all (function None, _ -> true | _ -> false) explist ->
-    List.map (fun (_, e) -> e) explist
-  | _ -> [exp]
-
-(* Immutable array indexing is a regular operator, so it doesn't need a special
-   case here *)
-let builtin_arraylike_name loc _ ~assign paren_kind n =
-  let opname = if assign then "set" else "get" in
-  let prefix = match paren_kind with
-    | Paren -> Lident "Array"
-    | Bracket ->
-        if assign then removed_string_set loc
-        else Lident "String"
-    | Brace ->
-       let submodule_name = match n with
-         | One -> "Array1"
-         | Two -> "Array2"
-         | Three -> "Array3"
-         | Many -> "Genarray" in
-       Ldot(Lident "Bigarray", submodule_name) in
-   ghloc ~loc (Ldot(prefix,opname))
-
-let builtin_arraylike_index loc paren_kind index = match paren_kind with
-    | Paren | Bracket -> One, [Nolabel, index]
-    | Brace ->
-       (* Multi-indices for bigarray are comma-separated ([a.{1,2,3,4}]) *)
-       match bigarray_untuplify index with
-     | [x] -> One, [Nolabel, x]
-     | [x;y] -> Two, [Nolabel, x; Nolabel, y]
-     | [x;y;z] -> Three, [Nolabel, x; Nolabel, y; Nolabel, z]
-     | coords -> Many, [Nolabel, ghexp ~loc (Pexp_array (Mutable, coords))]
-
-let builtin_indexing_operators : (unit, expression) array_family  =
-  { index = builtin_arraylike_index; name = builtin_arraylike_name }
 
 let paren_to_strings = function
   | Paren -> "(", ")"
   | Bracket -> "[", "]"
   | Brace -> "{", "}"
-
-let user_indexing_operator_name loc (prefix,ext) ~assign paren_kind n =
-  let name =
-    let assign = if assign then "<-" else "" in
-    let mid = match n with
-        | Many | Three | Two  -> ";.."
-        | One -> "" in
-    let left, right = paren_to_strings paren_kind in
-    String.concat "" ["."; ext; left; mid; right; assign] in
-  let lid = match prefix with
-    | None -> Lident name
-    | Some p -> Ldot(p,name) in
-  ghloc ~loc lid
-
-let user_index loc _ index =
-  (* Multi-indices for user-defined operators are semicolon-separated
-     ([a.%[1;2;3;4]]) *)
-  match index with
-    | [a] -> One, [Nolabel, a]
-    | l -> Many, [Nolabel, mkexp ~loc (Pexp_array (Mutable, l))]
-
-let user_indexing_operators:
-      (Longident.t option * string, expression list) array_family
-  = { index = user_index; name = user_indexing_operator_name }
-
-let mk_indexop_expr array_indexing_operator ~loc
-      (array,dot,paren,index,set_expr) =
-  let assign = match set_expr with None -> false | Some _ -> true in
-  let n, index = array_indexing_operator.index loc paren index in
-  let fn = array_indexing_operator.name loc dot ~assign paren n in
-  let set_arg = match set_expr with
-    | None -> []
-    | Some expr -> [Nolabel, expr] in
-  let args = (Nolabel,array) :: index @ set_arg in
-  mkexp ~loc (Pexp_apply(ghexp ~loc (Pexp_ident fn), args))
 
 let indexop_unclosed_error loc_s s loc_e =
   let left, right = paren_to_strings s in
@@ -2755,11 +2632,14 @@ let_pattern_no_modes:
 
 %inline indexop_expr(dot, index, right):
   | array=simple_expr d=dot LPAREN i=index RPAREN r=right
-    { array, d, Paren,   i, r }
+    { Pexp_index_op
+        { kind = Paren; op = d; seq = array; indices = i; assign=r } }
   | array=simple_expr d=dot LBRACE i=index RBRACE r=right
-    { array, d, Brace,   i, r }
+    { Pexp_index_op
+        { kind = Brace; op = d; seq = array; indices = i; assign=r } }
   | array=simple_expr d=dot LBRACKET i=index RBRACKET r=right
-    { array, d, Bracket, i, r }
+    { Pexp_index_op
+        { kind = Bracket; op = d; seq = array; indices = i; assign=r } }
 ;
 
 %inline indexop_error(dot, index):
@@ -2771,7 +2651,7 @@ let_pattern_no_modes:
     { indexop_unclosed_error $loc(_p) Bracket $loc(_e) }
 ;
 
-%inline qualified_dotop: ioption(DOT mod_longident {$2}) DOTOP { $1, $2 };
+%inline qualified_dotop: ioption(DOT mod_longident {$2}) DOTOP { Some ($1, $2) };
 
 optional_atomic_constraint_:
   | COLON atomic_type optional_atat_mode_expr {
@@ -2821,10 +2701,10 @@ fun_expr:
       { mkexp ~loc:$sloc (Pexp_setinstvar($1, $3)) }
   | simple_expr DOT mkrhs(label_longident) LESSMINUS expr
       { mkexp ~loc:$sloc (Pexp_setfield($1, $3, $5)) }
-  | indexop_expr(DOT, seq_expr, LESSMINUS v=expr {Some v})
-    { mk_indexop_expr builtin_indexing_operators ~loc:$sloc $1 }
+  | indexop_expr(DOT { None }, seq_expr { [$1] }, LESSMINUS v=expr {Some v})
+    { mkexp ~loc:$sloc $1 }
   | indexop_expr(qualified_dotop, expr_semi_list, LESSMINUS v=expr {Some v})
-    { mk_indexop_expr user_indexing_operators ~loc:$sloc $1 }
+    { mkexp ~loc:$sloc $1 }
   | fun_expr attribute
       { Exp.attr $1 $2 }
   | UNDERSCORE
@@ -2907,12 +2787,12 @@ simple_expr:
   | LPAREN seq_expr type_constraint_with_modes RPAREN
       { let (t, m) = $3 in
         mkexp_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2 t }
-  | indexop_expr(DOT, seq_expr, { None })
-      { mk_indexop_expr builtin_indexing_operators ~loc:$sloc $1 }
+  | indexop_expr(DOT { None }, seq_expr { [$1] }, { None })
+      { mkexp ~loc:$sloc $1 }
   (* Immutable array indexing is a regular operator, so it doesn't need its own
      rule and is handled by the next case *)
   | indexop_expr(qualified_dotop, expr_semi_list, { None })
-      { mk_indexop_expr user_indexing_operators ~loc:$sloc $1 }
+      { mkexp ~loc:$sloc $1 }
   | indexop_error (DOT, seq_expr) { $1 }
   | indexop_error (qualified_dotop, expr_semi_list) { $1 }
   | simple_expr_attrs
