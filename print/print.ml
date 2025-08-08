@@ -372,6 +372,7 @@ and expression_desc = function
     separate_map (break 1) function_param params ^^
     function_constraint constr ^/^ string "->" ^/^
     function_body body
+  | Pexp_prefix_apply (op, arg) -> expression op ^^ expression arg
   | Pexp_apply (e, args) ->
     let arg (lbl, e) =
       begin match lbl with
