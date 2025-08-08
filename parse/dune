@@ -6,7 +6,6 @@
 
 (library
   (name parse)
-  (modes byte) ; my processor is anemic
   (modules_without_implementation asttypes parsetree)
   (libraries menhirLib)
   (flags :standard -w -9-63))
