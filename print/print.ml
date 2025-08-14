@@ -65,14 +65,14 @@ let type_app ?(parens=true) ty args =
   end ^^ ty
 
 let arrow_type arg_lbl arg rhs =
-    begin match arg_lbl with
-      | Nolabel -> empty
-      | Labelled s -> string s ^^ colon ^^ break 0
-      | Optional s ->
-        (* FIXME: sometimes the "?foo:" is a single token *)
-        qmark ^^ string s ^^ colon ^^ break 0
-    end ^^
-    arg ^/^ S.rarrow ^/^ rhs
+  begin match arg_lbl with
+  | Nolabel -> empty
+  | Labelled s -> string s ^^ colon ^^ break 0
+  | Optional s ->
+    (* FIXME: sometimes the "?foo:" is a single token *)
+    qmark ^^ string s ^^ colon ^^ break 0
+  end ^^
+  arg ^/^ S.rarrow ^/^ rhs
 
 (* FIXME: handling of string literals is not good enough. *)
 (* N.B. stringf is important here: suffixed number come out of the lexer as a
@@ -404,17 +404,7 @@ end = struct
     | Pexp_prefix_apply (op, arg) -> pp op ^^ pp arg
     | Pexp_infix_apply {op; arg1; arg2} ->
       pp arg1 ^/^ pp op ^/^ pp arg2
-    | Pexp_apply (e, args) ->
-      let arg (lbl, e) =
-        begin match lbl with
-        | Nolabel -> empty
-        | Labelled l -> tilde ^^ string l ^^ colon ^^ break 0
-        | Optional l -> qmark ^^ string l ^^ colon ^^ break 0
-        end ^^
-        pp e
-      in
-      pp e ^/^
-      separate_map (break 1) arg args
+    | Pexp_apply (e, args) -> pp_apply e args
     | Pexp_match (e, cases) ->
       (* FIXME: leading "|" *)
       S.match_ ^/^ pp e ^/^ S.with_ ^/^
@@ -561,6 +551,31 @@ end = struct
     | Pexp_parens { begin_end = false; exp } -> parens (pp exp)
     | Pexp_parens { begin_end = true; exp } ->
       S.begin_ ^/^ pp exp ^/^ S.end_
+
+  and pp_apply e args = pp e ^/^ Application.pp_args args
+end
+
+and Application : sig
+  val pp_args : (arg_label * expression) list -> document
+end = struct
+  let punned lbl e =
+    match e.pexp_desc with
+    | Pexp_ident { txt = Lident i; _ } -> i = lbl
+    | _ -> false
+
+  let pp_arg (lbl, e) =
+    match lbl with
+    | Nolabel -> Expression.pp e
+    | Labelled l ->
+      if punned l e
+      then tilde ^^ string l
+      else tilde ^^ string l ^^ colon ^^ break 0 ^^ Expression.pp e
+    | Optional l ->
+      if punned l e
+      then qmark ^^ string l
+      else qmark ^^ string l ^^ colon ^^ break 0 ^^ Expression.pp e
+
+  let pp_args = separate_map (break 1) pp_arg
 end
 
 and Case : sig
@@ -601,26 +616,33 @@ and Function_param : sig
   val pp : function_param -> document
   val pp_desc : function_param_desc -> document
 end = struct
+  let punned lbl p =
+    match p.ppat_desc with
+    | Ppat_var { txt = v; _ } -> v = lbl
+    | _ -> false
+
   let pp_desc = function
-  | Pparam_val (Nolabel, None, p) -> Pattern.pp p
-  | Pparam_val (Labelled l, None, p) ->
-    (* FIXME: what about punning? *)
-    tilde ^^ string l ^^ colon ^^ break 0 ^^ Pattern.pp p
-  | Pparam_val (Optional l, None, p) ->
-    (* FIXME: what about punning? *)
-    qmark ^^ string l ^^ colon ^^ break 0 ^^ Pattern.pp p
-  | Pparam_val (Optional l, Some e, p) ->
-    qmark ^^ string l ^^ colon ^^ break 0 ^^ lparen ^^
-    break 0 ^^ Pattern.pp p ^/^ equals ^/^ Expression.pp e ^^ break 0 ^^
-    rparen
-  | Pparam_val ((Nolabel | Labelled _), Some _, _) -> assert false
-  | Pparam_newtype (lat, jkind_o) ->
-    lparen ^^ S.type_ ^/^ string lat.txt ^^
-    begin match jkind_o with
-      | None -> empty
-      | Some j -> break 1 ^^ colon ^/^ Jkind_annotation.pp j
-    end ^^
-    rparen
+    | Pparam_val (Nolabel, None, p) -> Pattern.pp p
+    | Pparam_val (Labelled l, None, p) ->
+      if punned l p
+      then tilde ^^ string l
+      else tilde ^^ string l ^^ colon ^^ break 0 ^^ Pattern.pp p
+    | Pparam_val (Optional l, None, p) ->
+      if punned l p
+      then qmark ^^ string l
+      else qmark ^^ string l ^^ colon ^^ break 0 ^^ Pattern.pp p
+    | Pparam_val (Optional l, Some e, p) ->
+      qmark ^^ string l ^^ colon ^^ break 0 ^^ lparen ^^
+      break 0 ^^ Pattern.pp p ^/^ equals ^/^ Expression.pp e ^^ break 0 ^^
+      rparen
+    | Pparam_val ((Nolabel | Labelled _), Some _, _) -> assert false
+    | Pparam_newtype (lat, jkind_o) ->
+      lparen ^^ S.type_ ^/^ string lat.txt ^^
+      begin match jkind_o with
+        | None -> empty
+        | Some j -> break 1 ^^ colon ^/^ Jkind_annotation.pp j
+      end ^^
+      rparen
 
   let pp fp = pp_desc fp.pparam_desc
 end
@@ -998,17 +1020,7 @@ end = struct
     | Pcl_fun (lbl, default, pat, rhs) ->
       Function_param.pp_desc (Pparam_val (lbl, default, pat))
         ^/^ S.rarrow ^/^ pp rhs
-    | Pcl_apply (ce, args) ->
-      let arg (lbl, e) =
-        begin match lbl with
-        | Nolabel -> empty
-        | Labelled l -> tilde ^^ string l ^^ colon ^^ break 0
-        | Optional l -> qmark ^^ string l ^^ colon ^^ break 0
-        end ^^
-        Expression.pp e
-      in
-      pp ce ^/^
-      separate_map (break 1) arg args
+    | Pcl_apply (ce, args) -> pp ce ^/^ Application.pp_args args
     | Pcl_let (rf, vbs, body) ->
       (* FIXME: factorize with Pexp_let *)
       S.let_ ^/^
