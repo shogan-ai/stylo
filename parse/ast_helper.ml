@@ -136,6 +136,7 @@ module Typ = struct
             Ptyp_open (mod_ident, loop core_type)
         | Ptyp_extension (s, arg) ->
             Ptyp_extension (s, arg)
+        | Ptyp_parens ct -> Ptyp_parens (loop ct)
       in
       {t with ptyp_desc = desc}
     and loop_jkind jkind =

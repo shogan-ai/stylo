@@ -222,6 +222,7 @@ and core_type_desc = function
   | Ptyp_package pkg -> package_type pkg
   | Ptyp_open (lid, ct) -> longident lid.txt ^^ dot ^^ core_type ct
   | Ptyp_extension ext -> extension ext
+  | Ptyp_parens ct -> parens (core_type ct)
 
 and package_type (lid, constraints) =
   let with_ =
@@ -346,6 +347,7 @@ and pattern_desc = function
   | Ppat_exception p -> string "exception" ^/^ pattern  p
   | Ppat_extension ext -> extension ext
   | Ppat_open (lid, p) -> longident lid.txt ^^ dot ^^ pattern p
+  | Ppat_parens p -> parens (pattern p)
 
 (** {2 Value expressions} *)
 
@@ -532,6 +534,10 @@ and expression_desc = function
       | None -> empty
       | Some e -> break 1 ^^ string "<-" ^/^ expression e
     end
+  | Pexp_parens { begin_end = false; exp } -> parens (expression exp)
+  | Pexp_parens { begin_end = true; exp } ->
+    string "begin" ^/^ expression exp ^/^ string "end"
+
 
 and case { pc_lhs; pc_guard; pc_rhs } =
   pattern pc_lhs ^^

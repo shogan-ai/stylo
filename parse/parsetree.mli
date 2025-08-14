@@ -203,6 +203,7 @@ and core_type_desc =
   | Ptyp_package of package_type  (** [(module S)]. *)
   | Ptyp_open of Longident.t loc * core_type (** [M.(T)] *)
   | Ptyp_extension of extension  (** [[%id]]. *)
+  | Ptyp_parens of core_type
 
 and arg_label = Asttypes.arg_label =
     Nolabel
@@ -346,6 +347,7 @@ and pattern_desc =
   | Ppat_exception of pattern  (** Pattern [exception P] *)
   | Ppat_extension of extension  (** Pattern [[%id]] *)
   | Ppat_open of Longident.t loc * pattern  (** Pattern [M.(P)] *)
+  | Ppat_parens of pattern
 
 (** {2 Value expressions} *)
 
@@ -522,6 +524,7 @@ and expression_desc =
       indices: expression list;
       assign: expression option
     }
+  | Pexp_parens of { begin_end: bool; exp: expression }
 
 and case =
     {

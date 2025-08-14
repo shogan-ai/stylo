@@ -98,12 +98,6 @@ let push_loc x acc =
   then acc
   else x :: acc
 
-let reloc_pat ~loc x =
-  { x with ppat_loc = make_loc loc;
-           ppat_loc_stack = push_loc x.ppat_loc x.ppat_loc_stack }
-let reloc_exp ~loc x =
-  { x with pexp_loc = make_loc loc;
-           pexp_loc_stack = push_loc x.pexp_loc x.pexp_loc_stack }
 let reloc_typ ~loc x =
   { x with ptyp_loc = make_loc loc;
            ptyp_loc_stack = push_loc x.ptyp_loc x.ptyp_loc_stack }
@@ -2181,7 +2175,7 @@ class_fun_def:
 ;
 class_self_pattern:
     LPAREN pattern RPAREN
-      { reloc_pat ~loc:$sloc $2 }
+      { mkpat ~loc:$sloc (Ppat_parens $2) }
   | LPAREN pattern COLON core_type RPAREN
       { mkpat_with_modes ~loc:$sloc ~pat:$2 ~cty:(Some $4) ~modes:[] }
   | /* empty */
@@ -2781,7 +2775,7 @@ fun_expr:
 
 simple_expr:
   | LPAREN seq_expr RPAREN
-      { reloc_exp ~loc:$sloc $2 }
+      { mkexp ~loc:$sloc (Pexp_parens { begin_end = false; exp = $2 }) }
   | LPAREN seq_expr error
       { unclosed "(" $loc($1) ")" $loc($3) }
   | LPAREN seq_expr type_constraint_with_modes RPAREN
@@ -2815,9 +2809,11 @@ simple_expr:
 ;
 %inline simple_expr_attrs:
   | BEGIN ext = ext attrs = attributes e = seq_expr END
-      { e.pexp_desc, (ext, attrs @ e.pexp_attributes) }
+    { Pexp_parens { begin_end = true; exp = e },
+      (ext, attrs) }
   | BEGIN ext_attributes END
-      { Pexp_construct (mkloc (Lident "()") (make_loc $sloc), None), $2 }
+      { (* FIXME! *)
+        Pexp_construct (mkloc (Lident "()") (make_loc $sloc), None), $2 }
   | BEGIN ext_attributes seq_expr error
       { unclosed "begin" $loc($1) "end" $loc($4) }
   | NEW ext_attributes mkrhs(class_longident)
@@ -2941,7 +2937,11 @@ comprehension_clause:
   | simple_expr DOTHASH mkrhs(label_longident)
       { Pexp_unboxed_field($1, $3) }
   | od=open_dot_declaration DOT LPAREN seq_expr RPAREN
-      { Pexp_open(od, $4) }
+      { let exp =
+          let loc = $startpos($3), $endpos($5) in
+          mkexp ~loc (Pexp_parens { begin_end = false; exp = $4 })
+        in
+        Pexp_open(od, exp) }
   | od=open_dot_declaration DOT LBRACELESS object_expr_content GREATERRBRACE
       { (* TODO: review the location of Pexp_override *)
         Pexp_open(od, mkexp ~loc:$sloc (Pexp_override $4)) }
@@ -3540,7 +3540,7 @@ simple_pattern:
 
 simple_pattern_not_ident:
   | LPAREN pattern RPAREN
-      { reloc_pat ~loc:$sloc $2 }
+      { mkpat (Ppat_parens $2) ~loc:$sloc }
   | simple_delimited_pattern
       { $1 }
   | LPAREN MODULE ext_attributes mkrhs(module_name) RPAREN
@@ -4516,7 +4516,7 @@ tuple_type:
 *)
 delimited_type_supporting_local_open:
   | LPAREN type_ = core_type RPAREN
-      { type_ }
+      { mktyp ~loc:$sloc (Ptyp_parens type_) }
   | LPAREN MODULE attrs = ext_attributes package_type = package_type RPAREN
       { wrap_typ_attrs ~loc:$sloc (reloc_typ ~loc:$sloc package_type) attrs }
   | mktyp(
