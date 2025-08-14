@@ -219,7 +219,7 @@ module Exp:
     val hole : ?loc:loc -> ?attrs:attrs -> unit -> expression
 
     val case: pattern -> ?guard:expression -> expression -> case
-    val binding_op: str -> pattern -> expression -> loc -> binding_op
+    val binding_op: str -> value_binding -> loc -> binding_op
   end
 
 (** Value declarations *)
@@ -422,8 +422,9 @@ module Incl:
 module Vb:
   sig
     val mk: ?loc: loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
-      ?value_constraint:value_constraint -> ?modes:mode with_loc list -> pattern ->
-      expression -> value_binding
+      ?params:function_param list -> ?modes:modes ->
+      ?value_constraint:value_constraint -> ?ret_modes:modes -> pattern ->
+      expression option -> value_binding
   end
 
 
@@ -505,7 +506,7 @@ module Cf:
     val text: text -> class_field list
 
     val virtual_: core_type -> class_field_kind
-    val concrete: override_flag -> expression -> class_field_kind
+    val concrete: override_flag -> value_binding -> class_field_kind
 
   end
 

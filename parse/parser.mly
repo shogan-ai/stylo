@@ -119,9 +119,6 @@ let ghloc ~loc d = { txt = d; loc = ghost_loc loc }
 let ghstr ~loc d = Str.mk ~loc:(ghost_loc loc) d
 let ghsig ~loc d = Sig.mk ~loc:(ghost_loc loc) d
 
-let ghexpvar ~loc name =
-  ghexp ~loc (Pexp_ident (ghrhs (Lident name) loc))
-
 let mkinfix arg1 op arg2 =
   Pexp_infix_apply {op; arg1; arg2}
 
@@ -185,10 +182,6 @@ let mkpat_with_modes ~loc ~pat ~cty ~modes =
     | None, [] -> pat
     | cty, modes -> mkpat ~loc (Ppat_constraint (pat, cty, modes))
     end
-
-let ghpat_with_modes ~loc ~pat ~cty ~modes =
-  let pat = mkpat_with_modes ~loc ~pat ~cty ~modes in
-  { pat with ppat_loc = { pat.ppat_loc with loc_ghost = true }}
 
 let mkexp_constraint ~loc ~exp ~cty ~modes =
   match exp.pexp_desc with
@@ -417,16 +410,6 @@ let mk_newtypes ~loc newtypes exp =
   (* outermost expression should have non-ghost location *)
   { exp with pexp_loc = make_loc loc }
 
-(* The [typloc] argument is used to adjust a location for something we're
-   parsing a bit differently than upstream.  See comment about [Pvc_constraint]
-   in [let_binding_body_no_punning]. *)
-let wrap_type_annotation ~loc ?(typloc=loc) ~modes newtypes core_type body =
-  let mk_newtypes = mk_newtypes ~loc in
-  let exp = mkexp_constraint ~loc ~exp:body ~cty:(Some core_type) ~modes in
-  let exp = mk_newtypes newtypes exp in
-  let inner_type = Typ.varify_constructors (List.map fst newtypes) core_type in
-  (exp, ghtyp ~loc:typloc (Ptyp_poly (newtypes, inner_type)))
-
 let wrap_exp_attrs ~loc body (ext, attrs) =
   let ghexp = ghexp ~loc in
   (* todo: keep exact location for the entire attribute *)
@@ -516,13 +499,9 @@ let extra_rhs_core_type ct ~pos =
   let docs = rhs_info pos in
   { ct with ptyp_attributes = add_info_attrs docs ct.ptyp_attributes }
 
-let mklb first ~loc (p, e, typ, modes, is_pun) attrs =
+let mklb first ~loc body attrs =
   {
-    lb_pattern = p;
-    lb_expression = e;
-    lb_constraint=typ;
-    lb_is_pun = is_pun;
-    lb_modes = modes;
+    lb_body = body;
     lb_attributes = attrs;
     lb_docs = symbol_docs_lazy loc;
     lb_text = (if first then empty_text_lazy
@@ -531,7 +510,8 @@ let mklb first ~loc (p, e, typ, modes, is_pun) attrs =
   }
 
 let addlb lbs lb =
-  if lb.lb_is_pun && lbs.lbs_extension = None then syntax_error ();
+  if Option.is_none lb.lb_body.lbb_expr && lbs.lbs_extension = None then
+    syntax_error ();
   { lbs with lbs_bindings = lb :: lbs.lbs_bindings }
 
 let mklbs ext rf lb =
@@ -547,10 +527,13 @@ let val_of_let_bindings ~loc lbs =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
-           ~modes:lb.lb_modes
+           ~modes:lb.lb_body.lbb_modes
            ~docs:(Lazy.force lb.lb_docs)
            ~text:(Lazy.force lb.lb_text)
-           ?value_constraint:lb.lb_constraint lb.lb_pattern lb.lb_expression)
+           ?value_constraint:lb.lb_body.lbb_constraint
+           ~params:lb.lb_body.lbb_params
+           ~ret_modes:lb.lb_body.lbb_ret_modes
+           lb.lb_body.lbb_pat lb.lb_body.lbb_expr)
       lbs.lbs_bindings
   in
   let str = mkstr ~loc (Pstr_value(lbs.lbs_rec, List.rev bindings)) in
@@ -563,8 +546,13 @@ let expr_of_let_bindings ~loc lbs body =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
-          ~modes:lb.lb_modes
-          ?value_constraint:lb.lb_constraint  lb.lb_pattern lb.lb_expression)
+           ~modes:lb.lb_body.lbb_modes
+           ~docs:(Lazy.force lb.lb_docs)
+           ~text:(Lazy.force lb.lb_text)
+           ?value_constraint:lb.lb_body.lbb_constraint
+           ~params:lb.lb_body.lbb_params
+           ~ret_modes:lb.lb_body.lbb_ret_modes
+           lb.lb_body.lbb_pat lb.lb_body.lbb_expr)
       lbs.lbs_bindings
   in
     mkexp_attrs ~loc (Pexp_let(lbs.lbs_rec, List.rev bindings, body))
@@ -575,8 +563,13 @@ let class_of_let_bindings ~loc lbs body =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
-          ~modes:lb.lb_modes
-          ?value_constraint:lb.lb_constraint lb.lb_pattern lb.lb_expression)
+           ~modes:lb.lb_body.lbb_modes
+           ~docs:(Lazy.force lb.lb_docs)
+           ~text:(Lazy.force lb.lb_text)
+           ?value_constraint:lb.lb_body.lbb_constraint
+           ~params:lb.lb_body.lbb_params
+           ~ret_modes:lb.lb_body.lbb_ret_modes
+           lb.lb_body.lbb_pat lb.lb_body.lbb_expr)
       lbs.lbs_bindings
   in
     (* Our use of let_bindings(no_ext) guarantees the following: *)
@@ -2219,11 +2212,31 @@ value:
     label = mkrhs(label) COLON ty = core_type
       { (label, mutable_, Cfk_virtual ty), attrs }
   | override_flag attributes mutable_flag mkrhs(label) EQUAL seq_expr
-      { ($4, $3, Cfk_concrete ($1, $6)), $2 }
+      { let vb =
+          { pvb_pat = mkpat ~loc:$loc($4) (Ppat_var $4);
+            pvb_modes = []; pvb_params = [];
+            pvb_constraint = None; pvb_ret_modes = [];
+            pvb_expr = Some $6; pvb_loc = make_loc $sloc;
+            pvb_attributes = [] (* FIXME? *) }
+        in
+        ($4, $3, Cfk_concrete ($1, vb)), $2 }
   | override_flag attributes mutable_flag mkrhs(label) type_constraint
     EQUAL seq_expr
-      { let e = mkexp_type_constraint_with_modes ~loc:$sloc ~modes:[] $7 $5 in
-        ($4, $3, Cfk_concrete ($1, e)), $2
+      {
+        let t =
+          match $5 with
+          | Pconstraint t ->
+             Pvc_constraint { locally_abstract_univars = []; typ=t }
+          | Pcoerce (ground, coercion) -> Pvc_coercion { ground; coercion}
+        in
+        let vb =
+          { pvb_pat = mkpat ~loc:$loc($4) (Ppat_var $4);
+            pvb_modes = []; pvb_params = [];
+            pvb_constraint = Some t; pvb_ret_modes = [];
+            pvb_expr = Some $7; pvb_loc = make_loc $sloc;
+            pvb_attributes = [] (* FIXME? *) }
+        in
+        ($4, $3, Cfk_concrete ($1, vb)), $2
       }
 ;
 method_:
@@ -2233,28 +2246,45 @@ method_:
     label = mkrhs(label) COLON ty = poly_type
       { (label, private_, Cfk_virtual ty), attrs }
   | override_flag attributes private_flag mkrhs(label) strict_binding
-      { let e = $5 in
-        let loc = Location.(e.pexp_loc.loc_start, e.pexp_loc.loc_end) in
+      { let params, tc, ret_modes, e = $5 in
+        let vb =
+          { pvb_pat = mkpat ~loc:$loc($4) (Ppat_var $4);
+            pvb_modes = []; pvb_params = params;
+            pvb_constraint = tc; pvb_ret_modes = ret_modes;
+            pvb_expr = Some e;
+            pvb_loc = make_loc $sloc;
+            pvb_attributes = [] (* FIXME: ? *) }
+        in
         ($4, $3,
-        Cfk_concrete ($1, ghexp ~loc (Pexp_poly (e, None)))), $2 }
+        Cfk_concrete ($1, vb)), $2 }
   | override_flag attributes private_flag mkrhs(label)
     COLON poly_type EQUAL seq_expr
-      { let poly_exp =
-          let loc = ($startpos($6), $endpos($8)) in
-          ghexp ~loc (Pexp_poly($8, Some $6)) in
-        ($4, $3, Cfk_concrete ($1, poly_exp)), $2 }
+      { let constr =
+          Pvc_constraint { locally_abstract_univars = []; typ = $6 }
+        in
+        let vb =
+          { pvb_pat = mkpat ~loc:$loc($4) (Ppat_var $4);
+            pvb_modes = []; pvb_params = [];
+            pvb_constraint = Some constr; pvb_ret_modes = [];
+            pvb_expr = Some $8;
+            pvb_loc = make_loc $sloc;
+            pvb_attributes = [] (* FIXME: ? *) }
+        in
+        ($4, $3, Cfk_concrete ($1, vb)), $2 }
   | override_flag attributes private_flag mkrhs(label) COLON TYPE newtypes
     DOT core_type EQUAL seq_expr
-      { let poly_exp_loc = ($startpos($7), $endpos($11)) in
-        let poly_exp =
-          let exp, poly =
-            (* it seems odd to use the global ~loc here while poly_exp_loc
-               is tighter, but this is what ocamlyacc does;
-               TODO improve parser.mly *)
-            wrap_type_annotation ~loc:$sloc ~modes:[] $7 $9 $11 in
-          ghexp ~loc:poly_exp_loc (Pexp_poly(exp, Some poly)) in
-        ($4, $3,
-        Cfk_concrete ($1, poly_exp)), $2 }
+      { let constr =
+          Pvc_constraint { locally_abstract_univars = $7; typ = $9 }
+        in
+        let vb =
+          { pvb_pat = mkpat ~loc:$loc($4) (Ppat_var $4);
+            pvb_modes = []; pvb_params = [];
+            pvb_constraint = Some constr; pvb_ret_modes = [];
+            pvb_expr = Some $11;
+            pvb_loc = make_loc $sloc;
+            pvb_attributes = [] (* FIXME: ? *) }
+        in
+        ($4, $3, Cfk_concrete ($1, vb)), $2 }
 ;
 
 /* Class types */
@@ -2683,10 +2713,10 @@ fun_expr:
   | let_bindings(ext) IN seq_expr
       { expr_of_let_bindings ~loc:$sloc $1 $3 }
   | pbop_op = mkrhs(LETOP) bindings = letop_bindings IN body = seq_expr
-      { let (pbop_pat, pbop_exp, rev_ands) = bindings in
+      { let (pbop_binding, rev_ands) = bindings in
         let ands = List.rev rev_ands in
         let pbop_loc = make_loc $sloc in
-        let let_ = {pbop_op; pbop_pat; pbop_exp; pbop_loc} in
+        let let_ = {pbop_op; pbop_binding; pbop_loc} in
         mkexp ~loc:$sloc (Pexp_letop{ let_; ands; body}) }
   | fun_expr COLONCOLON expr
       { mkexp_cons ~loc:$sloc $loc($2)
@@ -3034,7 +3064,9 @@ labeled_simple_expr:
 ;
 let_binding_body_no_punning:
     let_ident strict_binding
-      { ($1, $2, None, []) }
+      { let params, tc, ret_modes, e = $2 in
+        { lbb_modes = []; lbb_pat = $1; lbb_params = params;
+          lbb_constraint = tc; lbb_ret_modes = ret_modes; lbb_expr = Some e } }
   | modes0 = optional_mode_expr_legacy let_ident constraint_ EQUAL seq_expr
       (* CR zqian: modes are duplicated, and one of them needs to be made ghost
          to make internal tools happy. We should try to avoid that. *)
@@ -3047,16 +3079,19 @@ let_binding_body_no_punning:
           | Pcoerce (ground, coercion) -> Pvc_coercion { ground; coercion}
           ) typ
         in
-        let modes = modes0 @ modes1 in
-        (v, $5, t, modes)
+        { lbb_modes = modes0;
+          lbb_pat = v; lbb_params = []; lbb_constraint = t;
+          lbb_ret_modes = modes1; lbb_expr = Some $5 }
       }
   | modes0 = optional_mode_expr_legacy let_ident COLON poly(core_type) modes1 = optional_atat_mode_expr EQUAL seq_expr
       { let bound_vars, inner_type = $4 in
         let ltyp = Ptyp_poly (bound_vars, inner_type) in
         let typ = ghtyp ~loc:$loc($4) ltyp in
-        let modes = modes0 @ modes1 in
-        ($2, $7, Some (Pvc_constraint { locally_abstract_univars = []; typ }),
-         modes)
+        { lbb_modes = modes0;
+          lbb_pat = $2; lbb_params = [];
+          lbb_constraint =
+            Some (Pvc_constraint { locally_abstract_univars = []; typ });
+          lbb_ret_modes = modes1; lbb_expr = Some $7 }
       }
   | let_ident COLON TYPE newtypes DOT core_type modes=optional_atat_mode_expr EQUAL seq_expr
       (* The code upstream looks like:
@@ -3074,34 +3109,46 @@ let_binding_body_no_punning:
          location on the [core_type] node for the annotation match the upstream
          version, even though we are creating a slightly different [core_type].
       *)
-      { let exp, poly =
-          wrap_type_annotation ~loc:$sloc ~modes:[] ~typloc:$loc($6) $4 $6 $9
-        in
-        let loc = ($startpos($1), $endpos($6)) in
-        (ghpat_with_modes ~loc ~pat:$1 ~cty:(Some poly) ~modes:[], exp, None, modes)
+      (* FIXME: ! *)
+      { { lbb_modes = [];
+          lbb_pat = $1; lbb_params = [];
+          lbb_constraint =
+            Some (Pvc_constraint { locally_abstract_univars = $4; typ = $6 });
+          lbb_ret_modes = modes; lbb_expr = Some $9 }
        }
   | pattern_no_exn EQUAL seq_expr
-      { ($1, $3, None, []) }
+      { { lbb_modes = []; lbb_pat = $1; lbb_params = [];
+          lbb_constraint = None; lbb_ret_modes = []; lbb_expr = Some $3 } }
   | simple_pattern_not_ident pvc_modes EQUAL seq_expr
       {
         let pvc, modes = $2 in
-        ($1, $4, pvc, modes)
+        { lbb_modes = []; lbb_pat = $1; lbb_params = [];
+          lbb_constraint = pvc; lbb_ret_modes = modes; lbb_expr = Some $4 }
       }
   | modes=mode_expr_legacy let_ident strict_binding_modes
-      {
-        ($2, $3 modes, None, modes)
+      { let params, tc, ret_modes, e = $3 in
+        { lbb_modes = modes; lbb_pat = $2; lbb_params = params;
+          lbb_constraint = tc; lbb_ret_modes = ret_modes; lbb_expr = Some e }
       }
   | LPAREN let_ident modes=at_mode_expr RPAREN strict_binding_modes
-      {
-        ($2, $5 modes, None, modes)
+      { let params, tc, ret_modes, e = $5 in
+        let pat =
+          let loc = ($startpos($1), $endpos($4)) in
+          mkpat_with_modes ~loc ~pat:$2 ~cty:None ~modes
+        in
+        { lbb_modes = []; lbb_pat = pat; lbb_params = params;
+          lbb_constraint = tc; lbb_ret_modes = ret_modes; lbb_expr = Some e }
       }
 ;
 let_binding_body:
   | let_binding_body_no_punning
-      { let p,e,c,modes = $1 in (p,e,c,modes,false) }
+      { $1 }
 /* BEGIN AVOID */
   | val_ident %prec below_HASH
-      { (mkpatvar ~loc:$loc $1, ghexpvar ~loc:$loc $1, None, [], true) }
+      { { lbb_modes = [];
+          lbb_pat = mkpatvar ~loc:$loc $1;
+          lbb_params = []; lbb_constraint = None; lbb_ret_modes = [];
+          lbb_expr = None } }
   (* The production that allows puns is marked so that [make list-parse-errors]
      does not attempt to exploit it. That would be problematic because it
      would then generate bindings such as [let x], which are rejected by the
@@ -3138,50 +3185,60 @@ and_let_binding:
 ;
 letop_binding_body:
     pat = let_ident exp = strict_binding
-      { (pat, exp) }
+      { let params, tc, ret_modes, e = exp in
+        Vb.mk ~loc:(make_loc $sloc) ~params ?value_constraint:tc ~ret_modes pat (Some e) }
   | val_ident
       (* Let-punning *)
-      { (mkpatvar ~loc:$loc $1, ghexpvar ~loc:$loc $1) }
+      { Vb.mk ~loc:(make_loc $sloc) (mkpatvar ~loc:$loc $1) None }
   (* CR zqian: support mode annotation on letop. *)
   | pat = simple_pattern COLON typ = core_type EQUAL exp = seq_expr
-      { let loc = ($startpos(pat), $endpos(typ)) in
-        (ghpat_with_modes ~loc ~pat ~cty:(Some typ) ~modes:[], exp) }
+      { Vb.mk ~loc:(make_loc $sloc)
+          ~value_constraint:(
+            Pvc_constraint { locally_abstract_univars = []; typ })
+          pat (Some exp) }
   | pat = pattern_no_exn EQUAL exp = seq_expr
-      { (pat, exp) }
+      { Vb.mk ~loc:(make_loc $sloc) pat (Some exp) }
 ;
 letop_bindings:
     body = letop_binding_body
-      { let let_pat, let_exp = body in
-        let_pat, let_exp, [] }
+      { body, [] }
   | bindings = letop_bindings pbop_op = mkrhs(ANDOP) body = letop_binding_body
-      { let let_pat, let_exp, rev_ands = bindings in
-        let pbop_pat, pbop_exp = body in
-        let pbop_loc = make_loc $sloc in
-        let and_ = {pbop_op; pbop_pat; pbop_exp; pbop_loc} in
-        let_pat, let_exp, and_ :: rev_ands }
+      { let first_vb, rev_ands = bindings in
+        let pbop_loc = make_loc ($startpos(pbop_op), $endpos(body)) in
+        let and_ = {pbop_op; pbop_binding = body; pbop_loc} in
+        first_vb, and_ :: rev_ands }
 ;
 strict_binding_modes:
     EQUAL seq_expr
-      { fun _ -> $2 }
+      { [], None, [], $2 }
   | fun_params constraint_? EQUAL fun_body
-    { fun mode_annotations ->
-        let constraint_ : function_constraint =
-          let ret_type_constraint, ret_mode_annotations =
-            match $2 with
-            | None -> None, []
-            | Some (ret_type_constraint, ret_mode_annotations) ->
-                ret_type_constraint, ret_mode_annotations
-          in
-          {mode_annotations; ret_type_constraint ; ret_mode_annotations }
-        in
-        let exp = mkfunction $1 constraint_ $4 ~loc:$sloc ~attrs:(None, []) in
-        { exp with pexp_loc = { exp.pexp_loc with loc_ghost = true } }
-
+    {
+      let ret_type_constraint, ret_mode_annotations =
+        match $2 with
+        | None -> None, []
+        | Some (ret_type_constraint, ret_mode_annotations) ->
+            ret_type_constraint, ret_mode_annotations
+      in
+      let typ =
+        Option.map (function
+          | Pconstraint t ->
+             Pvc_constraint { locally_abstract_univars = []; typ=t }
+          | Pcoerce (ground, coercion) -> Pvc_coercion { ground; coercion}
+        ) ret_type_constraint
+      in
+      let expr =
+        match $4 with
+        | Pfunction_body e -> e
+        | Pfunction_cases _ as cases ->
+            mkfunction [] empty_body_constraint cases ~loc:$loc($4)
+            ~attrs:(None, [])
+      in
+      $1, typ, ret_mode_annotations, expr
     }
 ;
 %inline strict_binding:
   strict_binding_modes
-    {$1 []}
+    {$1}
 ;
 fun_body:
   | FUNCTION ext_attributes match_cases

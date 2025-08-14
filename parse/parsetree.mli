@@ -544,8 +544,7 @@ and letop =
 and binding_op =
   {
     pbop_op : string loc;
-    pbop_pat : pattern;
-    pbop_exp : expression;
+    pbop_binding : value_binding;
     pbop_loc : Location.t;
   }
 
@@ -1033,7 +1032,7 @@ and class_field_desc =
 
 and class_field_kind =
   | Cfk_virtual of core_type
-  | Cfk_concrete of override_flag * expression
+  | Cfk_concrete of override_flag * value_binding
 
 and class_declaration = class_expr class_infos
 
@@ -1278,7 +1277,7 @@ and structure_item_desc =
 
 and value_constraint =
   | Pvc_constraint of {
-      locally_abstract_univars:string loc list;
+      locally_abstract_univars:(string loc * jkind_annotation option) list;
       typ:core_type;
     }
   | Pvc_coercion of {ground:core_type option; coercion:core_type }
@@ -1295,12 +1294,14 @@ and value_constraint =
 and value_binding =
   {
     pvb_pat: pattern;
-    pvb_expr: expression;
+    pvb_params: function_param list;
+    pvb_expr: expression option;
     pvb_constraint: value_constraint option;
     pvb_modes: modes;
+    pvb_ret_modes: modes;
     pvb_attributes: attributes;
     pvb_loc: Location.t;
-  }(** [let pat : type_constraint = exp] *)
+  } (** [let modes pat params : type_constraint @@ ret_modes = exp] *)
 
 and module_binding =
     {

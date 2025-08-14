@@ -263,11 +263,10 @@ module Exp = struct
      pc_rhs = rhs;
     }
 
-  let binding_op op pat exp loc =
+  let binding_op op vb loc =
     {
       pbop_op = op;
-      pbop_pat = pat;
-      pbop_exp = exp;
+      pbop_binding = vb;
       pbop_loc = loc;
     }
 end
@@ -539,12 +538,15 @@ end
 
 module Vb = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(text = []) ?value_constraint ?(modes = []) pat expr =
+      ?(text = []) ?(params = []) ?(modes = []) ?value_constraint
+      ?(ret_modes = []) pat expr =
     {
      pvb_pat = pat;
+     pvb_params = params;
      pvb_expr = expr;
      pvb_constraint=value_constraint;
-     pvb_modes=modes;
+     pvb_modes = modes;
+     pvb_ret_modes = ret_modes;
      pvb_attributes =
        add_text_attrs text (add_docs_attrs docs attrs);
      pvb_loc = loc;

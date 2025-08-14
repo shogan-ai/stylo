@@ -607,9 +607,8 @@ end
 and Binding_op : sig
   val pp : binding_op -> document
 end = struct
-  let pp { pbop_op; pbop_pat; pbop_exp; _ }=
-    string pbop_op.txt ^/^ Pattern.pp pbop_pat ^/^ equals ^/^
-    Expression.pp pbop_exp
+  let pp { pbop_op; pbop_binding; _ }=
+    string pbop_op.txt ^/^ Value_binding.pp pbop_binding
 end
 
 and Function_param : sig
@@ -1079,7 +1078,7 @@ end = struct
 
   and pp_field_kind = function
     | Cfk_virtual ct -> colon ^/^ Core_type.pp ct
-    | Cfk_concrete (_, e) -> equals ^/^ Expression.pp e
+    | Cfk_concrete (_, vb) -> Value_binding.pp vb
 
   and pp { pcl_desc; pcl_attributes; _ } =
     pp_desc pcl_desc
@@ -1405,8 +1404,14 @@ end = struct
       begin match locally_abstract_univars with
         | [] -> empty
         | vars ->
+          let pp_var (name, jkind) =
+            string name.txt ^^
+            match jkind with
+            | None -> empty
+            | Some j -> break 1 ^^ Jkind_annotation.pp j
+          in
           S.type_ ^/^
-          separate_loc_list (break 1) string vars ^^ dot ^^ break 1
+          separate_map (break 1) pp_var vars ^^ dot ^^ break 1
       end ^^
       Core_type.pp typ
     | Pvc_coercion {ground; coercion} ->
@@ -1420,17 +1425,29 @@ end
 and Value_binding : sig
   val pp : value_binding -> document
 end = struct
-  let pp { pvb_pat; pvb_expr; pvb_constraint; pvb_modes; pvb_attributes; _ } =
-    Pattern.pp pvb_pat ^/^
-    begin match pvb_constraint with
-      | None -> empty
-      | Some vc -> Value_constraint.pp vc ^^ break 1
-    end ^^
+  let pp { pvb_modes; pvb_pat; pvb_params; pvb_constraint;
+           pvb_ret_modes; pvb_expr; pvb_attributes;
+           pvb_loc = _ } =
     begin match pvb_modes with
       | [] -> empty
-      | lst -> at ^/^ modes lst ^^ break 1
+      | lst -> modes lst ^^ break 1
     end ^^
-    equals ^/^ Expression.pp pvb_expr
+    Pattern.pp pvb_pat ^^
+    begin match pvb_params with
+      | [] -> empty
+      | params ->
+        break 1 ^^ separate_map (break 1) Function_param.pp params
+    end ^^
+    begin match pvb_constraint with
+      | None -> empty
+      | Some vc ->
+        break 1 ^^ Value_constraint.pp vc
+        |> with_modes ~modes:pvb_ret_modes
+    end ^^
+    begin match pvb_expr with
+      | None -> empty
+      | Some e -> break 1 ^^ equals ^/^ Expression.pp e
+    end
     |> Attribute.attach ~attrs:pvb_attributes (* FIXME: post? *)
 end
 
