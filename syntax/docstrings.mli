@@ -26,7 +26,7 @@ val init : unit -> unit
 (** {2 Docstrings} *)
 
 (** Documentation comments *)
-type docstring
+type docstring = Docstring.t
 
 (** Create a docstring *)
 val docstring : string -> Location.t -> docstring

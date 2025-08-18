@@ -1,4 +1,3 @@
-
 /* Tokens */
 
 /* The alias that follows each token is used by Menhir when it needs to
@@ -155,7 +154,7 @@
 %token WHILE                  "while"
 %token WITH                   "with"
 %token <string * Location.t> COMMENT    "(* comment *)"
-%token <Docstrings.docstring> DOCSTRING "(** documentation *)"
+%token <Docstring.t> DOCSTRING "(** documentation *)"
 
 %token EOL                    "\\n"      (* not great, but EOL is unused *)
 
