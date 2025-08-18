@@ -25,7 +25,7 @@
 %{
 
 [@@@ocaml.warning "-60"]
-module Parse = struct end (* https://github.com/ocaml/dune/issues/2450 *)
+module Ocaml_syntax = struct end (* https://github.com/ocaml/dune/issues/2450 *)
 module Str = Ast_helper.Str (* For ocamldep *)
 [@@@ocaml.warning "+60"]
 

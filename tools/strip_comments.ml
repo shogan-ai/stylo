@@ -2,7 +2,7 @@ let ic = In_channel.open_text Sys.argv.(1)
 let () = at_exit (fun () -> In_channel.close ic)
 
 let comments =
-  let open Parse in
+  let open Ocaml_syntax in
   Lexer.init ();
   let lexbuf = Lexing.from_channel ic in
   while Lexer.token lexbuf <> EOF do () done;
@@ -32,7 +32,7 @@ let rec strip_comments ic oc offset = function
   | [] ->
     (* no more comments, transfer til EOF *)
     transfer_until ic oc max_int offset
-  | (_, (next_cmt_loc : Parse.Location.t)) :: cmts ->
+  | (_, (next_cmt_loc : Ocaml_syntax.Location.t)) :: cmts ->
     let cmt_start = next_cmt_loc.loc_start.pos_cnum in
     let cmt_stop = next_cmt_loc.loc_end.pos_cnum in
     transfer_until ic oc cmt_start offset;

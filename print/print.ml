@@ -1,5 +1,5 @@
 open PPrint
-open Parse
+open Ocaml_syntax
 open Parsetree
 
 module S = Syntax
