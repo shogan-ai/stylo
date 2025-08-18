@@ -144,80 +144,80 @@ module Pat:
 (** Expressions *)
 module Exp:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> expression_desc -> expression
+    val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression_desc -> expression
     val attr: expression -> attribute -> expression
 
-    val ident: ?loc:loc -> ?attrs:attrs -> lid -> expression
-    val constant: ?loc:loc -> ?attrs:attrs -> constant -> expression
-    val let_: ?loc:loc -> ?attrs:attrs -> rec_flag -> value_binding list
+    val ident: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> expression
+    val constant: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> constant -> expression
+    val let_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> rec_flag -> value_binding list
               -> expression -> expression
-    val function_ : ?loc:loc -> ?attrs:attrs -> function_param list
+    val function_ : ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> function_param list
                    -> function_constraint -> function_body
                    -> expression
-    val apply: ?loc:loc -> ?attrs:attrs -> expression
+    val apply: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression
                -> expression argument list -> expression
-    val match_: ?loc:loc -> ?attrs:attrs -> expression -> case list
+    val match_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> case list
                 -> expression
-    val try_: ?loc:loc -> ?attrs:attrs -> expression -> case list -> expression
-    val tuple: ?loc:loc -> ?attrs:attrs -> expression argument list -> expression
-    val unboxed_tuple: ?loc:loc -> ?attrs:attrs
+    val try_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> case list -> expression
+    val tuple: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression argument list -> expression
+    val unboxed_tuple: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq
                        -> expression argument list -> expression
-    val construct: ?loc:loc -> ?attrs:attrs -> lid -> expression option
+    val construct: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> expression option
                    -> expression
-    val variant: ?loc:loc -> ?attrs:attrs -> label -> expression option
+    val variant: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> label -> expression option
                  -> expression
-    val record: ?loc:loc -> ?attrs:attrs -> expression record_field list
+    val record: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression record_field list
                 -> expression option -> expression
-    val record_unboxed_product: ?loc:loc -> ?attrs:attrs
+    val record_unboxed_product: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq
         -> expression record_field list -> expression option -> expression
-    val field: ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
-    val unboxed_field: ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
-    val setfield: ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
+    val field: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> lid -> expression
+    val unboxed_field: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> lid -> expression
+    val setfield: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> lid -> expression
                   -> expression
-    val array: ?loc:loc -> ?attrs:attrs -> mutable_flag -> expression list ->
+    val array: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> mutable_flag -> expression list ->
       expression
-    val ifthenelse: ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val ifthenelse: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> expression
                     -> expression option -> expression
-    val sequence: ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val sequence: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> expression
                   -> expression
-    val while_: ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val while_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> expression
                 -> expression
-    val for_: ?loc:loc -> ?attrs:attrs -> pattern -> expression -> expression
+    val for_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern -> expression -> expression
               -> direction_flag -> expression -> expression
-    val coerce: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
+    val coerce: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> core_type option
                 -> core_type -> expression
-    val constraint_: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
+    val constraint_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> core_type option
                      -> mode with_loc list -> expression
-    val send: ?loc:loc -> ?attrs:attrs -> expression -> str -> expression
-    val new_: ?loc:loc -> ?attrs:attrs -> lid -> expression
-    val setinstvar: ?loc:loc -> ?attrs:attrs -> str -> expression -> expression
-    val override: ?loc:loc -> ?attrs:attrs -> (str * expression option) list
+    val send: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> str -> expression
+    val new_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> expression
+    val setinstvar: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str -> expression -> expression
+    val override: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> (str * expression option) list
                   -> expression
-    val letmodule: ?loc:loc -> ?attrs:attrs -> str_opt -> module_expr
+    val letmodule: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str_opt -> module_expr
                    -> expression -> expression
     val letexception:
-      ?loc:loc -> ?attrs:attrs -> extension_constructor -> expression
+      ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension_constructor -> expression
       -> expression
-    val assert_: ?loc:loc -> ?attrs:attrs -> expression -> expression
-    val lazy_: ?loc:loc -> ?attrs:attrs -> expression -> expression
-    val poly: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
+    val assert_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> expression
+    val lazy_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> expression
+    val poly: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> core_type option
               -> expression
-    val object_: ?loc:loc -> ?attrs:attrs -> class_structure -> expression
-    val newtype: ?loc:loc -> ?attrs:attrs -> str -> jkind_annotation option ->
+    val object_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> class_structure -> expression
+    val newtype: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str -> jkind_annotation option ->
       expression  -> expression
-    val pack: ?loc:loc -> ?attrs:attrs -> ?pkg_type:core_type -> module_expr ->
+    val pack: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?pkg_type:core_type -> module_expr ->
       expression
-    val open_: ?loc:loc -> ?attrs:attrs -> open_declaration -> expression
+    val open_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> open_declaration -> expression
                -> expression
-    val letop: ?loc:loc -> ?attrs:attrs -> binding_op
+    val letop: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> binding_op
                -> binding_op list -> expression -> expression
-    val extension: ?loc:loc -> ?attrs:attrs -> extension -> expression
-    val unreachable: ?loc:loc -> ?attrs:attrs -> unit -> expression
-    val stack : ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> expression
+    val unreachable: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> unit -> expression
+    val stack : ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> expression
     val comprehension :
-      ?loc:loc -> ?attrs:attrs -> comprehension_expression -> expression
-    val overwrite : ?loc:loc -> ?attrs:attrs -> expression -> expression -> expression
-    val hole : ?loc:loc -> ?attrs:attrs -> unit -> expression
+      ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> comprehension_expression -> expression
+    val overwrite : ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> expression -> expression
+    val hole : ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> unit -> expression
 
     val case: pattern -> ?guard:expression -> expression -> case
     val binding_op: str -> value_binding -> loc -> binding_op

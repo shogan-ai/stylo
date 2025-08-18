@@ -203,58 +203,59 @@ module Pat = struct
 end
 
 module Exp = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) d =
+  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
     {pexp_desc = d;
      pexp_loc = loc;
      pexp_loc_stack = [];
-     pexp_attributes = attrs}
+     pexp_attributes = attrs;
+     pexp_tokens = tokens}
   let attr d a = {d with pexp_attributes = d.pexp_attributes @ [a]}
 
-  let ident ?loc ?attrs a = mk ?loc ?attrs (Pexp_ident a)
-  let constant ?loc ?attrs a = mk ?loc ?attrs (Pexp_constant a)
-  let let_ ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_let (a, b, c))
-  let function_ ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_function (a, b, c))
-  let apply ?loc ?attrs a b = mk ?loc ?attrs (Pexp_apply (a, b))
-  let match_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_match (a, b))
-  let try_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_try (a, b))
-  let tuple ?loc ?attrs a = mk ?loc ?attrs (Pexp_tuple a)
-  let unboxed_tuple ?loc ?attrs a = mk ?loc ?attrs (Pexp_unboxed_tuple a)
-  let construct ?loc ?attrs a b = mk ?loc ?attrs (Pexp_construct (a, b))
-  let variant ?loc ?attrs a b = mk ?loc ?attrs (Pexp_variant (a, b))
-  let record ?loc ?attrs a b = mk ?loc ?attrs (Pexp_record (a, b))
-  let record_unboxed_product ?loc ?attrs a b =
-    mk ?loc ?attrs (Pexp_record_unboxed_product (a, b))
-  let field ?loc ?attrs a b = mk ?loc ?attrs (Pexp_field (a, b))
-  let unboxed_field ?loc ?attrs a b = mk ?loc ?attrs (Pexp_unboxed_field (a, b))
-  let setfield ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_setfield (a, b, c))
-  let array ?loc ?attrs a b = mk ?loc ?attrs (Pexp_array (a, b))
-  let ifthenelse ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_ifthenelse (a, b, c))
-  let sequence ?loc ?attrs a b = mk ?loc ?attrs (Pexp_sequence (a, b))
-  let while_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_while (a, b))
-  let for_ ?loc ?attrs a b c d e = mk ?loc ?attrs (Pexp_for (a, b, c, d, e))
-  let constraint_ ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_constraint (a, b, c))
-  let coerce ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_coerce (a, b, c))
-  let send ?loc ?attrs a b = mk ?loc ?attrs (Pexp_send (a, b))
-  let new_ ?loc ?attrs a = mk ?loc ?attrs (Pexp_new a)
-  let setinstvar ?loc ?attrs a b = mk ?loc ?attrs (Pexp_setinstvar (a, b))
-  let override ?loc ?attrs a = mk ?loc ?attrs (Pexp_override a)
-  let letmodule ?loc ?attrs a b c= mk ?loc ?attrs (Pexp_letmodule (a, b, c))
-  let letexception ?loc ?attrs a b = mk ?loc ?attrs (Pexp_letexception (a, b))
-  let assert_ ?loc ?attrs a = mk ?loc ?attrs (Pexp_assert a)
-  let lazy_ ?loc ?attrs a = mk ?loc ?attrs (Pexp_lazy a)
-  let poly ?loc ?attrs a b = mk ?loc ?attrs (Pexp_poly (a, b))
-  let object_ ?loc ?attrs a = mk ?loc ?attrs (Pexp_object a)
-  let newtype ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_newtype (a, b, c))
-  let pack ?loc ?attrs ?pkg_type a = mk ?loc ?attrs (Pexp_pack (a, pkg_type))
-  let open_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_dot_open (a, b))
-  let letop ?loc ?attrs let_ ands body =
-    mk ?loc ?attrs (Pexp_letop {let_; ands; body})
-  let extension ?loc ?attrs a = mk ?loc ?attrs (Pexp_extension a)
-  let unreachable ?loc ?attrs () = mk ?loc ?attrs Pexp_unreachable
-  let stack ?loc ?attrs e = mk ?loc ?attrs (Pexp_stack e)
-  let comprehension ?loc ?attrs e = mk ?loc ?attrs (Pexp_comprehension e)
-  let overwrite ?loc ?attrs a b = mk ?loc ?attrs (Pexp_overwrite (a, b))
-  let hole ?loc ?attrs () = mk ?loc ?attrs Pexp_hole
+  let ident ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_ident a)
+  let constant ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_constant a)
+  let let_ ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Pexp_let (a, b, c))
+  let function_ ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Pexp_function (a, b, c))
+  let apply ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_apply (a, b))
+  let match_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_match (a, b))
+  let try_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_try (a, b))
+  let tuple ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_tuple a)
+  let unboxed_tuple ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_unboxed_tuple a)
+  let construct ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_construct (a, b))
+  let variant ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_variant (a, b))
+  let record ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_record (a, b))
+  let record_unboxed_product ?loc ?attrs ~tokens a b =
+    mk ?loc ?attrs ~tokens (Pexp_record_unboxed_product (a, b))
+  let field ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_field (a, b))
+  let unboxed_field ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_unboxed_field (a, b))
+  let setfield ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Pexp_setfield (a, b, c))
+  let array ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_array (a, b))
+  let ifthenelse ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Pexp_ifthenelse (a, b, c))
+  let sequence ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_sequence (a, b))
+  let while_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_while (a, b))
+  let for_ ?loc ?attrs ~tokens a b c d e = mk ?loc ?attrs ~tokens (Pexp_for (a, b, c, d, e))
+  let constraint_ ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Pexp_constraint (a, b, c))
+  let coerce ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Pexp_coerce (a, b, c))
+  let send ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_send (a, b))
+  let new_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_new a)
+  let setinstvar ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_setinstvar (a, b))
+  let override ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_override a)
+  let letmodule ?loc ?attrs ~tokens a b c= mk ?loc ?attrs ~tokens (Pexp_letmodule (a, b, c))
+  let letexception ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_letexception (a, b))
+  let assert_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_assert a)
+  let lazy_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_lazy a)
+  let poly ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_poly (a, b))
+  let object_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_object a)
+  let newtype ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Pexp_newtype (a, b, c))
+  let pack ?loc ?attrs ~tokens ?pkg_type a = mk ?loc ?attrs ~tokens (Pexp_pack (a, pkg_type))
+  let open_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_dot_open (a, b))
+  let letop ?loc ?attrs ~tokens let_ ands body =
+    mk ?loc ?attrs ~tokens (Pexp_letop {let_; ands; body})
+  let extension ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_extension a)
+  let unreachable ?loc ?attrs ~tokens () = mk ?loc ?attrs ~tokens Pexp_unreachable
+  let stack ?loc ?attrs ~tokens e = mk ?loc ?attrs ~tokens (Pexp_stack e)
+  let comprehension ?loc ?attrs ~tokens e = mk ?loc ?attrs ~tokens (Pexp_comprehension e)
+  let overwrite ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_overwrite (a, b))
+  let hole ?loc ?attrs ~tokens () = mk ?loc ?attrs ~tokens Pexp_hole
 
   let case lhs ?guard rhs =
     {

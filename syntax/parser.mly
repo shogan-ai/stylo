@@ -54,7 +54,9 @@ let ghost_loc (startpos, endpos) = {
 
 let mktyp ~loc ?attrs d = Typ.mk ~loc:(make_loc loc) ?attrs d
 let mkpat ~loc ?attrs d = Pat.mk ~loc:(make_loc loc) ?attrs d
-let mkexp ~loc ?attrs d = Exp.mk ~loc:(make_loc loc) ?attrs d
+let mkexp ~loc ?attrs d =
+  let tokens = Tokens.of_production () in
+  Exp.mk ~loc:(make_loc loc) ~tokens ?attrs d
 let mkmty ~loc ?attrs d = Mty.mk ~loc:(make_loc loc) ?attrs d
 let mksig ~loc d = Sig.mk ~loc:(make_loc loc) d
 let mkmod ~loc ?attrs d = Mod.mk ~loc:(make_loc loc) ?attrs d
@@ -111,7 +113,9 @@ let mkpatvar ~loc name =
   mkpat ~loc (Ppat_var (mkrhs name loc))
 
 (* See commentary about ghost locations at the declaration of Location.t *)
-let ghexp ~loc d = Exp.mk ~loc:(ghost_loc loc) d
+let ghexp ~loc d =
+  let tokens = Tokens.of_production () in
+  Exp.mk ~tokens ~loc:(ghost_loc loc) d
 let ghpat ~loc d = Pat.mk ~loc:(ghost_loc loc) d
 let ghtyp ~loc ?attrs d = Typ.mk ~loc:(ghost_loc loc) ?attrs d
 let ghstr ~loc d = Str.mk ~loc:(ghost_loc loc) d
@@ -150,22 +154,10 @@ let mkpat_with_modes ~loc ~pat ~cty ~modes =
     end
 
 let mkexp_constraint ~loc ~exp ~cty ~modes =
-  match exp.pexp_desc with
-  | Pexp_constraint (exp', cty', modes') ->
-     begin match cty, cty' with
-     | cty, None | None, cty ->
-        { exp with
-          pexp_desc = Pexp_constraint (exp', cty, modes @ modes');
-          pexp_loc = make_loc loc
-        }
-     | _ ->
-        mkexp ~loc (Pexp_constraint (exp, cty, modes))
-     end
-  | _ ->
-     begin match cty, modes with
-     | None, [] -> exp
-     | cty, modes -> mkexp ~loc (Pexp_constraint (exp, cty, modes))
-     end
+   begin match cty, modes with
+   | None, [] -> invalid_arg "empty mkexp_constraint" (* ? *)
+   | cty, modes -> mkexp ~loc (Pexp_constraint (exp, cty, modes))
+   end
 
 let ghexp_constraint ~loc ~exp ~cty ~modes =
   let exp = mkexp_constraint ~loc ~exp ~cty ~modes in
@@ -3016,8 +3008,11 @@ match_case:
       { Exp.case $1 $3 }
   | pattern WHEN seq_expr MINUSGREATER seq_expr
       { Exp.case $1 ~guard:$3 $5 }
-  | pattern MINUSGREATER DOT
-      { Exp.case $1 (Exp.unreachable ~loc:(make_loc $loc($3)) ()) }
+  | pattern MINUSGREATER exp_unreachable
+      { Exp.case $1 $3 }
+;
+exp_unreachable:
+  | DOT { mkexp ~loc:$sloc Pexp_unreachable }
 ;
 fun_param_as_list:
   | LPAREN TYPE ty_params = newtypes RPAREN

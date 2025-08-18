@@ -359,6 +359,7 @@ and expression =
      pexp_loc: Location.t;
      pexp_loc_stack: location_stack;
      pexp_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
+     pexp_tokens: Tokens.seq;
     }
 
 and expression_desc =
