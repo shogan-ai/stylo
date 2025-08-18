@@ -523,8 +523,10 @@ end = struct
       pp body
     | Pexp_pack me ->
       lparen ^^ S.module_ ^/^ Module_expr.pp me ^^ rparen
-    | Pexp_open (od, e) ->
+    | Pexp_dot_open (od, e) ->
       Open_declaration.pp od ^^ dot ^^ pp e
+    | Pexp_let_open (od, e) ->
+      S.let_ ^/^ S.open_ ^^ Open_declaration.pp od ^/^ S.in_ ^/^ pp e
     | Pexp_letop lo -> Letop.pp lo
     | Pexp_extension ext -> Extension.pp ext
     | Pexp_unreachable  -> dot

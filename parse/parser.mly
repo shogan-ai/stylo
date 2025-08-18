@@ -290,14 +290,14 @@ module Generic_array = struct
         match t with
         | Simple x -> Simple.to_ast open_ close array x
         | Opened_literal (od, startpos, endpos, elts) ->
-          Pexp_open (od, mkexp ~loc:(startpos, endpos) (array elts))
+          Pexp_dot_open (od, mkexp ~loc:(startpos, endpos) (array elts))
 
     let to_expression (open_ : string) (close : string) mut ~loc t =
       let array ~loc elts = mkexp ~loc (Pexp_array (mut, elts)) in
       match t with
       | Simple x -> Simple.to_ast open_ close (array ~loc) x
       | Opened_literal (od, startpos, endpos, elts) ->
-        mkexp ~loc (Pexp_open (od, array ~loc:(startpos, endpos) elts))
+        mkexp ~loc (Pexp_dot_open (od, array ~loc:(startpos, endpos) elts))
   end
 
   module Pattern = struct
@@ -2726,7 +2726,7 @@ fun_expr:
   | LET OPEN override_flag ext_attributes module_expr IN seq_expr
       { let open_loc = make_loc ($startpos($2), $endpos($5)) in
         let od = Opn.mk $5 ~override:$3 ~loc:open_loc in
-        Pexp_open(od, $7), $4 }
+        Pexp_let_open(od, $7), $4 }
   | MATCH ext_attributes seq_expr WITH match_cases
       { Pexp_match($3, $5), $2 }
   | TRY ext_attributes seq_expr WITH match_cases
@@ -2945,10 +2945,10 @@ comprehension_clause:
           let loc = $startpos($3), $endpos($5) in
           mkexp ~loc (Pexp_parens { begin_end = false; exp = $4 })
         in
-        Pexp_open(od, exp) }
+        Pexp_dot_open(od, exp) }
   | od=open_dot_declaration DOT LBRACELESS object_expr_content GREATERRBRACE
       { (* TODO: review the location of Pexp_override *)
-        Pexp_open(od, mkexp ~loc:$sloc (Pexp_override $4)) }
+        Pexp_dot_open(od, mkexp ~loc:$sloc (Pexp_override $4)) }
   | mod_longident DOT LBRACELESS object_expr_content error
       { unclosed "{<" $loc($3) ">}" $loc($5) }
   | simple_expr hash mkrhs(label)
@@ -2958,7 +2958,7 @@ comprehension_clause:
   | extension
       { Pexp_extension $1 }
   | od=open_dot_declaration DOT mkrhs(LPAREN RPAREN {Lident "()"})
-      { Pexp_open(od, mkexp ~loc:($loc($3)) (Pexp_construct($3, None))) }
+      { Pexp_dot_open(od, mkexp ~loc:($loc($3)) (Pexp_construct($3, None))) }
   | mod_longident DOT LPAREN seq_expr error
       { unclosed "(" $loc($3) ")" $loc($5) }
   | LBRACE record_expr_content RBRACE
@@ -2971,7 +2971,7 @@ comprehension_clause:
       { unclosed "{" $loc($1) "}" $loc($3) }
   | od=open_dot_declaration DOT LBRACE record_expr_content RBRACE
       { let (exten, fields) = $4 in
-        Pexp_open(od, mkexp ~loc:($startpos($3), $endpos)
+        Pexp_dot_open(od, mkexp ~loc:($startpos($3), $endpos)
                         (Pexp_record(fields, exten))) }
   | mod_longident DOT LBRACE record_expr_content error
       { unclosed "{" $loc($3) "}" $loc($5) }
@@ -2986,15 +2986,15 @@ comprehension_clause:
   | LBRACKET expr_semi_list error
       { unclosed "[" $loc($1) "]" $loc($3) }
   | od=open_dot_declaration DOT comprehension_expr
-      { Pexp_open(od, $3) }
+      { Pexp_dot_open(od, $3) }
   | od=open_dot_declaration DOT LBRACKET expr_semi_list RBRACKET
       { let list_exp =
           (* TODO: review the location of list_exp *)
           let tail_exp, _tail_loc = mktailexp $loc($5) $4 in
           mkexp ~loc:($startpos($3), $endpos) tail_exp in
-        Pexp_open(od, list_exp) }
+        Pexp_dot_open(od, list_exp) }
   | od=open_dot_declaration DOT mkrhs(LBRACKET RBRACKET {Lident "[]"})
-      { Pexp_open(od, mkexp ~loc:$loc($3) (Pexp_construct($3, None))) }
+      { Pexp_dot_open(od, mkexp ~loc:$loc($3) (Pexp_construct($3, None))) }
   | mod_longident DOT
     LBRACKET expr_semi_list error
       { unclosed "[" $loc($3) "]" $loc($5) }
@@ -3003,7 +3003,7 @@ comprehension_clause:
       { let modexp =
           mkexp_attrs ~loc:($startpos($3), $endpos)
             (Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $6), Some $8, [])) $5 in
-        Pexp_open(od, modexp) }
+        Pexp_dot_open(od, modexp) }
   | mod_longident DOT
     LPAREN MODULE ext_attributes module_expr COLON error
       { unclosed "(" $loc($3) ")" $loc($8) }
