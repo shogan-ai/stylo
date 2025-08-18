@@ -120,41 +120,9 @@ let ghsig ~loc d = Sig.mk ~loc:(ghost_loc loc) d
 let mkinfix arg1 op arg2 =
   Pexp_infix_apply {op; arg1; arg2}
 
-let neg_string f =
-  if String.length f > 0 && f.[0] = '-'
-  then String.sub f 1 (String.length f - 1)
-  else "-" ^ f
+let mkuminus ~oploc:_ name arg = Pexp_add_or_sub (name, arg), []
 
-let mkuminus ~oploc name arg =
-  let result =
-    match arg.pexp_desc with
-    | Pexp_constant const -> begin
-        match name, const with
-        | "-", Pconst_integer (n, m) ->
-           Some (Pconst_integer (neg_string n, m))
-        | "-", Pconst_unboxed_integer (n, m) ->
-           Some (Pconst_unboxed_integer (neg_string n, m))
-        | ("-" | "-."), Pconst_float (f, m) ->
-           Some (Pconst_float (neg_string f, m))
-        | ("-" | "-."), Pconst_unboxed_float (f, m) ->
-           Some (Pconst_unboxed_float (neg_string f, m))
-        | _, _ -> None
-      end
-    | _ -> None
-  in
-  match result with
-  | Some desc -> Pexp_constant desc, arg.pexp_attributes
-  | None ->
-      Pexp_apply (mkoperator ~loc:oploc ("~" ^ name), [Nolabel, arg]), []
-
-let mkuplus ~oploc name arg =
-  let desc = arg.pexp_desc in
-  match name, desc with
-  | "+", Pexp_constant (Pconst_integer _ | Pconst_unboxed_integer _)
-  | ("+" | "+."), Pexp_constant (Pconst_float _ | Pconst_unboxed_float _) ->
-     desc, arg.pexp_attributes
-  | _ ->
-     Pexp_apply (mkoperator ~loc:oploc ("~" ^ name), [Nolabel, arg]), []
+let mkuplus = mkuminus
 
 let mk_attr ~loc name payload = Attr.mk ~loc name payload
 

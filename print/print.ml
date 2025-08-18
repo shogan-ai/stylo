@@ -407,6 +407,7 @@ end = struct
       Function_constraint.pp constr ^/^ S.rarrow ^/^
       Function_body.pp body
     | Pexp_prefix_apply (op, arg) -> pp op ^^ pp arg
+    | Pexp_add_or_sub (op, arg) -> string op ^^ pp arg
     | Pexp_infix_apply {op; arg1; arg2} ->
       pp arg1 ^/^ pp op ^/^ pp arg2
     | Pexp_apply (e, args) -> pp_apply e args

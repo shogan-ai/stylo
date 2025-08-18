@@ -390,6 +390,7 @@ and expression_desc =
       have non-empty [params] or a [Pfunction_cases _] body.
   *)
   | Pexp_prefix_apply of expression * expression
+  | Pexp_add_or_sub of string * expression
   | Pexp_infix_apply of { op: expression; arg1: expression; arg2: expression }
   | Pexp_apply of expression * (arg_label * expression) list
       (** [Pexp_apply(E0, [(l1, E1) ; ... ; (ln, En)])]
