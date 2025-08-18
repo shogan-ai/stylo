@@ -1,0 +1,4 @@
+(library
+  (name parsing)
+  (libraries ; menhirLib
+             ocaml_syntax))

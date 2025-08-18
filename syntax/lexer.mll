@@ -17,7 +17,7 @@
 
 {
 open Lexing
-open Parser
+open Parser_tokens
 
 type error =
   | Illegal_character of char
@@ -428,18 +428,16 @@ let escaped_newlines = ref false
 (* Warn about Latin-1 characters used in idents *)
 
 let handle_docstrings = ref true
-let comment_list = ref []
+let comments = Queue.create ()
 
-let add_comment com =
-  comment_list := com :: !comment_list
+let add_comment com = Queue.add com comments
 
 let add_docstring_comment ds =
   let com =
     ("*" ^ Docstrings.docstring_body ds, Docstrings.docstring_loc ds)
   in
+  (* FIXME: except don't? *)
     add_comment com
-
-let comments () = List.rev !comment_list
 
 let float ~maybe_hash lit modifier =
   match maybe_hash with
@@ -1061,7 +1059,7 @@ and skip_hash_bang = parse
   let init () =
     is_in_string := false;
     comment_start_loc := [];
-    comment_list := [];
+    Queue.clear comments;
     match !preprocessor with
     | None -> ()
     | Some (init, _preprocess) -> init ()

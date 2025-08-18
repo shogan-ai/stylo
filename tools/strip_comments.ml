@@ -6,7 +6,9 @@ let comments =
   Lexer.init ();
   let lexbuf = Lexing.from_channel ic in
   while Lexer.token lexbuf <> EOF do () done;
-  Lexer.comments ()
+  Lexer.comments
+  |> Queue.to_seq
+  |> List.of_seq
 
 let max_chunk_sz = 4096
 let buffer = Bytes.create max_chunk_sz
