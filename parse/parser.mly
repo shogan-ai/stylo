@@ -91,7 +91,6 @@ let mkcf ~loc ?attrs ?docs d =
   Cf.mk ~loc:(make_loc loc) ?attrs ?docs d
 
 let mkrhs rhs loc = mkloc rhs (make_loc loc)
-let ghrhs rhs loc = mkloc rhs (ghost_loc loc)
 
 let push_loc x acc =
   if x.Location.loc_ghost
@@ -115,7 +114,6 @@ let mkpatvar ~loc name =
 let ghexp ~loc d = Exp.mk ~loc:(ghost_loc loc) d
 let ghpat ~loc d = Pat.mk ~loc:(ghost_loc loc) d
 let ghtyp ~loc ?attrs d = Typ.mk ~loc:(ghost_loc loc) ?attrs d
-let ghloc ~loc d = { txt = d; loc = ghost_loc loc }
 let ghstr ~loc d = Str.mk ~loc:(ghost_loc loc) d
 let ghsig ~loc d = Sig.mk ~loc:(ghost_loc loc) d
 
@@ -229,40 +227,17 @@ let maybe_curry_typ typ loc =
    and locations-as-Location.t; it should be clear when we move from
    one world to the other *)
 
-let mkexp_cons_desc consloc args =
-  Pexp_construct(mkrhs (Lident "::") consloc, Some args)
-let mkexp_cons ~loc consloc args =
-  mkexp ~loc (mkexp_cons_desc consloc args)
+let mkexp_cons_desc _consloc hd tl = Pexp_cons(hd, tl)
+let mkexp_cons ~loc consloc hd tl =
+  mkexp ~loc (mkexp_cons_desc consloc hd tl)
 
-let mkpat_cons_desc consloc args =
-  Ppat_construct(mkrhs (Lident "::") consloc, Some ([], args))
-let mkpat_cons ~loc consloc args =
-  mkpat ~loc (mkpat_cons_desc consloc args)
+let mkpat_cons_desc _consloc hd tl = Ppat_cons(hd, tl)
+let mkpat_cons ~loc consloc hd tl =
+  mkpat ~loc (mkpat_cons_desc consloc hd tl)
 
-let ghexp_cons_desc consloc args =
-  Pexp_construct(ghrhs (Lident "::") consloc, Some args)
-let ghpat_cons_desc consloc args =
-  Ppat_construct(ghrhs (Lident "::") consloc, Some ([], args))
+let mktailexp _nilloc elts = Pexp_list elts, _nilloc (* whatever *)
 
-let rec mktailexp nilloc = let open Location in function
-    [] ->
-      let nil = ghloc ~loc:nilloc (Lident "[]") in
-      Pexp_construct (nil, None), nilloc
-  | e1 :: el ->
-      let exp_el, el_loc = mktailexp nilloc el in
-      let loc = (e1.pexp_loc.loc_start, snd el_loc) in
-      let arg = ghexp ~loc (Pexp_tuple [None, e1; None, ghexp ~loc:el_loc exp_el]) in
-      ghexp_cons_desc loc arg, loc
-
-let rec mktailpat nilloc = let open Location in function
-    [] ->
-      let nil = ghloc ~loc:nilloc (Lident "[]") in
-      Ppat_construct (nil, None), nilloc
-  | p1 :: pl ->
-      let pat_pl, el_loc = mktailpat nilloc pl in
-      let loc = (p1.ppat_loc.loc_start, snd el_loc) in
-      let arg = ghpat ~loc (Ppat_tuple ([None, p1; None, ghpat ~loc:el_loc pat_pl], Closed)) in
-      ghpat_cons_desc loc arg, loc
+let mktailpat _nilloc elts = Ppat_list elts, _nilloc (* whatever *)
 
 let mkstrexp e attrs =
   { pstr_desc = Pstr_eval (e, attrs); pstr_loc = e.pexp_loc }
@@ -2719,8 +2694,7 @@ fun_expr:
         let let_ = {pbop_op; pbop_binding; pbop_loc} in
         mkexp ~loc:$sloc (Pexp_letop{ let_; ands; body}) }
   | fun_expr COLONCOLON expr
-      { mkexp_cons ~loc:$sloc $loc($2)
-          (ghexp ~loc:$sloc (Pexp_tuple[None, $1;None, $3])) }
+      { mkexp_cons ~loc:$sloc $loc($2) $1 $3 }
   | mkrhs(label) LESSMINUS expr
       { mkexp ~loc:$sloc (Pexp_setinstvar($1, $3)) }
   | simple_expr DOT mkrhs(label_longident) LESSMINUS expr
@@ -3487,9 +3461,7 @@ pattern_no_exn:
 
 %inline pattern_(self):
   | self COLONCOLON pattern
-      { mkpat_cons ~loc:$sloc $loc($2)
-          (ghpat ~loc:$sloc (Ppat_tuple ([None, $1;None, $3], Closed)))
-      }
+      { mkpat_cons ~loc:$sloc $loc($2) $1 $3 }
   | self attribute
       { Pat.attr $1 $2 }
   | pattern_gen

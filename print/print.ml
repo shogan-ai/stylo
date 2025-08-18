@@ -371,6 +371,11 @@ end = struct
     | Ppat_extension ext -> Extension.pp ext
     | Ppat_open (lid, p) -> longident lid.txt ^^ dot ^^ pp p
     | Ppat_parens p -> parens (pp p)
+    | Ppat_list elts ->
+      brackets (
+        separate_map (semi ^^ break 1) pp elts
+      )
+    | Ppat_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
 end
 
 (** {2 Value expressions} *)
@@ -551,6 +556,11 @@ end = struct
     | Pexp_parens { begin_end = false; exp } -> parens (pp exp)
     | Pexp_parens { begin_end = true; exp } ->
       S.begin_ ^/^ pp exp ^/^ S.end_
+    | Pexp_list elts ->
+      brackets (
+        separate_map (semi ^^ break 1) pp elts
+      )
+    | Pexp_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
 
   and pp_apply e args = pp e ^/^ Application.pp_args args
 end

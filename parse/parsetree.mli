@@ -348,6 +348,8 @@ and pattern_desc =
   | Ppat_extension of extension  (** Pattern [[%id]] *)
   | Ppat_open of Longident.t loc * pattern  (** Pattern [M.(P)] *)
   | Ppat_parens of pattern
+  | Ppat_list of pattern list
+  | Ppat_cons of pattern * pattern
 
 (** {2 Value expressions} *)
 
@@ -525,6 +527,8 @@ and expression_desc =
       assign: expression option
     }
   | Pexp_parens of { begin_end: bool; exp: expression }
+  | Pexp_list of expression list
+  | Pexp_cons of expression * expression
 
 and case =
     {
