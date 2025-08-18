@@ -5,7 +5,7 @@ for f in $@; do
             cat <<EOF
 (rule
   (with-stdout-to nocomment-$f
-    (run ../tools/strip_comments.exe $f)))
+    (run ../tools/strip_comments.exe %{dep:$f})))
 
 (rule
   (with-stdout-to normalized-$f
@@ -13,15 +13,17 @@ for f in $@; do
 
 (rule
   (with-stdout-to printed-$f
-    (run ../bin/stylo.exe nocomment-$f)))
+    (run ../bin/stylo.exe %{dep:nocomment-$f})))
 
 (rule
   (alias $name)
-  (action (diff normalized-$f printed-$f)))
+  (action (diff %{dep:normalized-$f} %{dep:printed-$f})))
 
 (alias
   (name all-tests)
   (deps (alias $name)))
+
+;; ---
 EOF
             ;;
 
