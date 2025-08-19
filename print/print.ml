@@ -569,24 +569,10 @@ end = struct
 end
 
 and Application : sig
-  val pp_args : (arg_label * expression) list -> document
+  val pp_args : expression argument list -> document
 end = struct
-  let punned lbl e =
-    match e.pexp_desc with
-    | Pexp_ident { txt = Lident i; _ } -> i = lbl
-    | _ -> false
 
-  let pp_arg (lbl, e) =
-    match lbl with
-    | Nolabel -> Expression.pp e
-    | Labelled l ->
-      if punned l e
-      then tilde ^^ string l
-      else tilde ^^ string l ^^ colon ^^ break 0 ^^ Expression.pp e
-    | Optional l ->
-      if punned l e
-      then qmark ^^ string l
-      else qmark ^^ string l ^^ colon ^^ break 0 ^^ Expression.pp e
+  let pp_arg a = Argument.pp Expression.pp a
 
   let pp_args = separate_map (break 1) pp_arg
 end
@@ -624,30 +610,67 @@ end = struct
     string pbop_op.txt ^/^ Value_binding.pp pbop_binding
 end
 
+and Argument : sig
+  val pp : ('a -> document) -> 'a argument -> document
+end = struct
+  let pp pp_arg = function
+    | Parg_unlabelled
+        { legacy_modes = []; arg; typ_constraint = None; modes = []; } ->
+      pp_arg arg
+    | Parg_unlabelled { legacy_modes; arg; typ_constraint; modes = m; } ->
+      parens (
+        modes legacy_modes ^/^ pp_arg arg ^^
+        begin match typ_constraint with
+          | None -> empty
+          | Some ct -> break 1 ^^ Type_constraint.pp ct
+        end
+        |> with_modes ~modes:m (* FIXME @ or @@ ? *)
+      )
+    | Parg_labelled {
+        optional; legacy_modes; name: string; maybe_punned = None; typ_constraint;
+        modes = m; default;
+      } ->
+      (if optional then qmark else tilde) ^^
+      parens (
+        modes legacy_modes ^/^ string name ^^
+        begin (match typ_constraint with
+          | None -> empty
+          | Some ct -> break 1 ^^ Type_constraint.pp ct)
+              |> with_modes ~modes:m (* FIXME @ or @@ ? *)
+        end ^^
+           begin match default with
+             | None -> empty
+             | Some d ->
+               equals ^^ Expression.pp d
+           end
+      )
+    | Parg_labelled {
+        optional; legacy_modes; name: string; maybe_punned = Some arg;
+        typ_constraint; modes = m; default;
+      } ->
+      (* FIXME: single or multi-token? *)
+      (if optional then qmark else tilde) ^^ string name ^^
+      parens (* FIXME: check in tokens if really present *) (
+        modes legacy_modes ^/^ pp_arg arg ^^
+        begin (match typ_constraint with
+          | None -> empty
+          | Some ct -> break 1 ^^ Type_constraint.pp ct)
+              |> with_modes ~modes:m (* FIXME @ or @@ ? *)
+        end ^^
+           begin match default with
+             | None -> empty
+             | Some d ->
+               equals ^^ Expression.pp d
+           end
+      )
+end
+
 and Function_param : sig
   val pp : function_param -> document
   val pp_desc : function_param_desc -> document
 end = struct
-  let punned lbl p =
-    match p.ppat_desc with
-    | Ppat_var { txt = v; _ } -> v = lbl
-    | _ -> false
-
   let pp_desc = function
-    | Pparam_val (Nolabel, None, p) -> Pattern.pp p
-    | Pparam_val (Labelled l, None, p) ->
-      if punned l p
-      then tilde ^^ string l
-      else tilde ^^ string l ^^ colon ^^ break 0 ^^ Pattern.pp p
-    | Pparam_val (Optional l, None, p) ->
-      if punned l p
-      then qmark ^^ string l
-      else qmark ^^ string l ^^ colon ^^ break 0 ^^ Pattern.pp p
-    | Pparam_val (Optional l, Some e, p) ->
-      qmark ^^ string l ^^ colon ^^ break 0 ^^ lparen ^^
-      break 0 ^^ Pattern.pp p ^/^ equals ^/^ Expression.pp e ^^ break 0 ^^
-      rparen
-    | Pparam_val ((Nolabel | Labelled _), Some _, _) -> assert false
+    | Pparam_val arg -> Argument.pp Pattern.pp arg
     | Pparam_newtype (lat, jkind_o) ->
       lparen ^^ S.type_ ^/^ string lat.txt ^^
       begin match jkind_o with
@@ -671,16 +694,21 @@ end = struct
       |> Attribute.attach ~attrs
 end
 
-and Function_constraint : sig
-  val pp : function_constraint -> document
+and Type_constraint : sig
+  val pp : type_constraint -> document
 end = struct
-  let pp_constraint = function
+  let pp = function
   | Pconstraint ct ->
     colon ^/^ Core_type.pp ct
   | Pcoerce (None, ct) -> S.coerce ^/^ Core_type.pp ct
   | Pcoerce (Some ct1, ct2) ->
     colon ^/^ Core_type.pp ct1 ^/^ S.coerce ^/^ Core_type.pp ct2
+end
 
+
+and Function_constraint : sig
+  val pp : function_constraint -> document
+end = struct
   let pp fc =
   (* FIXME:
   { mode_annotations : modes;
@@ -705,7 +733,7 @@ end = struct
      *)
   match fc.ret_type_constraint with
   | None -> empty
-  | Some tc -> pp_constraint tc
+  | Some tc -> Type_constraint.pp tc
 end
 
 and Comprehension : sig
@@ -1029,9 +1057,8 @@ end = struct
     | Pcl_constr (lid, args) ->
       type_app ~parens:false (longident lid.txt) (List.map Core_type.pp args)
     | Pcl_structure cs -> pp_structure cs
-    | Pcl_fun (lbl, default, pat, rhs) ->
-      Function_param.pp_desc (Pparam_val (lbl, default, pat))
-        ^/^ S.rarrow ^/^ pp rhs
+    | Pcl_fun (arg, rhs) ->
+      Argument.pp Pattern.pp arg ^/^ S.rarrow ^/^ pp rhs
     | Pcl_apply (ce, args) -> pp ce ^/^ Application.pp_args args
     | Pcl_let (rf, vbs, body) ->
       (* FIXME: factorize with Pexp_let *)

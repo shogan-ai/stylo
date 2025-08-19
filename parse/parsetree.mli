@@ -392,7 +392,7 @@ and expression_desc =
   | Pexp_prefix_apply of expression * expression
   | Pexp_add_or_sub of string * expression
   | Pexp_infix_apply of { op: expression; arg1: expression; arg2: expression }
-  | Pexp_apply of expression * (arg_label * expression) list
+  | Pexp_apply of expression * expression argument list
       (** [Pexp_apply(E0, [(l1, E1) ; ... ; (ln, En)])]
             represents [E0 ~l1:E1 ... ~ln:En]
 
@@ -554,8 +554,25 @@ and binding_op =
     pbop_loc : Location.t;
   }
 
+and 'a argument =
+  | Parg_unlabelled of {
+      legacy_modes: modes;
+      arg: 'a;
+      typ_constraint: type_constraint option;
+      modes: modes;
+    }
+  | Parg_labelled of {
+      optional: bool;
+      legacy_modes: modes;
+      name: string;
+      maybe_punned: 'a option;
+      typ_constraint: type_constraint option;
+      modes: modes;
+      default: expression option;
+    }
+
 and function_param_desc =
-  | Pparam_val of arg_label * expression option * pattern
+  | Pparam_val of pattern argument
   (** [Pparam_val (lbl, exp0, P)] represents the parameter:
       - [P]
         when [lbl] is {{!Asttypes.arg_label.Nolabel}[Nolabel]}
@@ -942,7 +959,7 @@ and class_expr_desc =
   | Pcl_constr of Longident.t loc * core_type list
       (** [c] and [['a1, ..., 'an] c] *)
   | Pcl_structure of class_structure  (** [object ... end] *)
-  | Pcl_fun of arg_label * expression option * pattern * class_expr
+  | Pcl_fun of pattern argument * class_expr
       (** [Pcl_fun(lbl, exp0, P, CE)] represents:
             - [fun P -> CE]
                      when [lbl]  is {{!arg_label.Nolabel}[Nolabel]}
@@ -957,7 +974,7 @@ and class_expr_desc =
                      when [lbl]  is {{!arg_label.Optional}[Optional l]}
                       and [exp0] is [Some E0].
         *)
-  | Pcl_apply of class_expr * (arg_label * expression) list
+  | Pcl_apply of class_expr * expression argument list
       (** [Pcl_apply(CE, [(l1,E1) ; ... ; (ln,En)])]
             represents [CE ~l1:E1 ... ~ln:En].
             [li] can be empty (non labeled argument) or start with [?]

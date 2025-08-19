@@ -178,7 +178,8 @@ let exclave_extension loc =
     (Pexp_extension(exclave_ext_loc loc, PStr []))
 
 let mkexp_exclave ~loc ~kwd_loc exp =
-  ghexp ~loc (Pexp_apply(exclave_extension (make_loc kwd_loc), [Nolabel, exp]))
+  ghexp ~loc (Pexp_apply(exclave_extension (make_loc kwd_loc),
+  [Arg.nolabel exp]))
 
 let mktyp_curry typ loc =
   {typ with ptyp_attributes =
@@ -2046,7 +2047,7 @@ class_fun_binding:
       COLON class_type EQUAL class_expr
         { Pcl_constraint($4, $2) }
     | labeled_simple_pattern class_fun_binding
-      { let (l,o,p) = $1 in Pcl_fun(l, o, p, $2) }
+      { Pcl_fun($1, $2) }
     ) { $1 }
 ;
 
@@ -2102,7 +2103,7 @@ class_fun_def:
   mkclass(
     labeled_simple_pattern MINUSGREATER e = class_expr
   | labeled_simple_pattern e = class_fun_def
-      { let (l,o,p) = $1 in Pcl_fun(l, o, p, e) }
+      { Pcl_fun($1, e) }
   ) { $1 }
 ;
 %inline class_structure:
@@ -2454,70 +2455,72 @@ seq_expr:
 labeled_simple_pattern:
     QUESTION LPAREN modes0=optional_mode_expr_legacy x=label_let_pattern opt_default RPAREN
       { let lbl, pat, cty, modes = x in
-        let loc = $startpos(modes0), $endpos(x) in
-        (Optional lbl, $5,
-         mkpat_with_modes ~loc ~pat ~cty ~modes:(modes0 @ modes))
+        ignore pat; (* punned! *)
+        Arg.optional ~legacy_modes:modes0
+        ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
+        ~modes ?default:$5 lbl
       }
   | QUESTION label_var
-      { (Optional (fst $2), None, snd $2) }
+      { Arg.optional (fst $2) }
   | OPTLABEL LPAREN modes0=optional_mode_expr_legacy x=let_pattern opt_default RPAREN
       { let pat, cty, modes = x in
-        let loc = $startpos(modes0), $endpos(x) in
-        (Optional $1, $5,
-         mkpat_with_modes ~loc ~pat ~cty ~modes:(modes0 @ modes))
+        (* FIXME: if everything is [] or None, how do we know we need parens,
+           compared to the next case?
+           Answer: check tokens. *)
+        Arg.optional ~legacy_modes:modes0 ~maybe_punned:pat
+          ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
+          ?default:$5 ~modes $1
       }
   | OPTLABEL pattern_var
-      { (Optional $1, None, $2) }
+      { Arg.optional ~maybe_punned:$2 $1 }
   | TILDE LPAREN modes0=optional_mode_expr_legacy x=label_let_pattern RPAREN
       { let lbl, pat, cty, modes = x in
-        let loc = $startpos(modes0), $endpos(x) in
-        (Labelled lbl, None,
-         mkpat_with_modes ~loc ~pat ~cty ~modes:(modes0 @ modes))
+        ignore pat; (* punned! *)
+        Arg.labelled ~legacy_modes:modes0
+          ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
+          ~modes lbl
       }
   | TILDE label_var
-      { (Labelled (fst $2), None, snd $2) }
+      { Arg.labelled (fst $2) }
   | LABEL simple_pattern
-      { (Labelled $1, None, $2) }
+      { Arg.labelled ~maybe_punned:$2 $1 }
   | LABEL LPAREN modes0=optional_mode_expr_legacy x=let_pattern_required_modes RPAREN
-    { let pat, cty, modes = x in
-      let loc = $startpos(modes0), $endpos(x) in
-      (Labelled $1, None,
-       mkpat_with_modes ~loc ~pat ~cty ~modes:(modes0 @ modes))
-    }
-  | LABEL LPAREN modes=mode_expr_legacy pat=pattern RPAREN
-      { let loc = $startpos(modes), $endpos(pat) in
-        (Labelled $1, None,
-         mkpat_with_modes ~loc ~pat ~cty:None ~modes)
+      { let pat, cty, modes = x in
+        Arg.labelled ~legacy_modes:modes0 ~maybe_punned:pat
+          ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
+          ~modes $1
       }
+  | LABEL LPAREN modes=mode_expr_legacy pat=pattern RPAREN
+      { Arg.labelled ~legacy_modes:modes ~maybe_punned:pat $1 }
   | simple_pattern
-      { (Nolabel, None, $1) }
+      { Arg.nolabel $1 }
   | LPAREN modes=mode_expr_legacy x=let_pattern_no_modes RPAREN
       { let pat, cty = x in
-        let loc = $startpos(modes), $endpos(x) in
-        (Nolabel, None,
-         mkpat_with_modes ~loc ~pat ~cty ~modes)
+        Arg.nolabel ~legacy_modes:modes
+          ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty) pat
       }
   | LPAREN modes0=optional_mode_expr_legacy x=let_pattern_required_modes RPAREN
       { let pat, cty, modes = x in
-        let loc = $startpos(modes0), $endpos(x) in
-        (Nolabel, None,
-        mkpat_with_modes ~loc ~pat ~cty ~modes:(modes0 @ modes))
+        Arg.nolabel ~legacy_modes:modes0
+          ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
+          ~modes pat
       }
   | LABEL LPAREN x=poly_pattern_no_modes RPAREN
       { let pat, cty = x in
-        (Labelled $1, None,
-        mkpat_with_modes ~loc:$loc(x) ~pat ~cty ~modes:[])
+        Arg.labelled ~maybe_punned:pat
+          ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
+          $1
       }
   | LABEL LPAREN modes=mode_expr_legacy x=poly_pattern_no_modes RPAREN
       { let pat, cty = x in
-        let loc = $startpos(modes), $endpos(x) in
-        (Labelled $1, None,
-         mkpat_with_modes ~loc ~pat ~cty ~modes)
+        Arg.labelled ~legacy_modes:modes ~maybe_punned:pat
+          ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
+          $1
       }
   | LPAREN x=poly_pattern_no_modes RPAREN
       { let pat, cty = x in
-        (Nolabel, None,
-         mkpat_with_modes ~loc:$loc(x) ~pat ~cty ~modes:[])
+        Arg.nolabel ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
+        pat
       }
 ;
 
@@ -2980,20 +2983,17 @@ comprehension_clause:
 ;
 labeled_simple_expr:
     simple_expr %prec below_HASH
-      { (Nolabel, $1) }
+      { Arg.nolabel $1 }
   | LABEL simple_expr %prec below_HASH
-      { (Labelled $1, $2) }
+      { Arg.labelled $1 ~maybe_punned:$2 }
   | TILDE label = LIDENT
-      { let loc = $loc(label) in
-        (Labelled label, mkexpvar ~loc label) }
+      { Arg.labelled label }
   | TILDE LPAREN label = LIDENT c = type_constraint RPAREN
-      { (Labelled label, mkexp_type_constraint_with_modes ~loc:($startpos($2), $endpos) ~modes:[]
-                           (mkexpvar ~loc:$loc(label) label) c) }
+      { Arg.labelled ~typ_constraint:c label }
   | QUESTION label = LIDENT
-      { let loc = $loc(label) in
-        (Optional label, mkexpvar ~loc label) }
+      { Arg.optional label }
   | OPTLABEL simple_expr %prec below_HASH
-      { (Optional $1, $2) }
+      { Arg.optional $1 ~maybe_punned:$2 }
 ;
 %inline let_ident:
     val_ident { mkpatvar ~loc:$sloc $1 }
@@ -3232,9 +3232,8 @@ fun_param_as_list:
         ]
       }
   | labeled_simple_pattern
-      { let a, b, c = $1 in
-        [ { pparam_loc = make_loc $sloc;
-            pparam_desc = Pparam_val (a, b, c)
+      { [ { pparam_loc = make_loc $sloc;
+            pparam_desc = Pparam_val $1
           }
         ]
       }

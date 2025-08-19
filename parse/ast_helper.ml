@@ -373,7 +373,7 @@ module Cl = struct
 
   let constr ?loc ?attrs a b = mk ?loc ?attrs (Pcl_constr (a, b))
   let structure ?loc ?attrs a = mk ?loc ?attrs (Pcl_structure a)
-  let fun_ ?loc ?attrs a b c d = mk ?loc ?attrs (Pcl_fun (a, b, c, d))
+  let fun_ ?loc ?attrs a b = mk ?loc ?attrs (Pcl_fun (a, b))
   let apply ?loc ?attrs a b = mk ?loc ?attrs (Pcl_apply (a, b))
   let let_ ?loc ?attrs a b c = mk ?loc ?attrs (Pcl_let (a, b, c))
   let constraint_ ?loc ?attrs a b = mk ?loc ?attrs (Pcl_constraint (a, b))
@@ -711,4 +711,29 @@ module Of = struct
     mk ?loc ?attrs (Otag (label, ty))
   let inherit_ ?loc ty =
     mk ?loc (Oinherit ty)
+end
+
+module Arg = struct
+  let nolabel ?(legacy_modes=[]) ?typ_constraint ?(modes=[]) arg =
+    Parg_unlabelled { legacy_modes; arg; typ_constraint; modes }
+
+  let mk ~opt ?(legacy_modes=[]) ?maybe_punned ?typ_constraint ?(modes=[])
+      ?default name =
+    Parg_labelled {
+      optional = opt;
+      legacy_modes;
+      name;
+      maybe_punned;
+      typ_constraint;
+      modes;
+      default;
+    }
+
+  let labelled ?legacy_modes ?maybe_punned ?typ_constraint ?modes name =
+    mk ~opt:false ?legacy_modes ?maybe_punned ?typ_constraint ?modes name
+
+  let optional ?legacy_modes ?maybe_punned ?typ_constraint ?modes ?default name
+    =
+    mk ~opt:true ?legacy_modes ?maybe_punned ?typ_constraint ?modes ?default
+      name
 end

@@ -155,7 +155,7 @@ module Exp:
                    -> function_constraint -> function_body
                    -> expression
     val apply: ?loc:loc -> ?attrs:attrs -> expression
-               -> (arg_label * expression) list -> expression
+               -> expression argument list -> expression
     val match_: ?loc:loc -> ?attrs:attrs -> expression -> case list
                 -> expression
     val try_: ?loc:loc -> ?attrs:attrs -> expression -> case list -> expression
@@ -472,10 +472,9 @@ module Cl:
 
     val constr: ?loc:loc -> ?attrs:attrs -> lid -> core_type list -> class_expr
     val structure: ?loc:loc -> ?attrs:attrs -> class_structure -> class_expr
-    val fun_: ?loc:loc -> ?attrs:attrs -> arg_label -> expression option ->
-      pattern -> class_expr -> class_expr
+    val fun_: ?loc:loc -> ?attrs:attrs -> pattern argument -> class_expr -> class_expr
     val apply: ?loc:loc -> ?attrs:attrs -> class_expr ->
-      (arg_label * expression) list -> class_expr
+      expression argument list -> class_expr
     val let_: ?loc:loc -> ?attrs:attrs -> rec_flag -> value_binding list ->
       class_expr -> class_expr
     val constraint_: ?loc:loc -> ?attrs:attrs -> class_expr -> class_type ->
@@ -549,3 +548,25 @@ module Of:
       label with_loc -> core_type -> object_field
     val inherit_: ?loc:loc -> core_type -> object_field
   end
+
+module Arg : sig
+  val nolabel :
+      ?legacy_modes:modes ->
+      ?typ_constraint:type_constraint ->
+      ?modes:modes -> 'a -> 'a argument
+
+  val labelled:
+      ?legacy_modes:modes ->
+      ?maybe_punned:'a ->
+      ?typ_constraint:type_constraint ->
+      ?modes:modes ->
+      string -> 'a argument
+
+  val optional:
+      ?legacy_modes:modes ->
+      ?maybe_punned:'a ->
+      ?typ_constraint:type_constraint ->
+      ?modes:modes ->
+      ?default:expression ->
+      string -> 'a argument
+end
