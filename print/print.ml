@@ -654,7 +654,7 @@ end = struct
         typ_constraint; modes = m; default;
       } ->
       (* FIXME: single or multi-token? *)
-      (if optional then qmark else tilde) ^^ string name ^^
+      (if optional then qmark else tilde) ^^ string name ^^ colon ^^
       parens (* FIXME: check in tokens if really present *) (
         modes legacy_modes ^/^ pp_arg arg ^^
         begin (match typ_constraint with
