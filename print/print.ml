@@ -622,7 +622,26 @@ end
 and Argument : sig
   val pp : ('a -> document) -> 'a argument -> document
 end = struct
-  let pp pp_arg = function
+  let had_parens arg = List.mem (Tokens.Token LPAREN) arg.parg_tokens
+
+  let pp pp_arg arg =
+    let parenthesize doc =
+      if had_parens arg
+      then parens (break 0 ^^ doc ^^ break 0)
+      else doc
+    in
+    let single_or_multi_token mark name =
+      match
+        List.find_map (function
+          | Tokens.Token LABEL _ -> Some (stringf "~%s:" name)
+          | Tokens.Token OPTLABEL _ -> Some (stringf "~%s:" name)
+          | _ -> None
+        ) arg.parg_tokens
+      with
+      | Some doc -> doc
+      | None -> mark ^^ string name ^^ colon
+    in
+    match arg.parg_desc with
     | Parg_unlabelled
         { legacy_modes = []; arg; typ_constraint = None; modes = []; } ->
       pp_arg arg
@@ -640,7 +659,7 @@ end = struct
         modes = m; default;
       } ->
       (if optional then qmark else tilde) ^^
-      parens (
+      parenthesize (
         modes legacy_modes ^/^ string name ^^
         begin (match typ_constraint with
           | None -> empty
@@ -657,9 +676,8 @@ end = struct
         optional; legacy_modes; name: string; maybe_punned = Some arg;
         typ_constraint; modes = m; default;
       } ->
-      (* FIXME: single or multi-token? *)
-      (if optional then qmark else tilde) ^^ string name ^^ colon ^^
-      parens (* FIXME: check in tokens if really present *) (
+      single_or_multi_token (if optional then qmark else tilde) name ^^
+      parenthesize (
         modes legacy_modes ^/^ pp_arg arg ^^
         begin (match typ_constraint with
           | None -> empty

@@ -562,7 +562,7 @@ and binding_op =
     pbop_loc : Location.t;
   }
 
-and 'a argument =
+and 'a argument_desc =
   | Parg_unlabelled of {
       legacy_modes: modes;
       arg: 'a;
@@ -578,6 +578,10 @@ and 'a argument =
       modes: modes;
       default: expression option;
     }
+
+and 'a argument =
+  { parg_desc: 'a argument_desc;
+    parg_tokens: Tokens.seq; }
 
 and function_param_desc =
   | Pparam_val of pattern argument

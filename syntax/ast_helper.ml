@@ -715,8 +715,9 @@ module Of = struct
 end
 
 module Arg = struct
-  let nolabel ?(legacy_modes=[]) ?typ_constraint ?(modes=[]) arg =
-    Parg_unlabelled { legacy_modes; arg; typ_constraint; modes }
+  let nolabel ~tokens ?(legacy_modes=[]) ?typ_constraint ?(modes=[]) arg =
+    { parg_desc = Parg_unlabelled { legacy_modes; arg; typ_constraint; modes };
+      parg_tokens = tokens }
 
   let mk ~opt ?(legacy_modes=[]) ?maybe_punned ?typ_constraint ?(modes=[])
       ?default name =
@@ -730,11 +731,17 @@ module Arg = struct
       default;
     }
 
-  let labelled ?legacy_modes ?maybe_punned ?typ_constraint ?modes name =
-    mk ~opt:false ?legacy_modes ?maybe_punned ?typ_constraint ?modes name
+  let labelled ~tokens ?legacy_modes ?maybe_punned ?typ_constraint ?modes name =
+    let desc =
+      mk ~opt:false ?legacy_modes ?maybe_punned ?typ_constraint ?modes name
+    in
+    { parg_desc = desc; parg_tokens = tokens; }
 
-  let optional ?legacy_modes ?maybe_punned ?typ_constraint ?modes ?default name
+  let optional ~tokens ?legacy_modes ?maybe_punned ?typ_constraint ?modes ?default name
     =
-    mk ~opt:true ?legacy_modes ?maybe_punned ?typ_constraint ?modes ?default
-      name
+    let desc =
+      mk ~opt:true ?legacy_modes ?maybe_punned ?typ_constraint ?modes ?default
+        name
+    in
+    { parg_desc = desc; parg_tokens = tokens; }
 end

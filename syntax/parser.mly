@@ -2261,70 +2261,70 @@ labeled_simple_pattern:
     QUESTION LPAREN modes0=optional_mode_expr_legacy x=label_let_pattern opt_default RPAREN
       { let lbl, pat, cty, modes = x in
         ignore pat; (* punned! *)
-        Arg.optional ~legacy_modes:modes0
+        Arg.optional ~tokens:(Tokens.of_production ()) ~legacy_modes:modes0
         ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
         ~modes ?default:$5 lbl
       }
   | QUESTION label_var
-      { Arg.optional (fst $2) }
+      { Arg.optional ~tokens:(Tokens.of_production ()) (fst $2) }
   | OPTLABEL LPAREN modes0=optional_mode_expr_legacy x=let_pattern opt_default RPAREN
       { let pat, cty, modes = x in
         (* FIXME: if everything is [] or None, how do we know we need parens,
            compared to the next case?
            Answer: check tokens. *)
-        Arg.optional ~legacy_modes:modes0 ~maybe_punned:pat
+        Arg.optional ~tokens:(Tokens.of_production ()) ~legacy_modes:modes0 ~maybe_punned:pat
           ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
           ?default:$5 ~modes $1
       }
   | OPTLABEL pattern_var
-      { Arg.optional ~maybe_punned:$2 $1 }
+      { Arg.optional ~tokens:(Tokens.of_production ()) ~maybe_punned:$2 $1 }
   | TILDE LPAREN modes0=optional_mode_expr_legacy x=label_let_pattern RPAREN
       { let lbl, pat, cty, modes = x in
         ignore pat; (* punned! *)
-        Arg.labelled ~legacy_modes:modes0
+        Arg.labelled ~tokens:(Tokens.of_production ()) ~legacy_modes:modes0
           ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
           ~modes lbl
       }
   | TILDE label_var
-      { Arg.labelled (fst $2) }
+      { Arg.labelled ~tokens:(Tokens.of_production ()) (fst $2) }
   | LABEL simple_pattern
-      { Arg.labelled ~maybe_punned:$2 $1 }
+      { Arg.labelled ~tokens:(Tokens.of_production ()) ~maybe_punned:$2 $1 }
   | LABEL LPAREN modes0=optional_mode_expr_legacy x=let_pattern_required_modes RPAREN
       { let pat, cty, modes = x in
-        Arg.labelled ~legacy_modes:modes0 ~maybe_punned:pat
+        Arg.labelled ~tokens:(Tokens.of_production ()) ~legacy_modes:modes0 ~maybe_punned:pat
           ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
           ~modes $1
       }
   | LABEL LPAREN modes=mode_expr_legacy pat=pattern RPAREN
-      { Arg.labelled ~legacy_modes:modes ~maybe_punned:pat $1 }
+      { Arg.labelled ~tokens:(Tokens.of_production ()) ~legacy_modes:modes ~maybe_punned:pat $1 }
   | simple_pattern
-      { Arg.nolabel $1 }
+      { Arg.nolabel ~tokens:(Tokens.of_production ()) $1 }
   | LPAREN modes=mode_expr_legacy x=let_pattern_no_modes RPAREN
       { let pat, cty = x in
-        Arg.nolabel ~legacy_modes:modes
+        Arg.nolabel ~tokens:(Tokens.of_production ()) ~legacy_modes:modes
           ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty) pat
       }
   | LPAREN modes0=optional_mode_expr_legacy x=let_pattern_required_modes RPAREN
       { let pat, cty, modes = x in
-        Arg.nolabel ~legacy_modes:modes0
+        Arg.nolabel ~tokens:(Tokens.of_production ()) ~legacy_modes:modes0
           ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
           ~modes pat
       }
   | LABEL LPAREN x=poly_pattern_no_modes RPAREN
       { let pat, cty = x in
-        Arg.labelled ~maybe_punned:pat
+        Arg.labelled ~tokens:(Tokens.of_production ()) ~maybe_punned:pat
           ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
           $1
       }
   | LABEL LPAREN modes=mode_expr_legacy x=poly_pattern_no_modes RPAREN
       { let pat, cty = x in
-        Arg.labelled ~legacy_modes:modes ~maybe_punned:pat
+        Arg.labelled ~tokens:(Tokens.of_production ()) ~legacy_modes:modes ~maybe_punned:pat
           ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
           $1
       }
   | LPAREN x=poly_pattern_no_modes RPAREN
       { let pat, cty = x in
-        Arg.nolabel ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
+        Arg.nolabel ~tokens:(Tokens.of_production ()) ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
         pat
       }
 ;
@@ -2786,17 +2786,17 @@ comprehension_clause:
 ;
 labeled_simple_expr:
     simple_expr %prec below_HASH
-      { Arg.nolabel $1 }
+      { Arg.nolabel ~tokens:(Tokens.of_production ()) $1 }
   | LABEL simple_expr %prec below_HASH
-      { Arg.labelled $1 ~maybe_punned:$2 }
+      { Arg.labelled ~tokens:(Tokens.of_production ()) $1 ~maybe_punned:$2 }
   | TILDE label = LIDENT
-      { Arg.labelled label }
+      { Arg.labelled ~tokens:(Tokens.of_production ()) label }
   | TILDE LPAREN label = LIDENT c = type_constraint RPAREN
-      { Arg.labelled ~typ_constraint:c label }
+      { Arg.labelled ~tokens:(Tokens.of_production ()) ~typ_constraint:c label }
   | QUESTION label = LIDENT
-      { Arg.optional label }
+      { Arg.optional ~tokens:(Tokens.of_production ()) label }
   | OPTLABEL simple_expr %prec below_HASH
-      { Arg.optional $1 ~maybe_punned:$2 }
+      { Arg.optional ~tokens:(Tokens.of_production ()) $1 ~maybe_punned:$2 }
 ;
 %inline let_ident:
     val_ident { mkpatvar ~loc:$sloc $1 }
@@ -3082,14 +3082,17 @@ fun_params:
    in one base case for each case of [labeled_tuple_element].  *)
 %inline labeled_tuple_element :
   | expr
-     { Arg.nolabel $1 }
+     { Arg.nolabel ~tokens:(Tokens.of_production ()) $1 }
   | LABEL simple_expr %prec below_HASH
-     { Arg.labelled $1 ~maybe_punned:$2 }
+     { Arg.labelled ~tokens:(Tokens.of_production ()) $1 ~maybe_punned:$2 }
   | TILDE label = LIDENT
-     { Arg.labelled label }
+     { Arg.labelled ~tokens:(Tokens.of_production ()) label }
   | TILDE LPAREN label = LIDENT c = type_constraint RPAREN %prec below_HASH
-     { Arg.labelled ~typ_constraint:c label }
+     { Arg.labelled ~tokens:(Tokens.of_production ()) ~typ_constraint:c label }
 ;
+
+(* FIXME: how do I get the tokens from the inlined element and leave the rest..?
+     *)
 reversed_labeled_tuple_body:
   (* > 2 elements *)
   xs = reversed_labeled_tuple_body
@@ -3100,19 +3103,19 @@ reversed_labeled_tuple_body:
 | x1 = expr
   COMMA
   x2 = labeled_tuple_element
-    { [ x2; Arg.nolabel x1 ] }
+    { [ x2; Arg.nolabel ~tokens:[] x1 ] }
 | l1 = LABEL x1 = simple_expr
   COMMA
   x2 = labeled_tuple_element
-    { [ x2; Arg.labelled l1 ~maybe_punned:x1 ] }
+    { [ x2; Arg.labelled ~tokens:[] l1 ~maybe_punned:x1 ] }
 | TILDE l1 = LIDENT
   COMMA
   x2 = labeled_tuple_element
-  { [ x2; Arg.labelled l1] }
+  { [ x2; Arg.labelled ~tokens:[] l1] }
 | TILDE LPAREN l1 = LIDENT c = type_constraint RPAREN
   COMMA
   x2 = labeled_tuple_element
-  { [ x2; Arg.labelled l1 ~typ_constraint:c] }
+  { [ x2; Arg.labelled ~tokens:[] l1 ~typ_constraint:c] }
 ;
 %inline labeled_tuple:
   xs = rev(reversed_labeled_tuple_body)

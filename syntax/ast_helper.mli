@@ -552,11 +552,13 @@ module Of:
 
 module Arg : sig
   val nolabel :
+      tokens:Tokens.seq ->
       ?legacy_modes:modes ->
       ?typ_constraint:type_constraint ->
       ?modes:modes -> 'a -> 'a argument
 
   val labelled:
+      tokens:Tokens.seq ->
       ?legacy_modes:modes ->
       ?maybe_punned:'a ->
       ?typ_constraint:type_constraint ->
@@ -564,6 +566,7 @@ module Arg : sig
       string -> 'a argument
 
   val optional:
+      tokens:Tokens.seq ->
       ?legacy_modes:modes ->
       ?maybe_punned:'a ->
       ?typ_constraint:type_constraint ->
