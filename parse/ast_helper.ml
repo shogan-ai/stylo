@@ -245,7 +245,7 @@ module Exp = struct
   let poly ?loc ?attrs a b = mk ?loc ?attrs (Pexp_poly (a, b))
   let object_ ?loc ?attrs a = mk ?loc ?attrs (Pexp_object a)
   let newtype ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_newtype (a, b, c))
-  let pack ?loc ?attrs a = mk ?loc ?attrs (Pexp_pack a)
+  let pack ?loc ?attrs ?pkg_type a = mk ?loc ?attrs (Pexp_pack (a, pkg_type))
   let open_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_dot_open (a, b))
   let letop ?loc ?attrs let_ ands body =
     mk ?loc ?attrs (Pexp_letop {let_; ands; body})

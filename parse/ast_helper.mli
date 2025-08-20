@@ -205,7 +205,8 @@ module Exp:
     val object_: ?loc:loc -> ?attrs:attrs -> class_structure -> expression
     val newtype: ?loc:loc -> ?attrs:attrs -> str -> jkind_annotation option ->
       expression  -> expression
-    val pack: ?loc:loc -> ?attrs:attrs -> module_expr -> expression
+    val pack: ?loc:loc -> ?attrs:attrs -> ?pkg_type:core_type -> module_expr ->
+      expression
     val open_: ?loc:loc -> ?attrs:attrs -> open_declaration -> expression
                -> expression
     val letop: ?loc:loc -> ?attrs:attrs -> binding_op

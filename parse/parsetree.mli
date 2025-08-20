@@ -497,7 +497,7 @@ and expression_desc =
   | Pexp_object of class_structure  (** [object ... end] *)
   | Pexp_newtype of string loc * jkind_annotation option * expression
       (** [fun (type t) -> E] or [fun (type t : k) -> E] *)
-  | Pexp_pack of module_expr
+  | Pexp_pack of module_expr * core_type option
       (** [(module ME)].
 
            [(module ME : S)] is represented as

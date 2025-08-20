@@ -522,8 +522,13 @@ end = struct
         | Some jkind -> break 1 ^^ colon ^/^ Jkind_annotation.pp jkind
       end ^/^ rparen ^/^ S.rarrow ^/^
       pp body
-    | Pexp_pack me ->
-      lparen ^^ S.module_ ^/^ Module_expr.pp me ^^ rparen
+    | Pexp_pack (me, ty) ->
+      lparen ^^ S.module_ ^/^ Module_expr.pp me ^^
+      begin match ty with
+      | None -> empty
+      | Some ct -> break 1 ^^ Type_constraint.pp (Pconstraint ct)
+      end ^^
+      rparen
     | Pexp_dot_open (od, e) ->
       Open_declaration.pp od ^^ dot ^^ pp e
     | Pexp_let_open (od, e) ->
