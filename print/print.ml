@@ -600,11 +600,9 @@ end = struct
     let ands =
       match ands with
       | [] -> empty
-      | _ ->
-        let sep = break 1 ^^ S.and_ in
-        sep ^^ separate_map sep Binding_op.pp ands
+      | _ -> break 1 ^^ separate_map (break 1) Binding_op.pp ands
     in
-    S.let_ ^^ Binding_op.pp let_ ^^ ands ^/^ S.in_ ^/^
+    Binding_op.pp let_ ^^ ands ^/^ S.in_ ^/^
     Expression.pp body
 end
 
