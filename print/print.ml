@@ -483,7 +483,13 @@ end = struct
     | Pexp_new lid -> S.new_ ^/^ longident lid.txt
     | Pexp_setinstvar (lbl, e) -> string lbl.txt ^/^ S.larrow ^/^ pp e
     | Pexp_override fields ->
-      let field (lbl, e) = string lbl.txt ^/^ equals ^/^ pp e in
+      let field (lbl, eo) =
+        string lbl.txt ^^
+        begin match eo with
+          | None -> empty
+          | Some e -> break 1 ^^ equals ^/^ pp e
+        end
+      in
       S.lbrace_lt ^/^
       separate_map (semi ^^ break 1) field fields ^/^
       S.gt_rbrace

@@ -315,19 +315,8 @@ let indexop_unclosed_error loc_s s loc_e =
 let lapply ~loc:_ p1 p2 =
   Lapply(p1, p2)
 
-let make_ghost x =
-  if x.loc.loc_ghost
-  then x (* Save an allocation *)
-  else { x with loc = Location.ghostify x.loc }
-
 let loc_last (id : Longident.t Location.loc) : string Location.loc =
   Location.map Longident.last id
-
-let loc_lident (id : string Location.loc) : Longident.t Location.loc =
-  Location.map (fun x -> Lident x) id
-
-let exp_of_label lbl =
-  Exp.mk ~loc:lbl.loc (Pexp_ident (loc_lident lbl))
 
 let mk_newtypes ~loc newtypes exp =
   let mk_one (name, jkind) exp =
@@ -3314,15 +3303,7 @@ record_expr_content:
 %inline object_expr_field:
     label = mkrhs(label)
     oe = preceded(EQUAL, expr)?
-      { let label, e =
-          match oe with
-          | None ->
-              (* No expression; this is a pun. Desugar it. *)
-              make_ghost label, exp_of_label label
-          | Some e ->
-              label, e
-        in
-        label, e }
+      { label, oe }
 ;
 %inline expr_semi_list:
   es = separated_or_terminated_nonempty_list(SEMI, expr)

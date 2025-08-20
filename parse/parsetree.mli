@@ -476,7 +476,7 @@ and expression_desc =
   | Pexp_send of expression * label loc  (** [E # m] *)
   | Pexp_new of Longident.t loc  (** [new M.c] *)
   | Pexp_setinstvar of label loc * expression  (** [x <- 2] *)
-  | Pexp_override of (label loc * expression) list
+  | Pexp_override of (label loc * expression option) list
       (** [{< x1 = E1; ...; xn = En >}] *)
   | Pexp_letmodule of string option loc * module_expr * expression
       (** [let module M = ME in E] *)
