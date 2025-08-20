@@ -124,9 +124,9 @@ module Pat:
     val construct: ?loc:loc -> ?attrs:attrs ->
       lid -> ((str * jkind_annotation option) list * pattern) option -> pattern
     val variant: ?loc:loc -> ?attrs:attrs -> label -> pattern option -> pattern
-    val record: ?loc:loc -> ?attrs:attrs -> (lid * pattern) list -> closed_flag
+    val record: ?loc:loc -> ?attrs:attrs -> pattern record_field list -> closed_flag
                 -> pattern
-    val record_unboxed_product: ?loc:loc -> ?attrs:attrs -> (lid * pattern) list
+    val record_unboxed_product: ?loc:loc -> ?attrs:attrs -> pattern record_field list
                 -> closed_flag -> pattern
     val array: ?loc:loc -> ?attrs:attrs -> mutable_flag -> pattern list ->
       pattern
@@ -166,10 +166,10 @@ module Exp:
                    -> expression
     val variant: ?loc:loc -> ?attrs:attrs -> label -> expression option
                  -> expression
-    val record: ?loc:loc -> ?attrs:attrs -> (lid * expression) list
+    val record: ?loc:loc -> ?attrs:attrs -> expression record_field list
                 -> expression option -> expression
-    val record_unboxed_product: ?loc:loc -> ?attrs:attrs -> (lid * expression) list
-                -> expression option -> expression
+    val record_unboxed_product: ?loc:loc -> ?attrs:attrs
+        -> expression record_field list -> expression option -> expression
     val field: ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
     val unboxed_field: ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
     val setfield: ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression

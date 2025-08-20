@@ -325,18 +325,16 @@ end = struct
     | Ppat_variant (lbl, None) -> bquote ^^ string lbl
     | Ppat_variant (lbl, Some p) -> bquote ^^ string lbl ^/^ pp p
     | Ppat_record (fields, cf) ->
-      let field (lid, p) = longident lid.txt ^/^ equals ^/^ pp p in
       lbrace ^/^
-      separate_map (semi ^^ break 1) field fields ^/^
+      separate_map (semi ^^ break 1) (Record_field.pp pp) fields ^/^
       begin match cf with
         | Closed -> empty
         | Open -> underscore ^^ break 1
       end ^^
       rbrace
     | Ppat_record_unboxed_product (fields, cf) ->
-      let field (lid, p) = longident lid.txt ^/^ equals ^/^ pp p in
       S.hash_lbrace ^/^
-      separate_map (semi ^^ break 1) field fields ^/^
+      separate_map (semi ^^ break 1) (Record_field.pp pp) fields ^/^
       begin match cf with
         | Closed -> empty
         | Open -> underscore ^^ break 1
@@ -439,9 +437,8 @@ end = struct
         | None -> empty
         | Some e -> pp e ^/^ S.with_ ^^ break 1
       in
-      let field (lid, e) = longident lid.txt ^/^ equals ^/^ pp e in
       lbrace ^/^ eo ^^
-      separate_map (semi ^^ break 1) field fields ^/^
+      separate_map (semi ^^ break 1) (Record_field.pp pp) fields ^/^
       rbrace
     | Pexp_field (e, lid) -> pp e ^^ dot ^^ longident lid.txt
     | Pexp_unboxed_field (e, lid) ->
@@ -565,6 +562,15 @@ end = struct
     | Pexp_exclave exp -> S.exclave_ ^/^ pp exp
 
   and pp_apply e args = pp e ^/^ Application.pp_args args
+end
+
+and Record_field : sig
+  val pp : ('a -> document) -> 'a record_field -> document
+end = struct
+  let pp pp_value rf =
+    longident rf.field_name.txt ^/^
+    optional Type_constraint.pp rf.typ ^^
+    optional (fun v -> break 1 ^^ equals ^/^ pp_value v) rf.value
 end
 
 and Application : sig

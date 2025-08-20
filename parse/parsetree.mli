@@ -308,7 +308,7 @@ and pattern_desc =
             - [`A]   when [pat] is [None],
             - [`A P] when [pat] is [Some P]
          *)
-  | Ppat_record of (Longident.t loc * pattern) list * closed_flag
+  | Ppat_record of pattern record_field list * closed_flag
       (** [Ppat_record([(l1, P1) ; ... ; (ln, Pn)], flag)] represents:
             - [{ l1=P1; ...; ln=Pn }]
                  when [flag] is {{!Asttypes.closed_flag.Closed}[Closed]}
@@ -317,7 +317,7 @@ and pattern_desc =
 
            Invariant: [n > 0]
          *)
-  | Ppat_record_unboxed_product of (Longident.t loc * pattern) list * closed_flag
+  | Ppat_record_unboxed_product of pattern record_field list * closed_flag
       (** [Ppat_record_unboxed_product([(l1, P1) ; ... ; (ln, Pn)], flag)] represents:
             - [#{ l1=P1; ...; ln=Pn }]
                  when [flag] is {{!Asttypes.closed_flag.Closed}[Closed]}
@@ -436,14 +436,14 @@ and expression_desc =
             - [`A]   when [exp] is [None]
             - [`A E] when [exp] is [Some E]
          *)
-  | Pexp_record of (Longident.t loc * expression) list * expression option
+  | Pexp_record of expression record_field list * expression option
       (** [Pexp_record([(l1,P1) ; ... ; (ln,Pn)], exp0)] represents
             - [{ l1=P1; ...; ln=Pn }]         when [exp0] is [None]
             - [{ E0 with l1=P1; ...; ln=Pn }] when [exp0] is [Some E0]
 
            Invariant: [n > 0]
          *)
-  | Pexp_record_unboxed_product of (Longident.t loc * expression) list * expression option
+  | Pexp_record_unboxed_product of expression record_field list * expression option
       (** [Pexp_record_unboxed_product([(l1,P1) ; ... ; (ln,Pn)], exp0)] represents
             - [#{ l1=P1; ...; ln=Pn }]         when [exp0] is [None]
             - [#{ E0 with l1=P1; ...; ln=Pn }] when [exp0] is [Some E0]
@@ -532,6 +532,12 @@ and expression_desc =
   | Pexp_list of expression list
   | Pexp_cons of expression * expression
   | Pexp_exclave of expression
+
+and 'a record_field =
+  { field_name: Longident.t loc;
+    value: 'a option;
+    typ: type_constraint option;
+  }
 
 and case =
     {
