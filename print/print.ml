@@ -749,10 +749,12 @@ end = struct
     | Pcomp_in e -> S.in_ ^/^ Expression.pp e
 
   let pp_clause_binding
-    { pcomp_cb_pattern = p
+    { pcomp_cb_mode = m_opt
+    ; pcomp_cb_pattern = p
     ; pcomp_cb_iterator = it
     ; pcomp_cb_attributes = attrs
     } =
+    optional (fun m -> mode m.txt ^^ break 1) m_opt ^^
     Pattern.pp p ^/^ pp_iterator it
     |> Attribute.attach ~attrs
 

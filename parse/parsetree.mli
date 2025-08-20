@@ -665,7 +665,8 @@ and comprehension_iterator =
 
 (** [@...] PAT (in/=) ... *)
 and comprehension_clause_binding =
-  { pcomp_cb_pattern : pattern;
+  { pcomp_cb_mode: mode loc option;
+    pcomp_cb_pattern : pattern;
     pcomp_cb_iterator : comprehension_iterator;
     pcomp_cb_attributes : attributes
   }
