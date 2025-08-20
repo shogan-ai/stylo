@@ -562,6 +562,7 @@ end = struct
         separate_map (semi ^^ break 1) pp elts
       )
     | Pexp_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
+    | Pexp_exclave exp -> S.exclave_ ^/^ pp exp
 
   and pp_apply e args = pp e ^/^ Application.pp_args args
 end

@@ -171,16 +171,6 @@ let ghexp_constraint ~loc ~exp ~cty ~modes =
   let exp = mkexp_constraint ~loc ~exp ~cty ~modes in
   { exp with pexp_loc = { exp.pexp_loc with loc_ghost = true }}
 
-let exclave_ext_loc loc = mkloc "extension.exclave" loc
-
-let exclave_extension loc =
-  Exp.mk ~loc:Location.none
-    (Pexp_extension(exclave_ext_loc loc, PStr []))
-
-let mkexp_exclave ~loc ~kwd_loc exp =
-  ghexp ~loc (Pexp_apply(exclave_extension (make_loc kwd_loc),
-  [Arg.nolabel exp]))
-
 let mktyp_curry typ loc =
   {typ with ptyp_attributes =
      Builtin_attributes.curry_attr loc :: typ.ptyp_attributes}
@@ -2681,7 +2671,7 @@ fun_expr:
   | mode=mode_legacy exp=seq_expr
      { mkexp_constraint ~loc:$sloc ~exp ~cty:None ~modes:[mode] }
   | EXCLAVE seq_expr
-     { mkexp_exclave ~loc:$sloc ~kwd_loc:($loc($1)) $2 }
+     { mkexp ~loc:$sloc (Pexp_exclave $2) }
 ;
 %inline expr:
   | or_function(fun_expr) { $1 }

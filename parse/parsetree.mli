@@ -531,6 +531,7 @@ and expression_desc =
   | Pexp_parens of { begin_end: bool; exp: expression }
   | Pexp_list of expression list
   | Pexp_cons of expression * expression
+  | Pexp_exclave of expression
 
 and case =
     {
