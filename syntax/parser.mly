@@ -371,10 +371,9 @@ let wrap_sig_ext ~loc body ext =
 let wrap_mksig_ext ~loc (item, ext) =
   wrap_sig_ext ~loc (mksig ~loc item) ext
 
-let mk_quotedext ~loc (id, idloc, str, strloc, delim) =
+let mk_quotedext ~loc:_ (id, idloc, str, _, delim) =
   let exp_id = mkloc id idloc in
-  let e = ghexp ~loc (Pexp_constant (Pconst_string (str, strloc, delim))) in
-  (exp_id, PStr [mkstrexp e []])
+  (exp_id, PString (str, delim))
 
 let text_str pos = Str.text (rhs_text pos)
 let text_sig pos = Sig.text (rhs_text pos)

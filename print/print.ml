@@ -139,9 +139,19 @@ end
 and Extension : sig
   val pp : ?floating:bool -> extension -> document
 end = struct
-  let pp ?(floating=false) (ext_name, ext_payload) =
+  let pp_classic ~floating name payload =
     (if floating then S.lbracket_percentpercent else S.lbracket_percent)
-    ^^ string ext_name.txt ^^ Payload.pp ext_payload ^^ rbracket
+    ^^ string name.txt ^^ Payload.pp payload ^^ rbracket
+
+  let pp ?(floating=false) (ext_name, ext_payload) =
+    match ext_payload with
+    | PString (s, delim) ->
+      (* Careful: single token! *)
+      (* FIXME: dedicated printer, same as string literals *)
+      let percent = if floating then "%%" else "%" in
+      let blank = if delim <> "" then " " else "" in
+      stringf "{%s%s%s%s|%s|%s}" percent ext_name.txt blank delim s delim
+    | _ -> pp_classic ~floating ext_name ext_payload
 end
 
 and Payload : sig
@@ -149,6 +159,7 @@ and Payload : sig
 end = struct
 (* FIXME: can't finish by '>', a space must be added *)
   let pp = function
+    | PString _ -> assert false (* handled in Extension *)
     | PStr s -> break 1 ^^ Structure.pp s
     | PSig s -> break 0 ^^ colon ^/^ Signature.pp s
     | PTyp c -> break 0 ^^ colon ^/^ Core_type.pp c

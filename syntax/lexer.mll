@@ -601,22 +601,22 @@ rule token = parse
       { let orig_loc = Location.curr lexbuf in
         let s, loc = wrap_string_lexer (quoted_string "") lexbuf in
         let idloc = compute_quoted_string_idloc orig_loc 2 id in
-        QUOTED_STRING_EXPR (id, idloc, s, loc, Some "") }
+        QUOTED_STRING_EXPR (id, idloc, s, loc, "") }
   | "{%" (extattrident as id) blank+ (lowercase* as delim) "|"
       { let orig_loc = Location.curr lexbuf in
         let s, loc = wrap_string_lexer (quoted_string delim) lexbuf in
         let idloc = compute_quoted_string_idloc orig_loc 2 id in
-        QUOTED_STRING_EXPR (id, idloc, s, loc, Some delim) }
+        QUOTED_STRING_EXPR (id, idloc, s, loc, delim) }
   | "{%%" (extattrident as id) "|"
       { let orig_loc = Location.curr lexbuf in
         let s, loc = wrap_string_lexer (quoted_string "") lexbuf in
         let idloc = compute_quoted_string_idloc orig_loc 3 id in
-        QUOTED_STRING_ITEM (id, idloc, s, loc, Some "") }
+        QUOTED_STRING_ITEM (id, idloc, s, loc, "") }
   | "{%%" (extattrident as id) blank+ (lowercase* as delim) "|"
       { let orig_loc = Location.curr lexbuf in
         let s, loc = wrap_string_lexer (quoted_string delim) lexbuf in
         let idloc = compute_quoted_string_idloc orig_loc 3 id in
-        QUOTED_STRING_ITEM (id, idloc, s, loc, Some delim) }
+        QUOTED_STRING_ITEM (id, idloc, s, loc, delim) }
   | "\'" newline "\'"
       { update_loc lexbuf None 1 false 1;
         (* newline is ('\013'* '\010') *)

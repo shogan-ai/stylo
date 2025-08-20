@@ -92,6 +92,7 @@ and payload =
   | PTyp of core_type  (** [: T] in an attribute or an extension point *)
   | PPat of pattern * expression option
       (** [? P]  or  [? P when E], in an attribute or an extension point *)
+  | PString of string * string
 
 (** {1 Core language} *)
 (** {2 Type expressions} *)

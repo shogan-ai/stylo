@@ -134,9 +134,9 @@
 %token STAR                   "*"
 %token <string * Location.t * string option>
        STRING                 "\"hello\"" (* just an example *)
-%token <string * Location.t * string * Location.t * string option>
+%token <string * Location.t * string * Location.t * string>
        QUOTED_STRING_EXPR     "{%hello|world|}"  (* just an example *)
-%token <string * Location.t * string * Location.t * string option>
+%token <string * Location.t * string * Location.t * string>
        QUOTED_STRING_ITEM     "{%%hello|world|}" (* just an example *)
 %token STRUCT                 "struct"
 %token THEN                   "then"
