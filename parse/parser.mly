@@ -3274,16 +3274,13 @@ fun_params:
    in one base case for each case of [labeled_tuple_element].  *)
 %inline labeled_tuple_element :
   | expr
-     { None, $1 }
+     { Arg.nolabel $1 }
   | LABEL simple_expr %prec below_HASH
-     { Some $1, $2 }
+     { Arg.labelled $1 ~maybe_punned:$2 }
   | TILDE label = LIDENT
-     { let loc = $loc(label) in
-       Some label, mkexpvar ~loc label }
+     { Arg.labelled label }
   | TILDE LPAREN label = LIDENT c = type_constraint RPAREN %prec below_HASH
-      { Some label,
-        mkexp_type_constraint_with_modes
-          ~loc:($startpos($2), $endpos) ~modes:[] (mkexpvar ~loc:$loc(label) label) c }
+     { Arg.labelled ~typ_constraint:c label }
 ;
 reversed_labeled_tuple_body:
   (* > 2 elements *)
@@ -3295,24 +3292,19 @@ reversed_labeled_tuple_body:
 | x1 = expr
   COMMA
   x2 = labeled_tuple_element
-    { [ x2; None, x1 ] }
+    { [ x2; Arg.nolabel x1 ] }
 | l1 = LABEL x1 = simple_expr
   COMMA
   x2 = labeled_tuple_element
-    { [ x2; Some l1, x1 ] }
+    { [ x2; Arg.labelled l1 ~maybe_punned:x1 ] }
 | TILDE l1 = LIDENT
   COMMA
   x2 = labeled_tuple_element
-  { let loc = $loc(l1) in
-    [ x2; Some l1, mkexpvar ~loc l1] }
+  { [ x2; Arg.labelled l1] }
 | TILDE LPAREN l1 = LIDENT c = type_constraint RPAREN
   COMMA
   x2 = labeled_tuple_element
-  { let x1 =
-      mkexp_type_constraint_with_modes
-        ~loc:($startpos($2), $endpos) ~modes:[] (mkexpvar ~loc:$loc(l1) l1) c
-    in
-    [ x2; Some l1, x1] }
+  { [ x2; Arg.labelled l1 ~typ_constraint:c] }
 ;
 %inline labeled_tuple:
   xs = rev(reversed_labeled_tuple_body)

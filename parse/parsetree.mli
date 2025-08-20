@@ -407,7 +407,7 @@ and expression_desc =
       (** [match E0 with P1 -> E1 | ... | Pn -> En] *)
   | Pexp_try of expression * case list
       (** [try E0 with P1 -> E1 | ... | Pn -> En] *)
-  | Pexp_tuple of (string option * expression) list
+  | Pexp_tuple of expression argument list
       (** [Pexp_tuple(el)] represents
           - [(E1, ..., En)]
             when [el] is [(None, E1);...;(None, En)]
@@ -418,7 +418,7 @@ and expression_desc =
 
            Invariant: [n >= 2]
         *)
-  | Pexp_unboxed_tuple of (string option * expression) list
+  | Pexp_unboxed_tuple of expression argument list
       (** Unboxed tuple expressions: [Pexp_unboxed_tuple([(Some l1,P1);...;(Some
           l2,Pn)])] represents [#(l1:E1, ..., ln:En)], and the labels are
           optional.

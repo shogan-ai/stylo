@@ -419,14 +419,7 @@ end = struct
       S.try_ ^/^ pp e ^/^ S.with_ ^/^
       separate_map (break 1 ^^ S.pipe ^^ break 1) Case.pp cases
     | Pexp_tuple elts ->
-      let elt (lbl, e) =
-        begin match lbl with
-          | None -> empty
-          | Some s -> tilde ^^ string s ^^ colon ^^ break 0
-        end ^^
-        pp e
-      in
-      separate_map (comma ^^ break 1) elt elts
+      separate_map (comma ^^ break 1) (Argument.pp pp) elts
     | Pexp_unboxed_tuple elts ->
       S.hash_lparen ^^
       pp_desc (Pexp_tuple elts) ^^
