@@ -3090,8 +3090,17 @@ fun_params:
      { Arg.labelled ~tokens:(Tokens.of_production ()) ~typ_constraint:c label }
 ;
 
-(* FIXME: how do I get the tokens from the inlined element and leave the rest..?
-     *)
+%inline labeled_tuple_element_noprec :
+  | expr
+     { Arg.nolabel ~tokens:(Tokens.of_production ()) $1 }
+  | LABEL simple_expr
+     { Arg.labelled ~tokens:(Tokens.of_production ()) $1 ~maybe_punned:$2 }
+  | TILDE label = LIDENT
+     { Arg.labelled ~tokens:(Tokens.of_production ()) label }
+  | TILDE LPAREN label = LIDENT c = type_constraint RPAREN
+     { Arg.labelled ~tokens:(Tokens.of_production ()) ~typ_constraint:c label }
+;
+
 reversed_labeled_tuple_body:
   (* > 2 elements *)
   xs = reversed_labeled_tuple_body
@@ -3099,22 +3108,10 @@ reversed_labeled_tuple_body:
   x = labeled_tuple_element
     { x :: xs }
   (* base cases (2 elements) *)
-| x1 = expr
+| x1 = labeled_tuple_element_noprec
   COMMA
   x2 = labeled_tuple_element
-    { [ x2; Arg.nolabel ~tokens:[] x1 ] }
-| l1 = LABEL x1 = simple_expr
-  COMMA
-  x2 = labeled_tuple_element
-    { [ x2; Arg.labelled ~tokens:[] l1 ~maybe_punned:x1 ] }
-| TILDE l1 = LIDENT
-  COMMA
-  x2 = labeled_tuple_element
-  { [ x2; Arg.labelled ~tokens:[] l1] }
-| TILDE LPAREN l1 = LIDENT c = type_constraint RPAREN
-  COMMA
-  x2 = labeled_tuple_element
-  { [ x2; Arg.labelled ~tokens:[] l1 ~typ_constraint:c] }
+    { [ x2; x1 ] }
 ;
 %inline labeled_tuple:
   xs = rev(reversed_labeled_tuple_body)
