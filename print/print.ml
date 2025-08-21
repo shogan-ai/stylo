@@ -306,13 +306,7 @@ end = struct
     | Ppat_constant c -> constant c
     | Ppat_interval (c1,c2) -> constant c1 ^/^ S.dotdot ^/^ constant c2
     | Ppat_tuple (elts, closed) ->
-      let elt (lbl_opt, p) =
-        begin match lbl_opt with
-          | None -> empty
-          | Some s -> string s ^^ colon ^^ break 0
-        end ^^ pp p
-      in
-      separate_map (break 0 ^^ comma ^^ break 1) elt elts ^^
+      separate_map (break 0 ^^ comma ^^ break 1) (Argument.pp pp) elts ^^
       begin match closed with
         | Closed -> empty
         | Open -> break 0 ^^ comma ^^ break 1 ^^ S.dotdot

@@ -116,10 +116,10 @@ module Pat:
     val alias: ?loc:loc -> ?attrs:attrs -> pattern -> str -> pattern
     val constant: ?loc:loc -> ?attrs:attrs -> constant -> pattern
     val interval: ?loc:loc -> ?attrs:attrs -> constant -> constant -> pattern
-    val tuple: ?loc:loc -> ?attrs:attrs -> (string option * pattern) list ->
+    val tuple: ?loc:loc -> ?attrs:attrs -> pattern argument list ->
       closed_flag -> pattern
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs
-                       -> (string option * pattern) list -> closed_flag
+                       -> pattern argument list -> closed_flag
                        -> pattern
     val construct: ?loc:loc -> ?attrs:attrs ->
       lid -> ((str * jkind_annotation option) list * pattern) option -> pattern

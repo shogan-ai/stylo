@@ -271,7 +271,7 @@ and pattern_desc =
 
            Other forms of interval are recognized by the parser
            but rejected by the type-checker. *)
-  | Ppat_tuple of (string option * pattern) list * Asttypes.closed_flag
+  | Ppat_tuple of pattern argument list * Asttypes.closed_flag
       (** [Ppat_tuple(pl, Closed)] represents
           - [(P1, ..., Pn)]       when [pl] is [(None, P1);...;(None, Pn)]
           - [(~L1:P1, ..., ~Ln:Pn)] when [pl] is
@@ -283,7 +283,7 @@ and pattern_desc =
           - If Closed, [n >= 2].
           - If Open, [n >= 1].
         *)
-  | Ppat_unboxed_tuple of (string option * pattern) list * Asttypes.closed_flag
+  | Ppat_unboxed_tuple of pattern argument list * Asttypes.closed_flag
       (** Unboxed tuple patterns: [#(l1:P1, ..., ln:Pn)] is [([(Some
           l1,P1);...;(Some l2,Pn)], Closed)], and the labels are optional.  An
           [Open] pattern ends in [..].

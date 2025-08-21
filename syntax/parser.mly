@@ -3248,31 +3248,27 @@ pattern_no_exn:
    without them suitable for use in other locations.
 *)
 %inline labeled_tuple_pat_element(self):
-  | self { None, $1 }
+  | self
+      { Arg.nolabel ~tokens:(Tokens.of_production ()) $1 }
   | LABEL simple_pattern %prec COMMA
-      { Some $1, $2 }
+      { Arg.labelled ~tokens:(Tokens.of_production ()) $1 ~maybe_punned:$2 }
   | TILDE label = LIDENT
-      { let loc = $loc(label) in
-        Some label, mkpatvar ~loc label }
+      { Arg.labelled ~tokens:(Tokens.of_production ()) label }
   | TILDE LPAREN label = LIDENT COLON cty = core_type RPAREN %prec COMMA
-      { let lbl_loc = $loc(label) in
-        let pat_loc = $startpos($2), $endpos in
-        let pat = mkpatvar ~loc:lbl_loc label in
-        Some label, mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
+      { Arg.labelled ~tokens:(Tokens.of_production ())
+          ~typ_constraint:(Pconstraint cty) label }
 
 (* If changing this, don't forget to change its copy just above. *)
 %inline labeled_tuple_pat_element_noprec(self):
-  | self { None, $1 }
+  | self
+      { Arg.nolabel ~tokens:(Tokens.of_production ()) $1 }
   | LABEL simple_pattern
-      { Some $1, $2 }
+      { Arg.labelled ~tokens:(Tokens.of_production ()) $1 ~maybe_punned:$2 }
   | TILDE label = LIDENT
-      { let loc = $loc(label) in
-        Some label, mkpatvar ~loc label }
+      { Arg.labelled ~tokens:(Tokens.of_production ()) label }
   | TILDE LPAREN label = LIDENT COLON cty = core_type RPAREN
-      { let lbl_loc = $loc(label) in
-        let pat_loc = $startpos($2), $endpos in
-        let pat = mkpatvar ~loc:lbl_loc label in
-        Some label, mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
+      { Arg.labelled ~tokens:(Tokens.of_production ())
+          ~typ_constraint:(Pconstraint cty) label }
 
 labeled_tuple_pat_element_list(self):
   | labeled_tuple_pat_element_list(self) COMMA labeled_tuple_pat_element(self)
