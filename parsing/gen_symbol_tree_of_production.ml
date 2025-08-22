@@ -42,21 +42,43 @@ type symbol = name
 type expanded_producer =
   | Regular of symbol
   | Inlined of expanded_branch
+  | (* tokens are not retrieved in the action, so we actually inline in the
+       Symbol_tree *)
+    Inlined_inlinable of expanded_branch
 
 and expanded_branch = expanded_producer list
+and post_expansion = {
+  tokens_are_accessed: bool;
+  producers: expanded_branch;
+}
 
-let expanded_inline_symbols : (name, expanded_branch list) Hashtbl.t =
+let expanded_inline_symbols : (name, post_expansion list) Hashtbl.t =
   Hashtbl.create 42
 
+let tokens_are_accessed =
+  let accessor = Str.regexp "Tokens.of_production" in
+  fun action ->
+    let source = G.Action.expr action in
+    try ignore (Str.search_forward accessor source 0); true
+    with Not_found -> false
+
 let rec expand_branch b =
-  expand_map (Branch.producers b) ~f:(fun p ->
-    let name = Producer.symbol p in
-    match StringMap.find name rules with
-    | rule when Rule.inline rule ->
-      List.map (expand_symbol name rule) ~f:(fun b -> Inlined b)
-    | _ | exception Not_found ->
-      [Regular name]
-  )
+  let branches =
+    expand_map (Branch.producers b) ~f:(fun p ->
+      let name = Producer.symbol p in
+      match StringMap.find name rules with
+      | rule when Rule.inline rule ->
+        List.map (expand_symbol name rule) ~f:(fun b ->
+          if b.tokens_are_accessed
+          then Inlined b.producers
+          else Inlined_inlinable b.producers
+        )
+      | _ | exception Not_found ->
+        [Regular name]
+    )
+  in
+  let tokens_are_accessed = tokens_are_accessed (Branch.action b) in
+  List.map branches ~f:(fun producers -> { tokens_are_accessed; producers })
 
 and expand_symbol name rule =
   match Hashtbl.find expanded_inline_symbols name with
@@ -73,7 +95,7 @@ let expanded =
   StringMap.filter_map rules ~f:(fun _name rule ->
     if Rule.inline rule
     then None
-    else Some (do_expand_symbol rule)
+    else Some (List.map (do_expand_symbol rule) ~f:(fun pe -> pe.producers))
   )
 
 (* Matching productions to their associated expanded branch *)
@@ -99,7 +121,7 @@ let rec matches p_rhs expanded_branch =
     not (Prod_rhs_it.ended p_rhs) &&
     Prod_rhs_it.name p_rhs = id &&
     matches (Prod_rhs_it.next p_rhs) expanded_branch_tail
-  | Inlined producers :: expanded_branch_tail ->
+  | (Inlined producers | Inlined_inlinable producers) :: expanded_branch_tail ->
     matches p_rhs (producers @ expanded_branch_tail)
 
 let rec extract_branch prod_rhs = function
@@ -154,6 +176,8 @@ let rec string_of_branch = function
       (string_of_branch b)
   | Inlined bi :: b ->
     sprintf "Inlined [%s]; %s" (string_of_branch bi) (string_of_branch b)
+  | Inlined_inlinable bi :: b ->
+    sprintf "%s %s" (string_of_branch bi) (string_of_branch b)
 
 let () =
   printf "type t = node list\n";

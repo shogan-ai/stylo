@@ -6,7 +6,7 @@
 (executable
   (name gen_symbol_tree_of_production)
   (modules gen_symbol_tree_of_production)
-  (libraries menhirSdk)
+  (libraries menhirSdk str)
   (flags :standard -open StdLabels -open MoreLabels))
 
 (rule
