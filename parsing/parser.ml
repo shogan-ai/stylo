@@ -64,10 +64,10 @@ let rec enqueue_subtrees root =
 
 let reduce_token_stream prod =
   let symbols = Symbol_tree.of_production prod in
-  Format.eprintf "PROD TREE:\n%a\n%!"
+  Format.eprintf "PROD TREE:@\n%a@."
     Symbol_tree.pp symbols;
   let tree = ref @@ Tokens.Available (pop_token_stream symbols) in
-  Format.eprintf "BEFORE ENQUEUING:\n%a\n%!"
+  Format.eprintf "BEFORE ENQUEUING:@\n%a@."
     Tokens.pp_tree !tree;
   enqueue_subtrees tree;
   Stack.push (TokenStream.Non_terminal tree) TS.tree_state

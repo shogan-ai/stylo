@@ -190,7 +190,7 @@ let () =
   printf "  | Inlined t -> pp ppf t)\n\n";
   printf "and pp ppf lst =\n\n";
   printf "  let open Format in\n";
-  printf "  fprintf ppf {|{@[@ %%a@}|}\n";
+  printf "  fprintf ppf {|{@[<hov 2>@ %%a@]}|}\n";
   printf "    (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf {|,@ |})\n";
   printf "       pp_node) lst\n";
   printf "let symbols_of_prod = function[@ocaml.warning \"-8\"]\n";

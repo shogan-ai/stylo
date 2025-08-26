@@ -37,11 +37,11 @@ let rec pp_tree ppf = function
   | Available lst ->
     let pp_lst =
       pp_print_list
-        ~pp_sep:(fun ppf () -> fprintf ppf ",@,")
+        ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
         pp_tree_node
     in
-    fprintf ppf "{@[@ %a" pp_lst lst;
-    fprintf ppf "@]}"
+    fprintf ppf "{@[<hov 2>@ %a" pp_lst lst;
+    fprintf ppf "@]@,}"
 
 and pp_tree_node ppf = function
   | Tok _ -> pp_print_string ppf "Token"
