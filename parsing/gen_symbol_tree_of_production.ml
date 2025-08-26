@@ -59,7 +59,7 @@ let tokens_are_accessed =
   (* FIXME: this is very fragile...
      We should just alway consider them accessed, and have a better structure
      than a stack to retrieve them in actions (e.g. a table with locs as key) *)
-  let accessor = Str.regexp {re|Tokens.of_production\|mkoperator|re} in
+  let accessor = Str.regexp {re|Tokens.of_production\|mkoperator\|mkexp|re} in
   fun action ->
     let source = G.Action.expr action in
     try ignore (Str.search_forward accessor source 0); true

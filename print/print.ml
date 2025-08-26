@@ -386,11 +386,24 @@ end
 and Expression : sig
   val pp : expression -> document
 end = struct
+  let pipe_before_pattern =
+    let rec consume_until_with = function
+      | [] -> assert false
+      | Tokens.Token Parser_tokens.WITH :: rest -> next_is_pipe rest
+      | _ :: rest -> consume_until_with rest
+    and next_is_pipe = function
+      | Tokens.Token Parser_tokens.BAR :: _ -> true
+      | Tokens.Comment _ :: rest -> next_is_pipe rest
+      | _ -> false
+    in
+    consume_until_with
+
   let rec pp e =
-    pp_desc e.pexp_desc
+    pp_desc e
     |> Attribute.attach ~attrs:e.pexp_attributes
 
-  and pp_desc = function
+  and pp_desc exp =
+    match exp.pexp_desc with
     | Pexp_ident lid -> longident lid.txt
     | Pexp_constant c -> constant c
     | Pexp_let (rf, vbs, body) ->
@@ -417,6 +430,11 @@ end = struct
     | Pexp_match (e, cases) ->
       (* FIXME: leading "|" *)
       S.match_ ^/^ pp e ^/^ S.with_ ^/^
+      begin if pipe_before_pattern exp.pexp_tokens then
+          S.pipe ^^ break 1
+        else
+          empty
+      end ^^
       separate_map (break 1 ^^ S.pipe ^^ break 1) Case.pp cases
     | Pexp_try (e, cases) ->
       S.try_ ^/^ pp e ^/^ S.with_ ^/^
@@ -425,7 +443,8 @@ end = struct
       separate_map (comma ^^ break 1) (Argument.pp pp) elts
     | Pexp_unboxed_tuple elts ->
       S.hash_lparen ^^
-      pp_desc (Pexp_tuple elts) ^^
+      (* FIXME: ! *)
+      pp_desc { exp with pexp_desc = Pexp_tuple elts } ^^
       rparen
     | Pexp_construct (lid, None) -> longident lid.txt
     | Pexp_construct (lid, Some e) -> longident lid.txt ^/^ pp e
