@@ -15,7 +15,6 @@ let () =
     match !c_r with
     | Consumed -> failwith "Tokens already accessed"
     | Available tree ->
-      Format.eprintf "ACCESSING\n%a\n%!" Tokens.pp_tree !c_r;
       c_r := Consumed;
       flatten tree
   )
@@ -53,7 +52,6 @@ let rec enqueue_subtrees root =
        non-inlined one being reduced). *)
     ()
   | Available tree ->
-    Format.eprintf "pushing@.";
     Stack.push root consumables;
     List.iter (function
       | Tok _ | Cmt _ -> ()
@@ -63,11 +61,7 @@ let rec enqueue_subtrees root =
 
 let reduce_token_stream prod =
   let symbols = Symbol_tree.of_production prod in
-  Format.eprintf "PROD TREE:@\n%a@."
-    Symbol_tree.pp symbols;
   let tree = ref @@ Tokens.Available (pop_token_stream symbols) in
-  Format.eprintf "BEFORE ENQUEUING:@\n%a@."
-    Tokens.pp_tree !tree;
   enqueue_subtrees tree;
   Stack.push (TokenStream.Non_terminal tree) TS.tree_state
 
@@ -78,8 +72,6 @@ let rec loop supplier checkpoint =
   | InputNeeded _ -> loop supplier (offer checkpoint (supplier ()))
   | AboutToReduce (_, prod) ->
     Stack.clear consumables;
-    Format.eprintf "AboutToReduce %s\n"
-      (Symbol_tree.xsym_to_string @@ lhs prod);
     reduce_token_stream prod;
     loop supplier (resume checkpoint)
   | _ -> loop supplier (resume checkpoint)
