@@ -179,9 +179,20 @@ let rec string_of_branch = function
   | Inlined_inlinable bi :: b ->
     sprintf "%s %s" (string_of_branch bi) (string_of_branch b)
 
+let interp = "Ocaml_syntax.Parser.MenhirInterpreter"
+
 let () =
   printf "type t = node list\n";
   printf "and node = Terminal | Nonterminal | Inlined of t\n\n";
+  printf "let rec pp_node ppf = Format.(function\n";
+  printf "  | Terminal -> pp_print_string ppf {|terminal|}\n";
+  printf "  | Nonterminal -> pp_print_string ppf {|nonterminal|}\n";
+  printf "  | Inlined t -> pp ppf t)\n\n";
+  printf "and pp ppf lst =\n\n";
+  printf "  let open Format in\n";
+  printf "  fprintf ppf {|{@[@ %%a@}|}\n";
+  printf "    (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf {|,@ |})\n";
+  printf "       pp_node) lst\n";
   printf "let symbols_of_prod = [|\n";
   IntMap.iter prod_to_branch ~f:(fun ~key:_ ~data ->
     (* We rely on the ordering of IntMap.iter *)
@@ -189,4 +200,15 @@ let () =
   );
   printf "|]\n\n";
   printf "let of_production p =\n";
-  printf "  symbols_of_prod.(Ocaml_syntax.Parser.MenhirInterpreter.production_index p)\n%!";
+  printf "  symbols_of_prod.(%s.production_index p)\n" interp
+
+let () =
+  printf "\n";
+  printf "let xsym_to_string : %s.xsymbol -> string = function\n" interp;
+  G.Nonterminal.(iter (fun nt ->
+    if G.Nonterminal.kind nt = `START then () else
+    let s = G.Nonterminal.mangled_name nt in
+    printf "  | X N N_%s -> %S\n" s s
+  ));
+  printf "  | _ -> \"Terminal\"";
+  printf "%!"
