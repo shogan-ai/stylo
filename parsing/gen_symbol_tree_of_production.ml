@@ -193,14 +193,13 @@ let () =
   printf "  fprintf ppf {|{@[@ %%a@}|}\n";
   printf "    (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf {|,@ |})\n";
   printf "       pp_node) lst\n";
-  printf "let symbols_of_prod = [|\n";
-  IntMap.iter prod_to_branch ~f:(fun ~key:_ ~data ->
-    (* We rely on the ordering of IntMap.iter *)
-    printf "  [ %s];\n" (string_of_branch data)
+  printf "let symbols_of_prod = function[@ocaml.warning \"-8\"]\n";
+  IntMap.iter prod_to_branch ~f:(fun ~key ~data ->
+    printf "  | %d -> [ %s]\n" key (string_of_branch data)
   );
-  printf "|]\n\n";
+  printf "\n\n";
   printf "let of_production p =\n";
-  printf "  symbols_of_prod.(%s.production_index p)\n" interp
+  printf "  symbols_of_prod (%s.production_index p)\n" interp
 
 let () =
   printf "\n";
