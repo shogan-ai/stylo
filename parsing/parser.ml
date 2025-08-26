@@ -5,13 +5,13 @@ module TS = TokenStream.Make ()
 open Ocaml_syntax.Parser.MenhirInterpreter
 
 
-let consumables : Tokens.consumable ref Queue.t =
-  Queue.create ()
+let consumables : Tokens.consumable ref Stack.t =
+  Stack.create ()
 
 let () =
   let open Tokens in
   of_production_ref := (fun () ->
-    let c_r = Queue.pop consumables in
+    let c_r = Stack.pop consumables in
     match !c_r with
     | Consumed -> failwith "Tokens already accessed"
     | Available tree ->
@@ -53,13 +53,13 @@ let rec enqueue_subtrees root =
        non-inlined one being reduced). *)
     ()
   | Available tree ->
-    (* Enqueue children first *)
+    Format.eprintf "pushing@.";
+    Stack.push root consumables;
     List.iter (function
       | Tok _ | Cmt _ -> ()
       | Non_terminal _ -> (* would have been accessed already *) ()
       | Inlined consumable -> enqueue_subtrees consumable
-    ) tree;
-    Queue.add root consumables
+    ) tree
 
 let reduce_token_stream prod =
   let symbols = Symbol_tree.of_production prod in
@@ -77,7 +77,7 @@ let rec loop supplier checkpoint =
   | Rejected -> failwith "Parse error"
   | InputNeeded _ -> loop supplier (offer checkpoint (supplier ()))
   | AboutToReduce (_, prod) ->
-    Queue.clear consumables;
+    Stack.clear consumables;
     Format.eprintf "AboutToReduce %s\n"
       (Symbol_tree.xsym_to_string @@ lhs prod);
     reduce_token_stream prod;
