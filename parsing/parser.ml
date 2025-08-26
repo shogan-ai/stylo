@@ -24,7 +24,7 @@ let flatten_stack_elts =
   List.map (function
     | TokenStream.Terminal t -> Tokens.Tok t
     | Comment s -> Cmt s
-    | Non_terminal nt -> Inlined nt
+    | Non_terminal nt -> Non_terminal nt
   )
 
 let rec pop_token_stream (syms : Symbol_tree.t) =
@@ -56,6 +56,7 @@ let rec enqueue_subtrees root =
     (* Enqueue children first *)
     List.iter (function
       | Tok _ | Cmt _ -> ()
+      | Non_terminal _ -> (* would have been accessed already *) ()
       | Inlined consumable -> enqueue_subtrees consumable
     ) tree;
     Queue.add root consumables

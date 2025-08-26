@@ -10,6 +10,7 @@ type tree_node =
   | Tok of token
   | Cmt of string
   | Inlined of consumable ref
+  | Non_terminal of consumable ref
 
 and consumable = Consumed | Available of tree
 
@@ -23,6 +24,9 @@ let rec flatten : tree -> seq = function
   | Cmt s :: rest -> Comment s :: flatten rest
   | Inlined { contents = Consumed } :: rest -> Child_node :: flatten rest
   | Inlined { contents = Available subtree } :: rest ->
+    flatten subtree @ flatten rest
+  | Non_terminal { contents = Consumed } :: rest -> Child_node :: flatten rest
+  | Non_terminal { contents = Available subtree } :: rest ->
     flatten subtree @ flatten rest
 
 let of_production_ref : (unit -> seq) ref =
@@ -47,3 +51,4 @@ and pp_tree_node ppf = function
   | Tok _ -> pp_print_string ppf "Token"
   | Cmt _ -> pp_print_string ppf "Comment"
   | Inlined c_ref -> pp_tree ppf !c_ref
+  | Non_terminal c_ref -> pp_print_string ppf "*"; pp_tree ppf !c_ref
