@@ -17,6 +17,14 @@ and tree = tree_node list
 
 type seq = elt list
 
+let rec flatten : tree -> seq = function
+  | [] -> []
+  | Tok t :: rest -> Token t :: flatten rest
+  | Cmt s :: rest -> Comment s :: flatten rest
+  | Inlined { contents = Consumed } :: rest -> Child_node :: flatten rest
+  | Inlined { contents = Available subtree } :: rest ->
+    flatten subtree @ flatten rest
+
 let of_production_ref : (unit -> seq) ref =
   ref (fun () -> failwith "Initialization error")
 
