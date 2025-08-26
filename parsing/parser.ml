@@ -53,12 +53,10 @@ let rec enqueue_subtrees root =
        non-inlined one being reduced). *)
     ()
   | Available tree ->
+    (* Enqueue children first *)
     List.iter (function
       | Tok _ | Cmt _ -> ()
-      | Inlined consumable ->
-        (* Enqueue children first *)
-        enqueue_subtrees consumable;
-        Queue.add consumable consumables
+      | Inlined consumable -> enqueue_subtrees consumable
     ) tree;
     Queue.add root consumables
 
