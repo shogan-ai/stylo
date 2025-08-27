@@ -331,11 +331,11 @@ end = struct
     | Ppat_variant (lbl, Some p) -> bquote ^^ string lbl ^/^ pp p
     | Ppat_record (fields, cf) ->
       lbrace ^/^
-      separate_map (semi ^^ break 1) (Record_field.pp pp) fields ^/^
+      separate_map (semi ^^ break 1) (Record_field.pp pp) fields ^^
       begin match cf with
         | Closed -> empty
-        | Open -> underscore ^^ break 1
-      end ^^
+        | Open -> semi ^/^ underscore
+      end ^/^
       rbrace
     | Ppat_record_unboxed_product (fields, cf) ->
       S.hash_lbrace ^/^
@@ -598,8 +598,8 @@ and Record_field : sig
   val pp : ('a -> document) -> 'a record_field -> document
 end = struct
   let pp pp_value rf =
-    longident rf.field_name.txt ^/^
-    optional Type_constraint.pp rf.typ ^^
+    longident rf.field_name.txt ^^
+    optional (fun v -> break 1 ^^ Type_constraint.pp v) rf.typ ^^
     optional (fun v -> break 1 ^^ equals ^/^ pp_value v) rf.value
 end
 
