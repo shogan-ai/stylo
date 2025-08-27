@@ -4,78 +4,18 @@ module TS = TokenStream.Make ()
 
 open Ocaml_syntax.Parser.MenhirInterpreter
 
-
-let consumables : Tokens.consumable ref Stack.t =
-  Stack.create ()
-
 let () =
   let open Tokens in
-  of_production_ref := (fun () ->
-    let c_r = Stack.pop consumables in
-    match !c_r with
-    | Consumed -> failwith "Tokens already accessed"
-    | Available tree ->
-      c_r := Consumed;
-      flatten tree
-  );
   between_ref := (fun ~start ~stop ->
-    Tokens.Indexed_list.consume TS.indexed_list start stop
+    Indexed_list.consume TS.indexed_list start stop
   )
-
-let flatten_stack_elts =
-  List.map (function
-    | TokenStream.Terminal t -> Tokens.Tok t
-    | Comment s -> Cmt s
-    | Non_terminal nt -> Non_terminal nt
-  )
-
-let rec pop_token_stream (syms : Symbol_tree.t) =
-  match syms with
-  | [] -> []
-  | Terminal :: rest ->
-    let tail = pop_token_stream rest in
-    let prefix = TS.pop_until `terminal in
-    flatten_stack_elts prefix @ tail
-  | Nonterminal :: rest ->
-    let tail = pop_token_stream rest in
-    let prefix = TS.pop_until `non_terminal in
-    flatten_stack_elts prefix @ tail
-  | Inlined sub :: rest ->
-    let tail = pop_token_stream rest in
-    let sub_tree = ref @@ Tokens.Available (pop_token_stream sub) in
-    Tokens.Inlined sub_tree :: tail
-
-let rec enqueue_subtrees root =
-  let open Tokens in
-  match !root with
-  | Consumed ->
-    (* We encounter an already consumed node when a previous reduction accessed
-       subtrees (corresponding to inlined rules) of the token tree built at the
-       time, but didn't access the tokens of the "main" production (i.e. the
-       non-inlined one being reduced). *)
-    ()
-  | Available tree ->
-    Stack.push root consumables;
-    List.iter (function
-      | Tok _ | Cmt _ -> ()
-      | Non_terminal _ -> (* would have been accessed already *) ()
-      | Inlined consumable -> enqueue_subtrees consumable
-    ) tree
-
-let reduce_token_stream prod =
-  let symbols = Symbol_tree.of_production prod in
-  let tree = ref @@ Tokens.Available (pop_token_stream symbols) in
-  enqueue_subtrees tree;
-  Stack.push (TokenStream.Non_terminal tree) TS.tree_state
 
 let rec loop supplier checkpoint =
   match checkpoint with
   | Accepted value -> value
   | Rejected -> failwith "Parse error"
   | InputNeeded _ -> loop supplier (offer checkpoint (supplier ()))
-  | AboutToReduce (_, prod) ->
-    Stack.clear consumables;
-    reduce_token_stream prod;
+  | AboutToReduce (_, _) ->
     loop supplier (resume checkpoint)
   | _ -> loop supplier (resume checkpoint)
 

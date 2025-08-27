@@ -1,15 +1,3 @@
 (library
   (name parsing)
-  (modules :standard \ gen_symbol_tree_of_production)
   (libraries ocaml_syntax))
-
-(executable
-  (name gen_symbol_tree_of_production)
-  (modules gen_symbol_tree_of_production)
-  (libraries menhirSdk str)
-  (flags :standard -open StdLabels -open MoreLabels))
-
-(rule
-  (with-stdout-to symbol_tree.ml
-    (run %{dep:./gen_symbol_tree_of_production.exe}
-         %{dep:../syntax/parser.cmly})))
