@@ -172,34 +172,35 @@ module Typ = struct
 end
 
 module Pat = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) d =
+  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
     {ppat_desc = d;
      ppat_loc = loc;
      ppat_loc_stack = [];
-     ppat_attributes = attrs}
+     ppat_attributes = attrs;
+     ppat_tokens = tokens}
   let attr d a = {d with ppat_attributes = d.ppat_attributes @ [a]}
 
-  let any ?loc ?attrs () = mk ?loc ?attrs Ppat_any
-  let var ?loc ?attrs a = mk ?loc ?attrs (Ppat_var a)
-  let alias ?loc ?attrs a b = mk ?loc ?attrs (Ppat_alias (a, b))
-  let constant ?loc ?attrs a = mk ?loc ?attrs (Ppat_constant a)
-  let interval ?loc ?attrs a b = mk ?loc ?attrs (Ppat_interval (a, b))
-  let tuple ?loc ?attrs a b = mk ?loc ?attrs (Ppat_tuple (a, b))
-  let unboxed_tuple ?loc ?attrs a b = mk ?loc ?attrs (Ppat_unboxed_tuple (a, b))
-  let construct ?loc ?attrs a b = mk ?loc ?attrs (Ppat_construct (a, b))
-  let variant ?loc ?attrs a b = mk ?loc ?attrs (Ppat_variant (a, b))
-  let record ?loc ?attrs a b = mk ?loc ?attrs (Ppat_record (a, b))
-  let record_unboxed_product ?loc ?attrs a b =
-    mk ?loc ?attrs (Ppat_record_unboxed_product (a, b))
-  let array ?loc ?attrs a b = mk ?loc ?attrs (Ppat_array (a, b))
-  let or_ ?loc ?attrs a b = mk ?loc ?attrs (Ppat_or (a, b))
-  let constraint_ ?loc ?attrs a b c = mk ?loc ?attrs (Ppat_constraint (a, b, c))
-  let type_ ?loc ?attrs a = mk ?loc ?attrs (Ppat_type a)
-  let lazy_ ?loc ?attrs a = mk ?loc ?attrs (Ppat_lazy a)
-  let unpack ?loc ?attrs a = mk ?loc ?attrs (Ppat_unpack a)
-  let open_ ?loc ?attrs a b = mk ?loc ?attrs (Ppat_open (a, b))
-  let exception_ ?loc ?attrs a = mk ?loc ?attrs (Ppat_exception a)
-  let extension ?loc ?attrs a = mk ?loc ?attrs (Ppat_extension a)
+  let any ?loc ?attrs ~tokens () = mk ?loc ?attrs ~tokens Ppat_any
+  let var ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ppat_var a)
+  let alias ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ppat_alias (a, b))
+  let constant ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ppat_constant a)
+  let interval ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ppat_interval (a, b))
+  let tuple ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ppat_tuple (a, b))
+  let unboxed_tuple ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ppat_unboxed_tuple (a, b))
+  let construct ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ppat_construct (a, b))
+  let variant ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ppat_variant (a, b))
+  let record ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ppat_record (a, b))
+  let record_unboxed_product ?loc ?attrs ~tokens a b =
+    mk ?loc ?attrs ~tokens (Ppat_record_unboxed_product (a, b))
+  let array ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ppat_array (a, b))
+  let or_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ppat_or (a, b))
+  let constraint_ ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Ppat_constraint (a, b, c))
+  let type_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ppat_type a)
+  let lazy_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ppat_lazy a)
+  let unpack ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ppat_unpack a)
+  let open_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ppat_open (a, b))
+  let exception_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ppat_exception a)
+  let extension ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ppat_extension a)
 end
 
 module Exp = struct

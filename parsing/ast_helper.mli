@@ -108,37 +108,37 @@ module Typ :
 (** Patterns *)
 module Pat:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> pattern_desc -> pattern
+    val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern_desc -> pattern
     val attr:pattern -> attribute -> pattern
 
-    val any: ?loc:loc -> ?attrs:attrs -> unit -> pattern
-    val var: ?loc:loc -> ?attrs:attrs -> str -> pattern
-    val alias: ?loc:loc -> ?attrs:attrs -> pattern -> str -> pattern
-    val constant: ?loc:loc -> ?attrs:attrs -> constant -> pattern
-    val interval: ?loc:loc -> ?attrs:attrs -> constant -> constant -> pattern
-    val tuple: ?loc:loc -> ?attrs:attrs -> pattern argument list ->
+    val any: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> unit -> pattern
+    val var: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str -> pattern
+    val alias: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern -> str -> pattern
+    val constant: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> constant -> pattern
+    val interval: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> constant -> constant -> pattern
+    val tuple: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern argument list ->
       closed_flag -> pattern
-    val unboxed_tuple: ?loc:loc -> ?attrs:attrs
+    val unboxed_tuple: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq
                        -> pattern argument list -> closed_flag
                        -> pattern
-    val construct: ?loc:loc -> ?attrs:attrs ->
+    val construct: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
       lid -> ((str * jkind_annotation option) list * pattern) option -> pattern
-    val variant: ?loc:loc -> ?attrs:attrs -> label -> pattern option -> pattern
-    val record: ?loc:loc -> ?attrs:attrs -> pattern record_field list -> closed_flag
+    val variant: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> label -> pattern option -> pattern
+    val record: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern record_field list -> closed_flag
                 -> pattern
-    val record_unboxed_product: ?loc:loc -> ?attrs:attrs -> pattern record_field list
+    val record_unboxed_product: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern record_field list
                 -> closed_flag -> pattern
-    val array: ?loc:loc -> ?attrs:attrs -> mutable_flag -> pattern list ->
+    val array: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> mutable_flag -> pattern list ->
       pattern
-    val or_: ?loc:loc -> ?attrs:attrs -> pattern -> pattern -> pattern
-    val constraint_: ?loc:loc -> ?attrs:attrs -> pattern -> core_type option
+    val or_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern -> pattern -> pattern
+    val constraint_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern -> core_type option
                      -> mode with_loc list -> pattern
-    val type_: ?loc:loc -> ?attrs:attrs -> lid -> pattern
-    val lazy_: ?loc:loc -> ?attrs:attrs -> pattern -> pattern
-    val unpack: ?loc:loc -> ?attrs:attrs -> str_opt -> pattern
-    val open_: ?loc:loc -> ?attrs:attrs  -> lid -> pattern -> pattern
-    val exception_: ?loc:loc -> ?attrs:attrs -> pattern -> pattern
-    val extension: ?loc:loc -> ?attrs:attrs -> extension -> pattern
+    val type_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> pattern
+    val lazy_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern -> pattern
+    val unpack: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str_opt -> pattern
+    val open_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq  -> lid -> pattern -> pattern
+    val exception_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern -> pattern
+    val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> pattern
   end
 
 (** Expressions *)

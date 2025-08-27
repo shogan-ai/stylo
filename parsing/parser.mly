@@ -53,7 +53,9 @@ let ghost_loc (startpos, endpos) = {
 }
 
 let mktyp ~loc ?attrs d = Typ.mk ~loc:(make_loc loc) ?attrs d
-let mkpat ~loc ?attrs d = Pat.mk ~loc:(make_loc loc) ?attrs d
+let mkpat ~loc ?attrs d =
+  let tokens = Tokens.at loc in
+  Pat.mk ~loc:(make_loc loc) ~tokens ?attrs d
 let mkexp ~loc ?attrs d =
   let tokens = Tokens.at loc in
   Exp.mk ~loc:(make_loc loc) ~tokens ?attrs d
@@ -116,7 +118,9 @@ let mkpatvar ~loc name =
 let ghexp ~loc d =
   let tokens = Tokens.at loc in
   Exp.mk ~tokens ~loc:(ghost_loc loc) d
-let ghpat ~loc d = Pat.mk ~loc:(ghost_loc loc) d
+let ghpat ~loc d =
+  let tokens = Tokens.at loc in
+  Pat.mk ~tokens ~loc:(ghost_loc loc) d
 let ghtyp ~loc ?attrs d = Typ.mk ~loc:(ghost_loc loc) ?attrs d
 let ghstr ~loc d = Str.mk ~loc:(ghost_loc loc) d
 let ghsig ~loc d = Sig.mk ~loc:(ghost_loc loc) d
@@ -131,33 +135,14 @@ let mkuplus = mkuminus
 let mk_attr ~loc name payload = Attr.mk ~loc name payload
 
 let mkpat_with_modes ~loc ~pat ~cty ~modes =
-  match pat.ppat_desc with
-  | Ppat_constraint (pat', cty', modes') ->
-    begin match cty, cty' with
-    | Some _, None ->
-      { pat with
-        ppat_desc = Ppat_constraint (pat', cty, modes @ modes');
-        ppat_loc = make_loc loc
-      }
-    | None, _ ->
-      { pat with
-        ppat_desc = Ppat_constraint (pat', cty', modes @ modes');
-        ppat_loc = make_loc loc
-      }
-    | _ ->
-      mkpat ~loc (Ppat_constraint (pat, cty, modes))
-    end
-  | _ ->
-    begin match cty, modes with
-    | None, [] -> pat
-    | cty, modes -> mkpat ~loc (Ppat_constraint (pat, cty, modes))
-    end
+  match cty, modes with
+  | None, [] -> pat
+  | cty, modes -> mkpat ~loc (Ppat_constraint (pat, cty, modes))
 
 let mkexp_constraint ~loc ~exp ~cty ~modes =
-   begin match cty, modes with
-   | None, [] -> invalid_arg "empty mkexp_constraint" (* ? *)
-   | cty, modes -> mkexp ~loc (Pexp_constraint (exp, cty, modes))
-   end
+  match cty, modes with
+  | None, [] -> invalid_arg "empty mkexp_constraint" (* ? *)
+  | cty, modes -> mkexp ~loc (Pexp_constraint (exp, cty, modes))
 
 let ghexp_constraint ~loc ~exp ~cty ~modes =
   let exp = mkexp_constraint ~loc ~exp ~cty ~modes in
