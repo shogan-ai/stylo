@@ -17,6 +17,9 @@ let () =
     | Available tree ->
       c_r := Consumed;
       flatten tree
+  );
+  between_ref := (fun ~start ~stop ->
+    Tokens.Indexed_list.consume TS.indexed_list start stop
   )
 
 let flatten_stack_elts =
