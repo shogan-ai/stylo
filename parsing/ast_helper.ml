@@ -54,33 +54,29 @@ module Attr = struct
 end
 
 module Typ = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) d =
+  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
     {ptyp_desc = d;
      ptyp_loc = loc;
      ptyp_loc_stack = [];
-     ptyp_attributes = attrs}
+     ptyp_attributes = attrs;
+     ptyp_tokens = tokens;}
 
   let attr d a = {d with ptyp_attributes = d.ptyp_attributes @ [a]}
 
-  let any ?loc ?attrs a = mk ?loc ?attrs (Ptyp_any a)
-  let var ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_var (a, b))
-  let arrow ?loc ?attrs a b c d e = mk ?loc ?attrs (Ptyp_arrow (a, b, c, d, e))
-  let tuple ?loc ?attrs a = mk ?loc ?attrs (Ptyp_tuple a)
-  let unboxed_tuple ?loc ?attrs a = mk ?loc ?attrs (Ptyp_unboxed_tuple a)
-  let constr ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_constr (a, b))
-  let object_ ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_object (a, b))
-  let class_ ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_class (a, b))
-  let alias ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_alias (a, b, c))
-  let variant ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_variant (a, b, c))
-  let poly ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_poly (a, b))
-  let package ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_package (a, b))
-  let extension ?loc ?attrs a = mk ?loc ?attrs (Ptyp_extension a)
-  let open_ ?loc ?attrs mod_ident t = mk ?loc ?attrs (Ptyp_open (mod_ident, t))
-
-  let force_poly t =
-    match t.ptyp_desc with
-    | Ptyp_poly _ -> t
-    | _ -> poly ~loc:t.ptyp_loc [] t (* -> ghost? *)
+  let any ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ptyp_any a)
+  let var ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ptyp_var (a, b))
+  let arrow ?loc ?attrs ~tokens a b c d e = mk ?loc ?attrs ~tokens (Ptyp_arrow (a, b, c, d, e))
+  let tuple ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ptyp_tuple a)
+  let unboxed_tuple ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ptyp_unboxed_tuple a)
+  let constr ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ptyp_constr (a, b))
+  let object_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ptyp_object (a, b))
+  let class_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ptyp_class (a, b))
+  let alias ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Ptyp_alias (a, b, c))
+  let variant ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Ptyp_variant (a, b, c))
+  let poly ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ptyp_poly (a, b))
+  let package ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ptyp_package (a, b))
+  let extension ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ptyp_extension a)
+  let open_ ?loc ?attrs ~tokens mod_ident t = mk ?loc ?attrs ~tokens (Ptyp_open (mod_ident, t))
 
   let varify_constructors var_names t =
     let check_variable vl _loc v =

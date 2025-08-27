@@ -103,6 +103,7 @@ and core_type =
      ptyp_loc: Location.t;
      ptyp_loc_stack: location_stack;
      ptyp_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
+     ptyp_tokens: Tokens.seq;
     }
 
 and core_type_desc =

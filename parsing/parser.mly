@@ -52,7 +52,9 @@ let ghost_loc (startpos, endpos) = {
   Location.loc_ghost = true;
 }
 
-let mktyp ~loc ?attrs d = Typ.mk ~loc:(make_loc loc) ?attrs d
+let mktyp ~loc ?attrs d =
+  let tokens = Tokens.at loc in
+  Typ.mk ~loc:(make_loc loc) ~tokens ?attrs d
 let mkpat ~loc ?attrs d =
   let tokens = Tokens.at loc in
   Pat.mk ~loc:(make_loc loc) ~tokens ?attrs d
@@ -121,7 +123,9 @@ let ghexp ~loc d =
 let ghpat ~loc d =
   let tokens = Tokens.at loc in
   Pat.mk ~tokens ~loc:(ghost_loc loc) d
-let ghtyp ~loc ?attrs d = Typ.mk ~loc:(ghost_loc loc) ?attrs d
+let ghtyp ~loc ?attrs d =
+  let tokens = Tokens.at loc in
+  Typ.mk ~tokens ~loc:(ghost_loc loc) ?attrs d
 let ghstr ~loc d = Str.mk ~loc:(ghost_loc loc) d
 let ghsig ~loc d = Sig.mk ~loc:(ghost_loc loc) d
 

@@ -65,34 +65,32 @@ end
 (** Type expressions *)
 module Typ :
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> core_type_desc -> core_type
+    val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> core_type_desc -> core_type
     val attr: core_type -> attribute -> core_type
 
-    val any: ?loc:loc -> ?attrs:attrs -> jkind_annotation option -> core_type
-    val var: ?loc:loc -> ?attrs:attrs -> string -> jkind_annotation option
+    val any: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> jkind_annotation option -> core_type
+    val var: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> string -> jkind_annotation option
       -> core_type
-    val arrow: ?loc:loc -> ?attrs:attrs -> arg_label -> core_type -> core_type ->
+    val arrow: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> arg_label -> core_type -> core_type ->
       mode with_loc list -> mode with_loc list -> core_type
-    val tuple: ?loc:loc -> ?attrs:attrs -> (string option * core_type) list -> core_type
-    val unboxed_tuple: ?loc:loc -> ?attrs:attrs
+    val tuple: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> (string option * core_type) list -> core_type
+    val unboxed_tuple: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq
                        -> (string option * core_type) list -> core_type
-    val constr: ?loc:loc -> ?attrs:attrs -> lid -> core_type list -> core_type
-    val object_: ?loc:loc -> ?attrs:attrs -> object_field list
+    val constr: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> core_type list -> core_type
+    val object_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> object_field list
                    -> closed_flag -> core_type
-    val class_: ?loc:loc -> ?attrs:attrs -> lid -> core_type list -> core_type
-    val alias: ?loc:loc -> ?attrs:attrs -> core_type -> string with_loc option
+    val class_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> core_type list -> core_type
+    val alias: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> core_type -> string with_loc option
                -> jkind_annotation option -> core_type
     (* Invariant: One of the options must be [Some]. *)
-    val variant: ?loc:loc -> ?attrs:attrs -> row_field list -> closed_flag
+    val variant: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> row_field list -> closed_flag
                  -> label list option -> core_type
-    val poly: ?loc:loc -> ?attrs:attrs ->
+    val poly: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
       (str * jkind_annotation option) list -> core_type -> core_type
-    val package: ?loc:loc -> ?attrs:attrs -> lid -> (lid * core_type) list
+    val package: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> (lid * core_type) list
                  -> core_type
-    val open_ : ?loc:loc -> ?attrs:attrs -> lid -> core_type -> core_type
-    val extension: ?loc:loc -> ?attrs:attrs -> extension -> core_type
-
-    val force_poly: core_type -> core_type
+    val open_ : ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> core_type -> core_type
+    val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> core_type
 
     val varify_constructors: str list -> core_type -> core_type
     (** [varify_constructors newtypes te] is type expression [te], of which
