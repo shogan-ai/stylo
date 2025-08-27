@@ -1,3 +1,20 @@
+(ocamllex lexer)
+
+; (menhir
+;   (modules parser_tokens)
+;   (flags --table --inspection --only-tokens))
+(rule
+  (targets parser_tokens.ml parser_tokens.mli)
+  (action
+    (run menhir --table --inspection --only-tokens %{dep:parser_tokens.mly})))
+
+(menhir
+  (modules parser parser_tokens)
+  (merge_into parser)
+  (flags :standard --table --inspection --external-tokens Parser_tokens --cmly))
+
 (library
-  (name parsing)
-  (libraries ocaml_syntax))
+  (name ocaml_syntax)
+  (modules_without_implementation asttypes parsetree)
+  (libraries menhirLib)
+  (flags :standard -w -9-63))

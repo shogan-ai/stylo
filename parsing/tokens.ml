@@ -14,6 +14,9 @@ module Indexed_list : sig
   val create : unit -> t
   val append : t -> pos:Lexing.position -> elt -> unit
   val consume : t -> Lexing.position -> Lexing.position -> seq
+
+  val global : t
+  val reset_global : unit -> unit
 end = struct
   open Lexing
 
@@ -69,9 +72,12 @@ end = struct
       Tbl.replace t.tbl start cell; (* has been removed by aux... *)
       Tbl.replace t.tbl stop cell;
       seq
+
+  let global = create ()
+  let reset_global () =
+    Tbl.clear global.tbl;
+    global.last <- Empty
 end
 
-let between_ref : (start:Lexing.position -> stop:Lexing.position -> seq) ref =
-  ref (fun ~start:_ ~stop:_ -> failwith "Initialization error")
-
-let at (startpos,endpos) = !between_ref ~start:startpos ~stop:endpos
+let at (startpos,endpos) =
+  Indexed_list.(consume global startpos endpos)
