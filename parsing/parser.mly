@@ -98,14 +98,8 @@ let mkcf ~loc ?attrs ?docs d =
 
 let mkrhs rhs loc = mkloc rhs (make_loc loc)
 
-let push_loc x acc =
-  if x.Location.loc_ghost
-  then acc
-  else x :: acc
-
 let reloc_typ ~loc x =
-  { x with ptyp_loc = make_loc loc;
-           ptyp_loc_stack = push_loc x.ptyp_loc x.ptyp_loc_stack }
+  { x with ptyp_loc = make_loc loc }
 
 let mkexpvar ~loc (name : string) =
   mkexp ~loc (Pexp_ident(mkrhs (Lident name) loc))

@@ -57,7 +57,6 @@ module Typ = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
     {ptyp_desc = d;
      ptyp_loc = loc;
-     ptyp_loc_stack = [];
      ptyp_attributes = attrs;
      ptyp_tokens = tokens;}
 
@@ -171,7 +170,6 @@ module Pat = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
     {ppat_desc = d;
      ppat_loc = loc;
-     ppat_loc_stack = [];
      ppat_attributes = attrs;
      ppat_tokens = tokens}
   let attr d a = {d with ppat_attributes = d.ppat_attributes @ [a]}
@@ -203,7 +201,6 @@ module Exp = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
     {pexp_desc = d;
      pexp_loc = loc;
-     pexp_loc_stack = [];
      pexp_attributes = attrs;
      pexp_tokens = tokens}
   let attr d a = {d with pexp_attributes = d.pexp_attributes @ [a]}

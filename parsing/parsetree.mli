@@ -55,8 +55,6 @@ type constant =
       Suffixes except ['s'] are rejected by the typechecker.
   *)
 
-type location_stack = Location.t list
-
 type modality = | Modality of string [@@unboxed]
 type modalities = modality loc list
 
@@ -101,7 +99,6 @@ and core_type =
     {
      ptyp_desc: core_type_desc;
      ptyp_loc: Location.t;
-     ptyp_loc_stack: location_stack;
      ptyp_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
      ptyp_tokens: Tokens.seq;
     }
@@ -256,7 +253,6 @@ and pattern =
     {
      ppat_desc: pattern_desc;
      ppat_loc: Location.t;
-     ppat_loc_stack: location_stack;
      ppat_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
      ppat_tokens: Tokens.seq;
     }
@@ -360,7 +356,6 @@ and expression =
     {
      pexp_desc: expression_desc;
      pexp_loc: Location.t;
-     pexp_loc_stack: location_stack;
      pexp_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
      pexp_tokens: Tokens.seq;
     }
