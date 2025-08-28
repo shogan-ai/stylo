@@ -1,3 +1,3 @@
 (executable
   (name stylo)
-  (libraries ocaml_syntax print))
+  (libraries ocaml_syntax print wrapprint))

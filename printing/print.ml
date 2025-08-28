@@ -1,17 +1,29 @@
-open PPrint
+open Wrapprint
 open Ocaml_syntax
 open Parsetree
 
 module S = Syntax
+
+let enclose l r d = group (l ^^ break 0 ^^ d ^^ break 0 ^^ r)
+
+let parens = enclose S.lparen S.rparen
+let brackets = enclose S.lbracket S.rbracket
+
+let dquotes d = S.dquote ^^ d ^^ S.dquote
+
+let optional f v_opt =
+  match v_opt with
+  | None -> empty
+  | Some v -> f v
 
 type 'a loc = 'a Location.loc = { txt: 'a; loc: Location.t }
 let stringf fmt = Printf.ksprintf string fmt
 
 let rec longident = function
   | Longident.Lident s -> string s
-  | Ldot (lid, s) -> longident lid ^^ dot ^^ string s
+  | Ldot (lid, s) -> longident lid ^^ S.dot ^^ string s
   | Lapply (l1, l2) ->
-    longident l1 ^^ lparen ^^ break 0 ^^ longident l2 ^^ break 0 ^^ rparen
+    longident l1 ^^ S.lparen ^^ break 0 ^^ longident l2 ^^ break 0 ^^ S.rparen
 
 let direction = function
   | Asttypes.Upto -> S.to_
@@ -36,15 +48,15 @@ let virtual_field = function
 let override_field = function
   | Cfk_virtual _ -> empty
   | Cfk_concrete (Fresh, _) -> empty
-  | Cfk_concrete (Override, _) -> bang
+  | Cfk_concrete (Override, _) -> S.bang
 
 let param_info = Asttypes.(function
     | NoVariance, NoInjectivity -> empty
-    | Covariant, NoInjectivity -> plus
-    | Contravariant, NoInjectivity -> minus
-    | NoVariance, Injective -> bang
-    | Covariant, Injective -> plus ^^ bang (* FIXME: [bang ^^ plus] also ok *)
-    | Contravariant, Injective -> minus ^^ bang (* FIXME: likewise *)
+    | Covariant, NoInjectivity -> S.plus
+    | Contravariant, NoInjectivity -> S.minus
+    | NoVariance, Injective -> S.bang
+    | Covariant, Injective -> S.plus ^^ S.bang (* FIXME: [S.bang ^^ S.plus] also ok *)
+    | Contravariant, Injective -> S.minus ^^ S.bang (* FIXME: likewise *)
   )
 
 let array_delimiters = function
@@ -54,23 +66,23 @@ let array_delimiters = function
 let type_app ?(parens=true) ty args =
   let left, right =
     if parens then
-      lparen, rparen
+      S.lparen, S.rparen
     else
-      lbracket, rbracket
+      S.lbracket, S.rbracket
   in
   begin match args with
     | [] -> empty
     | [ x ] -> x ^^ break 1
-    | _ -> left ^^ separate (comma ^^ break 1) args ^^ right ^^ break 1
+    | _ -> left ^^ separate (S.comma ^^ break 1) args ^^ right ^^ break 1
   end ^^ ty
 
 let arrow_type arg_lbl arg rhs =
   begin match arg_lbl with
   | Nolabel -> empty
-  | Labelled s -> string s ^^ colon ^^ break 0
+  | Labelled s -> string s ^^ S.colon ^^ break 0
   | Optional s ->
     (* FIXME: sometimes the "?foo:" is a single token *)
-    qmark ^^ string s ^^ colon ^^ break 0
+    S.qmark ^^ string s ^^ S.colon ^^ break 0
   end ^^
   arg ^/^ S.rarrow ^/^ rhs
 
@@ -105,7 +117,7 @@ let modes = separate_loc_list (break 1) mode
 let with_modes ~modes:l t =
   match l with
   | [] -> t
-  | _ -> t ^/^ at ^/^ modes l
+  | _ -> t ^/^ S.at ^/^ modes l
 
 let include_kind = function
   | Structure -> empty
@@ -121,12 +133,12 @@ end = struct
   let pp ?(post=false) { attr_name; attr_payload; _ } =
     (if post then S.lbracket_atat else S.lbracket_at)
     ^^ string attr_name.txt ^^ Payload.pp attr_payload
-    ^^ rbracket
+    ^^ S.rbracket
 
   let pp_floating { attr_name; attr_payload; _ } =
     S.lbracket_atatat
     ^^ string attr_name.txt ^^ Payload.pp attr_payload
-    ^^ rbracket
+    ^^ S.rbracket
 
   let pp_list ?post l = separate_map (break 0) (pp ?post) l
 
@@ -141,7 +153,7 @@ and Extension : sig
 end = struct
   let pp_classic ~floating name payload =
     (if floating then S.lbracket_percentpercent else S.lbracket_percent)
-    ^^ string name.txt ^^ Payload.pp payload ^^ rbracket
+    ^^ string name.txt ^^ Payload.pp payload ^^ S.rbracket
 
   let pp ?(floating=false) (ext_name, ext_payload) =
     match ext_payload with
@@ -161,10 +173,10 @@ end = struct
   let pp = function
     | PString _ -> assert false (* handled in Extension *)
     | PStr s -> break 1 ^^ Structure.pp s
-    | PSig s -> break 0 ^^ colon ^/^ Signature.pp s
-    | PTyp c -> break 0 ^^ colon ^/^ Core_type.pp c
+    | PSig s -> break 0 ^^ S.colon ^/^ Signature.pp s
+    | PTyp c -> break 0 ^^ S.colon ^/^ Core_type.pp c
     | PPat (p, eo) ->
-      break 0 ^^ qmark ^/^ Pattern.pp p
+      break 0 ^^ S.qmark ^/^ Pattern.pp p
       ^^ match eo with
       | None -> empty
       | Some e -> break 1 ^^ S.when_ ^/^ Expression.pp e
@@ -181,13 +193,13 @@ end = struct
     |> Attribute.attach ~attrs:ct.ptyp_attributes
 
   and pp_desc = function
-    | Ptyp_any None -> underscore
-    | Ptyp_any Some k -> underscore ^/^ colon ^/^ Jkind_annotation.pp k
+    | Ptyp_any None -> S.underscore
+    | Ptyp_any Some k -> S.underscore ^/^ S.colon ^/^ Jkind_annotation.pp k
     | Ptyp_var (s, ko) ->
       let var = char '\'' ^^ string s in
       begin match ko with
         | None -> var
-        | Some k -> var ^/^ colon ^/^ Jkind_annotation.pp k
+        | Some k -> var ^/^ S.colon ^/^ Jkind_annotation.pp k
       end
     | Ptyp_arrow (lbl, arg_ty, ret_ty, arg_mods, ret_mods) ->
       arrow_type lbl
@@ -197,65 +209,65 @@ end = struct
       let elt (lbl_opt, ct) =
         begin match lbl_opt with
           | None -> empty
-          | Some s -> string s ^^ colon ^^ break 0
+          | Some s -> string s ^^ S.colon ^^ break 0
         end ^^ pp ct
       in
-      separate_map (break 1 ^^ star ^^ break 1) elt elts
+      separate_map (break 1 ^^ S.star ^^ break 1) elt elts
     | Ptyp_unboxed_tuple elts ->
       S.hash_lparen ^^
-      pp_desc (Ptyp_tuple elts) ^^ rparen
+      pp_desc (Ptyp_tuple elts) ^^ S.rparen
     | Ptyp_constr (lid, args) ->
       type_app (longident lid.txt) (List.map pp args)
     | Ptyp_object (fields, closed) ->
       S.lt ^/^
-      separate_map (semi ^^ break 1) object_field fields ^^
+      separate_map (S.semi ^^ break 1) object_field fields ^^
       begin match closed with
         | Closed -> empty
-        | Open -> semi ^/^ S.dotdot
+        | Open -> S.semi ^/^ S.dotdot
       end ^/^ S.gt
     | Ptyp_class (lid, args) ->
       begin match args with
         | [] -> empty
         | [ x ] -> pp x ^^ break 1
         | lst ->
-          lparen ^^ separate_map comma pp lst ^^ rparen ^^ break 1
+          S.lparen ^^ separate_map S.comma pp lst ^^ S.rparen ^^ break 1
       end ^^ S.hash ^^ longident lid.txt
     | Ptyp_alias (ct, name, None) ->
       pp ct ^/^ S.as_ ^/^
-      squote ^^ string (Option.get name).txt
+      S.squote ^^ string (Option.get name).txt
     | Ptyp_alias (ct, name_o, Some jkind) ->
       pp ct ^/^ S.as_ ^/^
-      lparen ^^ break 0 ^^ (
+      S.lparen ^^ break 0 ^^ (
         match name_o with
-        | None -> underscore
-        | Some s -> squote ^^ string s.txt
-      ) ^^ colon ^^ Jkind_annotation.pp jkind ^^ break 0 ^^ rparen
+        | None -> S.underscore
+        | Some s -> S.squote ^^ string s.txt
+      ) ^^ S.colon ^^ Jkind_annotation.pp jkind ^^ break 0 ^^ S.rparen
     | Ptyp_variant (fields, Closed, None) ->
       (* FIXME: leading | *)
-      lbracket ^/^ separate_map (semi ^^ break 1) row_field fields ^/^ rbracket
+      S.lbracket ^/^ separate_map (S.semi ^^ break 1) row_field fields ^/^ S.rbracket
     | Ptyp_variant (fields, Open, None) ->
       (* FIXME: leading | *)
       let trailing_break = if fields = [] then 0 else 1 in
-      S.lbracket_gt ^/^ separate_map (semi ^^ break 1) row_field fields ^^
-      break trailing_break ^^ rbracket
+      S.lbracket_gt ^/^ separate_map (S.semi ^^ break 1) row_field fields ^^
+      break trailing_break ^^ S.rbracket
     | Ptyp_variant (fields, Closed, Some []) ->
       (* FIXME: leading | *)
-      S.lbracket_lt ^/^ separate_map (semi ^^ break 1) row_field fields ^/^ rbracket
+      S.lbracket_lt ^/^ separate_map (S.semi ^^ break 1) row_field fields ^/^ S.rbracket
     | Ptyp_variant (fields, Closed, Some labels) ->
-      S.lbracket_lt ^/^ separate_map (semi ^^ break 1) row_field fields ^/^
+      S.lbracket_lt ^/^ separate_map (S.semi ^^ break 1) row_field fields ^/^
       S.gt ^/^ separate_map (break 1) string labels ^/^
-      rbracket
+      S.rbracket
     | Ptyp_variant (_, Open, Some _) -> assert false
     | Ptyp_poly (bound_vars, ct) ->
       let binding = function
-        | var, None -> squote ^^ string var.Location.txt
+        | var, None -> S.squote ^^ string var.Location.txt
         | var, Some jkind ->
-          lparen ^^ break 0 ^^ squote ^^ string var.txt ^^
-          Jkind_annotation.pp jkind ^^ break 0 ^^ rparen
+          S.lparen ^^ break 0 ^^ S.squote ^^ string var.txt ^^
+          Jkind_annotation.pp jkind ^^ break 0 ^^ S.rparen
       in
-      separate_map (break 1) binding bound_vars ^^ break 0 ^^ dot ^/^ pp ct
+      separate_map (break 1) binding bound_vars ^^ break 0 ^^ S.dot ^/^ pp ct
     | Ptyp_package pkg -> package_type pkg
-    | Ptyp_open (lid, ct) -> longident lid.txt ^^ dot ^^ pp ct
+    | Ptyp_open (lid, ct) -> longident lid.txt ^^ S.dot ^^ pp ct
     | Ptyp_extension ext -> Extension.pp ext
     | Ptyp_parens ct -> parens (pp ct)
 
@@ -264,29 +276,29 @@ end = struct
       match constraints with
       | [] -> empty
       | _ ->
-        let one (lid, ct) = longident lid.txt ^/^ equals ^/^ pp ct in
+        let one (lid, ct) = longident lid.txt ^/^ S.equals ^/^ pp ct in
         break 1 ^^ S.with_ ^/^
         separate_map (break 1 ^^ S.and_ ^^ break 1) one constraints
     in
-    lparen ^^ S.module_ ^/^ longident lid.txt ^^ with_ ^^ break 0 ^^ rparen
+    S.lparen ^^ S.module_ ^/^ longident lid.txt ^^ with_ ^^ break 0 ^^ S.rparen
 
   and row_field rf =
     Attribute.attach ~attrs:rf.prf_attributes (row_field_desc rf.prf_desc)
 
   and row_field_desc = function
     | Rinherit ct -> pp ct
-    | Rtag (label, _, []) -> bquote ^^ string label.txt
+    | Rtag (label, _, []) -> S.bquote ^^ string label.txt
     | Rtag (label, has_const, at_types) ->
-      bquote ^^ string label.txt ^/^ S.of_ ^/^
-      (if has_const then ampersand ^^ break 1 else empty) ^^
-      separate_map (break 1 ^^ ampersand ^^ break 1) pp at_types
+      S.bquote ^^ string label.txt ^/^ S.of_ ^/^
+      (if has_const then S.ampersand ^^ break 1 else empty) ^^
+      separate_map (break 1 ^^ S.ampersand ^^ break 1) pp at_types
 
   and object_field of_ =
     Attribute.attach ~attrs:of_.pof_attributes (object_field_desc of_.pof_desc)
 
   and object_field_desc = function
     | Oinherit ct -> pp ct
-    | Otag (lbl, ct) -> string lbl.txt ^^ colon ^/^ pp ct
+    | Otag (lbl, ct) -> string lbl.txt ^^ S.colon ^/^ pp ct
 end
 
 (** {2 Patterns} *)
@@ -299,20 +311,20 @@ end = struct
     |> Attribute.attach ~attrs:p.ppat_attributes
 
   and pp_desc = function
-    | Ppat_any -> underscore
+    | Ppat_any -> S.underscore
     | Ppat_var name -> string name.txt
     | Ppat_alias (p, alias) ->
       pp p ^/^ S.as_ ^/^ string alias.txt
     | Ppat_constant c -> constant c
     | Ppat_interval (c1,c2) -> constant c1 ^/^ S.dotdot ^/^ constant c2
     | Ppat_tuple (elts, closed) ->
-      separate_map (break 0 ^^ comma ^^ break 1) (Argument.pp pp) elts ^^
+      separate_map (break 0 ^^ S.comma ^^ break 1) (Argument.pp pp) elts ^^
       begin match closed with
         | Closed -> empty
-        | Open -> break 0 ^^ comma ^^ break 1 ^^ S.dotdot
+        | Open -> break 0 ^^ S.comma ^^ break 1 ^^ S.dotdot
       end
     | Ppat_unboxed_tuple (elts, cf) ->
-      S.hash_lparen ^^ pp_desc (Ppat_tuple (elts, cf)) ^^ rparen
+      S.hash_lparen ^^ pp_desc (Ppat_tuple (elts, cf)) ^^ S.rparen
     | Ppat_construct (lid, None) -> longident lid.txt
     | Ppat_construct (lid, Some ([], p)) -> longident lid.txt ^/^ pp p
     | Ppat_construct (lid, Some (bindings, p)) ->
@@ -320,41 +332,41 @@ end = struct
         match jkind with
         | None -> string newtype.txt
         | Some jkind ->
-          lparen ^^ string newtype.txt ^/^ colon ^/^ Jkind_annotation.pp jkind ^^
-          rparen
+          S.lparen ^^ string newtype.txt ^/^ S.colon ^/^ Jkind_annotation.pp jkind ^^
+          S.rparen
       in
       longident lid.txt ^/^
-      lparen ^^ S.type_ ^/^
-      separate_map (break 1) binding bindings ^^ rparen ^/^
+      S.lparen ^^ S.type_ ^/^
+      separate_map (break 1) binding bindings ^^ S.rparen ^/^
       pp p
-    | Ppat_variant (lbl, None) -> bquote ^^ string lbl
-    | Ppat_variant (lbl, Some p) -> bquote ^^ string lbl ^/^ pp p
+    | Ppat_variant (lbl, None) -> S.bquote ^^ string lbl
+    | Ppat_variant (lbl, Some p) -> S.bquote ^^ string lbl ^/^ pp p
     | Ppat_record (fields, cf) ->
-      lbrace ^/^
-      separate_map (semi ^^ break 1) (Record_field.pp pp) fields ^^
+      S.lbrace ^/^
+      separate_map (S.semi ^^ break 1) (Record_field.pp pp) fields ^^
       begin match cf with
         | Closed -> empty
-        | Open -> semi ^/^ underscore
+        | Open -> S.semi ^/^ S.underscore
       end ^/^
-      rbrace
+      S.rbrace
     | Ppat_record_unboxed_product (fields, cf) ->
       S.hash_lbrace ^/^
-      separate_map (semi ^^ break 1) (Record_field.pp pp) fields ^/^
+      separate_map (S.semi ^^ break 1) (Record_field.pp pp) fields ^/^
       begin match cf with
         | Closed -> empty
-        | Open -> underscore ^^ break 1
+        | Open -> S.underscore ^^ break 1
       end ^^
-      rbrace
+      S.rbrace
     | Ppat_array (mut, ps) ->
       let opn, cls = array_delimiters mut in
       opn ^/^
-      separate_map (semi ^^ break 1) pp ps ^/^
+      separate_map (S.semi ^^ break 1) pp ps ^/^
       cls
     | Ppat_or (p1, p2) -> pp p1 ^/^ S.pipe ^/^ pp p2
     | Ppat_constraint (p, None, modes) ->
       with_modes ~modes (pp p)
     | Ppat_constraint (p, Some ty, atat_modes) ->
-      pp p ^/^ colon ^^
+      pp p ^/^ S.colon ^^
       begin match atat_modes with
         | [] -> empty
         | lst -> break 1 ^^ Core_type.pp ty ^/^ S.atat ^/^ modes lst
@@ -366,17 +378,17 @@ end = struct
     | Ppat_unpack path ->
       let path =
         match path.txt with
-        | None -> underscore
+        | None -> S.underscore
         | Some s -> string s
       in
-      lparen ^^ S.module_ ^/^ path ^^ rparen
+      S.lparen ^^ S.module_ ^/^ path ^^ S.rparen
     | Ppat_exception p -> S.exception_ ^/^ pp  p
     | Ppat_extension ext -> Extension.pp ext
-    | Ppat_open (lid, p) -> longident lid.txt ^^ dot ^^ pp p
+    | Ppat_open (lid, p) -> longident lid.txt ^^ S.dot ^^ pp p
     | Ppat_parens p -> parens (pp p)
     | Ppat_list elts ->
       brackets (
-        separate_map (semi ^^ break 1) pp elts
+        separate_map (S.semi ^^ break 1) pp elts
       )
     | Ppat_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
 end
@@ -440,16 +452,16 @@ end = struct
       S.try_ ^/^ pp e ^/^ S.with_ ^/^
       separate_map (break 1 ^^ S.pipe ^^ break 1) Case.pp cases
     | Pexp_tuple elts ->
-      separate_map (comma ^^ break 1) (Argument.pp pp) elts
+      separate_map (S.comma ^^ break 1) (Argument.pp pp) elts
     | Pexp_unboxed_tuple elts ->
       S.hash_lparen ^^
       (* FIXME: ! *)
       pp_desc { exp with pexp_desc = Pexp_tuple elts } ^^
-      rparen
+      S.rparen
     | Pexp_construct (lid, None) -> longident lid.txt
     | Pexp_construct (lid, Some e) -> longident lid.txt ^/^ pp e
     | Pexp_variant (lbl, eo) ->
-      bquote ^^ string lbl ^^
+      S.bquote ^^ string lbl ^^
       begin match eo with
         | None -> empty
         | Some e -> break 1 ^^ pp e
@@ -461,18 +473,18 @@ end = struct
         | None -> empty
         | Some e -> pp e ^/^ S.with_ ^^ break 1
       in
-      lbrace ^/^ eo ^^
-      separate_map (semi ^^ break 1) (Record_field.pp pp) fields ^/^
-      rbrace
-    | Pexp_field (e, lid) -> pp e ^^ dot ^^ longident lid.txt
+      S.lbrace ^/^ eo ^^
+      separate_map (S.semi ^^ break 1) (Record_field.pp pp) fields ^/^
+      S.rbrace
+    | Pexp_field (e, lid) -> pp e ^^ S.dot ^^ longident lid.txt
     | Pexp_unboxed_field (e, lid) ->
-      pp e ^^ dot ^^ S.hash ^^ longident lid.txt
+      pp e ^^ S.dot ^^ S.hash ^^ longident lid.txt
     | Pexp_setfield (e1, lid, e2) ->
-      pp e1 ^^ dot ^^ longident lid.txt ^/^ S.larrow ^/^ pp e2
+      pp e1 ^^ S.dot ^^ longident lid.txt ^/^ S.larrow ^/^ pp e2
     | Pexp_array (mut, es) ->
       let opn, cls = array_delimiters mut in
       opn ^/^
-      separate_map (semi ^^ break 1) pp es ^/^
+      separate_map (S.semi ^^ break 1) pp es ^/^
       cls
     | Pexp_ifthenelse (e1, e2, e3_o) ->
       S.if_ ^/^ pp e1 ^/^ S.then_ ^/^ pp e2 ^^
@@ -480,18 +492,18 @@ end = struct
         | None -> empty
         | Some e3 -> break 1 ^^ S.else_ ^/^ pp e3
       end
-    | Pexp_sequence (e1, e2) -> pp e1 ^^ semi ^/^ pp e2
+    | Pexp_sequence (e1, e2) -> pp e1 ^^ S.semi ^/^ pp e2
     | Pexp_while (e1, e2) ->
       S.while_ ^/^ pp e1 ^/^ S.do_ ^/^ pp e2 ^/^
       S.done_
     | Pexp_for (p, e1, e2, dir, e3) ->
       S.for_ ^/^
-      Pattern.pp p ^/^ equals ^/^ pp e1 ^/^ direction dir ^/^
+      Pattern.pp p ^/^ S.equals ^/^ pp e1 ^/^ direction dir ^/^
       pp e2 ^/^ S.do_ ^/^ pp e3 ^/^ S.done_
     | Pexp_constraint (e, None, modes) ->
       with_modes ~modes (pp e)
     | Pexp_constraint (e, Some ct, atat_modes) ->
-      pp e ^/^ colon ^/^ Core_type.pp ct ^^
+      pp e ^/^ S.colon ^/^ Core_type.pp ct ^^
       begin match atat_modes with
         | [] -> empty
         | lst -> break 1 ^^ S.atat ^/^ modes lst
@@ -500,7 +512,7 @@ end = struct
       let ct1 =
         match ct1 with
         | None -> empty
-        | Some ct -> break 1 ^^ colon ^/^ Core_type.pp ct
+        | Some ct -> break 1 ^^ S.colon ^/^ Core_type.pp ct
       in
       pp e ^^ ct1 ^/^ S.coerce ^/^ Core_type.pp ct2
     | Pexp_send (e, lbl) -> pp e ^/^ S.hash ^/^ string lbl.txt
@@ -511,19 +523,19 @@ end = struct
         string lbl.txt ^^
         begin match eo with
           | None -> empty
-          | Some e -> break 1 ^^ equals ^/^ pp e
+          | Some e -> break 1 ^^ S.equals ^/^ pp e
         end
       in
       S.lbrace_lt ^/^
-      separate_map (semi ^^ break 1) field fields ^/^
+      separate_map (S.semi ^^ break 1) field fields ^/^
       S.gt_rbrace
     | Pexp_letmodule (name, me, body) ->
       let name =
         match name.txt with
-        | None -> underscore
+        | None -> S.underscore
         | Some s -> string s
       in
-      S.let_ ^/^ S.module_ ^/^ name ^/^ equals ^/^
+      S.let_ ^/^ S.module_ ^/^ name ^/^ S.equals ^/^
       Module_expr.pp me ^/^ S.in_ ^/^
       pp body
     | Pexp_letexception (ec, body) ->
@@ -536,46 +548,46 @@ end = struct
     | Pexp_object cs ->
       S.object_ ^/^ Class_expr.pp_structure cs ^/^ S.end_
     | Pexp_newtype (newty, jkind_o, body) ->
-      S.fun_ ^/^ lparen ^^ S.type_ ^/^ string newty.txt ^^
+      S.fun_ ^/^ S.lparen ^^ S.type_ ^/^ string newty.txt ^^
       begin match jkind_o with
         | None -> empty
-        | Some jkind -> break 1 ^^ colon ^/^ Jkind_annotation.pp jkind
-      end ^/^ rparen ^/^ S.rarrow ^/^
+        | Some jkind -> break 1 ^^ S.colon ^/^ Jkind_annotation.pp jkind
+      end ^/^ S.rparen ^/^ S.rarrow ^/^
       pp body
     | Pexp_pack (me, ty) ->
-      lparen ^^ S.module_ ^/^ Module_expr.pp me ^^
+      S.lparen ^^ S.module_ ^/^ Module_expr.pp me ^^
       begin match ty with
       | None -> empty
       | Some ct -> break 1 ^^ Type_constraint.pp (Pconstraint ct)
       end ^^
-      rparen
+      S.rparen
     | Pexp_dot_open (od, e) ->
-      Open_declaration.pp od ^^ dot ^^ pp e
+      Open_declaration.pp od ^^ S.dot ^^ pp e
     | Pexp_let_open (od, e) ->
       S.let_ ^/^ S.open_ ^^ Open_declaration.pp od ^/^ S.in_ ^/^ pp e
     | Pexp_letop lo -> Letop.pp lo
     | Pexp_extension ext -> Extension.pp ext
-    | Pexp_unreachable  -> dot
+    | Pexp_unreachable  -> S.dot
     | Pexp_stack e -> S.stack_ ^/^ pp e
     | Pexp_comprehension ce -> Comprehension.pp_expr ce
     | Pexp_overwrite (e1, e2) ->
       S.overwrite_ ^/^ pp e1 ^/^ S.with_ ^/^ pp e2
-    | Pexp_hole -> underscore
+    | Pexp_hole -> S.underscore
     | Pexp_index_op access ->
       let left, right =
         match access.kind with
-        | Paren -> lparen, rparen
-        | Brace -> lbrace, rbrace
-        | Bracket -> lbracket, rbracket
+        | Paren -> S.lparen, S.rparen
+        | Brace -> S.lbrace, S.rbrace
+        | Bracket -> S.lbracket, S.rbracket
       in
       pp access.seq ^/^
       begin match access.op with
-        | None -> dot
+        | None -> S.dot
         | Some (None, op) -> string op
-        | Some (Some lid, op) -> dot ^^ longident lid ^^ string op
+        | Some (Some lid, op) -> S.dot ^^ longident lid ^^ string op
       end ^^
       left ^^
-      separate_map (semi ^^ break 1) pp access.indices ^^
+      separate_map (S.semi ^^ break 1) pp access.indices ^^
       right ^^
       begin match access.assign with
         | None -> empty
@@ -586,7 +598,7 @@ end = struct
       S.begin_ ^/^ pp exp ^/^ S.end_
     | Pexp_list elts ->
       brackets (
-        separate_map (semi ^^ break 1) pp elts
+        separate_map (S.semi ^^ break 1) pp elts
       )
     | Pexp_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
     | Pexp_exclave exp -> S.exclave_ ^/^ pp exp
@@ -600,7 +612,7 @@ end = struct
   let pp pp_value rf =
     longident rf.field_name.txt ^^
     optional (fun v -> break 1 ^^ Type_constraint.pp v) rf.typ ^^
-    optional (fun v -> break 1 ^^ equals ^/^ pp_value v) rf.value
+    optional (fun v -> break 1 ^^ S.equals ^/^ pp_value v) rf.value
 end
 
 and Application : sig
@@ -663,7 +675,7 @@ end = struct
         ) arg.parg_tokens
       with
       | Some doc -> doc
-      | None -> mark ^^ string name ^^ colon
+      | None -> mark ^^ string name ^^ S.colon
     in
     match arg.parg_desc with
     | Parg_unlabelled
@@ -682,7 +694,7 @@ end = struct
         optional; legacy_modes; name: string; maybe_punned = None; typ_constraint;
         modes = m; default;
       } ->
-      (if optional then qmark else tilde) ^^
+      (if optional then S.qmark else S.tilde) ^^
       parenthesize (
         modes legacy_modes ^/^ string name ^^
         begin (match typ_constraint with
@@ -693,14 +705,14 @@ end = struct
            begin match default with
              | None -> empty
              | Some d ->
-               equals ^^ Expression.pp d
+               S.equals ^^ Expression.pp d
            end
       )
     | Parg_labelled {
         optional; legacy_modes; name: string; maybe_punned = Some arg;
         typ_constraint; modes = m; default;
       } ->
-      single_or_multi_token (if optional then qmark else tilde) name ^^
+      single_or_multi_token (if optional then S.qmark else S.tilde) name ^^
       parenthesize (
         modes legacy_modes ^/^ pp_arg arg ^^
         begin (match typ_constraint with
@@ -711,7 +723,7 @@ end = struct
            begin match default with
              | None -> empty
              | Some d ->
-               equals ^^ Expression.pp d
+               S.equals ^^ Expression.pp d
            end
       )
 end
@@ -723,12 +735,12 @@ end = struct
   let pp_desc = function
     | Pparam_val arg -> Argument.pp Pattern.pp arg
     | Pparam_newtype (lat, jkind_o) ->
-      lparen ^^ S.type_ ^/^ string lat.txt ^^
+      S.lparen ^^ S.type_ ^/^ string lat.txt ^^
       begin match jkind_o with
         | None -> empty
-        | Some j -> break 1 ^^ colon ^/^ Jkind_annotation.pp j
+        | Some j -> break 1 ^^ S.colon ^/^ Jkind_annotation.pp j
       end ^^
-      rparen
+      S.rparen
 
   let pp fp = pp_desc fp.pparam_desc
 end
@@ -750,10 +762,10 @@ and Type_constraint : sig
 end = struct
   let pp = function
   | Pconstraint ct ->
-    colon ^/^ Core_type.pp ct
+    S.colon ^/^ Core_type.pp ct
   | Pcoerce (None, ct) -> S.coerce ^/^ Core_type.pp ct
   | Pcoerce (Some ct1, ct2) ->
-    colon ^/^ Core_type.pp ct1 ^/^ S.coerce ^/^ Core_type.pp ct2
+    S.colon ^/^ Core_type.pp ct1 ^/^ S.coerce ^/^ Core_type.pp ct2
 end
 
 
@@ -793,7 +805,7 @@ and Comprehension : sig
 end = struct
   let pp_iterator = function
     | Pcomp_range { start; stop; direction = dir } ->
-      equals ^/^ Expression.pp start ^/^ direction dir ^/^ Expression.pp stop
+      S.equals ^/^ Expression.pp start ^/^ direction dir ^/^ Expression.pp stop
     | Pcomp_in e -> S.in_ ^/^ Expression.pp e
 
   let pp_clause_binding
@@ -819,7 +831,7 @@ end = struct
     separate_map (break 1) pp_clause c.pcomp_clauses
 
   let pp_expr = function
-    | Pcomp_list_comprehension c -> lbracket ^^ pp c ^^ rbracket
+    | Pcomp_list_comprehension c -> S.lbracket ^^ pp c ^^ S.rbracket
     | Pcomp_array_comprehension (mut, c) ->
       let left, right = array_delimiters mut in
       left ^^ pp c ^^ right
@@ -836,7 +848,7 @@ end = struct
       | [] -> S.val_
       | _ -> S.external_
     in
-    kw ^/^ string vd.pval_name.txt ^/^ colon ^/^
+    kw ^/^ string vd.pval_name.txt ^/^ S.colon ^/^
     Core_type.pp vd.pval_type ^^
     begin match vd.pval_modalities with
       | [] -> empty
@@ -845,7 +857,7 @@ end = struct
     begin match vd.pval_prim with
       | [] -> empty
       | ps ->
-        break 1 ^^ equals ^/^
+        break 1 ^^ S.equals ^/^
         separate_map (break 1) (fun s -> dquotes (string s)) ps
     end
 end
@@ -857,7 +869,7 @@ end = struct
   let pp
       { pld_name; pld_mutable; pld_modalities; pld_type; pld_attributes; _ } =
     mutable_ pld_mutable ^^
-    string pld_name.txt ^/^ colon ^/^ Core_type.pp pld_type ^^
+    string pld_name.txt ^/^ S.colon ^/^ Core_type.pp pld_type ^^
     begin match pld_modalities with
       | [] -> empty
       | ms -> break 1 ^^ S.atat ^/^ modalities ms
@@ -879,11 +891,11 @@ end = struct
 
   let pp_args = function
     | Pcstr_tuple args ->
-      separate_map (break 1 ^^ star ^^ break 1) pp args
+      separate_map (break 1 ^^ S.star ^^ break 1) pp args
     | Pcstr_record lbls ->
-      lbrace ^/^
-      separate_map (semi ^^ break 1) Label_declaration.pp lbls ^/^
-      rbrace
+      S.lbrace ^/^
+      separate_map (S.semi ^^ break 1) Label_declaration.pp lbls ^/^
+      S.rbrace
 end
 
 and Type_declaration : sig
@@ -899,11 +911,11 @@ end = struct
         | [] -> empty
         | lst ->
           separate_map (break 1) (function
-            | var, None -> squote ^^ string var.txt
+            | var, None -> S.squote ^^ string var.txt
             | var, Some j ->
-              lparen ^^ squote ^^ string var.txt ^/^ colon ^/^
-              Jkind_annotation.pp j ^^ rparen
-          ) lst ^^ dot ^^ break 1
+              S.lparen ^^ S.squote ^^ string var.txt ^/^ S.colon ^/^
+              Jkind_annotation.pp j ^^ S.rparen
+          ) lst ^^ S.dot ^^ break 1
     in
     string pcd_name.txt ^^
     begin match pcd_args, pcd_res with
@@ -911,9 +923,9 @@ end = struct
     | args, None ->
       break 1 ^^ S.of_ ^/^ Constructor_argument.pp_args args
     | Pcstr_tuple [], Some ct ->
-      break 1 ^^ colon ^/^ pcd_vars ^^ Core_type.pp ct
+      break 1 ^^ S.colon ^/^ pcd_vars ^^ Core_type.pp ct
     | args, Some ct ->
-      break 1 ^^ colon ^/^ pcd_vars ^^
+      break 1 ^^ S.colon ^/^ pcd_vars ^^
       Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct
     end
     |> Attribute.attach ~attrs:pcd_attributes
@@ -922,22 +934,22 @@ end = struct
     | Ptype_abstract -> empty
     | Ptype_variant cds ->
       (* FIXME: leading pipe *)
-      break 1 ^^ equals ^/^ private_ priv ^^
+      break 1 ^^ S.equals ^/^ private_ priv ^^
       separate_map (break 1 ^^ S.pipe ^^ break 1) constructor_declaration
         cds
     | Ptype_record lbls ->
-      break 1 ^^ equals ^/^ private_ priv ^^ lbrace ^/^
-      separate_map (semi ^^ break 1) Label_declaration.pp lbls ^/^ rbrace
+      break 1 ^^ S.equals ^/^ private_ priv ^^ S.lbrace ^/^
+      separate_map (S.semi ^^ break 1) Label_declaration.pp lbls ^/^ S.rbrace
     | Ptype_record_unboxed_product lbls ->
-      break 1 ^^ equals ^/^ private_ priv ^^ S.hash_lbrace ^/^
-      separate_map (semi ^^ break 1) Label_declaration.pp lbls ^/^ rbrace
-    | Ptype_open -> break 1 ^^ equals ^/^ S.dotdot
+      break 1 ^^ S.equals ^/^ private_ priv ^^ S.hash_lbrace ^/^
+      separate_map (S.semi ^^ break 1) Label_declaration.pp lbls ^/^ S.rbrace
+    | Ptype_open -> break 1 ^^ S.equals ^/^ S.dotdot
 
   let pp_rhs ?(subst=false) td =
     begin match td.ptype_manifest with
       | None -> empty
       | Some ct ->
-        break 1 ^^ (if subst then S.colon_equals else equals) ^/^
+        break 1 ^^ (if subst then S.colon_equals else S.equals) ^/^
         Core_type.pp ct
     end ^^
     type_kind td.ptype_private td.ptype_kind ^^
@@ -945,7 +957,7 @@ end = struct
       | [] -> empty
       | cs ->
         separate_map (break 1) (fun (ct1, ct2, _) ->
-          S.constraint_ ^/^ Core_type.pp ct1 ^/^ equals ^/^
+          S.constraint_ ^/^ Core_type.pp ct1 ^/^ S.equals ^/^
           Core_type.pp ct2
         ) cs
     end
@@ -955,7 +967,7 @@ end = struct
     type_app (string td.ptype_name.txt) (List.map pp_param td.ptype_params) ^^
     begin match td.ptype_jkind_annotation with
       | None -> empty
-      | Some j -> break 1 ^^ colon ^/^ Jkind_annotation.pp j
+      | Some j -> break 1 ^^ S.colon ^/^ Jkind_annotation.pp j
     end ^^
     pp_rhs ?subst td
     |> Attribute.attach ~post:true ~attrs:td.ptype_attributes
@@ -973,7 +985,7 @@ end = struct
     | [] -> empty
     | [ x ] -> pp_param x ^^ break 1
     | xs ->
-      lparen ^^ separate_map (comma ^^ break 1) pp_param xs ^^ rparen ^^ break 1
+      S.lparen ^^ separate_map (S.comma ^^ break 1) pp_param xs ^^ S.rparen ^^ break 1
   in
   params ^^ longident ptyext_path.txt ^/^
   S.plus_equals ^/^
@@ -994,23 +1006,23 @@ end = struct
         | [] -> empty
         | lst ->
           separate_map (break 1) (function
-            | var, None -> squote ^^ string var.txt
+            | var, None -> S.squote ^^ string var.txt
             | var, Some j ->
-              lparen ^^ squote ^^ string var.txt ^/^ colon ^/^
-              Jkind_annotation.pp j ^^ rparen
-          ) lst ^^ dot ^^ break 1
+              S.lparen ^^ S.squote ^^ string var.txt ^/^ S.colon ^/^
+              Jkind_annotation.pp j ^^ S.rparen
+          ) lst ^^ S.dot ^^ break 1
       in
       begin match args, res with
         | Pcstr_tuple [], None -> empty
         | args, None ->
             break 1 ^^ S.of_ ^/^ Constructor_argument.pp_args args
           | Pcstr_tuple [], Some ct ->
-          break 1 ^^ colon ^/^ vars ^^ Core_type.pp ct
+          break 1 ^^ S.colon ^/^ vars ^^ Core_type.pp ct
         | args, Some ct ->
-          break 1 ^^ colon ^/^ vars ^^
+          break 1 ^^ S.colon ^/^ vars ^^
           Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct
       end
-    | Pext_rebind lid -> equals ^/^ longident lid.txt
+    | Pext_rebind lid -> S.equals ^/^ longident lid.txt
 
   let pp { pext_name; pext_kind; pext_attributes; _ } =
     string pext_name.txt ^/^ pp_kind pext_kind
@@ -1061,12 +1073,12 @@ end = struct
     | Pctf_inherit ct -> S.inherit_ ^/^ pp ct
     | Pctf_val (lbl, mut, virt, ct) ->
       S.val_ ^/^ mutable_ mut ^^ virtual_ virt ^^
-      string lbl.txt ^/^ colon ^/^ Core_type.pp ct
+      string lbl.txt ^/^ S.colon ^/^ Core_type.pp ct
     | Pctf_method (lbl, priv, virt, ct) ->
       S.method_ ^/^ private_ priv ^^ virtual_ virt ^^
-      string lbl.txt ^/^ colon ^/^ Core_type.pp ct
+      string lbl.txt ^/^ S.colon ^/^ Core_type.pp ct
     | Pctf_constraint (ct1, ct2) ->
-      S.constraint_ ^/^ Core_type.pp ct1 ^/^ equals ^/^ Core_type.pp ct2
+      S.constraint_ ^/^ Core_type.pp ct1 ^/^ S.equals ^/^ Core_type.pp ct2
     | Pctf_attribute attr -> Attribute.pp_floating attr
     | Pctf_extension ext -> Extension.pp ~floating:true ext
 
@@ -1084,7 +1096,7 @@ end = struct
     let pp_param (x, info) = param_info info ^^ Core_type.pp x in
     virtual_ pci_virt ^^
     type_app (string pci_name.txt) (List.map pp_param pci_params) ^/^
-    equals ^/^ pp_expr pci_expr
+    S.equals ^/^ pp_expr pci_expr
     |> Attribute.attach ~post:true ~attrs:pci_attributes
 end
 
@@ -1123,7 +1135,7 @@ end = struct
       separate_map (break 1 ^^ S.and_ ^^ break 1) Value_binding.pp vbs ^/^
       S.in_ ^/^
       pp body
-    | Pcl_constraint (ce, ct) -> pp ce ^/^ colon ^/^ Class_type.pp ct
+    | Pcl_constraint (ce, ct) -> pp ce ^/^ S.colon ^/^ Class_type.pp ct
     | Pcl_extension ext -> Extension.pp ext
     | Pcl_open (od, ce) ->
       (* FIXME: factorize *)
@@ -1148,7 +1160,7 @@ end = struct
       S.inherit_ ^^
       begin match override with
         | Fresh -> empty
-        | Override -> bang
+        | Override -> S.bang
       end ^/^
       pp ce ^^
       begin match alias with
@@ -1164,13 +1176,13 @@ end = struct
       private_ priv ^^ virtual_field cfk ^^ string lbl.txt ^/^
       pp_field_kind cfk
     | Pcf_constraint (ct1, ct2) ->
-      S.constraint_ ^/^ Core_type.pp ct1 ^/^ equals ^/^ Core_type.pp ct2
+      S.constraint_ ^/^ Core_type.pp ct1 ^/^ S.equals ^/^ Core_type.pp ct2
     | Pcf_initializer e -> S.initializer_ ^/^ Expression.pp e
     | Pcf_attribute attr -> Attribute.pp_floating attr
     | Pcf_extension ext -> Extension.pp ~floating:true ext
 
   and pp_field_kind = function
-    | Cfk_virtual ct -> colon ^/^ Core_type.pp ct
+    | Cfk_virtual ct -> S.colon ^/^ Core_type.pp ct
     | Cfk_concrete (_, vb) -> Value_binding.pp vb
 
   and pp { pcl_desc; pcl_attributes; _ } =
@@ -1225,9 +1237,9 @@ end = struct
     | Unit -> empty
     | Named (lbl, mty, modes) ->
       begin match lbl.txt with
-        | None -> underscore
+        | None -> S.underscore
         | Some s -> string s
-      end ^/^ colon ^/^ with_modes (Module_type.pp mty) ~modes
+      end ^/^ S.colon ^/^ with_modes (Module_type.pp mty) ~modes
 end
 
 and Signature : sig
@@ -1273,7 +1285,7 @@ end = struct
     | Psig_extension (ext, attrs) ->
       Attribute.attach ~attrs (Extension.pp ~floating:true ext)
     | Psig_kind_abbrev (name, k) ->
-      S.kind_abbrev_ ^/^ string name.txt ^/^ equals ^/^
+      S.kind_abbrev_ ^/^ string name.txt ^/^ S.equals ^/^
         Jkind_annotation.pp k
 
   let pp_item it = pp_item_desc it.psig_desc
@@ -1295,13 +1307,13 @@ end = struct
   let pp { pmd_name; pmd_type; pmd_modalities; pmd_attributes; _ } =
     let name =
       match pmd_name.txt with
-      | None -> underscore
+      | None -> S.underscore
       | Some s -> string s
     in
     begin match pmd_modalities with
       | [] -> name
-      | l -> name ^/^ at ^/^ modalities l
-    end ^/^ equals ^/^ Module_type.pp pmd_type
+      | l -> name ^/^ S.at ^/^ modalities l
+    end ^/^ S.equals ^/^ Module_type.pp pmd_type
     |> Attribute.attach ~post:true ~attrs:pmd_attributes
 end
 
@@ -1321,7 +1333,7 @@ end = struct
     begin match pmtd_type with
       | None -> empty
       | Some mty ->
-        break 1 ^^ (if subst then S.colon_equals else equals) ^/^
+        break 1 ^^ (if subst then S.colon_equals else S.equals) ^/^
           Module_type.pp mty
     end
     |> Attribute.attach ~post:true ~attrs:pmtd_attributes
@@ -1332,7 +1344,7 @@ and Open_infos : sig
 end = struct
   let pp pp_expr { popen_expr; popen_override; popen_attributes; _ } =
     begin match popen_override with
-      | Override -> bang
+      | Override -> S.bang
       | Fresh -> empty
     end ^/^
     pp_expr popen_expr
@@ -1383,9 +1395,9 @@ end = struct
     | Pwith_type (lid, td) ->
       S.type_ ^/^ longident lid.txt ^^ Type_declaration.pp_rhs td
     | Pwith_module (lid1, lid2) ->
-      S.module_ ^/^ longident lid1.txt ^/^ equals ^/^ longident lid2.txt
+      S.module_ ^/^ longident lid1.txt ^/^ S.equals ^/^ longident lid2.txt
     | Pwith_modtype (lid, mty) ->
-      S.module_ ^/^ S.type_ ^/^ longident lid.txt ^/^ equals ^/^
+      S.module_ ^/^ S.type_ ^/^ longident lid.txt ^/^ S.equals ^/^
       Module_type.pp mty
     | Pwith_modtypesubst (lid, mty) ->
       S.module_ ^/^ S.type_ ^/^ longident lid.txt ^/^ S.colon_equals ^/^
@@ -1410,13 +1422,13 @@ end = struct
       S.functor_ ^/^ parens (Functor_parameter.pp fp) ^/^ S.rarrow ^/^ pp me
     | Pmod_apply (m1, m2) ->
       pp m1 ^^ parens (pp m2)
-    | Pmod_apply_unit me -> pp me ^^ lparen ^^ rparen
+    | Pmod_apply_unit me -> pp me ^^ S.lparen ^^ S.rparen
     | Pmod_constraint (me, None, modes) ->
       (* FIXME: parens? shouldn't that be part of cst? *)
       parens (with_modes ~modes (pp me))
     | Pmod_constraint (me, Some mty, atat_modes) ->
       parens (
-        pp me ^/^ colon ^/^ Module_type.pp mty ^^
+        pp me ^/^ S.colon ^/^ Module_type.pp mty ^^
         begin match atat_modes with
           | [] -> empty
           | l -> break 1 ^^ S.atat ^/^ modes l
@@ -1475,7 +1487,7 @@ end = struct
     | Pstr_extension (ext, attrs) ->
       Attribute.attach ~attrs (Extension.pp ~floating:true ext)
     | Pstr_kind_abbrev (name, k) ->
-      S.kind_abbrev_ ^/^ string name.txt ^/^ equals ^/^
+      S.kind_abbrev_ ^/^ string name.txt ^/^ S.equals ^/^
       Jkind_annotation.pp k
 
   let pp_item it = pp_item_desc it.pstr_desc
@@ -1485,7 +1497,7 @@ end = struct
     separate_map (break 1) pp_item items ^/^
     S.end_
 
-  let pp_implementation = separate_map (break 1) pp_item
+  let pp_implementation s = group (separate_map (break 1) pp_item s)
 end
 
 and Value_constraint : sig
@@ -1493,7 +1505,7 @@ and Value_constraint : sig
 end = struct
   let pp = function
     | Pvc_constraint { locally_abstract_univars; typ } ->
-      colon ^/^
+      S.colon ^/^
       begin match locally_abstract_univars with
         | [] -> empty
         | vars ->
@@ -1504,13 +1516,13 @@ end = struct
             | Some j -> break 1 ^^ Jkind_annotation.pp j
           in
           S.type_ ^/^
-          separate_map (break 1) pp_var vars ^^ dot ^^ break 1
+          separate_map (break 1) pp_var vars ^^ S.dot ^^ break 1
       end ^^
       Core_type.pp typ
     | Pvc_coercion {ground; coercion} ->
       begin match ground with
         | None -> empty
-        | Some ct -> colon ^/^ Core_type.pp ct ^^ break 1
+        | Some ct -> S.colon ^/^ Core_type.pp ct ^^ break 1
       end ^^
       S.coerce ^/^ Core_type.pp coercion
 end
@@ -1539,7 +1551,7 @@ end = struct
     end ^^
     begin match pvb_expr with
       | None -> empty
-      | Some e -> break 1 ^^ equals ^/^ Expression.pp e
+      | Some e -> break 1 ^^ S.equals ^/^ Expression.pp e
     end
     |> Attribute.attach ~attrs:pvb_attributes (* FIXME: post? *)
 end
@@ -1549,9 +1561,9 @@ and Module_binding : sig
 end = struct
   let pp { pmb_name; pmb_expr; pmb_attributes; _ } =
     begin match pmb_name.txt with
-      | None -> underscore
+      | None -> S.underscore
       | Some s -> string s
-    end ^/^ equals ^/^ Module_expr.pp pmb_expr
+    end ^/^ S.equals ^/^ Module_expr.pp pmb_expr
     |> Attribute.attach ~attrs:pmb_attributes
 end
 
@@ -1559,7 +1571,7 @@ and Jkind_annotation : sig
   val pp : jkind_annotation -> document
 end = struct
   let jkind_annotation_desc = function
-    | Default -> underscore
+    | Default -> S.underscore
     | Abbreviation s -> string s
     | Mod (jk, ms) -> Jkind_annotation.pp jk ^/^ S.mod_ ^/^ modes ms
     | With (jk, ct, modalities) ->
@@ -1567,7 +1579,7 @@ end = struct
       |> with_modalities ~modalities
     | Kind_of ct -> S.kind_of_ ^/^ Core_type.pp ct
     | Product jks ->
-      separate_map (break 1 ^^ ampersand ^^ break 1) Jkind_annotation.pp jks
+      separate_map (break 1 ^^ S.ampersand ^^ break 1) Jkind_annotation.pp jks
 
   let pp jk = jkind_annotation_desc jk.pjkind_desc
 end
