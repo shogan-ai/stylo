@@ -6,7 +6,20 @@ type elt =
   | Comment of string
   | Child_node
 
+let kind_as_string = function
+  | Token _ -> "tok"
+  | Comment _ -> "cmt"
+  | Child_node -> "child"
+
+let pp_elt ppf e = Format.pp_print_string ppf (kind_as_string e)
+
 type seq = elt list
+
+let pp_seq =
+  let open Format in
+  pp_print_list
+    ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
+    pp_elt
 
 module Indexed_list : sig
   type t
