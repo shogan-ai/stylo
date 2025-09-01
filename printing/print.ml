@@ -1532,7 +1532,7 @@ and Value_binding : sig
 end = struct
   let pp { pvb_modes; pvb_pat; pvb_params; pvb_constraint;
            pvb_ret_modes; pvb_expr; pvb_attributes;
-           pvb_loc = _ } =
+           pvb_loc = _; pvb_tokens = _ } =
     begin match pvb_modes with
       | [] -> empty
       | lst -> modes lst ^^ break 1
