@@ -2241,14 +2241,13 @@ seq_expr:
 
 labeled_simple_pattern:
     QUESTION LPAREN modes0=optional_mode_expr_legacy x=label_let_pattern opt_default RPAREN
-      { let lbl, pat, cty, modes = x in
-        ignore pat; (* punned! *)
+      { let lbl, cty, modes = x in
         Arg.optional ~tokens:(Tokens.at $sloc) ~legacy_modes:modes0
         ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
         ~modes ?default:$5 lbl
       }
   | QUESTION label_var
-      { Arg.optional ~tokens:(Tokens.at $sloc) (fst $2) }
+      { Arg.optional ~tokens:(Tokens.at $sloc) $2 }
   | OPTLABEL LPAREN modes0=optional_mode_expr_legacy x=let_pattern opt_default RPAREN
       { let pat, cty, modes = x in
         (* FIXME: if everything is [] or None, how do we know we need parens,
@@ -2261,14 +2260,13 @@ labeled_simple_pattern:
   | OPTLABEL pattern_var
       { Arg.optional ~tokens:(Tokens.at $sloc) ~maybe_punned:$2 $1 }
   | TILDE LPAREN modes0=optional_mode_expr_legacy x=label_let_pattern RPAREN
-      { let lbl, pat, cty, modes = x in
-        ignore pat; (* punned! *)
+      { let lbl, cty, modes = x in
         Arg.labelled ~tokens:(Tokens.at $sloc) ~legacy_modes:modes0
           ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
           ~modes lbl
       }
   | TILDE label_var
-      { Arg.labelled ~tokens:(Tokens.at $sloc) (fst $2) }
+      { Arg.labelled ~tokens:(Tokens.at $sloc) $2 }
   | LABEL simple_pattern
       { Arg.labelled ~tokens:(Tokens.at $sloc) ~maybe_punned:$2 $1 }
   | LABEL LPAREN modes0=optional_mode_expr_legacy x=let_pattern_required_modes RPAREN
@@ -2324,12 +2322,10 @@ pattern_var:
 ;
 label_let_pattern:
     x = label_var modes = optional_at_mode_expr
-      { let lab, pat = x in
-        lab, pat, None, modes
+      { x, None, modes
       }
   | x = label_var COLON cty = core_type modes = optional_atat_mode_expr
-      { let lab, pat = x in
-        lab, pat, Some cty, modes
+      { x, Some cty, modes
       }
   | x = label_var COLON
     cty = mktyp (bound_vars = typevar_list
@@ -2337,13 +2333,12 @@ label_let_pattern:
                  inner_type = core_type
             { Ptyp_poly (bound_vars, inner_type) })
     modes = optional_atat_mode_expr
-      { let lab, pat = x in
-        lab, pat, Some cty, modes
+      { x, Some cty, modes
       }
 ;
 %inline label_var:
-    mkrhs(LIDENT)
-      { ($1.Location.txt, mkpat ~loc:$sloc (Ppat_var $1)) }
+    LIDENT
+      { $1 }
 ;
 let_pattern:
     x=let_pattern_awaiting_at_modes modes=optional_at_mode_expr
