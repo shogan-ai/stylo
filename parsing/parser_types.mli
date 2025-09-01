@@ -20,7 +20,8 @@ type let_binding =
     lb_attributes: attributes;
     lb_docs: docs Lazy.t;
     lb_text: text Lazy.t;
-    lb_loc: Location.t; }
+    lb_loc: Location.t;
+    lb_toks: Tokens.seq; }
 
 type let_bindings =
   { lbs_bindings: let_binding list;

@@ -397,6 +397,7 @@ let mklb first ~loc body attrs =
     lb_text = (if first then empty_text_lazy
                else symbol_text_lazy (fst loc));
     lb_loc = make_loc loc;
+    lb_toks = Tokens.at loc;
   }
 
 let addlb lbs lb =
@@ -417,6 +418,7 @@ let val_of_let_bindings ~loc lbs =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
+           ~tokens:lb.lb_toks
            ~modes:lb.lb_body.lbb_modes
            ~docs:(Lazy.force lb.lb_docs)
            ~text:(Lazy.force lb.lb_text)
@@ -436,6 +438,7 @@ let expr_of_let_bindings ~loc lbs body =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
+           ~tokens:lb.lb_toks
            ~modes:lb.lb_body.lbb_modes
            ~docs:(Lazy.force lb.lb_docs)
            ~text:(Lazy.force lb.lb_text)
@@ -453,6 +456,7 @@ let class_of_let_bindings ~loc lbs body =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
+           ~tokens:lb.lb_toks
            ~modes:lb.lb_body.lbb_modes
            ~docs:(Lazy.force lb.lb_docs)
            ~text:(Lazy.force lb.lb_text)
@@ -1948,7 +1952,8 @@ value:
             pvb_modes = []; pvb_params = [];
             pvb_constraint = None; pvb_ret_modes = [];
             pvb_expr = Some $6; pvb_loc = make_loc $sloc;
-            pvb_attributes = [] (* FIXME? *) }
+            pvb_attributes = [] (* FIXME? *);
+            pvb_tokens = Tokens.at $sloc; }
         in
         ($4, $3, Cfk_concrete ($1, vb)), $2 }
   | override_flag attributes mutable_flag mkrhs(label) type_constraint
@@ -1965,7 +1970,8 @@ value:
             pvb_modes = []; pvb_params = [];
             pvb_constraint = Some t; pvb_ret_modes = [];
             pvb_expr = Some $7; pvb_loc = make_loc $sloc;
-            pvb_attributes = [] (* FIXME? *) }
+            pvb_attributes = [] (* FIXME? *);
+            pvb_tokens = Tokens.at $sloc; }
         in
         ($4, $3, Cfk_concrete ($1, vb)), $2
       }
@@ -1984,7 +1990,8 @@ method_:
             pvb_constraint = tc; pvb_ret_modes = ret_modes;
             pvb_expr = Some e;
             pvb_loc = make_loc $sloc;
-            pvb_attributes = [] (* FIXME: ? *) }
+            pvb_attributes = [] (* FIXME: ? *);
+            pvb_tokens = Tokens.at $sloc; }
         in
         ($4, $3,
         Cfk_concrete ($1, vb)), $2 }
@@ -1999,7 +2006,8 @@ method_:
             pvb_constraint = Some constr; pvb_ret_modes = [];
             pvb_expr = Some $8;
             pvb_loc = make_loc $sloc;
-            pvb_attributes = [] (* FIXME: ? *) }
+            pvb_attributes = [] (* FIXME: ? *);
+            pvb_tokens = Tokens.at $sloc; }
         in
         ($4, $3, Cfk_concrete ($1, vb)), $2 }
   | override_flag attributes private_flag mkrhs(label) COLON TYPE newtypes
@@ -2013,7 +2021,8 @@ method_:
             pvb_constraint = Some constr; pvb_ret_modes = [];
             pvb_expr = Some $11;
             pvb_loc = make_loc $sloc;
-            pvb_attributes = [] (* FIXME: ? *) }
+            pvb_attributes = [] (* FIXME: ? *);
+            pvb_tokens = Tokens.at $sloc; }
         in
         ($4, $3, Cfk_concrete ($1, vb)), $2 }
 ;
@@ -2908,18 +2917,24 @@ and_let_binding:
 letop_binding_body:
     pat = let_ident exp = strict_binding
       { let params, tc, ret_modes, e = exp in
-        Vb.mk ~loc:(make_loc $sloc) ~params ?value_constraint:tc ~ret_modes pat (Some e) }
+        Vb.mk ~loc:(make_loc $sloc)
+          ~tokens:(Tokens.at $sloc)
+          ~params ?value_constraint:tc ~ret_modes pat (Some e) }
   | val_ident
       (* Let-punning *)
-      { Vb.mk ~loc:(make_loc $sloc) (mkpatvar ~loc:$loc $1) None }
+      { Vb.mk ~loc:(make_loc $sloc)
+          ~tokens:(Tokens.at $sloc)
+          (mkpatvar ~loc:$loc $1) (* FIXME: ! *)
+          None }
   (* CR zqian: support mode annotation on letop. *)
   | pat = simple_pattern COLON typ = core_type EQUAL exp = seq_expr
       { Vb.mk ~loc:(make_loc $sloc)
+          ~tokens:(Tokens.at $sloc)
           ~value_constraint:(
             Pvc_constraint { locally_abstract_univars = []; typ })
           pat (Some exp) }
   | pat = pattern_no_exn EQUAL exp = seq_expr
-      { Vb.mk ~loc:(make_loc $sloc) pat (Some exp) }
+      { Vb.mk ~tokens:(Tokens.at $sloc) ~loc:(make_loc $sloc) pat (Some exp) }
 ;
 letop_bindings:
     body = letop_binding_body

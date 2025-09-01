@@ -1388,6 +1388,7 @@ and value_binding =
     pvb_ret_modes: modes;
     pvb_attributes: attributes;
     pvb_loc: location;
+    pvb_tokens: tokens;
   } (** [let modes pat params : type_constraint @@ ret_modes = exp] *)
 
 and module_binding =
@@ -1483,5 +1484,10 @@ class to_tokens = object
   method! visit_argument visit_elt env a =
     let sub_tokens = super#visit_argument visit_elt env a in
     let node_toks = a.parg_tokens in
+    [combine_children node_toks sub_tokens]
+
+  method! visit_value_binding env vb =
+    let sub_tokens = super#visit_value_binding env vb in
+    let node_toks = vb.pvb_tokens in
     [combine_children node_toks sub_tokens]
 end

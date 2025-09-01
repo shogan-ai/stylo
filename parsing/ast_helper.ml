@@ -532,7 +532,7 @@ module Incl = struct
 end
 
 module Vb = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
+  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens ?(docs = empty_docs)
       ?(text = []) ?(params = []) ?(modes = []) ?value_constraint
       ?(ret_modes = []) pat expr =
     {
@@ -545,6 +545,7 @@ module Vb = struct
      pvb_attributes =
        add_text_attrs text (add_docs_attrs docs attrs);
      pvb_loc = loc;
+     pvb_tokens = tokens;
     }
 end
 

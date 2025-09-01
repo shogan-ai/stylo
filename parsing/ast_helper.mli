@@ -420,7 +420,7 @@ module Incl:
 (** Value bindings *)
 module Vb:
   sig
-    val mk: ?loc: loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
+    val mk: ?loc: loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?docs:docs -> ?text:text ->
       ?params:function_param list -> ?modes:modes ->
       ?value_constraint:value_constraint -> ?ret_modes:modes -> pattern ->
       expression option -> value_binding
