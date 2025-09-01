@@ -443,7 +443,7 @@ and expression_desc =
   *)
   | Pexp_prefix_apply of expression * expression
   | Pexp_add_or_sub of string * expression
-  | Pexp_infix_apply of { op: expression; arg1: expression; arg2: expression }
+  | Pexp_infix_apply of { arg1: expression; op: expression; arg2: expression }
   | Pexp_apply of expression * expression argument list
       (** [Pexp_apply(E0, [(l1, E1) ; ... ; (ln, En)])]
             represents [E0 ~l1:E1 ... ~ln:En]
