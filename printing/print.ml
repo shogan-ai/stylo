@@ -458,7 +458,12 @@ end = struct
       (* FIXME: ! *)
       pp_desc { exp with pexp_desc = Pexp_tuple elts } ^^
       S.rparen
-    | Pexp_construct (lid, None) -> longident lid.txt
+    | Pexp_construct (lid, None) ->
+      if lid.txt = Lident "()" then
+        (* unit is actually two tokens *)
+        S.lparen ^^ S.rparen
+      else
+        longident lid.txt
     | Pexp_construct (lid, Some e) -> longident lid.txt ^/^ pp e
     | Pexp_variant (lbl, eo) ->
       S.bquote ^^ string lbl ^^
