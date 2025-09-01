@@ -1460,6 +1460,17 @@ let rec combine_children (top : tokens) children =
   | tok :: tokens, _ ->
     tok :: combine_children tokens children
 
+(* dbg printing *)
+let pp_child ppf =
+  let open Format in
+  fprintf ppf "@[<hov 2>%a@]" Tokens.pp_seq
+
+let pp_children =
+  let open Format in
+  pp_print_list
+    ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
+    pp_child
+
 class to_tokens = object
   method zero : tokens list = []
   method plus = (@)
