@@ -3,6 +3,8 @@
 type t =
   | Empty
   | Token of PPrint.document
+  | Comment of PPrint.document
+    (** docstrings and explicitely inserted comments *)
   | Whitespace of PPrint.document
   | Cat of t * t
   | Nest of int * t
@@ -21,6 +23,9 @@ let (^^) t1 t2 = Cat (t1, t2)
 let nest i t = Nest (i, t)
 let group t = Group t
 let align t = Align t
+
+let comment s =
+  Comment PPrint.(string "(*" ^^ string s ^^ string "*)")
 
 (* Useful combinators *)
 
@@ -65,7 +70,7 @@ open PPrint
 
 let rec to_document : t -> document = function
   | Empty -> PPrint.empty
-  | Token t | Whitespace t -> t
+  | Comment t | Token t | Whitespace t -> t
   | Cat (t1, t2) -> to_document t1 ^^ to_document t2
   | Nest (i, t) -> nest i (to_document t)
   | Group t -> group (to_document t)
