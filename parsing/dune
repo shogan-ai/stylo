@@ -15,6 +15,9 @@
 
 (library
   (name ocaml_syntax)
-  (modules_without_implementation asttypes parsetree)
+  (modules_without_implementation asttypes)
   (libraries menhirLib)
+  (preprocess
+    (per_module
+      ((pps visitors.ppx) parsetree)))
   (flags :standard -w -9-63))
