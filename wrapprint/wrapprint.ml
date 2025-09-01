@@ -1,6 +1,7 @@
 (* Primitives *)
 
 type t =
+  | Empty
   | Token of PPrint.document
   | Whitespace of PPrint.document
   | Cat of t * t
@@ -10,7 +11,7 @@ type t =
 
 type document = t
 
-let empty = Token PPrint.empty
+let empty = Empty
 let char c = Token (PPrint.char c)
 let string s = Token (PPrint.string s)
 let blank n = Whitespace (PPrint.blank n)
@@ -63,6 +64,7 @@ let prefix n b left right =
 open PPrint
 
 let rec to_document : t -> document = function
+  | Empty -> PPrint.empty
   | Token t | Whitespace t -> t
   | Cat (t1, t2) -> to_document t1 ^^ to_document t2
   | Nest (i, t) -> nest i (to_document t)

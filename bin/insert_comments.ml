@@ -9,13 +9,16 @@ let rec advance_stream_and_insert_comments seq doc =
     | Tokens.Child_node -> assert false
     | Token _ -> seq, doc
     | Comment c ->
+      let c = "(*" ^ c ^ "*)" in
       advance_stream_and_insert_comments seq (doc ^/^ string c)
 
 let rec insert_comments_after seq doc =
   match doc with
   (* Return all the leaves as is *)
   | Token _ -> advance_stream_and_insert_comments seq doc
-  | Whitespace _ -> seq, doc
+  | Empty
+  | Whitespace _ ->
+    seq, doc
   | Cat (t1, t2) ->
     let stream', t1' = insert_comments_after seq t1 in
     let stream', t2' = insert_comments_after stream' t2 in
@@ -53,4 +56,5 @@ let rec from_tokens seq doc =
       assert (remaining = []);
       doc
     | Comment c ->
+      let c = "(*" ^ c ^ "*)" in
       Wrapprint.(string c ^/^ from_tokens seq doc)
