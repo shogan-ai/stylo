@@ -67,10 +67,11 @@ let docs_attr ds =
   let item =
     { pstr_desc = Pstr_eval (exp, []); pstr_loc = loc }
   in
+  let tok_elt = { Tokens.desc = Comment body; pos = loc.loc_start } in
   { attr_name = doc_loc;
     attr_payload = PStr [item];
     attr_loc = loc;
-    attr_tokens = [Comment body]}
+    attr_tokens = [tok_elt]}
 
 let add_docs_attrs docs attrs =
   let attrs =
@@ -121,10 +122,11 @@ let text_attr ds =
   let item =
     { pstr_desc = Pstr_eval (exp, []); pstr_loc = loc }
   in
+  let tok_elt = { Tokens.desc = Comment body; pos = loc.loc_start } in
   { attr_name = text_loc;
     attr_payload = PStr [item];
     attr_loc = loc;
-    attr_tokens = [Comment body]}
+    attr_tokens = [tok_elt]}
 
 let add_text_attrs dsl attrs =
   let fdsl = List.filter (function {ds_body=""} -> false| _ ->true) dsl in

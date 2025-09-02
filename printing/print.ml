@@ -417,11 +417,12 @@ end = struct
   let pipe_before_pattern =
     let rec consume_until_with = function
       | [] -> assert false
-      | Tokens.Token Parser_tokens.WITH :: rest -> next_is_pipe rest
+      | Tokens.{ desc = Token Parser_tokens.WITH; _ } :: rest ->
+        next_is_pipe rest
       | _ :: rest -> consume_until_with rest
     and next_is_pipe = function
-      | Tokens.Token Parser_tokens.BAR :: _ -> true
-      | Tokens.Comment _ :: rest -> next_is_pipe rest
+      | Tokens.{ desc = Token Parser_tokens.BAR; _ } :: _ -> true
+      | Tokens.{ desc = Comment _; _ } :: rest -> next_is_pipe rest
       | _ -> false
     in
     consume_until_with
@@ -679,7 +680,8 @@ end
 and Argument : sig
   val pp : ('a -> document) -> 'a argument -> document
 end = struct
-  let had_parens arg = List.mem (Tokens.Token LPAREN) arg.parg_tokens
+  let had_parens arg =
+    List.exists (fun elt -> elt.Tokens.desc = Token LPAREN) arg.parg_tokens
 
   let pp pp_arg arg =
     let parenthesize doc =
@@ -690,8 +692,8 @@ end = struct
     let single_or_multi_token mark name =
       match
         List.find_map (function
-          | Tokens.Token LABEL _ -> Some (stringf "~%s:" name)
-          | Tokens.Token OPTLABEL _ -> Some (stringf "~%s:" name)
+          | Tokens.{ desc = Token LABEL _; _ } -> Some (stringf "~%s:" name)
+          | Tokens.{ desc = Token OPTLABEL _; _ } -> Some (stringf "~%s:" name)
           | _ -> None
         ) arg.parg_tokens
       with

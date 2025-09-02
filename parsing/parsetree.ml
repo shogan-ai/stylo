@@ -1455,8 +1455,8 @@ let rec combine_children (top : tokens) children =
   match top, children with
   | [], [] -> [] (* done *)
   | [], _ -> assert false (* children left behind *)
-  | Child_node :: _, [] -> assert false (* missing child *)
-  | Child_node :: tokens, child :: children ->
+  | { desc = Child_node; _ } :: _, [] -> assert false (* missing child *)
+  | { desc = Child_node; _ } :: tokens, child :: children ->
     child @ combine_children tokens children
   | tok :: tokens, _ ->
     tok :: combine_children tokens children

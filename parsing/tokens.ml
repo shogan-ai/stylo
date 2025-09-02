@@ -1,17 +1,22 @@
 
 type token = Parser_tokens.token
 
-type elt =
+type desc =
   | Token of token
   | Comment of string
   | Child_node
 
-let kind_as_string = function
+type elt = {
+  desc: desc;
+  pos: Lexing.position;
+}
+
+let desc_as_string = function
   | Token _ -> "tok"
   | Comment _ -> "cmt"
   | Child_node -> "child"
 
-let pp_elt ppf e = Format.pp_print_string ppf (kind_as_string e)
+let pp_elt ppf e = Format.pp_print_string ppf (desc_as_string e.desc)
 
 type seq = elt list
 
@@ -25,7 +30,7 @@ module Indexed_list : sig
   type t
 
   val create : unit -> t
-  val append : t -> pos:Lexing.position -> elt -> unit
+  val append : t -> pos:Lexing.position -> desc -> unit
   val consume : t -> Lexing.position -> Lexing.position -> seq
 
   val global : t
@@ -54,7 +59,8 @@ end = struct
   }
   let create () : t = { tbl = Tbl.create 42; last = Empty }
 
-  let append t ~pos elt =
+  let append t ~pos desc =
+    let elt = { desc; pos } in
     let node = Node { pos; value = elt; next = Empty } in
     Tbl.add t.tbl pos node;
     begin match t.last with
@@ -80,7 +86,7 @@ end = struct
     | Empty -> invalid_arg "Tokens.consume"
     | Node start_node as cell->
       let seq, after = aux cell in
-      start_node.value <- Child_node;
+      start_node.value <- { start_node.value with desc = Child_node };
       start_node.next <- after;
       Tbl.replace t.tbl start cell; (* has been removed by aux... *)
       Tbl.replace t.tbl stop cell;

@@ -537,12 +537,21 @@ module Vb = struct
       ?(text = []) ?(params = []) ?(modes = []) ?value_constraint
       ?(ret_modes = []) pat expr =
     (* Naive, will do better later *)
-    let pvb_attributes = add_text_attrs text (add_docs_attrs docs attrs) in
-    let tokens =
-      tokens @
-      List.init (List.length pvb_attributes - List.length attrs)
-        (fun _ -> Tokens.Child_node)
+    let ds_child_nodes =
+      begin match docs.docs_pre with
+      | None | Some { ds_body=""; _ } -> []
+      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
+      end @
+      begin match docs.docs_post with
+      | None | Some { ds_body=""; _ } -> []
+      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
+      end @
+      List.filter_map (function
+        | {Docstring.ds_body=""} -> None
+        | {ds_loc} -> Some { Tokens.desc = Child_node; pos = ds_loc.loc_start }
+      ) text
     in
+    let tokens = tokens @ ds_child_nodes in
     {
      pvb_pat = pat;
      pvb_params = params;
@@ -550,7 +559,8 @@ module Vb = struct
      pvb_constraint=value_constraint;
      pvb_modes = modes;
      pvb_ret_modes = ret_modes;
-     pvb_attributes;
+     pvb_attributes =
+       add_text_attrs text (add_docs_attrs docs attrs);
      pvb_loc = loc;
      pvb_tokens = tokens;
     }
