@@ -130,15 +130,31 @@ module rec Attribute : sig
 
   val attach : ?post:bool -> attrs:attributes -> document -> document
 end = struct
+  let pp_doc : payload -> document = function
+    | PStr [ {
+      pstr_desc =
+        Pstr_eval
+          ({ pexp_desc = Pexp_constant Pconst_string (s, _loc, None); _ }, []);
+      _ } ]
+      ->
+      docstring s
+    | _ -> assert false
+
   let pp ?(post=false) { attr_name; attr_payload; _ } =
-    (if post then S.lbracket_atat else S.lbracket_at)
-    ^^ string attr_name.txt ^^ Payload.pp attr_payload
-    ^^ S.rbracket
+    match attr_name.txt with
+    | "ocaml.doc" | "ocaml.text" (* FIXME *) -> pp_doc attr_payload
+    | _ ->
+      (if post then S.lbracket_atat else S.lbracket_at)
+      ^^ string attr_name.txt ^^ Payload.pp attr_payload
+      ^^ S.rbracket
 
   let pp_floating { attr_name; attr_payload; _ } =
-    S.lbracket_atatat
-    ^^ string attr_name.txt ^^ Payload.pp attr_payload
-    ^^ S.rbracket
+    match attr_name.txt with
+    | "ocaml.doc" | "ocaml.text" (* FIXME *) -> pp_doc attr_payload
+    | _ ->
+      S.lbracket_atatat
+      ^^ string attr_name.txt ^^ Payload.pp attr_payload
+      ^^ S.rbracket
 
   let pp_list ?post l = separate_map (break 0) (pp ?post) l
 

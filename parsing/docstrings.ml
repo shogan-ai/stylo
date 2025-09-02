@@ -69,7 +69,8 @@ let docs_attr ds =
   in
   { attr_name = doc_loc;
     attr_payload = PStr [item];
-    attr_loc = loc }
+    attr_loc = loc;
+    attr_tokens = [Comment body]}
 
 let add_docs_attrs docs attrs =
   let attrs =
@@ -122,7 +123,8 @@ let text_attr ds =
   in
   { attr_name = text_loc;
     attr_payload = PStr [item];
-    attr_loc = loc }
+    attr_loc = loc;
+    attr_tokens = [Comment body]}
 
 let add_text_attrs dsl attrs =
   let fdsl = List.filter (function {ds_body=""} -> false| _ ->true) dsl in

@@ -47,10 +47,11 @@ module Const = struct
 end
 
 module Attr = struct
-  let mk ?(loc= !default_loc) name payload =
+  let mk ?(loc= !default_loc) ~tokens name payload =
     { attr_name = name;
       attr_payload = payload;
-      attr_loc = loc }
+      attr_loc = loc;
+      attr_tokens = tokens; }
 end
 
 module Typ = struct
@@ -535,6 +536,13 @@ module Vb = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ~tokens ?(docs = empty_docs)
       ?(text = []) ?(params = []) ?(modes = []) ?value_constraint
       ?(ret_modes = []) pat expr =
+    (* Naive, will do better later *)
+    let pvb_attributes = add_text_attrs text (add_docs_attrs docs attrs) in
+    let tokens =
+      tokens @
+      List.init (List.length pvb_attributes - List.length attrs)
+        (fun _ -> Tokens.Child_node)
+    in
     {
      pvb_pat = pat;
      pvb_params = params;
@@ -542,8 +550,7 @@ module Vb = struct
      pvb_constraint=value_constraint;
      pvb_modes = modes;
      pvb_ret_modes = ret_modes;
-     pvb_attributes =
-       add_text_attrs text (add_docs_attrs docs attrs);
+     pvb_attributes;
      pvb_loc = loc;
      pvb_tokens = tokens;
     }

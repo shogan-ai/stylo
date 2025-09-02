@@ -22,13 +22,3 @@ let attr_equals_builtin {Parsetree.attr_name = {txt; _}; _} s =
 
 let has_attribute nm attrs =
   List.exists (fun a -> attr_equals_builtin a nm) attrs
-
-let curry_attr_name = "extension.curry"
-
-let has_curry attrs =
-  has_attribute curry_attr_name attrs
-  || has_attribute "curry" attrs
-
-let curry_attr loc =
-  Ast_helper.Attr.mk ~loc:Location.none (Location.mkloc curry_attr_name loc) (PStr [])
-;;

@@ -27,6 +27,9 @@ let align t = Align t
 let comment s =
   Comment PPrint.(string "(*" ^^ string s ^^ string "*)")
 
+let docstring s =
+  Comment PPrint.(string "(**" ^^ string s ^^ string "*)")
+
 (* Useful combinators *)
 
 let foldli f init l =

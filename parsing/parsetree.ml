@@ -122,6 +122,7 @@ type attribute = {
     attr_name : string loc;
     attr_payload : payload;
     attr_loc : location;
+    attr_tokens : tokens;
   }
 (** Attributes such as [[\@id ARG]] and [[\@\@id ARG]].
 
@@ -1476,6 +1477,13 @@ class to_tokens = object
   method plus = (@)
 
   inherit [_] reduce as super
+
+  method! visit_attribute env a =
+    match a.attr_name.txt with
+    | "ocaml.doc" | "ocaml.text" -> [a.attr_tokens]
+    | _ ->
+      let sub_tokens = super#visit_attribute env a in
+      [combine_children a.attr_tokens sub_tokens]
 
   method! visit_core_type env ct =
     let sub_tokens = super#visit_core_type env ct in

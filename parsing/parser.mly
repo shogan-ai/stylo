@@ -130,7 +130,8 @@ let mkuminus ~oploc:_ name arg = Pexp_add_or_sub (name, arg), []
 
 let mkuplus = mkuminus
 
-let mk_attr ~loc name payload = Attr.mk ~loc name payload
+let mk_attr ~sloc name payload =
+  Attr.mk ~loc:(make_loc sloc) ~tokens:(Tokens.at sloc) name payload
 
 let mkpat_with_modes ~loc ~pat ~cty ~modes =
   match cty, modes with
@@ -146,16 +147,8 @@ let ghexp_constraint ~loc ~exp ~cty ~modes =
   let exp = mkexp_constraint ~loc ~exp ~cty ~modes in
   { exp with pexp_loc = { exp.pexp_loc with loc_ghost = true }}
 
-let mktyp_curry typ loc =
-  {typ with ptyp_attributes =
-     Builtin_attributes.curry_attr loc :: typ.ptyp_attributes}
-
-let maybe_curry_typ typ loc =
-  match typ.ptyp_desc with
-  | Ptyp_arrow _ ->
-      if Builtin_attributes.has_curry typ.ptyp_attributes then typ
-      else mktyp_curry typ (make_loc loc)
-  | _ -> typ
+let maybe_curry_typ typ _loc =
+  typ
 
 (* TODO define an abstraction boundary between locations-as-pairs
    and locations-as-Location.t; it should be clear when we move from
@@ -4835,16 +4828,16 @@ attr_id:
 ;
 attribute:
   LBRACKETAT attr_id attr_payload RBRACKET
-    { mk_attr ~loc:(make_loc $sloc) $2 $3 }
+    { mk_attr ~sloc:$sloc $2 $3 }
 ;
 post_item_attribute:
   LBRACKETATAT attr_id attr_payload RBRACKET
-    { mk_attr ~loc:(make_loc $sloc) $2 $3 }
+    { mk_attr ~sloc:$sloc $2 $3 }
 ;
 floating_attribute:
   LBRACKETATATAT attr_id attr_payload RBRACKET
     { mark_symbol_docs $sloc;
-      mk_attr ~loc:(make_loc $sloc) $2 $3 }
+      mk_attr ~sloc:$sloc $2 $3 }
 ;
 %inline post_item_attributes:
   post_item_attribute*

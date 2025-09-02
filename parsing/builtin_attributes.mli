@@ -24,12 +24,3 @@ val has_attribute : string -> Parsetree.attributes -> bool
     purpose of warning 53, so it is usually preferrable to use [has_attribute]
     or [select_attributes]. *)
 val attr_equals_builtin : Parsetree.attribute -> string -> bool
-
-(** The attribute placed on the inner [Ptyp_arrow] node in [x -> (y -> z)]
-    (meaning the [y -> z] node) to indicate parenthesization. This is relevant
-    for locals, as [local_ x -> (y -> z)] is different than
-    [local_ x -> y -> z].
-*)
-val curry_attr_name : string
-val curry_attr : Location.t -> Parsetree.attribute
-val has_curry: Parsetree.attributes -> bool
