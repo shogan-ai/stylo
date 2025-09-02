@@ -16,8 +16,8 @@
 (library
   (name ocaml_syntax)
   (modules_without_implementation asttypes)
-  (libraries menhirLib)
+  (libraries menhirLib dbg_print)
   (preprocess
     (per_module
       ((pps visitors.ppx) parsetree)))
-  (flags :standard -w -9-63))
+  (flags :standard -w -9-63 -open Dbg_print))

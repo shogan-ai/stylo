@@ -1478,6 +1478,19 @@ let pp_children =
     ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
     pp_child
 
+let combine_children ~loc top children =
+  try [combine_children top children]
+  with Assert_failure _ as exn ->
+    let pos = loc.Location.loc_start in
+    dprintf
+      "@[<h>loc:@ %d:%d@]@\n\
+       tokens:@[<hov 2>@ %a@]@\n\
+       children:@[<v 2>@ {%a}@]@."
+      pos.pos_lnum (pos.pos_cnum - pos.pos_bol)
+      Tokens.pp_seq top
+      pp_children children;
+    raise exn
+
 class to_tokens = object
   method zero : tokens list = []
   method plus = (@)
@@ -1489,35 +1502,35 @@ class to_tokens = object
     | "ocaml.doc" | "ocaml.text" -> [a.attr_tokens]
     | _ ->
       let sub_tokens = super#visit_attribute env a in
-      [combine_children a.attr_tokens sub_tokens]
+      combine_children ~loc:a.attr_loc a.attr_tokens sub_tokens
 
   method! visit_core_type env ct =
     let sub_tokens = super#visit_core_type env ct in
     let node_toks = ct.ptyp_tokens in
-    [combine_children node_toks sub_tokens]
+    combine_children ~loc:ct.ptyp_loc node_toks sub_tokens
 
   method! visit_pattern env p =
     let sub_tokens = super#visit_pattern env p in
     let node_toks = p.ppat_tokens in
-    [combine_children node_toks sub_tokens]
+    combine_children ~loc:p.ppat_loc node_toks sub_tokens
 
   method! visit_expression env e =
     let sub_tokens = super#visit_expression env e in
     let node_toks = e.pexp_tokens in
-    [combine_children node_toks sub_tokens]
+    combine_children ~loc:e.pexp_loc node_toks sub_tokens
 
   method! visit_argument visit_elt env a =
     let sub_tokens = super#visit_argument visit_elt env a in
     let node_toks = a.parg_tokens in
-    [combine_children node_toks sub_tokens]
+    combine_children ~loc:Location.none node_toks sub_tokens
 
   method! visit_value_binding env vb =
     let sub_tokens = super#visit_value_binding env vb in
     let node_toks = vb.pvb_tokens in
-    [combine_children node_toks sub_tokens]
+    combine_children ~loc:vb.pvb_loc node_toks sub_tokens
 
   method visit_function_body env fb =
     let sub_tokens = super#visit_function_body env fb in
     let node_toks = fb.pfunbody_tokens in
-    [combine_children node_toks sub_tokens]
+    combine_children ~loc:Location.none node_toks sub_tokens
 end

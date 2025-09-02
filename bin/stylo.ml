@@ -10,6 +10,7 @@ let () =
     tokenizer # visit_structure () ast
     |> List.flatten (* FIXME: shouldn't be needed when tokenizer is completed *)
   in
+  Dbg_print.dprintf "%a@." Tokens.pp_seq tokens;
   let doc =
     Insert_comments.from_tokens tokens doc
     |> Wrapprint.to_document

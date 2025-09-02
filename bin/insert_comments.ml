@@ -1,4 +1,5 @@
 open Ocaml_syntax
+open Dbg_print
 
 module T = Tokens
 module Doc = Wrapprint
@@ -20,8 +21,13 @@ let rec walk_both seq doc =
   | first :: rest ->
     match first.T.desc, doc with
     (* Synchronized, advance *)
-    | T.Token _, Doc.Token _
-    | T.Comment _, Doc.Comment _ -> rest, doc
+    | T.Token _, Doc.Token p
+    | T.Comment _, Doc.Comment p ->
+      dprintf "synced at %d:%d with << %a >>@."
+        first.pos.pos_lnum
+        (first.pos.pos_cnum - first.pos.pos_bol)
+        PPrint.ToFormatter.compact p;
+      rest, doc
 
     (* Skip "whitespaces" *)
     | _, Doc.(Empty | Whitespace _) -> seq, doc
@@ -59,7 +65,8 @@ let rec walk_both seq doc =
 let from_tokens tokens doc =
   match walk_both tokens doc with
   | [], doc -> doc
-  | _, _shortened_doc ->
+  | l, _shortened_doc ->
     Format.eprintf "ERROR: Output shorter than the input.@.";
+    dprintf "remaining:@ @[<hov 2>%a@]@." T.pp_seq l;
     (* we do not exit, because the diff is more useful to catch such errors *)
     _shortened_doc
