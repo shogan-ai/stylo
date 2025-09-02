@@ -19,7 +19,13 @@ let string s = Token (PPrint.string s)
 let blank n = Whitespace (PPrint.blank n)
 let hardline = Whitespace PPrint.hardline
 let break n = Whitespace (PPrint.break  n)
-let (^^) t1 t2 = Cat (t1, t2)
+
+let (^^) t1 t2 =
+  match t1, t2 with
+  | Empty, t
+  | t, Empty -> t
+  | _ -> Cat (t1, t2)
+
 let nest i t = Nest (i, t)
 let group t = Group t
 let align t = Align t
