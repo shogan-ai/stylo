@@ -380,13 +380,14 @@ end = struct
       cls
     | Ppat_or (p1, p2) -> pp p1 ^/^ S.pipe ^/^ pp p2
     | Ppat_constraint (p, None, modes) ->
-      with_modes ~modes (pp p)
+      parens (with_modes ~modes (pp p))
     | Ppat_constraint (p, Some ty, atat_modes) ->
-      pp p ^/^ S.colon ^^
-      begin match atat_modes with
+      parens (
+        pp p ^/^ S.colon ^/^ Core_type.pp ty ^^
+        match atat_modes with
         | [] -> empty
-        | lst -> break 1 ^^ Core_type.pp ty ^/^ S.atat ^/^ modes lst
-      end
+        | lst -> break 1 ^^ S.atat ^/^ modes lst
+      )
     (* FIXME: parser doesn't agree with what's written above I believe.
        Recognized form seems to depend on context... *)
     | Ppat_type lid -> S.hash ^^ longident lid.txt
