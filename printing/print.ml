@@ -526,18 +526,19 @@ end = struct
     | Pexp_constraint (e, None, modes) ->
       with_modes ~modes (pp e)
     | Pexp_constraint (e, Some ct, atat_modes) ->
-      pp e ^/^ S.colon ^/^ Core_type.pp ct ^^
-      begin match atat_modes with
+      parens (
+        pp e ^/^ S.colon ^/^ Core_type.pp ct ^^
+        match atat_modes with
         | [] -> empty
         | lst -> break 1 ^^ S.atat ^/^ modes lst
-      end
+      )
     | Pexp_coerce (e, ct1, ct2) ->
       let ct1 =
         match ct1 with
         | None -> empty
         | Some ct -> break 1 ^^ S.colon ^/^ Core_type.pp ct
       in
-      pp e ^^ ct1 ^/^ S.coerce ^/^ Core_type.pp ct2
+      parens (pp e ^^ ct1 ^/^ S.coerce ^/^ Core_type.pp ct2)
     | Pexp_send (e, lbl) -> pp e ^/^ S.hash ^/^ string lbl.txt
     | Pexp_new lid -> S.new_ ^/^ longident lid.txt
     | Pexp_setinstvar (lbl, e) -> string lbl.txt ^/^ S.larrow ^/^ pp e
