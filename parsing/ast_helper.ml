@@ -603,7 +603,8 @@ module Type = struct
      ptype_loc = loc;
     }
 
-  let constructor ?(loc = !default_loc) ?(attrs = []) ?(info = empty_info)
+  let constructor ?(loc = !default_loc) ?(attrs = []) ~tokens
+        ?(info = empty_info)
         ?(vars = []) ?(args = Pcstr_tuple []) ?res name =
     {
      pcd_name = name;
@@ -612,6 +613,7 @@ module Type = struct
      pcd_res = res;
      pcd_loc = loc;
      pcd_attributes = add_info_attrs info attrs;
+     pcd_tokens = tokens;
     }
 
   let constructor_arg ?(loc = !default_loc) ?(modalities = []) typ =

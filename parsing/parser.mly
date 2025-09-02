@@ -3762,7 +3762,8 @@ generic_constructor_declaration(opening):
   d = generic_constructor_declaration(opening)
     {
       let cid, vars, args, res, attrs, loc, info = d in
-      Type.constructor cid ~vars ~args ?res ~attrs ~loc ~info
+      Type.constructor cid ~vars ~args ?res ~attrs ~tokens:(Tokens.at $sloc)
+        ~loc ~info
     }
 ;
 str_exception_declaration:

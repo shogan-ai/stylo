@@ -239,7 +239,8 @@ module Type:
       str ->
       type_declaration
 
-    val constructor: ?loc:loc -> ?attrs:attrs -> ?info:info ->
+    val constructor: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
+      ?info:info ->
       ?vars:(str * jkind_annotation option) list ->
       ?args:constructor_arguments -> ?res:core_type ->
       str ->

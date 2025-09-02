@@ -857,6 +857,7 @@ and constructor_declaration =
      pcd_res: core_type option;
      pcd_loc: location;
      pcd_attributes: attributes;  (** [C of ... [\@id1] [\@id2]] *)
+     pcd_tokens: tokens;
     }
 
 and constructor_argument =
@@ -1537,5 +1538,10 @@ class to_tokens = object
   method visit_function_body env fb =
     let sub_tokens = super#visit_function_body env fb in
     let node_toks = fb.pfunbody_tokens in
+    combine_children ~loc:Location.none node_toks sub_tokens
+
+  method visit_constructor_declaration env cd =
+    let sub_tokens = super#visit_constructor_declaration env cd in
+    let node_toks = cd.pcd_tokens in
     combine_children ~loc:Location.none node_toks sub_tokens
 end

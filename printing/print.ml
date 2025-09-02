@@ -16,18 +16,16 @@ let optional f v_opt =
   | None -> empty
   | Some v -> f v
 
-let has_leading_pipe ~after:after_kw =
-  let rec advance_to_kw = function
-    | [] -> assert false
-    | Tokens.{ desc = Token tok; _ } :: rest when tok = after_kw ->
-      is_next_token_a_pipe rest
-    | _ :: rest -> advance_to_kw rest
-  and is_next_token_a_pipe = function
-    | Tokens.{ desc = Token BAR; _ } :: _ -> true
-    | Tokens.{ desc = Comment _; _ } :: rest -> is_next_token_a_pipe rest
-    | _ -> false
-  in
-  advance_to_kw
+let rec starts_with_pipe = function
+  | Tokens.{ desc = Token BAR; _ } :: _ -> true
+  | Tokens.{ desc = Comment _; _ } :: rest -> starts_with_pipe rest
+  | _ -> false
+
+let rec has_leading_pipe ~after:after_kw = function
+  | [] -> assert false
+  | Tokens.{ desc = Token tok; _ } :: rest when tok = after_kw ->
+    starts_with_pipe rest
+  | _ :: rest -> has_leading_pipe ~after:after_kw rest
 
 type 'a loc = 'a Location.loc = { txt: 'a; loc: Location.t }
 let stringf fmt = Printf.ksprintf string fmt
@@ -962,10 +960,14 @@ end = struct
   let type_kind priv = function
     | Ptype_abstract -> empty
     | Ptype_variant cds ->
-      (* FIXME: leading pipe *)
       break 1 ^^ S.equals ^/^ private_ priv ^^
-      separate_map (break 1 ^^ S.pipe ^^ break 1) constructor_declaration
-        cds
+      begin match cds with
+      | [] -> S.pipe
+      | cd :: _ ->
+        (if starts_with_pipe cd.pcd_tokens then S.pipe ^^ break 1 else empty) ^^
+        separate_map (break 1 ^^ S.pipe ^^ break 1) constructor_declaration
+          cds
+      end
     | Ptype_record lbls ->
       break 1 ^^ S.equals ^/^ private_ priv ^^ S.lbrace ^/^
       separate_map (S.semi ^^ break 1) Label_declaration.pp lbls ^/^ S.rbrace
