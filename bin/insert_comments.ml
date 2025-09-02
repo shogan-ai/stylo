@@ -49,7 +49,7 @@ let rec walk_both seq doc =
     (* Token missing from the document: this is a hard error. *)
     | T.Token _, Doc.Comment _ ->
       Format.eprintf
-        "ERROR: token at position %d:%d disappeared from the input.@."
+        "ERROR: token at position %d:%d absent from the output.@."
         first.pos.pos_lnum (first.pos.pos_cnum - first.pos.pos_bol);
       exit 1
 
