@@ -682,6 +682,11 @@ and function_param =
   }
 
 and function_body =
+  { pfunbody_desc : function_body_desc;
+    pfunbody_tokens: tokens;
+  }
+
+and function_body_desc =
   | Pfunction_body of expression
   | Pfunction_cases of case list * location * attributes
   (** In [Pfunction_cases (_, loc, attrs)], the location extends from the
@@ -1509,5 +1514,10 @@ class to_tokens = object
   method! visit_value_binding env vb =
     let sub_tokens = super#visit_value_binding env vb in
     let node_toks = vb.pvb_tokens in
+    [combine_children node_toks sub_tokens]
+
+  method visit_function_body env fb =
+    let sub_tokens = super#visit_function_body env fb in
+    let node_toks = fb.pfunbody_tokens in
     [combine_children node_toks sub_tokens]
 end

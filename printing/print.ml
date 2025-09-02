@@ -16,6 +16,19 @@ let optional f v_opt =
   | None -> empty
   | Some v -> f v
 
+let has_leading_pipe ~after:after_kw =
+  let rec advance_to_kw = function
+    | [] -> assert false
+    | Tokens.{ desc = Token tok; _ } :: rest when tok = after_kw ->
+      is_next_token_a_pipe rest
+    | _ :: rest -> advance_to_kw rest
+  and is_next_token_a_pipe = function
+    | Tokens.{ desc = Token BAR; _ } :: _ -> true
+    | Tokens.{ desc = Comment _; _ } :: rest -> is_next_token_a_pipe rest
+    | _ -> false
+  in
+  advance_to_kw
+
 type 'a loc = 'a Location.loc = { txt: 'a; loc: Location.t }
 let stringf fmt = Printf.ksprintf string fmt
 
@@ -421,19 +434,6 @@ end
 and Expression : sig
   val pp : expression -> document
 end = struct
-  let pipe_before_pattern =
-    let rec consume_until_with = function
-      | [] -> assert false
-      | Tokens.{ desc = Token Parser_tokens.WITH; _ } :: rest ->
-        next_is_pipe rest
-      | _ :: rest -> consume_until_with rest
-    and next_is_pipe = function
-      | Tokens.{ desc = Token Parser_tokens.BAR; _ } :: _ -> true
-      | Tokens.{ desc = Comment _; _ } :: rest -> next_is_pipe rest
-      | _ -> false
-    in
-    consume_until_with
-
   let rec pp e =
     pp_desc e
     |> Attribute.attach ~attrs:e.pexp_attributes
@@ -451,7 +451,6 @@ end = struct
       separate_map (break 1 ^^ S.and_ ^^ break 1) Value_binding.pp vbs ^/^
       S.in_ ^/^
       pp body
-    | Pexp_function ([], _, Pfunction_body _) -> assert false
     | Pexp_function ([], _, body) -> Function_body.pp body
     | Pexp_function (params, constr, body) ->
       S.fun_ ^/^
@@ -464,13 +463,10 @@ end = struct
       pp arg1 ^/^ pp op ^/^ pp arg2
     | Pexp_apply (e, args) -> pp_apply e args
     | Pexp_match (e, cases) ->
-      (* FIXME: leading "|" *)
       S.match_ ^/^ pp e ^/^ S.with_ ^/^
-      begin if pipe_before_pattern exp.pexp_tokens then
-          S.pipe ^^ break 1
-        else
-          empty
-      end ^^
+      (if has_leading_pipe ~after:WITH exp.pexp_tokens
+       then S.pipe ^^ break 1
+       else empty) ^^
       separate_map (break 1 ^^ S.pipe ^^ break 1) Case.pp cases
     | Pexp_try (e, cases) ->
       S.try_ ^/^ pp e ^/^ S.with_ ^/^
@@ -778,11 +774,14 @@ end
 and Function_body : sig
   val pp : function_body -> document
 end = struct
-  let pp = function
+  let pp fb =
+    match fb.pfunbody_desc with
     | Pfunction_body e -> Expression.pp e
     | Pfunction_cases (cases, _, attrs) ->
       S.function_ ^/^
-      (* FIXME: leading pipe? *)
+      (if has_leading_pipe ~after:FUNCTION fb.pfunbody_tokens
+       then S.pipe ^^ break 1
+       else empty) ^^
       separate_map (break 1 ^^ S.pipe ^^ break 1) Case.pp cases
       |> Attribute.attach ~attrs
 end

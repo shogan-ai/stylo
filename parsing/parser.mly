@@ -504,7 +504,7 @@ let mkghost_newtype_function_body newtypes body_constraint body ~loc =
   mk_newtypes ~loc newtypes wrapped_body
 
 let mkfunction ~loc ~attrs params body_constraint body =
-  match body with
+  match body.pfunbody_desc with
   | Pfunction_cases _ ->
       mkexp_attrs (Pexp_function (params, body_constraint, body)) attrs ~loc
   | Pfunction_body body_exp -> begin
@@ -2204,6 +2204,10 @@ class_type_declarations:
     FUNCTION ext_attributes match_cases
       { let loc = make_loc $sloc in
         let cases = $3 in
+        let body =
+          { pfunbody_desc = Pfunction_cases (cases, loc, [])
+          ; pfunbody_tokens = Tokens.at $sloc }
+        in
         (* There are two choices of where to put attributes: on the
            Pexp_function node; on the Pfunction_cases body. We put them on the
            Pexp_function node here because the compiler only uses
@@ -2211,8 +2215,7 @@ class_type_declarations:
            typechecking. For standalone function cases, we want the compiler to
            respect, e.g., [@inline] attributes.
          *)
-        mkfunction [] empty_body_constraint (Pfunction_cases (cases, loc, [])) ~attrs:$2
-          ~loc:$sloc
+        mkfunction [] empty_body_constraint body ~attrs:$2 ~loc:$sloc
       }
     )
     { $1 }
@@ -2958,10 +2961,11 @@ strict_binding_modes:
         ) ret_type_constraint
       in
       let expr =
-        match $4 with
+        let fb = $4 in
+        match fb.pfunbody_desc with
         | Pfunction_body e -> e
-        | Pfunction_cases _ as cases ->
-            mkfunction [] empty_body_constraint cases ~loc:$loc($4)
+        | Pfunction_cases _ ->
+            mkfunction [] empty_body_constraint fb ~loc:$loc($4)
             ~attrs:(None, [])
       in
       $1, typ, ret_mode_annotations, expr
@@ -2975,15 +2979,23 @@ fun_body:
   | FUNCTION ext_attributes match_cases
       { let ext, attrs = $2 in
         match ext with
-        | None -> Pfunction_cases ($3, make_loc $sloc, attrs)
+        | None ->
+            { pfunbody_desc = Pfunction_cases ($3, make_loc $sloc, attrs)
+            ; pfunbody_tokens = Tokens.at $sloc }
         | Some _ ->
+          (* FIXME: we don't care about that here! *)
           (* function%foo extension nodes interrupt the arity *)
-          let cases = Pfunction_cases ($3, make_loc $sloc, []) in
+          let cases =
+            { pfunbody_desc = Pfunction_cases ($3, make_loc $sloc, [])
+            ; pfunbody_tokens = Tokens.at $sloc }
+          in
           let function_ = mkfunction [] empty_body_constraint cases ~loc:$sloc ~attrs:$2 in
-          Pfunction_body function_
+          { pfunbody_desc = Pfunction_body function_
+          ; pfunbody_tokens = Tokens.at $sloc }
       }
   | fun_seq_expr
-      { Pfunction_body $1 }
+      { { pfunbody_desc = Pfunction_body $1
+        ; pfunbody_tokens = Tokens.at $sloc } }
 ;
 %inline match_cases:
   xs = preceded_or_separated_nonempty_llist(BAR, match_case)
