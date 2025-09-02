@@ -25,6 +25,12 @@ let rec longident = function
   | Lapply (l1, l2) ->
     longident l1 ^^ S.lparen ^^ break 0 ^^ longident l2 ^^ break 0 ^^ S.rparen
 
+let constr_longident (cstr : Longident.t) =
+  match cstr with
+  | Lident "[]" -> S.lbracket ^^ S.rbracket
+  | Lident "()" -> S.lparen ^^ S.rparen
+  | _ -> longident cstr
+
 let direction = function
   | Asttypes.Upto -> S.to_
   | Downto -> S.downto_
@@ -341,8 +347,8 @@ end = struct
       end
     | Ppat_unboxed_tuple (elts, cf) ->
       S.hash_lparen ^^ pp_desc (Ppat_tuple (elts, cf)) ^^ S.rparen
-    | Ppat_construct (lid, None) -> longident lid.txt
-    | Ppat_construct (lid, Some ([], p)) -> longident lid.txt ^/^ pp p
+    | Ppat_construct (lid, None) -> constr_longident lid.txt
+    | Ppat_construct (lid, Some ([], p)) -> constr_longident lid.txt ^/^ pp p
     | Ppat_construct (lid, Some (bindings, p)) ->
       let binding (newtype, jkind) =
         match jkind with
@@ -351,7 +357,7 @@ end = struct
           S.lparen ^^ string newtype.txt ^/^ S.colon ^/^ Jkind_annotation.pp jkind ^^
           S.rparen
       in
-      longident lid.txt ^/^
+      constr_longident lid.txt ^/^
       S.lparen ^^ S.type_ ^/^
       separate_map (break 1) binding bindings ^^ S.rparen ^/^
       pp p
@@ -476,13 +482,8 @@ end = struct
       (* FIXME: ! *)
       pp_desc { exp with pexp_desc = Pexp_tuple elts } ^^
       S.rparen
-    | Pexp_construct (lid, None) ->
-      if lid.txt = Lident "()" then
-        (* unit is actually two tokens *)
-        S.lparen ^^ S.rparen
-      else
-        longident lid.txt
-    | Pexp_construct (lid, Some e) -> longident lid.txt ^/^ pp e
+    | Pexp_construct (lid, None) -> constr_longident lid.txt
+    | Pexp_construct (lid, Some e) -> constr_longident lid.txt ^/^ pp e
     | Pexp_variant (lbl, eo) ->
       S.bquote ^^ string lbl ^^
       begin match eo with
