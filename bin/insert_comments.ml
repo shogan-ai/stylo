@@ -17,6 +17,8 @@ let rec walk_both seq doc =
   | [] ->
     (* Some extra tokens or comments were synthesized *)
     Format.eprintf "ERROR: Output longer than the input.@.";
+    dprintf "remaining doc: << %a >>@."
+      PPrint.ToFormatter.compact (Wrapprint.to_document doc);
     exit 1
   | first :: rest ->
     match first.T.desc, doc with
