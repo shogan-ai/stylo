@@ -150,11 +150,11 @@ module rec Attribute : sig
   val attach : ?post:bool -> attrs:attributes -> document -> document
 end = struct
   let pp_doc : payload -> document = function
-    | PStr [ {
+    | PStr ([ {
       pstr_desc =
         Pstr_eval
           ({ pexp_desc = Pexp_constant Pconst_string (s, _loc, None); _ }, []);
-      _ } ]
+      _ } ], _)
       ->
       docstring s
     | _ -> assert false
@@ -1521,12 +1521,12 @@ end = struct
 
   let pp_item it = pp_item_desc it.pstr_desc
 
-  let pp items =
+  let pp (items, _) =
     S.struct_ ^/^
     separate_map (break 1) pp_item items ^/^
     S.end_
 
-  let pp_implementation s = group (separate_map (break 1) pp_item s)
+  let pp_implementation (s, _) = group (separate_map (break 1) pp_item s)
 end
 
 and Value_constraint : sig

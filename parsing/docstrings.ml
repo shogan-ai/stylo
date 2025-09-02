@@ -69,7 +69,7 @@ let docs_attr ds =
   in
   let tok_elt = { Tokens.desc = Comment body; pos = loc.loc_start } in
   { attr_name = doc_loc;
-    attr_payload = PStr [item];
+    attr_payload = PStr ([item], []);
     attr_loc = loc;
     attr_tokens = [tok_elt]}
 
@@ -124,7 +124,7 @@ let text_attr ds =
   in
   let tok_elt = { Tokens.desc = Comment body; pos = loc.loc_start } in
   { attr_name = text_loc;
-    attr_payload = PStr [item];
+    attr_payload = PStr ([item], []);
     attr_loc = loc;
     attr_tokens = [tok_elt]}
 

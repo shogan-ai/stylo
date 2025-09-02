@@ -300,7 +300,10 @@ let wrap_exp_attrs ~loc body (ext, attrs) =
   let body = {body with pexp_attributes = attrs @ body.pexp_attributes} in
   match ext with
   | None -> body
-  | Some id -> ghexp(Pexp_extension (id, PStr [mkstrexp body []]))
+  | Some id ->
+      let fake_tok = (* FIXME: don't add synthezise nodes *)
+        { Tokens.desc = Child_node ; pos = body.pexp_loc.loc_start } in
+      ghexp(Pexp_extension (id, PStr ([mkstrexp body []], [fake_tok])))
 
 let mkexp_attrs ~loc d ext_attrs =
   wrap_exp_attrs ~loc (mkexp ~loc d) ext_attrs
@@ -332,7 +335,10 @@ let wrap_mty_attrs ~loc:_ attrs body =
 let wrap_str_ext ~loc body ext =
   match ext with
   | None -> body
-  | Some id -> ghstr ~loc (Pstr_extension ((id, PStr [body]), []))
+  | Some id ->
+      let fake_tok = (* FIXME: don't add synthezise nodes *)
+        { Tokens.desc = Child_node ; pos = body.pstr_loc.loc_start } in
+      ghstr ~loc (Pstr_extension ((id, PStr ([body], [fake_tok])), []))
 
 let wrap_mkstr_ext ~loc (item, ext) =
   wrap_str_ext ~loc (mkstr ~loc item) ext
@@ -356,7 +362,10 @@ let text_sig pos = Sig.text (rhs_text pos)
 let text_cstr pos = Cf.text (rhs_text pos)
 let text_csig pos = Ctf.text (rhs_text pos)
 let text_def pos =
-  List.map (fun def -> Ptop_def [def]) (Str.text (rhs_text pos))
+  List.map (fun def ->
+    let fake_tok = (* FIXME: don't add synthezise nodes *)
+      { Tokens.desc = Child_node ; pos = def.pstr_loc.loc_start } in
+    Ptop_def ([def], [fake_tok])) (Str.text (rhs_text pos))
 
 let extra_text startpos endpos text items =
   match items with
@@ -375,7 +384,10 @@ let extra_cstr p1 p2 items = extra_text p1 p2 Cf.text items
 let extra_csig p1 p2 items = extra_text p1 p2 Ctf.text  items
 let extra_def p1 p2 items =
   extra_text p1 p2
-    (fun txt -> List.map (fun def -> Ptop_def [def]) (Str.text txt))
+    (fun txt -> List.map (fun def ->
+      let fake_tok = (* FIXME: don't add synthezise nodes *)
+        { Tokens.desc = Child_node ; pos = def.pstr_loc.loc_start } in
+      Ptop_def ([def], [fake_tok])) (Str.text txt))
     items
 
 let extra_rhs_core_type ct ~pos =
@@ -424,7 +436,10 @@ let val_of_let_bindings ~loc lbs =
   let str = mkstr ~loc (Pstr_value(lbs.lbs_rec, List.rev bindings)) in
   match lbs.lbs_extension with
   | None -> str
-  | Some id -> ghstr ~loc (Pstr_extension((id, PStr [str]), []))
+  | Some id ->
+      let fake_tok = (* FIXME: don't add synthezise nodes *)
+        { Tokens.desc = Child_node ; pos = str.pstr_loc.loc_start } in
+      ghstr ~loc (Pstr_extension((id, PStr ([str], [fake_tok])), []))
 
 let expr_of_let_bindings ~loc lbs body =
   let bindings =
@@ -786,7 +801,10 @@ The precedences must be listed from low to high.
 %inline text_def(symb): symb
   { text_def $startpos @ [$1] }
 %inline top_def(symb): symb
-  { Ptop_def [$1] }
+  { let def = $1 in
+    let fake_tok = (* FIXME: don't add synthezise nodes *)
+      { Tokens.desc = Child_node ; pos = def.pstr_loc.loc_start } in
+    Ptop_def ([def], [fake_tok]) }
 %inline text_cstr(symb): symb
   { text_cstr $startpos @ [$1] }
 %inline text_csig(symb): symb
@@ -1063,11 +1081,11 @@ toplevel_phrase:
   (* An expression with attributes, ended by a double semicolon. *)
   extra_str(text_str(str_exp))
   SEMISEMI
-    { Ptop_def $1 }
+    { Ptop_def ($1, Tokens.at $sloc) }
 | (* A list of structure items, ended by a double semicolon. *)
   extra_str(flatten(text_str(structure_item)*))
   SEMISEMI
-    { Ptop_def $1 }
+    { Ptop_def ($1, Tokens.at $sloc) }
 | (* A directive, ended by a double semicolon. *)
   toplevel_directive
   SEMISEMI
@@ -1296,7 +1314,7 @@ structure:
     optional_structure_standalone_expression,
     flatten(structure_element*)
   ))
-  { $1 }
+  { $1, Tokens.at $sloc }
 ;
 
 (* An optional standalone expression is just an expression with attributes
@@ -2238,7 +2256,10 @@ fun_seq_expr:
     { $1 }
   | fun_expr SEMI PERCENT attr_id seq_expr
     { let seq = mkexp ~loc:$sloc (Pexp_sequence ($1, $5)) in
-      let payload = PStr [mkstrexp seq []] in
+      let strexp = mkstrexp seq [] in
+      let fake_tok = (* FIXME: don't add synthezise nodes *)
+        { Tokens.desc = Child_node ; pos = strexp.pstr_loc.loc_start } in
+      let payload = PStr ([strexp], [fake_tok]) in
       mkexp ~loc:$sloc (Pexp_extension ($4, payload)) }
 ;
 seq_expr:

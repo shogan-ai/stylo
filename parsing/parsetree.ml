@@ -1328,7 +1328,7 @@ and module_instance =
   (** [M(P1)(MI1)...(Pn)(MIn)] *)
          *)
 
-and structure = structure_item list
+and structure = structure_item list * tokens
 
 and structure_item =
     {
@@ -1496,6 +1496,11 @@ class to_tokens = object
   method plus = (@)
 
   inherit [_] reduce as super
+
+  method! visit_structure env s =
+    let sub_tokens = super#visit_structure env s in
+    let node_toks = snd s in
+    combine_children ~loc:Location.none node_toks sub_tokens
 
   method! visit_attribute env a =
     match a.attr_name.txt with
