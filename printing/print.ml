@@ -517,6 +517,7 @@ end = struct
         | Some e3 -> break 1 ^^ S.else_ ^/^ pp e3
       end
     | Pexp_sequence (e1, e2) -> pp e1 ^^ S.semi ^/^ pp e2
+    | Pexp_seq_empty e -> pp e ^^ S.semi
     | Pexp_while (e1, e2) ->
       S.while_ ^/^ pp e1 ^/^ S.do_ ^/^ pp e2 ^/^
       S.done_
@@ -722,7 +723,10 @@ end = struct
       } ->
       (if optional then S.qmark else S.tilde) ^^
       parenthesize (
-        modes legacy_modes ^/^ string name ^^
+        begin match legacy_modes with
+        | [] -> empty
+        | _ -> modes legacy_modes ^^ break 1
+        end ^^ string name ^^
         begin (match typ_constraint with
           | None -> empty
           | Some ct -> break 1 ^^ Type_constraint.pp ct)

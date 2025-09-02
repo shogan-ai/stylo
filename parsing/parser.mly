@@ -2228,7 +2228,8 @@ class_type_declarations:
 *)
 fun_seq_expr:
   | fun_expr    %prec below_SEMI  { $1 }
-  | fun_expr SEMI                 { $1 }
+  | fun_expr SEMI
+    { mkexp ~loc:$sloc (Pexp_seq_empty $1) }
   | mkexp(fun_expr SEMI seq_expr
     { Pexp_sequence($1, $3) })
     { $1 }

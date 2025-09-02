@@ -512,6 +512,7 @@ and expression_desc =
   | Pexp_ifthenelse of expression * expression * expression option
       (** [if E1 then E2 else E3] *)
   | Pexp_sequence of expression * expression  (** [E1; E2] *)
+  | Pexp_seq_empty of expression (** [E1;] *)
   | Pexp_while of expression * expression  (** [while E1 do E2 done] *)
   | Pexp_for of pattern * expression * expression * direction_flag * expression
       (** [Pexp_for(i, E1, E2, direction, E3)] represents:
