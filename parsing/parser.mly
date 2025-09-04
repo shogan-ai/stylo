@@ -4048,7 +4048,7 @@ strict_function_or_labeled_tuple_type:
       MINUSGREATER
       codomain = strict_function_or_labeled_tuple_type
         { let (domain, (_ : Lexing.position * Lexing.position)), arg_modes = domain_with_modes in
-          Ptyp_arrow(label, domain , codomain, arg_modes, []) }
+          Ptyp_arrow(label, domain , arg_modes, codomain, []) }
     )
     { $1 }
   | mktyp(
@@ -4061,7 +4061,7 @@ strict_function_or_labeled_tuple_type:
           let (codomain, codomain_loc), ret_modes = codomain_with_modes in
           Ptyp_arrow(label,
             domain,
-            maybe_curry_typ codomain codomain_loc, arg_modes, ret_modes) }
+            arg_modes, maybe_curry_typ codomain codomain_loc, ret_modes) }
     )
     { $1 }
   (* These next three cases are for labled tuples - see comment on [tuple_type]
@@ -4087,7 +4087,7 @@ strict_function_or_labeled_tuple_type:
            let label = Labelled label in
            let domain = mktyp ~loc:tuple_loc (Ptyp_tuple ((None, ty) :: ltys)) in
            let domain = extra_rhs_core_type domain ~pos:(snd tuple_loc) in
-           Ptyp_arrow(label, domain, codomain, arg_modes, []) }
+           Ptyp_arrow(label, domain, arg_modes, codomain, []) }
     )
     { $1 }
   | mktyp(
@@ -4104,8 +4104,8 @@ strict_function_or_labeled_tuple_type:
            let domain = extra_rhs_core_type domain ~pos:(snd tuple_loc) in
            Ptyp_arrow(label,
             domain ,
-            maybe_curry_typ codomain codomain_loc,
             arg_modes,
+            maybe_curry_typ codomain codomain_loc,
             ret_modes)
          }
     )

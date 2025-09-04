@@ -96,8 +96,8 @@ module Typ = struct
             let jkind = Option.map loop_jkind jkind in
             check_variable var_names t.ptyp_loc x;
             Ptyp_var (x, jkind)
-        | Ptyp_arrow (label,core_type,core_type',modes,modes') ->
-            Ptyp_arrow(label, loop core_type, loop core_type', modes, modes')
+        | Ptyp_arrow (label,core_type,modes,core_type',modes') ->
+            Ptyp_arrow(label, loop core_type, modes, loop core_type', modes')
         | Ptyp_tuple lst ->
             Ptyp_tuple (List.map (fun (l, t) -> l, loop t) lst)
         | Ptyp_unboxed_tuple lst ->

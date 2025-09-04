@@ -71,8 +71,8 @@ module Typ :
     val any: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> jkind_annotation option -> core_type
     val var: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> string -> jkind_annotation option
       -> core_type
-    val arrow: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> arg_label -> core_type -> core_type ->
-      mode with_loc list -> mode with_loc list -> core_type
+    val arrow: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> arg_label -> core_type ->
+      mode with_loc list -> core_type -> mode with_loc list -> core_type
     val tuple: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> (string option * core_type) list -> core_type
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq
                        -> (string option * core_type) list -> core_type

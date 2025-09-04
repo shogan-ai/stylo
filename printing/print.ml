@@ -93,16 +93,6 @@ let type_app ?(parens=true) ty args =
     | _ -> left ^^ separate (S.comma ^^ break 1) args ^^ right ^^ break 1
   end ^^ ty
 
-let arrow_type arg_lbl arg rhs =
-  begin match arg_lbl with
-  | Nolabel -> empty
-  | Labelled s -> string s ^^ S.colon ^^ break 0
-  | Optional s ->
-    (* FIXME: sometimes the "?foo:" is a single token *)
-    S.qmark ^^ string s ^^ S.colon ^^ break 0
-  end ^^
-  arg ^/^ S.rarrow ^/^ rhs
-
 (* FIXME: handling of string literals is not good enough. *)
 (* N.B. stringf is important here: suffixed number come out of the lexer as a
    single token. We can't use ^^ here. *)
@@ -225,12 +215,30 @@ end
 
 and Core_type : sig
   val pp : core_type -> document
+
+  val pp_arrow: Tokens.seq -> arg_label -> document -> document -> document
 end = struct
+  let pp_arrow tokens arg_lbl arg rhs =
+    begin match arg_lbl with
+    | Nolabel -> empty
+    | Labelled s -> string s ^^ S.colon
+    | Optional s ->
+      if
+        List.exists (function
+          | Tokens.{ desc = Token OPTLABEL _; _ } -> true
+          | _ -> false
+        ) tokens
+      then stringf "~%s:" s
+      else S.qmark ^^ string s ^^ S.colon
+    end ^^
+    arg ^/^ S.rarrow ^/^ rhs
+
   let rec pp ct =
-    pp_desc ct.ptyp_desc
+    pp_desc ct
     |> Attribute.attach ~attrs:ct.ptyp_attributes
 
-  and pp_desc = function
+  and pp_desc ct =
+    match ct.ptyp_desc with
     | Ptyp_any None -> S.underscore
     | Ptyp_any Some k -> S.underscore ^/^ S.colon ^/^ Jkind_annotation.pp k
     | Ptyp_var (s, ko) ->
@@ -239,21 +247,12 @@ end = struct
         | None -> var
         | Some k -> var ^/^ S.colon ^/^ Jkind_annotation.pp k
       end
-    | Ptyp_arrow (lbl, arg_ty, ret_ty, arg_mods, ret_mods) ->
-      arrow_type lbl
+    | Ptyp_arrow (lbl, arg_ty, arg_mods, ret_ty, ret_mods) ->
+      pp_arrow ct.ptyp_tokens lbl
         (with_modes ~modes:arg_mods (pp arg_ty))
         (with_modes ~modes:ret_mods (pp ret_ty))
-    | Ptyp_tuple elts ->
-      let elt (lbl_opt, ct) =
-        begin match lbl_opt with
-          | None -> empty
-          | Some s -> string s ^^ S.colon ^^ break 0
-        end ^^ pp ct
-      in
-      separate_map (break 1 ^^ S.star ^^ break 1) elt elts
-    | Ptyp_unboxed_tuple elts ->
-      S.hash_lparen ^^
-      pp_desc (Ptyp_tuple elts) ^^ S.rparen
+    | Ptyp_tuple elts -> pp_tuple elts
+    | Ptyp_unboxed_tuple elts -> S.hash_lparen ^^ pp_tuple elts ^^ S.rparen
     | Ptyp_constr (lid, args) ->
       type_app (longident lid.txt) (List.map pp args)
     | Ptyp_object (fields, closed) ->
@@ -308,6 +307,15 @@ end = struct
     | Ptyp_open (lid, ct) -> longident lid.txt ^^ S.dot ^^ pp ct
     | Ptyp_extension ext -> Extension.pp ext
     | Ptyp_parens ct -> parens (pp ct)
+
+  and pp_tuple elts =
+    let pp_elt (lbl_opt, ct) =
+      begin match lbl_opt with
+      | None -> empty
+      | Some s -> string s ^^ S.colon ^^ break 0
+      end ^^ pp ct
+    in
+    separate_map (break 1 ^^ S.star ^^ break 1) pp_elt elts
 
   and package_type (lid, constraints) =
     let with_ =
@@ -686,22 +694,22 @@ end = struct
   let had_parens arg =
     List.exists (fun elt -> elt.Tokens.desc = Token LPAREN) arg.parg_tokens
 
+  let single_or_multi_token tokens ~optional name =
+    match
+      List.find_map (function
+        | Tokens.{ desc = Token LABEL _; _ } -> Some (stringf "~%s:" name)
+        | Tokens.{ desc = Token OPTLABEL _; _ } -> Some (stringf "~%s:" name)
+        | _ -> None
+      ) tokens
+    with
+    | Some doc -> doc
+    | None -> (if optional then S.qmark else S.tilde) ^^ string name ^^ S.colon
+
   let pp pp_arg arg =
     let parenthesize doc =
       if had_parens arg
       then parens (break 0 ^^ doc ^^ break 0)
       else doc
-    in
-    let single_or_multi_token mark name =
-      match
-        List.find_map (function
-          | Tokens.{ desc = Token LABEL _; _ } -> Some (stringf "~%s:" name)
-          | Tokens.{ desc = Token OPTLABEL _; _ } -> Some (stringf "~%s:" name)
-          | _ -> None
-        ) arg.parg_tokens
-      with
-      | Some doc -> doc
-      | None -> mark ^^ string name ^^ S.colon
     in
     match arg.parg_desc with
     | Parg_unlabelled
@@ -738,12 +746,12 @@ end = struct
            end
       )
     | Parg_labelled {
-        optional; legacy_modes; name: string; maybe_punned = Some arg;
+        optional; legacy_modes; name: string; maybe_punned = Some a;
         typ_constraint; modes = m; default;
       } ->
-      single_or_multi_token (if optional then S.qmark else S.tilde) name ^^
+      single_or_multi_token arg.parg_tokens ~optional name ^^
       parenthesize (
-        modes legacy_modes ^/^ pp_arg arg ^^
+        modes legacy_modes ^/^ pp_arg a ^^
         begin (match typ_constraint with
           | None -> empty
           | Some ct -> break 1 ^^ Type_constraint.pp ct)
@@ -1085,7 +1093,7 @@ end = struct
       type_app ~parens:false (longident lid.txt) (List.map Core_type.pp args)
     | Pcty_signature cs -> pp_signature cs
     | Pcty_arrow (lbl, arg, rhs) ->
-      arrow_type lbl (Core_type.pp arg) (pp rhs)
+      Core_type.pp_arrow [(* FIXME *)] lbl (Core_type.pp arg) (pp rhs)
     | Pcty_extension ext -> Extension.pp ext
     | Pcty_open (od, ct) ->
       S.let_ ^/^ S.open_ ^^ Open_description.pp od ^/^
