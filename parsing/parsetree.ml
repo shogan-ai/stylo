@@ -1401,10 +1401,14 @@ and value_binding =
 
 and module_binding =
     {
-     pmb_name: string option loc;
+     pmb_name: string option loc * modes;
+     pmb_params: functor_parameter list;
+     pmb_constraint: module_type option;
+     pmb_modes: modes;
      pmb_expr: module_expr;
      pmb_attributes: attributes;
      pmb_loc: location;
+     pmb_tokens : tokens;
     }
 (** Values of type [module_binding] represents [module X = ME] *)
 
@@ -1534,6 +1538,11 @@ class to_tokens = object
     let sub_tokens = super#visit_value_binding env vb in
     let node_toks = vb.pvb_tokens in
     combine_children ~loc:vb.pvb_loc node_toks sub_tokens
+
+  method! visit_module_binding env mb =
+    let sub_tokens = super#visit_module_binding env mb in
+    let node_toks = mb.pmb_tokens in
+    combine_children ~loc:mb.pmb_loc node_toks sub_tokens
 
   method visit_function_body env fb =
     let sub_tokens = super#visit_function_body env fb in

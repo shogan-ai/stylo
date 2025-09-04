@@ -1390,33 +1390,34 @@ structure_item:
 %inline module_binding:
   MODULE
   ext = ext attrs1 = attributes
-  name_ = module_name_modal(at_mode_expr)
+  name = module_name_modal(at_mode_expr)
   body = module_binding_body
   attrs2 = post_item_attributes
     { let docs = symbol_docs $sloc in
       let loc = make_loc $sloc in
       let attrs = attrs1 @ attrs2 in
-      let name, modes = name_ in
-      let body = maybe_pmod_constraint modes body in
-      let body = Mb.mk name body ~attrs ~loc ~docs in
-      Pstr_module body, ext }
+      let params, mty_opt, modes, me = body in
+      let mb =
+        Mb.mk name params mty_opt modes me ~attrs ~loc ~docs
+          ~tokens:(Tokens.at $sloc)
+      in
+      Pstr_module mb, ext }
 ;
 
 (* The body (right-hand side) of a module binding. *)
 module_binding_body:
     EQUAL me = module_expr
-      { me }
+      { [], None, [], me }
   | COLON error
       { expecting $loc($1) "=" }
-  | mkmod(
-      COLON mty = module_type mm = optional_atat_mode_expr EQUAL me = module_expr
-        { Pmod_constraint(me, Some mty, mm) }
-    | mm = at_mode_expr EQUAL me = module_expr
-        { Pmod_constraint(me, None, mm) }
-    | arg_and_pos = functor_arg body = module_binding_body
-        { let (_, arg) = arg_and_pos in
-          Pmod_functor(arg, body) }
-  ) { $1 }
+  | COLON mty = module_type mm = optional_atat_mode_expr EQUAL me = module_expr
+      { [], Some mty, mm, me }
+  | mm = at_mode_expr EQUAL me = module_expr
+      { [], None, mm, me }
+  | arg_and_pos = functor_arg body = module_binding_body
+      { let (_, arg) = arg_and_pos in
+        let args, mty, mm, me = body in
+        arg :: args, mty, mm, me }
 ;
 
 (* A group of recursive module bindings. *)
@@ -1431,17 +1432,19 @@ module_binding_body:
   ext = ext
   attrs1 = attributes
   REC
-  name_ = module_name_modal(at_mode_expr)
+  name = module_name_modal(at_mode_expr)
   body = module_binding_body
   attrs2 = post_item_attributes
   {
     let loc = make_loc $sloc in
     let attrs = attrs1 @ attrs2 in
     let docs = symbol_docs $sloc in
-    let name, modes = name_ in
-    let body = maybe_pmod_constraint modes body in
-    ext,
-    Mb.mk name body ~attrs ~loc ~docs
+    let params, mty_opt, modes, me = body in
+    let mb =
+      Mb.mk name params mty_opt modes me ~attrs ~loc ~docs
+        ~tokens:(Tokens.at $sloc)
+    in
+    ext, mb
   }
 ;
 
@@ -1449,7 +1452,7 @@ module_binding_body:
 %inline and_module_binding:
   AND
   attrs1 = attributes
-  name_ = module_name_modal(at_mode_expr)
+  name = module_name_modal(at_mode_expr)
   body = module_binding_body
   attrs2 = post_item_attributes
   {
@@ -1457,9 +1460,9 @@ module_binding_body:
     let attrs = attrs1 @ attrs2 in
     let docs = symbol_docs $sloc in
     let text = symbol_text $symbolstartpos in
-    let name, modes = name_ in
-    let body = maybe_pmod_constraint modes body in
-    Mb.mk name body ~attrs ~loc ~text ~docs
+    let params, mty_opt, modes, me = body in
+    Mb.mk name params mty_opt modes me ~attrs ~loc ~text ~docs
+      ~tokens:(Tokens.at $sloc)
   }
 ;
 
@@ -2499,7 +2502,11 @@ fun_expr:
   | LET MODULE ext_attributes module_name_modal(at_mode_expr) module_binding_body IN seq_expr
       {
         let name, modes = $4 in
-        let body = maybe_pmod_constraint modes $5 in
+        let body =
+          match $5 with
+          | [], None, [], me -> maybe_pmod_constraint modes me
+          | _ -> failwith "TODO: switch to Pexp_structure_item"
+        in
         Pexp_letmodule(name, body, $7), $3 }
   | LET EXCEPTION ext_attributes let_exception_declaration IN seq_expr
       { Pexp_letexception($4, $6), $3 }

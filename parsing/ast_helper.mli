@@ -400,8 +400,10 @@ module Mtd:
 (** Module bindings *)
 module Mb:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
-      str_opt -> module_expr -> module_binding
+    val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?docs:docs ->
+      ?text:text ->
+      str_opt * modes -> functor_parameter list -> module_type option ->
+      modes -> module_expr -> module_binding
   end
 
 (** Opens *)

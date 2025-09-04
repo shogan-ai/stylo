@@ -136,6 +136,11 @@ let with_modes ~modes:l t =
   | [] -> t
   | _ -> t ^/^ S.at ^/^ modes l
 
+let with_atat_modes ~modes:l t =
+  match l with
+  | [] -> t
+  | _ -> t ^/^ S.atat ^/^ modes l
+
 let include_kind = function
   | Structure -> empty
   | Functor -> S.functor_
@@ -1590,10 +1595,28 @@ end
 and Module_binding : sig
   val pp : module_binding -> document
 end = struct
-  let pp { pmb_name; pmb_expr; pmb_attributes; _ } =
-    begin match pmb_name.txt with
+  let pp { pmb_name = (name, name_modes); pmb_params; pmb_constraint; pmb_modes;
+           pmb_expr; pmb_attributes; _ } =
+    let name =
+      match name.txt with
       | None -> S.underscore
       | Some s -> string s
+    in
+    begin match name_modes with
+    | [] -> name
+    | modes -> S.lparen ^^ with_modes name ~modes ^^ S.rparen
+    end ^^
+    begin match pmb_params with
+      | [] -> empty
+      | params ->
+        break 1 ^^ separate_map (break 1) Functor_parameter.pp params
+    end ^^
+    begin match pmb_constraint, pmb_modes with
+    | None, [] -> empty
+    | Some mty, modes ->
+      break 1 ^^ S.colon ^/^ Module_type.pp mty
+      |> with_atat_modes ~modes
+    | None, at_modes -> break 1 ^^ S.at ^/^ modes at_modes
     end ^/^ S.equals ^/^ Module_expr.pp pmb_expr
     |> Attribute.attach ~attrs:pmb_attributes
 end

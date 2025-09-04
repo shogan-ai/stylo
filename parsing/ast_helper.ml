@@ -498,14 +498,18 @@ module Mtd = struct
 end
 
 module Mb = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(text = []) name expr =
+  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens
+        ?(docs = empty_docs) ?(text = []) name params mty_opt modes expr =
     {
      pmb_name = name;
+     pmb_params = params;
+     pmb_constraint = mty_opt;
+     pmb_modes = modes;
      pmb_expr = expr;
      pmb_attributes =
        add_text_attrs text (add_docs_attrs docs attrs);
      pmb_loc = loc;
+     pmb_tokens = tokens;
     }
 end
 
