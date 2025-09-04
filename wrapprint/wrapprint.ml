@@ -2,6 +2,7 @@
 
 type t =
   | Empty
+  | Token_let
   | Token of PPrint.document
   | Comment of PPrint.document
     (** docstrings and explicitely inserted comments *)
@@ -79,6 +80,7 @@ open PPrint
 
 let rec to_document : t -> document = function
   | Empty -> PPrint.empty
+  | Token_let -> PPrint.string "let"
   | Comment t | Token t | Whitespace t -> t
   | Cat (t1, t2) -> to_document t1 ^^ to_document t2
   | Nest (i, t) -> nest i (to_document t)

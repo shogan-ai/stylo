@@ -22,10 +22,16 @@ let rec walk_both seq doc =
     exit 1
   | first :: rest ->
     match first.T.desc, doc with
+    (*** Stricter synchro, for debugging purposes ***)
+    | T.Token LET, Doc.Token_let ->
+      dprintf "synced at %d:%d with LET@."
+        first.pos.pos_lnum
+        (first.pos.pos_cnum - first.pos.pos_bol);
+      rest, doc
     (* Synchronized, advance *)
     | T.Token _, Doc.Token p
     | T.Comment _, Doc.Comment p ->
-      dprintf "synced at %d:%d with << %a >>@."
+      dprintf "assume synced at %d:%d with << %a >>@."
         first.pos.pos_lnum
         (first.pos.pos_cnum - first.pos.pos_bol)
         PPrint.ToFormatter.compact p;
@@ -50,7 +56,7 @@ let rec walk_both seq doc =
       rest, Align doc
 
     (* Comments missing in the doc, insert them *)
-    | T.Comment _, Doc.Token _ ->
+    | T.Comment _, Doc.(Token_let | Token _) ->
       let to_prepend, rest = consume_leading_comments Doc.empty seq in
       rest, Doc.(to_prepend ^/^ doc)
 
@@ -58,6 +64,13 @@ let rec walk_both seq doc =
     | T.Token _, Doc.Comment _ ->
       Format.eprintf
         "ERROR: token at position %d:%d absent from the output.@."
+        first.pos.pos_lnum (first.pos.pos_cnum - first.pos.pos_bol);
+      exit 1
+
+    (*** Stricter sync check part 2 ***)
+    | _, Doc.Token_let ->
+      Format.eprintf
+        "ERROR: desynchronized at position %d:%d@."
         first.pos.pos_lnum (first.pos.pos_cnum - first.pos.pos_bol);
       exit 1
 
