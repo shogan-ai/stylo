@@ -70,7 +70,7 @@ type docs =
 
 val empty_docs : docs
 
-val docs_attr_tokens : (Lexing.position, Tokens.elt) Hashtbl.t
+val docs_attr_tokens : (Lexing.position, Tokens.seq) Hashtbl.t
 
 val docs_attr : docstring -> Parsetree.attribute
 

@@ -454,14 +454,12 @@ end = struct
     | Pexp_ident lid -> longident lid.txt
     | Pexp_constant c -> constant c
     | Pexp_let (rf, vbs, body) ->
-      S.let_ ^/^
-      begin match rf with
+      Value_binding.pp_list vbs ~start:(
+        S.let_ ^^
+        match rf with
         | Nonrecursive -> empty
-        | Recursive -> S.rec_ ^^ break 1
-      end ^^
-      separate_map (break 1 ^^ S.and_ ^^ break 1) Value_binding.pp vbs ^/^
-      S.in_ ^/^
-      pp body
+        | Recursive -> break 1 ^^ S.rec_
+      ) ^/^ S.in_ ^/^ pp body
     | Pexp_function ([], _, body) -> Function_body.pp body
     | Pexp_function (params, constr, body) ->
       S.fun_ ^/^
@@ -685,7 +683,7 @@ and Binding_op : sig
   val pp : binding_op -> document
 end = struct
   let pp { pbop_op; pbop_binding; _ }=
-    string pbop_op.txt ^/^ Value_binding.pp pbop_binding
+    Value_binding.pp_one ~start:(string pbop_op.txt) pbop_binding
 end
 
 and Argument : sig
@@ -1174,14 +1172,12 @@ end = struct
     | Pcl_apply (ce, args) -> pp ce ^/^ Application.pp_args args
     | Pcl_let (rf, vbs, body) ->
       (* FIXME: factorize with Pexp_let *)
-      S.let_ ^/^
-      begin match rf with
+      Value_binding.pp_list vbs ~start:(
+        S.let_ ^^
+        match rf with
         | Nonrecursive -> empty
-        | Recursive -> S.rec_ ^^ break 1
-      end ^^
-      separate_map (break 1 ^^ S.and_ ^^ break 1) Value_binding.pp vbs ^/^
-      S.in_ ^/^
-      pp body
+        | Recursive -> break 1 ^^ S.rec_
+      ) ^/^ S.in_ ^/^ pp body
     | Pcl_constraint (ce, ct) -> pp ce ^/^ S.colon ^/^ Class_type.pp ct
     | Pcl_extension ext -> Extension.pp ext
     | Pcl_open (od, ce) ->
@@ -1230,7 +1226,7 @@ end = struct
 
   and pp_field_kind = function
     | Cfk_virtual ct -> S.colon ^/^ Core_type.pp ct
-    | Cfk_concrete (_, vb) -> Value_binding.pp vb
+    | Cfk_concrete (_, vb) -> Value_binding.pp_core vb
 
   and pp { pcl_desc; pcl_attributes; _ } =
     pp_desc pcl_desc
@@ -1497,12 +1493,12 @@ end = struct
     | Pstr_eval (e, attrs) -> Attribute.attach ~attrs (Expression.pp e)
     | Pstr_value (rf, vbs) ->
       (* FIXME: factorize Pexp_let *)
-      S.let_ ^/^
-      begin match rf with
+      Value_binding.pp_list vbs ~start:(
+        S.let_ ^^
+        match rf with
         | Nonrecursive -> empty
-        | Recursive -> S.rec_ ^^ break 1
-      end ^^
-      separate_map (break 1 ^^ S.and_ ^^ break 1) Value_binding.pp vbs
+        | Recursive -> break 1 ^^ S.rec_
+      )
     | Pstr_primitive vd -> Value_description.pp vd
     (* FIXME: factorize with Psig_* *)
     | Pstr_type (rf, tds) ->
@@ -1575,11 +1571,13 @@ end = struct
 end
 
 and Value_binding : sig
-  val pp : value_binding -> document
+  val pp_core : value_binding -> document
+
+  val pp_one : start:document -> value_binding -> document
+  val pp_list : start:document -> value_binding list -> document
 end = struct
-  let pp { pvb_modes; pvb_pat; pvb_params; pvb_constraint;
-           pvb_ret_modes; pvb_expr; pvb_attributes;
-           pvb_loc = _; pvb_tokens = _ } =
+  let pp_core { pvb_modes; pvb_pat; pvb_params; pvb_constraint;
+                pvb_ret_modes; pvb_expr; pvb_attributes; _ } =
     begin match pvb_modes with
       | [] -> empty
       | lst -> modes lst ^^ break 1
@@ -1601,6 +1599,16 @@ end = struct
       | Some e -> break 1 ^^ S.equals ^/^ Expression.pp e
     end
     |> Attribute.attach ~attrs:pvb_attributes (* FIXME: post? *)
+
+  let pp_one ~start vb =
+    Attribute.pp_list vb.pvb_pre_docs ^?^
+    start ^/^ pp_core vb ^?^
+    Attribute.pp_list vb.pvb_post_doc
+
+  let rec pp_list ~start = function
+    | [] -> empty
+    | [ x ] -> pp_one ~start x
+    | x :: xs -> pp_one ~start x ^/^ pp_list ~start:S.and_ xs
 end
 
 and Module_binding : sig

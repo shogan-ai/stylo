@@ -540,31 +540,44 @@ module Vb = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ~tokens ?(docs = empty_docs)
       ?(text = []) ?(params = []) ?(modes = []) ?value_constraint
       ?(ret_modes = []) pat expr =
+    let simplify_ds : Docstring.t option -> _ = function
+      | None | Some { ds_body=""; _ } -> None
+      | Some ds -> Some ds
+    in
+    let pre_doc = simplify_ds docs.docs_pre in
+    let post_doc = simplify_ds docs.docs_post in
     (* Naive, will do better later *)
-    let ds_child_nodes =
-      begin match docs.docs_pre with
-      | None | Some { ds_body=""; _ } -> []
-      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
-      end @
-      begin match docs.docs_post with
-      | None | Some { ds_body=""; _ } -> []
-      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
-      end @
+    let tokens =
       List.filter_map (function
         | {Docstring.ds_body=""} -> None
         | {ds_loc} -> Some { Tokens.desc = Child_node; pos = ds_loc.loc_start }
-      ) text
+      ) text @
+      begin match pre_doc with
+      | None -> []
+      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
+      end @
+      tokens @
+      begin match post_doc with
+      | None -> []
+      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
+      end
     in
-    let tokens = tokens @ ds_child_nodes in
     {
+     pvb_pre_docs =
+       add_text_attrs text (
+         match pre_doc with
+         | Some ds -> [Docstrings.docs_attr ds]
+         | None -> []
+       );
      pvb_pat = pat;
      pvb_params = params;
      pvb_expr = expr;
      pvb_constraint=value_constraint;
      pvb_modes = modes;
      pvb_ret_modes = ret_modes;
-     pvb_attributes =
-       add_text_attrs text (add_docs_attrs docs attrs);
+     pvb_attributes = attrs;
+     pvb_post_doc =
+       (match post_doc with Some ds -> [Docstrings.docs_attr ds] | None -> []);
      pvb_loc = loc;
      pvb_tokens = tokens;
     }

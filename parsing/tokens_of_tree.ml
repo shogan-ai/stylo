@@ -4,7 +4,7 @@ let is_source_token_of_attached_docstring (tok : Tokens.elt) =
   match tok.desc with
   | Comment _ ->
     begin match Hashtbl.find Docstrings.docs_attr_tokens tok.pos with
-    | doc_tok -> tok != doc_tok
+    | ds -> not (List.memq tok ds)
     | exception Not_found -> false
     end
   | _ -> false

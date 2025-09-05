@@ -1388,6 +1388,7 @@ and value_constraint =
 
 and value_binding =
   {
+    pvb_pre_docs: attributes;
     pvb_pat: pattern;
     pvb_params: function_param list;
     pvb_expr: expression option;
@@ -1395,6 +1396,7 @@ and value_binding =
     pvb_modes: modes;
     pvb_ret_modes: modes;
     pvb_attributes: attributes;
+    pvb_post_doc: attributes;
     pvb_loc: location;
     pvb_tokens: tokens;
   } (** [let modes pat params : type_constraint @@ ret_modes = exp] *)
