@@ -53,6 +53,8 @@ let empty_docs = { docs_pre = None; docs_post = None }
 
 let doc_loc = {txt = "ocaml.doc"; loc = Location.none}
 
+let docs_attr_tokens = Hashtbl.create 42
+
 let docs_attr ds =
   let open Parsetree in
   let body = ds.ds_body in
@@ -68,6 +70,9 @@ let docs_attr ds =
     { pstr_desc = Pstr_eval (exp, []); pstr_loc = loc }
   in
   let tok_elt = { Tokens.desc = Comment body; pos = loc.loc_start } in
+  Dbg_print.dprintf "registering docstring at %d:%d@."
+    loc.loc_start.pos_lnum (loc.loc_start.pos_cnum - loc.loc_start.pos_bol);
+  Hashtbl.add docs_attr_tokens loc.loc_start tok_elt;
   { attr_name = doc_loc;
     attr_payload = PStr ([item], []);
     attr_loc = loc;

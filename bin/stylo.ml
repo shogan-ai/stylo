@@ -5,7 +5,7 @@ let () =
   let lexbuf = Lexing.from_channel ic in
   let ast = Parse.structure lexbuf in
   let doc = Print.Structure.pp_implementation ast in
-  let tokenizer = new Parsetree.to_tokens in
+  let tokenizer = new Tokens_of_tree.to_tokens in
   let tokens =
     tokenizer # visit_structure () ast
     |> List.flatten (* FIXME: shouldn't be needed when tokenizer is completed *)

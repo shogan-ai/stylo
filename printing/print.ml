@@ -751,7 +751,10 @@ end = struct
       } ->
       single_or_multi_token arg.parg_tokens ~optional name ^^
       parenthesize (
-        modes legacy_modes ^/^ pp_arg a ^^
+        begin match legacy_modes with
+        | [] -> empty
+        | _ -> modes legacy_modes ^^ break 1
+        end ^^ pp_arg a ^^
         begin (match typ_constraint with
           | None -> empty
           | Some ct -> break 1 ^^ Type_constraint.pp ct)

@@ -436,7 +436,6 @@ let add_docstring_comment ds =
   let com =
     ("*" ^ Docstrings.docstring_body ds, Docstrings.docstring_loc ds)
   in
-  (* FIXME: except don't? *)
     add_comment com
 
 let float ~maybe_hash lit modifier =
