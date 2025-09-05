@@ -8,11 +8,11 @@ function implementation_file {
 
 (rule
   (with-stdout-to normalized-$f
-    (bash "cat %{dep:nocomment-$f} | tr -s '[:space:]' '\n'")))
+    (bash "cat %{dep:$f} | tr -s '[:space:]' '\n'")))
 
 (rule
   (with-stdout-to printed-$f
-    (run ../bin/stylo.exe %{dep:nocomment-$f})))
+    (run ../bin/stylo.exe %{dep:$f})))
 
 (rule
   (alias $name)
