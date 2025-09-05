@@ -27,9 +27,9 @@ let (^^) t1 t2 =
   | t, Empty -> t
   | _ -> Cat (t1, t2)
 
-let nest i t = Nest (i, t)
-let group t = Group t
-let align t = Align t
+let nest i t = if t = Empty then t else Nest (i, t)
+let group t = if t = Empty then t else Group t
+let align t = if t = Empty then t else Align t
 
 let comment s =
   Comment PPrint.(string "(*" ^^ string s ^^ string "*)")
