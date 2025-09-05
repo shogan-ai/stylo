@@ -234,7 +234,7 @@ end = struct
     arg ^/^ S.rarrow ^/^ rhs
 
   let rec pp ct =
-    pp_desc ct
+    group (pp_desc ct)
     |> Attribute.attach ~attrs:ct.ptyp_attributes
 
   and pp_desc ct =
@@ -353,7 +353,7 @@ and Pattern : sig
   val pp : pattern -> document
 end = struct
   let rec pp p =
-    pp_desc p.ppat_desc
+    group (pp_desc p.ppat_desc)
     |> Attribute.attach ~attrs:p.ppat_attributes
 
   and pp_desc = function
@@ -446,7 +446,7 @@ and Expression : sig
   val pp : expression -> document
 end = struct
   let rec pp e =
-    pp_desc e
+    group (pp_desc e)
     |> Attribute.attach ~attrs:e.pexp_attributes
 
   and pp_desc exp =
@@ -454,29 +454,33 @@ end = struct
     | Pexp_ident lid -> longident lid.txt
     | Pexp_constant c -> constant c
     | Pexp_let (rf, vbs, body) ->
-      Value_binding.pp_list vbs ~start:(
-        S.let_ ^^
-        match rf with
-        | Nonrecursive -> empty
-        | Recursive -> break 1 ^^ S.rec_
-      ) ^/^ S.in_ ^/^ pp body
+      group (
+        Value_binding.pp_list vbs ~start:(
+          S.let_ ^^
+          match rf with
+          | Nonrecursive -> empty
+          | Recursive -> break 1 ^^ S.rec_
+        ) ^/^ S.in_
+      ) ^/^ pp body
     | Pexp_function ([], _, body) -> Function_body.pp body
     | Pexp_function (params, constr, body) ->
-      S.fun_ ^/^
-      separate_map (break 1) Function_param.pp params ^^
-      Function_constraint.pp constr ^/^ S.rarrow ^/^
-      Function_body.pp body
+      prefix (
+        prefix S.fun_ (
+          group (
+            flow_map (break 1) Function_param.pp params ^/^
+            group (Function_constraint.pp constr ^?^ S.rarrow)
+          )
+        )
+      ) (Function_body.pp body)
     | Pexp_prefix_apply (op, arg) -> pp op ^^ pp arg
     | Pexp_add_or_sub (op, arg) -> string op ^^ pp arg
     | Pexp_infix_apply {op; arg1; arg2} ->
       pp arg1 ^/^ pp op ^/^ pp arg2
     | Pexp_apply (e, args) -> pp_apply e args
     | Pexp_match (e, cases) ->
-      S.match_ ^/^ pp e ^/^ S.with_ ^/^
-      (if has_leading_pipe ~after:WITH exp.pexp_tokens
-       then S.pipe ^^ break 1
-       else empty) ^^
-      separate_map (break 1 ^^ S.pipe ^^ break 1) Case.pp cases
+      group (S.match_ ^/^ pp e ^/^ S.with_) ^/^
+      Case.pp_cases cases
+        ~has_leading_pipe:(has_leading_pipe ~after:WITH exp.pexp_tokens)
     | Pexp_try (e, cases) ->
       S.try_ ^/^ pp e ^/^ S.with_ ^/^
       separate_map (break 1 ^^ S.pipe ^^ break 1) Case.pp cases
@@ -487,8 +491,8 @@ end = struct
       (* FIXME: ! *)
       pp_desc { exp with pexp_desc = Pexp_tuple elts } ^^
       S.rparen
-    | Pexp_construct (lid, None) -> constr_longident lid.txt
-    | Pexp_construct (lid, Some e) -> constr_longident lid.txt ^/^ pp e
+    | Pexp_construct (lid, arg) ->
+      prefix_nonempty (constr_longident lid.txt) (optional pp arg)
     | Pexp_variant (lbl, eo) ->
       S.bquote ^^ string lbl ^^
       begin match eo with
@@ -516,10 +520,11 @@ end = struct
       separate_map (S.semi ^^ break 1) pp es ^/^
       cls
     | Pexp_ifthenelse (e1, e2, e3_o) ->
-      S.if_ ^/^ pp e1 ^/^ S.then_ ^/^ pp e2 ^^
+      let if_cond_then = S.if_ ^^ nest 2 (break 1 ^^ pp e1) ^/^ S.then_ in
+      prefix (group if_cond_then) (pp e2) ^?^
       begin match e3_o with
         | None -> empty
-        | Some e3 -> break 1 ^^ S.else_ ^/^ pp e3
+        | Some e3 -> prefix S.else_ (pp e3)
       end
     | Pexp_sequence (e1, e2) -> pp e1 ^^ S.semi ^/^ pp e2
     | Pexp_seq_empty e -> pp e ^^ S.semi
@@ -626,7 +631,7 @@ end = struct
       end
     | Pexp_parens { begin_end = false; exp } -> parens (pp exp)
     | Pexp_parens { begin_end = true; exp } ->
-      S.begin_ ^/^ pp exp ^/^ S.end_
+      prefix S.begin_ (pp exp) ^/^ S.end_
     | Pexp_list elts ->
       brackets (
         separate_map (S.semi ^^ break 1) pp elts
@@ -634,7 +639,7 @@ end = struct
     | Pexp_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
     | Pexp_exclave exp -> S.exclave_ ^/^ pp exp
 
-  and pp_apply e args = pp e ^/^ Application.pp_args args
+  and pp_apply e args = prefix (pp e) (Application.pp_args args)
 end
 
 and Record_field : sig
@@ -652,18 +657,32 @@ end = struct
 
   let pp_arg a = Argument.pp Expression.pp a
 
-  let pp_args = separate_map (break 1) pp_arg
+  let pp_args = flow_map (break 1) pp_arg
 end
 
 and Case : sig
   val pp : case -> document
+
+  val pp_cases : has_leading_pipe:bool -> case list -> document
 end = struct
-  let pp { pc_lhs; pc_guard; pc_rhs } =
-    Pattern.pp pc_lhs ^^
-    begin match pc_guard with
+  let pp pipe { pc_lhs; pc_guard; pc_rhs } =
+    let pat = Pattern.pp pc_lhs in
+    prefix (if pipe then group (S.pipe ^/^ pat) else pat) (
+      begin match pc_guard with
       | None -> empty
-      | Some e -> break 1 ^^ S.when_ ^/^ Expression.pp e
-    end ^/^ S.rarrow ^/^ Expression.pp pc_rhs
+      | Some e -> S.when_ ^/^ Expression.pp e
+      end ^?^ S.rarrow ^/^ Expression.pp pc_rhs
+    )
+
+  let pp_cases ~has_leading_pipe =
+    foldli (fun i accu x ->
+      if i = 0 then
+        pp has_leading_pipe x
+      else
+        accu ^/^ pp true x
+    ) empty
+
+  let pp = pp false
 end
 
 and Letop : sig
@@ -1389,7 +1408,7 @@ end = struct
     begin match popen_override with
       | Override -> S.bang
       | Fresh -> empty
-    end ^/^
+    end ^?^
     pp_expr popen_expr
     |> Attribute.attach ~attrs:popen_attributes
 end
@@ -1516,7 +1535,7 @@ end = struct
       separate_map (break 1 ^^ S.and_ ^^ break 1) Module_binding.pp mbs
     | Pstr_modtype mty ->
       S.module_ ^/^ S.type_ ^/^ Module_type_declaration.pp mty
-    | Pstr_open od -> S.open_ ^^ Open_declaration.pp od
+    | Pstr_open od -> S.open_ ^/^ Open_declaration.pp od
     | Pstr_class cds ->
       S.class_ ^/^
       separate_map (break 1 ^^ S.and_ ^^ break 1) Class_declaration.pp cds
@@ -1533,7 +1552,7 @@ end = struct
       S.kind_abbrev_ ^/^ string name.txt ^/^ S.equals ^/^
       Jkind_annotation.pp k
 
-  let pp_item it = pp_item_desc it.pstr_desc
+  let pp_item it = group (pp_item_desc it.pstr_desc)
 
   let pp (items, _) =
     S.struct_ ^/^
@@ -1568,6 +1587,8 @@ end = struct
         | Some ct -> S.colon ^/^ Core_type.pp ct ^^ break 1
       end ^^
       S.coerce ^/^ Core_type.pp coercion
+
+  let pp x = group (pp x)
 end
 
 and Value_binding : sig
@@ -1576,34 +1597,38 @@ and Value_binding : sig
   val pp_one : start:document -> value_binding -> document
   val pp_list : start:document -> value_binding list -> document
 end = struct
-  let pp_core { pvb_modes; pvb_pat; pvb_params; pvb_constraint;
+  let pp_core start { pvb_modes; pvb_pat; pvb_params; pvb_constraint;
                 pvb_ret_modes; pvb_expr; pvb_attributes; _ } =
-    begin match pvb_modes with
-      | [] -> empty
-      | lst -> modes lst ^^ break 1
-    end ^^
-    Pattern.pp pvb_pat ^^
-    begin match pvb_params with
-      | [] -> empty
-      | params ->
-        break 1 ^^ separate_map (break 1) Function_param.pp params
-    end ^^
-    begin match pvb_constraint with
-      | None -> empty
-      | Some vc ->
-        break 1 ^^ Value_constraint.pp vc
+    let kw_and_modes = group (start ^?^ modes pvb_modes) in
+    let pat = Pattern.pp pvb_pat in
+    let params = flow_map (break 1) Function_param.pp pvb_params in
+    let constraint_ =
+      optional (fun vc ->
+        Value_constraint.pp vc
         |> with_modes ~modes:pvb_ret_modes
-    end ^^
+      ) pvb_constraint
+    in
     begin match pvb_expr with
-      | None -> empty
-      | Some e -> break 1 ^^ S.equals ^/^ Expression.pp e
+    | None -> (* Punning *)
+      prefix kw_and_modes (
+        group (prefix_nonempty pat params ^?^ constraint_)
+      )
+    | Some e ->
+      prefix (
+        prefix kw_and_modes (
+          group (prefix_nonempty pat params ^?^
+                 group (constraint_ ^?^ S.equals))
+        )
+      ) (Expression.pp e)
     end
     |> Attribute.attach ~attrs:pvb_attributes (* FIXME: post? *)
 
   let pp_one ~start vb =
     Attribute.pp_list vb.pvb_pre_docs ^?^
-    start ^/^ pp_core vb ^?^
+    pp_core start vb ^?^
     Attribute.pp_list vb.pvb_post_doc
+
+  let pp_core = pp_core empty
 
   let rec pp_list ~start = function
     | [] -> empty
