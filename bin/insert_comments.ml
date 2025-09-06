@@ -8,9 +8,29 @@ let rec consume_leading_comments acc = function
   | [] -> acc, []
   | first :: rest ->
     match first.T.desc with
-    | Comment c -> consume_leading_comments Doc.(acc ^/^ comment c) rest
+    | Comment c -> consume_leading_comments Doc.(acc ^?^ comment c) rest
     | Token _ -> acc, rest
     | Child_node -> assert false
+
+let rec consume_only_leading_comments acc = function
+  | [] -> acc, []
+  | first :: rest ->
+    match first.T.desc with
+    | Comment c -> consume_only_leading_comments Doc.(acc ^?^ comment c) rest
+    | Token _ -> acc, first :: rest
+    | Child_node -> assert false
+
+let rec first_is_comment = function
+  | Doc.Comment _ -> `yes
+  | Token _ | Token_let -> `no
+  | Group d | Align d | Nest (_, d) -> first_is_comment d
+  | Empty | Whitespace _ -> `maybe
+  | Cat (d1, d2) ->
+    match first_is_comment d1 with
+    | `maybe -> first_is_comment d2
+    | res -> res
+
+let first_is_comment d = first_is_comment d = `yes
 
 let rec walk_both seq doc =
   match seq with
@@ -40,6 +60,16 @@ let rec walk_both seq doc =
     (* Skip "whitespaces" *)
     | _, Doc.(Empty | Whitespace _) -> seq, doc
 
+    (* Comments missing in the doc, insert them *)
+    | T.Comment _, Doc.(Token_let | Token _) ->
+      let to_prepend, rest = consume_leading_comments Doc.empty seq in
+      rest, Doc.(to_prepend ^/^ doc)
+
+    | T.Comment _, Doc.Group d when not (first_is_comment d) ->
+      let to_prepend, rest = consume_only_leading_comments Doc.empty seq in
+      let rest, doc = walk_both rest doc in
+      rest, Doc.(to_prepend ^/^ doc)
+
     (* Traverse document structure *)
     | _, Doc.Cat (left, right) ->
       let restl, left = walk_both seq left in
@@ -54,11 +84,6 @@ let rec walk_both seq doc =
     | _, Doc.Align doc ->
       let rest, doc = walk_both seq doc in
       rest, Align doc
-
-    (* Comments missing in the doc, insert them *)
-    | T.Comment _, Doc.(Token_let | Token _) ->
-      let to_prepend, rest = consume_leading_comments Doc.empty seq in
-      rest, Doc.(to_prepend ^/^ doc)
 
     (* Token missing from the document: this is a hard error. *)
     | T.Token _, Doc.Comment _ ->
