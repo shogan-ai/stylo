@@ -46,6 +46,12 @@ let foldli f init l =
   ) (0, init) l
 
 let (^/^) t1 t2 = t1 ^^ break 1 ^^ t2
+let (^?^) d1 d2 =
+  match d1, d2 with
+  | Empty, d
+  | d, Empty -> d
+  | _ -> d1 ^/^ d2
+
 let separate_map sep f xs =
   foldli (fun i accu x ->
     if i = 0 then
@@ -71,8 +77,16 @@ let flow_map sep f docs =
 let flow sep docs =
   flow_map sep (fun x -> x) docs
 
-let prefix n b left right =
+let prefix_gen n b left right =
   group (left ^^ nest n (break b ^^ right))
+
+let prefix = prefix_gen 2 1
+
+let prefix_nonempty l r =
+  match l, r with
+  | Empty, d
+  | d, Empty -> d
+  | _ -> prefix l r
 
 (* To document. *)
 
