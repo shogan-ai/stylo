@@ -675,14 +675,16 @@ and Case : sig
 
   val pp_cases : has_leading_pipe:bool -> case list -> document
 end = struct
+  let pp_guard = function
+    | None -> empty
+    | Some e -> group (S.when_ ^/^ Expression.pp e)
+
   let pp pipe { pc_lhs; pc_guard; pc_rhs } =
     let pat = Pattern.pp pc_lhs in
-    prefix (if pipe then group (S.pipe ^/^ pat) else pat) (
-      begin match pc_guard with
-      | None -> empty
-      | Some e -> S.when_ ^/^ Expression.pp e
-      end ^?^ S.rarrow ^/^ Expression.pp pc_rhs
-    )
+    prefix (
+      prefix (if pipe then group (prefix S.pipe pat) else pat)
+        (group (pp_guard pc_guard ^?^ S.rarrow))
+    ) (Expression.pp pc_rhs)
 
   let pp_cases ~has_leading_pipe =
     foldli (fun i accu x ->
