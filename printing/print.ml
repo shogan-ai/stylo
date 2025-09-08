@@ -369,7 +369,7 @@ end = struct
     | Ppat_any -> S.underscore
     | Ppat_var name -> string name.txt
     | Ppat_alias (p, alias) ->
-      pp p ^/^ S.as_ ^/^ string alias.txt
+      prefix (pp p) (group (S.as_ ^/^ string alias.txt))
     | Ppat_constant c -> constant c
     | Ppat_interval (c1,c2) -> constant c1 ^/^ S.dotdot ^/^ constant c2
     | Ppat_tuple (elts, closed) ->
@@ -380,38 +380,12 @@ end = struct
       end
     | Ppat_unboxed_tuple (elts, cf) ->
       S.hash_lparen ^^ pp_desc (Ppat_tuple (elts, cf)) ^^ S.rparen
-    | Ppat_construct (lid, None) -> constr_longident lid.txt
-    | Ppat_construct (lid, Some ([], p)) -> constr_longident lid.txt ^/^ pp p
-    | Ppat_construct (lid, Some (bindings, p)) ->
-      let binding (newtype, jkind) =
-        match jkind with
-        | None -> string newtype.txt
-        | Some jkind ->
-          S.lparen ^^ string newtype.txt ^/^ S.colon ^/^ Jkind_annotation.pp jkind ^^
-          S.rparen
-      in
-      constr_longident lid.txt ^/^
-      S.lparen ^^ S.type_ ^/^
-      separate_map (break 1) binding bindings ^^ S.rparen ^/^
-      pp p
+    | Ppat_construct (lid, arg) -> pp_construct lid arg
     | Ppat_variant (lbl, None) -> S.bquote ^^ string lbl
     | Ppat_variant (lbl, Some p) -> S.bquote ^^ string lbl ^/^ pp p
-    | Ppat_record (fields, cf) ->
-      S.lbrace ^/^
-      separate_map (S.semi ^^ break 1) (Record_field.pp pp) fields ^^
-      begin match cf with
-        | Closed -> empty
-        | Open -> S.semi ^/^ S.underscore
-      end ^/^
-      S.rbrace
+    | Ppat_record (fields, cf) -> pp_record cf fields
     | Ppat_record_unboxed_product (fields, cf) ->
-      S.hash_lbrace ^/^
-      separate_map (S.semi ^^ break 1) (Record_field.pp pp) fields ^/^
-      begin match cf with
-        | Closed -> empty
-        | Open -> S.underscore ^^ break 1
-      end ^^
-      S.rbrace
+      pp_record ~unboxed:true cf fields
     | Ppat_array (mut, ps) ->
       let opn, cls = array_delimiters mut in
       opn ^/^
@@ -447,6 +421,32 @@ end = struct
         separate_map (S.semi ^^ break 1) pp elts
       )
     | Ppat_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
+
+  and pp_construct name arg_opt =
+    let name = constr_longident name.txt in
+    match arg_opt with
+    | None -> name
+    | Some ([], arg_pat) -> prefix name (pp arg_pat)
+    | Some (bindings, arg_pat) ->
+      let binding (newtype, jkind) =
+        match jkind with
+        | None -> string newtype.txt
+        | Some jkind ->
+          parens (string newtype.txt ^/^ S.colon ^/^ Jkind_annotation.pp jkind)
+      in
+      prefix name (
+        parens (S.type_ ^/^ flow_map (break 1) binding bindings) ^/^
+        pp arg_pat
+      )
+
+  and pp_record ?(unboxed=false) closed_flag fields =
+    prefix (if unboxed then S.hash_lbrace else S.lbrace) (
+      Record_field.pp_list pp fields ^^
+      match closed_flag with
+      | Asttypes.Closed -> empty
+      | Open -> S.semi ^/^ S.underscore
+    ) ^/^
+    S.rbrace
 end
 
 (** {2 Value expressions} *)
