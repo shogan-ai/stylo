@@ -7,7 +7,7 @@ module S = Syntax
 let enclose l r d = group (l ^^ break 0 ^^ d ^^ break 0 ^^ r)
 
 let parens d =
-  group (S.lparen ^^ nest 1 (break 0 ^^ d) ^^ break 0 ^^ S.rparen)
+  group (S.lparen ^^ nest 1 d ^^ S.rparen)
 let brackets = enclose S.lbracket S.rbracket
 
 let dquotes d = S.dquote ^^ d ^^ S.dquote
@@ -362,10 +362,10 @@ and Pattern : sig
   val pp : pattern -> document
 end = struct
   let rec pp p =
-    group (pp_desc p.ppat_desc)
+    group (pp_desc p.ppat_tokens p.ppat_desc)
     |> Attribute.attach ~attrs:p.ppat_attributes
 
-  and pp_desc = function
+  and pp_desc tokens = function
     | Ppat_any -> S.underscore
     | Ppat_var name -> string name.txt
     | Ppat_alias (p, alias) ->
@@ -379,13 +379,14 @@ end = struct
         | Open -> break 0 ^^ S.comma ^^ break 1 ^^ S.dotdot
       end
     | Ppat_unboxed_tuple (elts, cf) ->
-      S.hash_lparen ^^ pp_desc (Ppat_tuple (elts, cf)) ^^ S.rparen
+      S.hash_lparen ^^ pp_desc tokens (* FIXME *)
+                         (Ppat_tuple (elts, cf)) ^^ S.rparen
     | Ppat_construct (lid, arg) -> pp_construct lid arg
     | Ppat_variant (lbl, None) -> S.bquote ^^ string lbl
     | Ppat_variant (lbl, Some p) -> S.bquote ^^ string lbl ^/^ pp p
-    | Ppat_record (fields, cf) -> pp_record cf fields
+    | Ppat_record (fields, cf) -> pp_record ~tokens cf fields
     | Ppat_record_unboxed_product (fields, cf) ->
-      pp_record ~unboxed:true cf fields
+      pp_record ~unboxed:true ~tokens cf fields
     | Ppat_array (mut, ps) ->
       let opn, cls = array_delimiters mut in
       opn ^/^
@@ -439,11 +440,18 @@ end = struct
         pp arg_pat
       )
 
-  and pp_record ?(unboxed=false) closed_flag fields =
+  and pp_record ?(unboxed=false) ~tokens closed_flag fields =
+    let semi_as_term =
+      List.filter
+        (function Tokens.{ desc = Token SEMI; _ } -> true | _ -> false) tokens
+      |> List.compare_lengths fields
+      |> (fun x -> 0 = x) (* FIXME: handle printing of parenthesized ops *)
+    in
     prefix (if unboxed then S.hash_lbrace else S.lbrace) (
-      Record_field.pp_list pp fields ^^
+      Record_field.pp_list ~semi_as_term pp fields ^^
       match closed_flag with
       | Asttypes.Closed -> empty
+      | Open when semi_as_term -> S.underscore
       | Open -> S.semi ^/^ S.underscore
     ) ^/^
     S.rbrace
@@ -509,9 +517,9 @@ end = struct
         | None -> empty
         | Some e -> break 1 ^^ pp e
       end
-    | Pexp_record (fields, eo) -> pp_record eo fields
+    | Pexp_record (fields, eo) -> pp_record ~tokens:exp.pexp_tokens eo fields
     | Pexp_record_unboxed_product (fields, eo) ->
-      pp_record ~unboxed:true eo fields
+      pp_record ~unboxed:true ~tokens:exp.pexp_tokens eo fields
     | Pexp_field (e, lid) -> pp e ^^ S.dot ^^ longident lid.txt
     | Pexp_unboxed_field (e, lid) ->
       pp e ^^ S.dot ^^ S.hash ^^ longident lid.txt
@@ -644,42 +652,54 @@ end = struct
 
   and pp_apply e args = prefix (pp e) (Application.pp_args args)
 
-  and pp_record ?(unboxed = false) expr_opt fields =
+  and pp_record ?(unboxed = false) ~tokens expr_opt fields =
+    let semi_as_term =
+      List.filter
+        (function Tokens.{ desc = Token SEMI; _ } -> true | _ -> false) tokens
+      |> List.compare_lengths fields
+      |> (fun x -> 0 = x)
+    in
     let eo =
       match expr_opt with
       | None -> empty
       | Some e -> pp e ^/^ S.with_
     in
     prefix ((if unboxed then S.hash_lbrace else S.lbrace) ^?^ eo)
-      (Record_field.pp_list pp fields) ^/^
+      (Record_field.pp_list ~semi_as_term pp fields) ^/^
     S.rbrace
 end
 
 and Record_field : sig
-  val pp : ('a -> document) -> 'a record_field -> document
+(*   val pp : ('a -> document) -> 'a record_field -> document *)
 
-  val pp_list : ('a -> document) -> 'a record_field list -> document
+  val pp_list : semi_as_term:bool -> ('a -> document) -> 'a record_field list ->
+    document
 end = struct
-  let pp pp_value rf =
+  let pp add_semi pp_value rf =
     let pre =
       group (
         longident rf.field_name.txt ^?^
         optional (fun v -> group @@ Type_constraint.pp v) rf.typ
       )
     in
-    match rf.value with
-    | None -> pre
-    | Some v ->
-      prefix (group (pre ^/^ S.equals)) (pp_value v)
+    let field =
+      match rf.value with
+      | None -> pre
+      | Some v ->
+        prefix (group (pre ^/^ S.equals)) (pp_value v)
+    in
+    if add_semi then group (field ^^ S.semi) else field
 
-  let pp_list pp_value =
-    (* [separate_map] inlined so we can group the ; *)
-    foldli (fun i accu x ->
-      if i = 0 then
-        pp pp_value x
-      else
-        group (accu ^^ S.semi) ^/^ pp pp_value x
-    ) empty
+  let pp_list ~semi_as_term pp_value fields =
+    (* [separate_map] inlined so we can control ; insertion and grouping *)
+    let len = List.length fields in
+    let fields =
+      List.mapi (fun i field ->
+        let add_semi = semi_as_term || i + 1 < len in
+        pp add_semi pp_value field
+      ) fields
+    in
+    separate (break 1) fields
 end
 
 and Application : sig
