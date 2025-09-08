@@ -111,7 +111,7 @@ let constant = function
   | Pconst_float (nb, Some suffix)
   | Pconst_integer (nb, Some suffix) -> stringf "%s%c" nb suffix
   | Pconst_unboxed_integer (nb, suffix) -> stringf "#%s%c" nb suffix
-  | Pconst_char c -> stringf "'%c'" c
+  | Pconst_char c -> stringf "'%s'" (Char.escaped c)
   | Pconst_string (s, _, None) -> stringf "%S" s
   | Pconst_string (s, _, Some delim) -> stringf "{%s|%s|%s}" delim s delim
   | Pconst_unboxed_float (nb, None) -> stringf "#%s" nb
