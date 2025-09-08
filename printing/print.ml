@@ -237,7 +237,7 @@ end = struct
           | Tokens.{ desc = Token OPTLABEL _; _ } -> true
           | _ -> false
         ) tokens
-      then stringf "~%s:" s
+      then stringf "?%s:" s
       else S.qmark ^^ string s ^^ S.colon
     end ^^
     arg ^/^ S.rarrow ^/^ rhs
@@ -768,7 +768,7 @@ end = struct
     match
       List.find_map (function
         | Tokens.{ desc = Token LABEL _; _ } -> Some (stringf "~%s:" name)
-        | Tokens.{ desc = Token OPTLABEL _; _ } -> Some (stringf "~%s:" name)
+        | Tokens.{ desc = Token OPTLABEL _; _ } -> Some (stringf "?%s:" name)
         | _ -> None
       ) tokens
     with
