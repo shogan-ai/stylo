@@ -58,6 +58,9 @@ let rec walk_both seq doc =
       rest, doc
 
     (* Skip "whitespaces" *)
+    (* FIXME: we might want to insert a comment before whitespaces. Currently
+       we're always placing comments just before the next token/group, but we
+       might want to keep them close to the preceeding one. *)
     | _, Doc.(Empty | Whitespace _) -> seq, doc
 
     (* Comments missing in the doc, insert them *)
