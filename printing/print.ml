@@ -1062,7 +1062,7 @@ end = struct
 
   let pp ~start ?subst td =
     let pp_param (x, info) = param_info info ^^ Core_type.pp x in
-    prefix (
+    prefix_nonempty (
       prefix start (
         type_app (string td.ptype_name.txt) (List.map pp_param td.ptype_params)
         ^?^
