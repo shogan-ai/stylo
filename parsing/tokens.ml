@@ -100,3 +100,296 @@ end
 
 let at (startpos,endpos) =
   Indexed_list.(consume global startpos endpos)
+
+module Raw = struct
+  let to_string = function
+  | Parser_tokens.AMPERAMPER  -> "AMPERAMPER"
+  | AMPERSAND  -> "AMPERSAND"
+  | AND  -> "AND"
+  | AS  -> "AS"
+  | ASSERT  -> "ASSERT"
+  | BACKQUOTE  -> "BACKQUOTE"
+  | BANG  -> "BANG"
+  | BAR  -> "BAR"
+  | BARBAR  -> "BARBAR"
+  | BARRBRACKET  -> "BARRBRACKET"
+  | BEGIN  -> "BEGIN"
+  | CHAR _ -> "CHAR"
+  | CLASS  -> "CLASS"
+  | COLON  -> "COLON"
+  | COLONCOLON  -> "COLONCOLON"
+  | COLONEQUAL  -> "COLONEQUAL"
+  | COLONGREATER  -> "COLONGREATER"
+  | COLONRBRACKET  -> "COLONRBRACKET"
+  | COMMA  -> "COMMA"
+  | CONSTRAINT  -> "CONSTRAINT"
+  | DO  -> "DO"
+  | DONE  -> "DONE"
+  | DOT  -> "DOT"
+  | DOTDOT  -> "DOTDOT"
+  | DOTHASH  -> "DOTHASH"
+  | DOWNTO  -> "DOWNTO"
+  | ELSE  -> "ELSE"
+  | END  -> "END"
+  | EOF  -> "EOF"
+  | EQUAL  -> "EQUAL"
+  | EXCEPTION  -> "EXCEPTION"
+  | EXCLAVE  -> "EXCLAVE"
+  | EXTERNAL  -> "EXTERNAL"
+  | FALSE  -> "FALSE"
+  | FLOAT _ -> "FLOAT"
+  | HASH_FLOAT _ -> "HASH_FLOAT"
+  | FOR  -> "FOR"
+  | FUN  -> "FUN"
+  | FUNCTION  -> "FUNCTION"
+  | FUNCTOR  -> "FUNCTOR"
+  | GLOBAL  -> "GLOBAL"
+  | GREATER  -> "GREATER"
+  | GREATERRBRACE  -> "GREATERRBRACE"
+  | GREATERRBRACKET  -> "GREATERRBRACKET"
+  | HASHLPAREN  -> "HASHLPAREN"
+  | HASHLBRACE  -> "HASHLBRACE"
+  | IF  -> "IF"
+  | IN  -> "IN"
+  | INCLUDE  -> "INCLUDE"
+  | INFIXOP0 _ -> "INFIXOP0"
+  | AT  -> "AT"
+  | ATAT  -> "ATAT"
+  | INFIXOP1 _ -> "INFIXOP1"
+  | INFIXOP2 _ -> "INFIXOP2"
+  | INFIXOP3 _ -> "INFIXOP3"
+  | INFIXOP4 _ -> "INFIXOP4"
+  | DOTOP _ -> "DOTOP"
+  | LETOP _ -> "LETOP"
+  | ANDOP _ -> "ANDOP"
+  | INHERIT  -> "INHERIT"
+  | INITIALIZER  -> "INITIALIZER"
+  | INT _ -> "INT"
+  | HASH_INT _ -> "HASH_INT"
+  | KIND_ABBREV  -> "KIND_ABBREV"
+  | KIND_OF  -> "KIND_OF"
+  | LABEL _ -> "LABEL"
+  | LAZY  -> "LAZY"
+  | LBRACE  -> "LBRACE"
+  | LBRACELESS  -> "LBRACELESS"
+  | LBRACKET  -> "LBRACKET"
+  | LBRACKETBAR  -> "LBRACKETBAR"
+  | LBRACKETCOLON  -> "LBRACKETCOLON"
+  | LBRACKETLESS  -> "LBRACKETLESS"
+  | LBRACKETGREATER  -> "LBRACKETGREATER"
+  | LBRACKETPERCENT  -> "LBRACKETPERCENT"
+  | LBRACKETPERCENTPERCENT  -> "LBRACKETPERCENTPERCENT"
+  | LESS  -> "LESS"
+  | LESSMINUS  -> "LESSMINUS"
+  | LET  -> "LET"
+  | LIDENT _ -> "LIDENT"
+  | LOCAL  -> "LOCAL"
+  | LPAREN  -> "LPAREN"
+  | LBRACKETAT  -> "LBRACKETAT"
+  | LBRACKETATAT  -> "LBRACKETATAT"
+  | LBRACKETATATAT  -> "LBRACKETATATAT"
+  | MATCH  -> "MATCH"
+  | METHOD  -> "METHOD"
+  | MINUS  -> "MINUS"
+  | MINUSDOT  -> "MINUSDOT"
+  | MINUSGREATER  -> "MINUSGREATER"
+  | MOD  -> "MOD"
+  | MODULE  -> "MODULE"
+  | MUTABLE  -> "MUTABLE"
+  | NEW  -> "NEW"
+  | NONREC  -> "NONREC"
+  | OBJECT  -> "OBJECT"
+  | OF  -> "OF"
+  | ONCE  -> "ONCE"
+  | OPEN  -> "OPEN"
+  | OPTLABEL _ -> "OPTLABEL"
+  | OR  -> "OR"
+  | OVERWRITE  -> "OVERWRITE"
+  | PERCENT  -> "PERCENT"
+  | PLUS  -> "PLUS"
+  | PLUSDOT  -> "PLUSDOT"
+  | PLUSEQ  -> "PLUSEQ"
+  | PREFIXOP _ -> "PREFIXOP"
+  | PRIVATE  -> "PRIVATE"
+  | QUESTION  -> "QUESTION"
+  | QUOTE  -> "QUOTE"
+  | RBRACE  -> "RBRACE"
+  | RBRACKET  -> "RBRACKET"
+  | REC  -> "REC"
+  | RPAREN  -> "RPAREN"
+  | SEMI  -> "SEMI"
+  | SEMISEMI  -> "SEMISEMI"
+  | HASH  -> "HASH"
+  | HASH_SUFFIX  -> "HASH_SUFFIX"
+  | HASHOP _ -> "HASHOP"
+  | SIG  -> "SIG"
+  | STACK  -> "STACK"
+  | STAR  -> "STAR"
+  | STRING _ -> "STRING"
+  | QUOTED_STRING_EXPR _ -> "QUOTED_STRING_EXPR"
+  | QUOTED_STRING_ITEM _ -> "QUOTED_STRING_ITEM"
+  | STRUCT  -> "STRUCT"
+  | THEN  -> "THEN"
+  | TILDE  -> "TILDE"
+  | TO  -> "TO"
+  | TRUE  -> "TRUE"
+  | TRY  -> "TRY"
+  | TYPE  -> "TYPE"
+  | UIDENT _ -> "UIDENT"
+  | UNDERSCORE  -> "UNDERSCORE"
+  | UNIQUE  -> "UNIQUE"
+  | VAL  -> "VAL"
+  | VIRTUAL  -> "VIRTUAL"
+  | WHEN  -> "WHEN"
+  | WHILE  -> "WHILE"
+  | WITH  -> "WITH"
+  | COMMENT _ -> "COMMENT"
+  | DOCSTRING _ -> "DOCSTRING"
+  | EOL  -> "EOL"
+
+  let equals t1 t2 = match t1, t2 with
+  | Parser_tokens.AMPERAMPER , Parser_tokens.AMPERAMPER -> true
+  | AMPERSAND , AMPERSAND -> true
+  | AND , AND -> true
+  | AS , AS -> true
+  | ASSERT , ASSERT -> true
+  | BACKQUOTE , BACKQUOTE -> true
+  | BANG , BANG -> true
+  | BAR , BAR -> true
+  | BARBAR , BARBAR -> true
+  | BARRBRACKET , BARRBRACKET -> true
+  | BEGIN , BEGIN -> true
+  | CHAR _, CHAR _-> true
+  | CLASS , CLASS -> true
+  | COLON , COLON -> true
+  | COLONCOLON , COLONCOLON -> true
+  | COLONEQUAL , COLONEQUAL -> true
+  | COLONGREATER , COLONGREATER -> true
+  | COLONRBRACKET , COLONRBRACKET -> true
+  | COMMA , COMMA -> true
+  | CONSTRAINT , CONSTRAINT -> true
+  | DO , DO -> true
+  | DONE , DONE -> true
+  | DOT , DOT -> true
+  | DOTDOT , DOTDOT -> true
+  | DOTHASH , DOTHASH -> true
+  | DOWNTO , DOWNTO -> true
+  | ELSE , ELSE -> true
+  | END , END -> true
+  | EOF , EOF -> true
+  | EQUAL , EQUAL -> true
+  | EXCEPTION , EXCEPTION -> true
+  | EXCLAVE , EXCLAVE -> true
+  | EXTERNAL , EXTERNAL -> true
+  | FALSE , FALSE -> true
+  | FLOAT _, FLOAT _-> true
+  | HASH_FLOAT _, HASH_FLOAT _-> true
+  | FOR , FOR -> true
+  | FUN , FUN -> true
+  | FUNCTION , FUNCTION -> true
+  | FUNCTOR , FUNCTOR -> true
+  | GLOBAL , GLOBAL -> true
+  | GREATER , GREATER -> true
+  | GREATERRBRACE , GREATERRBRACE -> true
+  | GREATERRBRACKET , GREATERRBRACKET -> true
+  | HASHLPAREN , HASHLPAREN -> true
+  | HASHLBRACE , HASHLBRACE -> true
+  | IF , IF -> true
+  | IN , IN -> true
+  | INCLUDE , INCLUDE -> true
+  | INFIXOP0 _, INFIXOP0 _-> true
+  | AT , AT -> true
+  | ATAT , ATAT -> true
+  | INFIXOP1 _, INFIXOP1 _-> true
+  | INFIXOP2 _, INFIXOP2 _-> true
+  | INFIXOP3 _, INFIXOP3 _-> true
+  | INFIXOP4 _, INFIXOP4 _-> true
+  | DOTOP _, DOTOP _-> true
+  | LETOP _, LETOP _-> true
+  | ANDOP _, ANDOP _-> true
+  | INHERIT , INHERIT -> true
+  | INITIALIZER , INITIALIZER -> true
+  | INT _, INT _-> true
+  | HASH_INT _, HASH_INT _-> true
+  | KIND_ABBREV , KIND_ABBREV -> true
+  | KIND_OF , KIND_OF -> true
+  | LABEL _, LABEL _-> true
+  | LAZY , LAZY -> true
+  | LBRACE , LBRACE -> true
+  | LBRACELESS , LBRACELESS -> true
+  | LBRACKET , LBRACKET -> true
+  | LBRACKETBAR , LBRACKETBAR -> true
+  | LBRACKETCOLON , LBRACKETCOLON -> true
+  | LBRACKETLESS , LBRACKETLESS -> true
+  | LBRACKETGREATER , LBRACKETGREATER -> true
+  | LBRACKETPERCENT , LBRACKETPERCENT -> true
+  | LBRACKETPERCENTPERCENT , LBRACKETPERCENTPERCENT -> true
+  | LESS , LESS -> true
+  | LESSMINUS , LESSMINUS -> true
+  | LET , LET -> true
+  | LIDENT _, LIDENT _-> true
+  | LOCAL , LOCAL -> true
+  | LPAREN , LPAREN -> true
+  | LBRACKETAT , LBRACKETAT -> true
+  | LBRACKETATAT , LBRACKETATAT -> true
+  | LBRACKETATATAT , LBRACKETATATAT -> true
+  | MATCH , MATCH -> true
+  | METHOD , METHOD -> true
+  | MINUS , MINUS -> true
+  | MINUSDOT , MINUSDOT -> true
+  | MINUSGREATER , MINUSGREATER -> true
+  | MOD , MOD -> true
+  | MODULE , MODULE -> true
+  | MUTABLE , MUTABLE -> true
+  | NEW , NEW -> true
+  | NONREC , NONREC -> true
+  | OBJECT , OBJECT -> true
+  | OF , OF -> true
+  | ONCE , ONCE -> true
+  | OPEN , OPEN -> true
+  | OPTLABEL _, OPTLABEL _-> true
+  | OR , OR -> true
+  | OVERWRITE , OVERWRITE -> true
+  | PERCENT , PERCENT -> true
+  | PLUS , PLUS -> true
+  | PLUSDOT , PLUSDOT -> true
+  | PLUSEQ , PLUSEQ -> true
+  | PREFIXOP _, PREFIXOP _-> true
+  | PRIVATE , PRIVATE -> true
+  | QUESTION , QUESTION -> true
+  | QUOTE , QUOTE -> true
+  | RBRACE , RBRACE -> true
+  | RBRACKET , RBRACKET -> true
+  | REC , REC -> true
+  | RPAREN , RPAREN -> true
+  | SEMI , SEMI -> true
+  | SEMISEMI , SEMISEMI -> true
+  | HASH , HASH -> true
+  | HASH_SUFFIX , HASH_SUFFIX -> true
+  | HASHOP _, HASHOP _-> true
+  | SIG , SIG -> true
+  | STACK , STACK -> true
+  | STAR , STAR -> true
+  | STRING _, STRING _-> true
+  | QUOTED_STRING_EXPR _, QUOTED_STRING_EXPR _-> true
+  | QUOTED_STRING_ITEM _, QUOTED_STRING_ITEM _-> true
+  | STRUCT , STRUCT -> true
+  | THEN , THEN -> true
+  | TILDE , TILDE -> true
+  | TO , TO -> true
+  | TRUE , TRUE -> true
+  | TRY , TRY -> true
+  | TYPE , TYPE -> true
+  | UIDENT _, UIDENT _-> true
+  | UNDERSCORE , UNDERSCORE -> true
+  | UNIQUE , UNIQUE -> true
+  | VAL , VAL -> true
+  | VIRTUAL , VIRTUAL -> true
+  | WHEN , WHEN -> true
+  | WHILE , WHILE -> true
+  | WITH , WITH -> true
+  | COMMENT _, COMMENT _-> true
+  | DOCSTRING _, DOCSTRING _-> true
+  | EOL , EOL -> true
+  | _ -> false
+end

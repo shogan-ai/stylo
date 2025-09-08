@@ -9,5 +9,6 @@ let lex_and_save lexbuf =
   next_tok
 
 let structure lb =
+  Lexer.init ();
   Tokens.Indexed_list.reset_global ();
   Parser.implementation lex_and_save lb
