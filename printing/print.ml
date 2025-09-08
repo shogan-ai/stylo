@@ -607,10 +607,10 @@ end = struct
     | Pexp_letop lo -> Letop.pp lo
     | Pexp_extension ext -> Extension.pp ext
     | Pexp_unreachable  -> S.dot
-    | Pexp_stack e -> S.stack_ ^/^ pp e
+    | Pexp_stack e -> S.stack__ ^/^ pp e
     | Pexp_comprehension ce -> Comprehension.pp_expr ce
     | Pexp_overwrite (e1, e2) ->
-      S.overwrite_ ^/^ pp e1 ^/^ S.with_ ^/^ pp e2
+      S.overwrite__ ^/^ pp e1 ^/^ S.with_ ^/^ pp e2
     | Pexp_hole -> S.underscore
     | Pexp_index_op access ->
       let left, right =
@@ -640,7 +640,7 @@ end = struct
         separate_map (S.semi ^^ break 1) pp elts
       )
     | Pexp_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
-    | Pexp_exclave exp -> S.exclave_ ^/^ pp exp
+    | Pexp_exclave exp -> S.exclave__ ^/^ pp exp
 
   and pp_apply e args = prefix (pp e) (Application.pp_args args)
 
@@ -1383,7 +1383,7 @@ end = struct
     | Psig_extension (ext, attrs) ->
       Attribute.attach ~attrs (Extension.pp ~floating:true ext)
     | Psig_kind_abbrev (name, k) ->
-      S.kind_abbrev_ ^/^ string name.txt ^/^ S.equals ^/^
+      S.kind_abbrev__ ^/^ string name.txt ^/^ S.equals ^/^
         Jkind_annotation.pp k
 
   let pp_item it = pp_item_desc it.psig_desc
@@ -1576,7 +1576,7 @@ end = struct
     | Pstr_extension (ext, attrs) ->
       Attribute.attach ~attrs (Extension.pp ~floating:true ext)
     | Pstr_kind_abbrev (name, k) ->
-      S.kind_abbrev_ ^/^ string name.txt ^/^ S.equals ^/^
+      S.kind_abbrev__ ^/^ string name.txt ^/^ S.equals ^/^
       Jkind_annotation.pp k
 
   let pp_item it = group (pp_item_desc it.pstr_desc)
@@ -1705,7 +1705,7 @@ end = struct
     | With (jk, ct, modalities) ->
       Jkind_annotation.pp jk ^/^ S.with_ ^/^ Core_type.pp ct
       |> with_modalities ~modalities
-    | Kind_of ct -> S.kind_of_ ^/^ Core_type.pp ct
+    | Kind_of ct -> S.kind_of__ ^/^ Core_type.pp ct
     | Product jks ->
       separate_map (break 1 ^^ S.ampersand ^^ break 1) Jkind_annotation.pp jks
 
