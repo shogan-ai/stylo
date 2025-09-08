@@ -48,10 +48,19 @@ let rec walk_both seq doc =
         first.pos.pos_lnum
         (first.pos.pos_cnum - first.pos.pos_bol);
       rest, doc
+
+    (*** Stricter sync check part 2 ***)
+    | T.Token LET, Doc.Token _ ->
+      Format.eprintf
+        "ERROR: desynchronized at position %d:%d@."
+        first.pos.pos_lnum (first.pos.pos_cnum - first.pos.pos_bol);
+      exit 1
+
     (* Synchronized, advance *)
     | T.Token _, Doc.Token p
     | T.Comment _, Doc.Comment p ->
-      dprintf "assume synced at %d:%d with << %a >>@."
+      dprintf "assume %a synced at %d:%d with << %a >>@."
+        Tokens.pp_elt first
         first.pos.pos_lnum
         (first.pos.pos_cnum - first.pos.pos_bol)
         PPrint.ToFormatter.compact p;
@@ -95,7 +104,7 @@ let rec walk_both seq doc =
         first.pos.pos_lnum (first.pos.pos_cnum - first.pos.pos_bol);
       exit 1
 
-    (*** Stricter sync check part 2 ***)
+    (*** Stricter sync check part 3 ***)
     | _, Doc.Token_let ->
       Format.eprintf
         "ERROR: desynchronized at position %d:%d@."
