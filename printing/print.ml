@@ -735,7 +735,7 @@ and Binding_op : sig
   val pp : binding_op -> document
 end = struct
   let pp { pbop_op; pbop_binding; _ }=
-    Value_binding.pp_one ~start:(string pbop_op.txt) pbop_binding
+    Value_binding.pp_list ~start:(string pbop_op.txt) [pbop_binding]
 end
 
 and Argument : sig
@@ -1556,10 +1556,8 @@ end = struct
     | Pstr_type (rf, tds) -> Type_declaration.pp_list rf tds
     | Pstr_typext te -> S.type_ ^/^ Type_extension.pp te
     | Pstr_exception exn -> Type_exception.pp exn
-    | Pstr_module mb -> S.module_ ^/^ Module_binding.pp mb
-    | Pstr_recmodule mbs ->
-      S.module_ ^/^ S.rec_ ^/^
-      separate_map (break 1 ^^ S.and_ ^^ break 1) Module_binding.pp mbs
+    | Pstr_module mb -> Module_binding.pp ~kw:S.module_ mb
+    | Pstr_recmodule mbs -> Module_binding.pp_recmods mbs
     | Pstr_modtype mty ->
       S.module_ ^/^ S.type_ ^/^ Module_type_declaration.pp mty
     | Pstr_open od -> S.open_ ^/^ Open_declaration.pp od
@@ -1621,78 +1619,107 @@ end = struct
   let pp x = group (pp x)
 end
 
+and Generic_binding : sig
+  val pp : ?post:bool -> ?pre_text:attributes -> ?pre_doc:attribute ->
+    keyword:document -> ?params:document list -> ?constraint_:document ->
+    ?rhs:document -> ?attrs:attributes -> ?post_doc:attribute -> document ->
+    document
+end = struct
+  let pp ?post ?(pre_text=[]) ?pre_doc ~keyword ?(params=[])
+        ?(constraint_=empty) ?rhs ?(attrs=[]) ?post_doc bound =
+    begin match pre_text with
+    | [] -> empty
+    | attrs ->
+      hardline ^^ hardline ^^
+      separate_map (break 1) Attribute.pp attrs ^^
+      hardline ^^ hardline
+    end ^^
+    optional Attribute.pp pre_doc ^?^
+    Attribute.attach ?post ~attrs
+      (match rhs with
+       | None -> (* Punning *)
+         prefix keyword (
+           group (prefix_nonempty bound (flow (break 1) params) ^?^ constraint_)
+         )
+       | Some d ->
+         prefix (
+           group @@ nest 2 (
+             flow (break 1) (keyword :: bound :: params) ^?^
+             group (constraint_ ^?^ S.equals)
+           )
+         ) d) ^?^
+    optional Attribute.pp post_doc
+end
+
 and Value_binding : sig
   val pp_core : value_binding -> document
 
-  val pp_one : start:document -> value_binding -> document
   val pp_list : start:document -> value_binding list -> document
 end = struct
   let pp_core start { pvb_modes; pvb_pat; pvb_params; pvb_constraint;
-                pvb_ret_modes; pvb_expr; pvb_attributes; _ } =
+                      pvb_ret_modes; pvb_expr; pvb_attributes; pvb_pre_text;
+                      pvb_pre_doc; pvb_post_doc; pvb_loc = _; pvb_tokens = _ } =
     let kw_and_modes = group (start ^?^ modes pvb_modes) in
     let pat = Pattern.pp pvb_pat in
-    let params = flow_map (break 1) Function_param.pp pvb_params in
+    let params = List.map Function_param.pp pvb_params in
     let constraint_ =
       optional (fun vc ->
         Value_constraint.pp vc
         |> with_modes ~modes:pvb_ret_modes
       ) pvb_constraint
     in
-    begin match pvb_expr with
-    | None -> (* Punning *)
-      prefix kw_and_modes (
-        group (prefix_nonempty pat params ^?^ constraint_)
-      )
-    | Some e ->
-      prefix (
-        prefix kw_and_modes (
-          group (prefix_nonempty pat params ^?^
-                 group (constraint_ ^?^ S.equals))
-        )
-      ) (Expression.pp e)
-    end
-    |> Attribute.attach ~attrs:pvb_attributes (* FIXME: post? *)
-
-  let pp_one ~start vb =
-    Attribute.pp_list vb.pvb_pre_docs ^?^
-    pp_core start vb ^?^
-    Attribute.pp_list vb.pvb_post_doc
-
-  let pp_core = pp_core empty
+    Generic_binding.pp ~pre_text:pvb_pre_text ?pre_doc:pvb_pre_doc
+      ~keyword:kw_and_modes
+      pat ~params ~constraint_
+      ?rhs:(Option.map Expression.pp pvb_expr)
+      ~attrs:pvb_attributes
+      ?post_doc:pvb_post_doc
 
   let rec pp_list ~start = function
     | [] -> empty
-    | [ x ] -> pp_one ~start x
-    | x :: xs -> pp_one ~start x ^/^ pp_list ~start:S.and_ xs
+    | x :: xs -> pp_core start x ^?^ pp_list ~start:S.and_ xs
+
+  let pp_core = pp_core empty
+
 end
 
 and Module_binding : sig
-  val pp : module_binding -> document
+  val pp : kw:document -> module_binding -> document
+
+  val pp_recmods : module_binding list -> document
 end = struct
-  let pp { pmb_name = (name, name_modes); pmb_params; pmb_constraint; pmb_modes;
-           pmb_expr; pmb_attributes; _ } =
-    let name =
-      match name.txt with
-      | None -> S.underscore
-      | Some s -> string s
+  let pp ~kw { pmb_name = (name, name_modes); pmb_params; pmb_constraint;
+               pmb_modes; pmb_expr; pmb_attributes; pmb_pre_text; pmb_pre_doc;
+               pmb_post_doc; pmb_loc = _; pmb_tokens = _ } =
+    let bound =
+      let name =
+        match name.txt with
+        | None -> S.underscore
+        | Some s -> string s
+      in
+      match name_modes with
+      | [] -> name
+      | modes -> parens (with_modes name ~modes)
     in
-    begin match name_modes with
-    | [] -> name
-    | modes -> S.lparen ^^ with_modes name ~modes ^^ S.rparen
-    end ^^
-    begin match pmb_params with
-      | [] -> empty
-      | params ->
-        break 1 ^^ separate_map (break 1) Functor_parameter.pp params
-    end ^^
-    begin match pmb_constraint, pmb_modes with
-    | None, [] -> empty
-    | Some mty, modes ->
-      break 1 ^^ S.colon ^/^ Module_type.pp mty
-      |> with_atat_modes ~modes
-    | None, at_modes -> break 1 ^^ S.at ^/^ modes at_modes
-    end ^/^ S.equals ^/^ Module_expr.pp pmb_expr
-    |> Attribute.attach ~attrs:pmb_attributes
+    let params = List.map Functor_parameter.pp pmb_params in
+    let constraint_ =
+      match pmb_constraint, pmb_modes with
+      | None, [] -> empty
+      | Some mty, modes ->
+        S.colon ^/^ Module_type.pp mty
+        |> with_atat_modes ~modes
+      | None, at_modes -> S.at ^/^ modes at_modes
+    in
+    Generic_binding.pp ~pre_text:pmb_pre_text ?pre_doc:pmb_pre_doc
+      ~keyword:kw bound ~params ~constraint_
+      ~rhs:(Module_expr.pp pmb_expr) ~attrs:pmb_attributes
+      ?post_doc:pmb_post_doc
+
+  let rec pp_recmods kw = function
+    | [] -> empty
+    | mb :: mbs -> pp ~kw mb ^?^ pp_recmods S.and_ mbs
+
+  let pp_recmods = pp_recmods (group (S.module_ ^/^ S.rec_))
 end
 
 and Jkind_annotation : sig

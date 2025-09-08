@@ -1388,7 +1388,8 @@ and value_constraint =
 
 and value_binding =
   {
-    pvb_pre_docs: attributes;
+    pvb_pre_text: attributes;
+    pvb_pre_doc: attribute option;
     pvb_pat: pattern;
     pvb_params: function_param list;
     pvb_expr: expression option;
@@ -1396,19 +1397,22 @@ and value_binding =
     pvb_modes: modes;
     pvb_ret_modes: modes;
     pvb_attributes: attributes;
-    pvb_post_doc: attributes;
+    pvb_post_doc: attribute option;
     pvb_loc: location;
     pvb_tokens: tokens;
   } (** [let modes pat params : type_constraint @@ ret_modes = exp] *)
 
 and module_binding =
     {
+     pmb_pre_text: attributes;
+     pmb_pre_doc: attribute option;
      pmb_name: string option loc * modes;
      pmb_params: functor_parameter list;
      pmb_constraint: module_type option;
      pmb_modes: modes;
      pmb_expr: module_expr;
      pmb_attributes: attributes;
+     pmb_post_doc: attribute option;
      pmb_loc: location;
      pmb_tokens : tokens;
     }

@@ -1962,13 +1962,14 @@ value:
       { (label, mutable_, Cfk_virtual ty), attrs }
   | override_flag attributes mutable_flag mkrhs(label) EQUAL seq_expr
       { let vb =
-          { pvb_pre_docs = [];
+          { pvb_pre_text = [];
+            pvb_pre_doc = None;
             pvb_pat = mkpat ~loc:$loc($4) (Ppat_var $4);
             pvb_modes = []; pvb_params = [];
             pvb_constraint = None; pvb_ret_modes = [];
             pvb_expr = Some $6; pvb_loc = make_loc $sloc;
             pvb_attributes = [] (* FIXME? *);
-            pvb_post_doc = [];
+            pvb_post_doc = None;
             pvb_tokens = Tokens.at $sloc; }
         in
         ($4, $3, Cfk_concrete ($1, vb)), $2 }
@@ -1982,13 +1983,14 @@ value:
           | Pcoerce (ground, coercion) -> Pvc_coercion { ground; coercion}
         in
         let vb =
-          { pvb_pre_docs = [];
+          { pvb_pre_text = [];
+            pvb_pre_doc = None;
             pvb_pat = mkpat ~loc:$loc($4) (Ppat_var $4);
             pvb_modes = []; pvb_params = [];
             pvb_constraint = Some t; pvb_ret_modes = [];
             pvb_expr = Some $7; pvb_loc = make_loc $sloc;
             pvb_attributes = [] (* FIXME? *);
-            pvb_post_doc = [];
+            pvb_post_doc = None;
             pvb_tokens = Tokens.at $sloc; }
         in
         ($4, $3, Cfk_concrete ($1, vb)), $2
@@ -2003,14 +2005,15 @@ method_:
   | override_flag attributes private_flag mkrhs(label) strict_binding
       { let params, tc, ret_modes, e = $5 in
         let vb =
-          { pvb_pre_docs = [];
+          { pvb_pre_text = [];
+            pvb_pre_doc = None;
             pvb_pat = mkpat ~loc:$loc($4) (Ppat_var $4);
             pvb_modes = []; pvb_params = params;
             pvb_constraint = tc; pvb_ret_modes = ret_modes;
             pvb_expr = Some e;
             pvb_loc = make_loc $sloc;
             pvb_attributes = [] (* FIXME: ? *);
-            pvb_post_doc = [];
+            pvb_post_doc = None;
             pvb_tokens = Tokens.at $sloc; }
         in
         ($4, $3,
@@ -2021,14 +2024,15 @@ method_:
           Pvc_constraint { locally_abstract_univars = []; typ = $6 }
         in
         let vb =
-          { pvb_pre_docs = [];
+          { pvb_pre_text = [];
+            pvb_pre_doc = None;
             pvb_pat = mkpat ~loc:$loc($4) (Ppat_var $4);
             pvb_modes = []; pvb_params = [];
             pvb_constraint = Some constr; pvb_ret_modes = [];
             pvb_expr = Some $8;
             pvb_loc = make_loc $sloc;
             pvb_attributes = [] (* FIXME: ? *);
-            pvb_post_doc = [];
+            pvb_post_doc = None;
             pvb_tokens = Tokens.at $sloc; }
         in
         ($4, $3, Cfk_concrete ($1, vb)), $2 }
@@ -2038,14 +2042,15 @@ method_:
           Pvc_constraint { locally_abstract_univars = $7; typ = $9 }
         in
         let vb =
-          { pvb_pre_docs = [];
+          { pvb_pre_text = [];
+            pvb_pre_doc = None;
             pvb_pat = mkpat ~loc:$loc($4) (Ppat_var $4);
             pvb_modes = []; pvb_params = [];
             pvb_constraint = Some constr; pvb_ret_modes = [];
             pvb_expr = Some $11;
             pvb_loc = make_loc $sloc;
             pvb_attributes = [] (* FIXME: ? *);
-            pvb_post_doc = [];
+            pvb_post_doc = None;
             pvb_tokens = Tokens.at $sloc; }
         in
         ($4, $3, Cfk_concrete ($1, vb)), $2 }

@@ -29,6 +29,10 @@ type attrs = attribute list
 
 let default_loc = ref Location.none
 
+let simplify_ds : Docstring.t option -> _ = function
+  | None | Some { ds_body=""; _ } -> None
+  | Some ds -> Some ds
+
 let with_default_loc l f =
   let orig = !default_loc in
   default_loc := l;
@@ -500,14 +504,34 @@ end
 module Mb = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ~tokens
         ?(docs = empty_docs) ?(text = []) name params mty_opt modes expr =
+    let pre_doc = simplify_ds docs.docs_pre in
+    let post_doc = simplify_ds docs.docs_post in
+    (* Naive, will do better later *)
+    let tokens =
+      List.filter_map (function
+        | {Docstring.ds_body=""} -> None
+        | {ds_loc} -> Some { Tokens.desc = Child_node; pos = ds_loc.loc_start }
+      ) text @
+      begin match pre_doc with
+      | None -> []
+      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
+      end @
+      tokens @
+      begin match post_doc with
+      | None -> []
+      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
+      end
+    in
     {
+     pmb_pre_text = add_text_attrs text [];
+     pmb_pre_doc = Option.map Docstrings.docs_attr pre_doc;
      pmb_name = name;
      pmb_params = params;
      pmb_constraint = mty_opt;
      pmb_modes = modes;
      pmb_expr = expr;
-     pmb_attributes =
-       add_text_attrs text (add_docs_attrs docs attrs);
+     pmb_attributes = attrs;
+     pmb_post_doc = Option.map Docstrings.docs_attr post_doc;
      pmb_loc = loc;
      pmb_tokens = tokens;
     }
@@ -540,10 +564,6 @@ module Vb = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ~tokens ?(docs = empty_docs)
       ?(text = []) ?(params = []) ?(modes = []) ?value_constraint
       ?(ret_modes = []) pat expr =
-    let simplify_ds : Docstring.t option -> _ = function
-      | None | Some { ds_body=""; _ } -> None
-      | Some ds -> Some ds
-    in
     let pre_doc = simplify_ds docs.docs_pre in
     let post_doc = simplify_ds docs.docs_post in
     (* Naive, will do better later *)
@@ -563,12 +583,8 @@ module Vb = struct
       end
     in
     {
-     pvb_pre_docs =
-       add_text_attrs text (
-         match pre_doc with
-         | Some ds -> [Docstrings.docs_attr ds]
-         | None -> []
-       );
+     pvb_pre_text = add_text_attrs text [];
+     pvb_pre_doc = Option.map Docstrings.docs_attr pre_doc;
      pvb_pat = pat;
      pvb_params = params;
      pvb_expr = expr;
@@ -576,8 +592,7 @@ module Vb = struct
      pvb_modes = modes;
      pvb_ret_modes = ret_modes;
      pvb_attributes = attrs;
-     pvb_post_doc =
-       (match post_doc with Some ds -> [Docstrings.docs_attr ds] | None -> []);
+     pvb_post_doc = Option.map Docstrings.docs_attr post_doc;
      pvb_loc = loc;
      pvb_tokens = tokens;
     }

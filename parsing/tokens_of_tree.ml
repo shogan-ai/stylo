@@ -95,16 +95,6 @@ class to_tokens = object
     let node_toks = a.parg_tokens in
     combine_children ~loc:Location.none node_toks sub_tokens
 
-  method! visit_value_binding env vb =
-    let sub_tokens = super#visit_value_binding env vb in
-    let node_toks = vb.pvb_tokens in
-    combine_children ~loc:vb.pvb_loc node_toks sub_tokens
-
-  method! visit_module_binding env mb =
-    let sub_tokens = super#visit_module_binding env mb in
-    let node_toks = mb.pmb_tokens in
-    combine_children ~loc:mb.pmb_loc node_toks sub_tokens
-
   method! visit_function_body env fb =
     let sub_tokens = super#visit_function_body env fb in
     let node_toks = fb.pfunbody_tokens in
@@ -114,5 +104,15 @@ class to_tokens = object
     let sub_tokens = super#visit_constructor_declaration env cd in
     let node_toks = cd.pcd_tokens in
     combine_children ~loc:Location.none node_toks sub_tokens
+
+  method! visit_value_binding env vb =
+    let sub_tokens = super#visit_value_binding env vb in
+    let node_toks = vb.pvb_tokens in
+    combine_children ~loc:vb.pvb_loc node_toks sub_tokens
+
+  method! visit_module_binding env mb =
+    let sub_tokens = super#visit_module_binding env mb in
+    let node_toks = mb.pmb_tokens in
+    combine_children ~loc:mb.pmb_loc node_toks sub_tokens
 end
 
