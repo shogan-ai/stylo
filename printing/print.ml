@@ -509,16 +509,9 @@ end = struct
         | None -> empty
         | Some e -> break 1 ^^ pp e
       end
-    | Pexp_record (fields, eo)
-    | Pexp_record_unboxed_product (fields, eo) (* FIXME *)->
-      let eo =
-        match eo with
-        | None -> empty
-        | Some e -> pp e ^/^ S.with_ ^^ break 1
-      in
-      S.lbrace ^/^ eo ^^
-      separate_map (S.semi ^^ break 1) (Record_field.pp pp) fields ^/^
-      S.rbrace
+    | Pexp_record (fields, eo) -> pp_record eo fields
+    | Pexp_record_unboxed_product (fields, eo) ->
+      pp_record ~unboxed:true eo fields
     | Pexp_field (e, lid) -> pp e ^^ S.dot ^^ longident lid.txt
     | Pexp_unboxed_field (e, lid) ->
       pp e ^^ S.dot ^^ S.hash ^^ longident lid.txt
@@ -650,15 +643,43 @@ end = struct
     | Pexp_exclave exp -> S.exclave_ ^/^ pp exp
 
   and pp_apply e args = prefix (pp e) (Application.pp_args args)
+
+  and pp_record ?(unboxed = false) expr_opt fields =
+    let eo =
+      match expr_opt with
+      | None -> empty
+      | Some e -> pp e ^/^ S.with_
+    in
+    prefix ((if unboxed then S.hash_lbrace else S.lbrace) ^?^ eo)
+      (Record_field.pp_list pp fields) ^/^
+    S.rbrace
 end
 
 and Record_field : sig
   val pp : ('a -> document) -> 'a record_field -> document
+
+  val pp_list : ('a -> document) -> 'a record_field list -> document
 end = struct
   let pp pp_value rf =
-    longident rf.field_name.txt ^^
-    optional (fun v -> break 1 ^^ Type_constraint.pp v) rf.typ ^^
-    optional (fun v -> break 1 ^^ S.equals ^/^ pp_value v) rf.value
+    let pre =
+      group (
+        longident rf.field_name.txt ^?^
+        optional (fun v -> group @@ Type_constraint.pp v) rf.typ
+      )
+    in
+    match rf.value with
+    | None -> pre
+    | Some v ->
+      prefix (group (pre ^/^ S.equals)) (pp_value v)
+
+  let pp_list pp_value =
+    (* [separate_map] inlined so we can group the ; *)
+    foldli (fun i accu x ->
+      if i = 0 then
+        pp pp_value x
+      else
+        group (accu ^^ S.semi) ^/^ pp pp_value x
+    ) empty
 end
 
 and Application : sig
