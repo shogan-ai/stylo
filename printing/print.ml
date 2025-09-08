@@ -290,17 +290,17 @@ end = struct
       ) ^^ S.colon ^^ Jkind_annotation.pp jkind ^^ break 0 ^^ S.rparen
     | Ptyp_variant (fields, Closed, None) ->
       (* FIXME: leading | *)
-      S.lbracket ^/^ separate_map (S.semi ^^ break 1) row_field fields ^/^ S.rbracket
+      S.lbracket ^/^ separate_map (S.pipe ^^ break 1) row_field fields ^/^ S.rbracket
     | Ptyp_variant (fields, Open, None) ->
       (* FIXME: leading | *)
       let trailing_break = if fields = [] then 0 else 1 in
-      S.lbracket_gt ^/^ separate_map (S.semi ^^ break 1) row_field fields ^^
+      S.lbracket_gt ^/^ separate_map (S.pipe ^^ break 1) row_field fields ^^
       break trailing_break ^^ S.rbracket
     | Ptyp_variant (fields, Closed, Some []) ->
       (* FIXME: leading | *)
-      S.lbracket_lt ^/^ separate_map (S.semi ^^ break 1) row_field fields ^/^ S.rbracket
+      S.lbracket_lt ^/^ separate_map (S.pipe ^^ break 1) row_field fields ^/^ S.rbracket
     | Ptyp_variant (fields, Closed, Some labels) ->
-      S.lbracket_lt ^/^ separate_map (S.semi ^^ break 1) row_field fields ^/^
+      S.lbracket_lt ^/^ separate_map (S.pipe ^^ break 1) row_field fields ^/^
       S.gt ^/^ separate_map (break 1) string labels ^/^
       S.rbracket
     | Ptyp_variant (_, Open, Some _) -> assert false
