@@ -173,7 +173,10 @@ let syntax_error () =
   failwith "TODO"
 
 let unclosed _opening_name _opening_loc _closing_name _closing_loc =
-  failwith "TODO"
+  let pos : Lexing.position = fst _opening_loc in
+  Format.eprintf "Unclosed %S at pos %d:%d@."
+    _opening_name pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
+  exit 1
 
 (* Normal mutable arrays and immutable arrays are parsed identically, just with
    different delimiters.  The parsing is done by the [array_exprs] rule, and the

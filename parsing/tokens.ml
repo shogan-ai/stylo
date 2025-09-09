@@ -11,20 +11,7 @@ type elt = {
   pos: Lexing.position;
 }
 
-let desc_as_string = function
-  | Token _ -> "tok"
-  | Comment _ -> "cmt"
-  | Child_node -> "child"
-
-let pp_elt ppf e = Format.pp_print_string ppf (desc_as_string e.desc)
-
 type seq = elt list
-
-let pp_seq =
-  let open Format in
-  pp_print_list
-    ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
-    pp_elt
 
 module Indexed_list : sig
   type t
@@ -393,3 +380,20 @@ module Raw = struct
   | EOL , EOL -> true
   | _ -> false
 end
+
+let desc_as_string = function
+  | Token t ->
+    if Dbg_print.dbg then
+      Raw.to_string t
+    else
+      "tok"
+  | Comment c -> Printf.sprintf "(* %s *)" c
+  | Child_node -> "child"
+
+let pp_elt ppf e = Format.pp_print_string ppf (desc_as_string e.desc)
+
+let pp_seq =
+  let open Format in
+  pp_print_list
+    ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
+    pp_elt
