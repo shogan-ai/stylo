@@ -76,13 +76,20 @@ let () =
     "stylo.exe [-only-check] FILENAME*"
 
 let () =
+  let has_error = ref false in
   List.iter (fun fn ->
-    let doc = style_file fn in
-    if !check then
-      lex_and_compare fn doc
-    else (
-      PPrint.ToChannel.pretty 1. 80 stdout doc;
-      print_newline ();
-      flush stdout
-    )
-  ) !inputs
+    match style_file fn with
+    | exception exn ->
+      Format.eprintf "%s: %s@." fn (Printexc.to_string exn);
+      has_error := true
+    | doc ->
+      if !check then
+        lex_and_compare fn doc
+      else (
+        PPrint.ToChannel.pretty 1. 80 stdout doc;
+        print_newline ();
+        flush stdout
+      )
+  ) !inputs;
+  if !has_error then
+    exit 1

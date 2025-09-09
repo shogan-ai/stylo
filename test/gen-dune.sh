@@ -3,20 +3,12 @@ function implementation_file {
     name=$(basename -s ".ml" $f)
     cat <<EOF
 (rule
-  (with-stdout-to nocomment-$f
-    (run ../tools/strip_comments.exe %{dep:$f})))
-
-(rule
-  (with-stdout-to normalized-$f
-    (bash "cat %{dep:$f} | tr -s '[:space:]' '\n'")))
-
-(rule
   (with-stdout-to printed-$f
     (run ../bin/stylo.exe %{dep:$f})))
 
 (rule
   (alias $name)
-  (action (diff %{dep:normalized-$f} %{dep:printed-$f})))
+  (action (diff %{dep:$f} %{dep:printed-$f})))
 
 (alias
   (name all-tests)
@@ -34,17 +26,6 @@ function fuzzer_output {
         (( i = j - 1 ))
         f="$BASE-$i"
         FILENAMES[$i]="$f"
-
-        cat <<EOF
-(rule
-  (with-stdout-to printed-$f
-    (run ../bin/stylo.exe %{dep:$f})))
-
-(rule
-  (alias $BASE)
-  (action (diff %{dep:$f} %{dep:printed-$f})))
-
-EOF
     done
 
     cat <<EOF
@@ -65,6 +46,11 @@ done"))
         (bash "chmod +x %{dep:./$BASE.sh}")
         (with-stdin-from %{dep:$1}
           (run %{dep:./$BASE.sh})))))
+
+(rule
+  (alias $BASE)
+  (deps ${FILENAMES[@]})
+  (action (run ../bin/stylo.exe -only-check %{deps})))
 ;; ---
 
 EOF
