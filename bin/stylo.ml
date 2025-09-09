@@ -80,7 +80,12 @@ let () =
   List.iter (fun fn ->
     match style_file fn with
     | exception exn ->
-      Format.eprintf "%s: %s@." fn (Printexc.to_string exn);
+      let bt = Printexc.get_backtrace () in
+      Format.eprintf "%s: %s" fn (Printexc.to_string exn);
+      if Dbg_print.dbg then
+        Format.eprintf "@\n%s@." bt
+      else
+        Format.eprintf "@.";
       has_error := true
     | doc ->
       if !check then
