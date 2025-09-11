@@ -4,6 +4,30 @@ open Dbg_print
 module T = Tokens
 module Doc = Wrapprint
 
+type error =
+  | Output_longer_than_input of Doc.document
+  | Output_shorter_than_input of T.seq
+  | Desynchronized of Lexing.position
+  | Missing_token of Lexing.position
+
+let pp_error ppf = function
+  | Output_longer_than_input doc ->
+    Format.fprintf ppf "Output longer than the input.";
+    dprintf "remaining doc: << %a >>@."
+      PPrint.ToFormatter.compact (Wrapprint.to_document doc)
+  | Output_shorter_than_input tokens ->
+    Format.eprintf "Output shorter than the input.";
+    dprintf "remaining:@ @[<hov 2>%a@]@." T.pp_seq tokens
+  | Desynchronized pos ->
+    Format.fprintf ppf "desynchronized at position %d:%d."
+      pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
+  | Missing_token pos ->
+    Format.fprintf ppf
+      "token at position %d:%d absent from the output."
+      pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
+
+exception Error of error
+
 let rec consume_leading_comments acc = function
   | [] -> acc, []
   | first :: rest ->
@@ -36,10 +60,8 @@ let rec walk_both seq doc =
   match seq with
   | [] ->
     (* Some extra tokens or comments were synthesized *)
-    Format.eprintf "ERROR: Output longer than the input.@.";
-    dprintf "remaining doc: << %a >>@."
-      PPrint.ToFormatter.compact (Wrapprint.to_document doc);
-    exit 1
+    raise (Error (Output_longer_than_input doc))
+
   | first :: rest ->
     match first.T.desc, doc with
     (*** Stricter synchro, for debugging purposes ***)
@@ -51,10 +73,7 @@ let rec walk_both seq doc =
 
     (*** Stricter sync check part 2 ***)
     | T.Token LET, Doc.Token _ ->
-      Format.eprintf
-        "ERROR: desynchronized at position %d:%d@."
-        first.pos.pos_lnum (first.pos.pos_cnum - first.pos.pos_bol);
-      exit 1
+      raise (Error (Desynchronized first.pos))
 
     (* Synchronized, advance *)
     | T.Token _, Doc.Token p
@@ -99,17 +118,11 @@ let rec walk_both seq doc =
 
     (* Token missing from the document: this is a hard error. *)
     | T.Token _, Doc.Comment _ ->
-      Format.eprintf
-        "ERROR: token at position %d:%d absent from the output.@."
-        first.pos.pos_lnum (first.pos.pos_cnum - first.pos.pos_bol);
-      exit 1
+      raise (Error (Missing_token first.pos))
 
     (*** Stricter sync check part 3 ***)
     | _, Doc.Token_let ->
-      Format.eprintf
-        "ERROR: desynchronized at position %d:%d@."
-        first.pos.pos_lnum (first.pos.pos_cnum - first.pos.pos_bol);
-      exit 1
+      raise (Error (Desynchronized first.pos))
 
     (* [Child_node] doesn't appear in linearized token stream *)
     | T.Child_node, _ -> assert false
@@ -117,8 +130,4 @@ let rec walk_both seq doc =
 let from_tokens tokens doc =
   match walk_both tokens doc with
   | [], doc -> doc
-  | l, _shortened_doc ->
-    Format.eprintf "ERROR: Output shorter than the input.@.";
-    dprintf "remaining:@ @[<hov 2>%a@]@." T.pp_seq l;
-    (* we do not exit, because the diff is more useful to catch such errors *)
-    _shortened_doc
+  | tokens, _ -> raise (Error (Output_shorter_than_input tokens))

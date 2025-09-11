@@ -80,6 +80,9 @@ let () =
   let has_error = ref false in
   List.iter (fun fn ->
     match style_file fn with
+    | exception Insert_comments.Error e ->
+      Format.eprintf "%s: ERROR: %a@." fn Insert_comments.pp_error e;
+      has_error := true
     | exception exn ->
       let bt = Printexc.get_backtrace () in
       Format.eprintf "%s: %s" fn (Printexc.to_string exn);
