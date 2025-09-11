@@ -417,27 +417,27 @@ end = struct
           n.value :: seq, after
         )
     in
-    match Tbl.find t.tbl start with
-    | exception Not_found ->
-      (* Nothing registered: we are reducing an empty rule *)
-      assert (start = stop);
-      (* We will return an empty list of tokens, but we must remember to insert
+    if start = stop then (
+      (* empty rule / epsilon reduction
+         We will return an empty list of tokens, but we must remember to insert
          a [Child_node] entry at that position, because the parent node in the
          token tree will expect a child, even if it's empty. *)
       insert_child t start;
       []
-    | Empty -> invalid_arg "Tokens.consume"
-    | Node start_node as cell ->
-      let seq, after = aux cell in
-      start_node.value <- { start_node.value with desc = Child_node };
-      start_node.next <- after;
-      begin match after with
-      | Empty -> ()
-      | Node n -> n.prev <- cell
-      end;
-      Tbl.replace t.tbl start cell; (* has been removed by aux... *)
-      Tbl.replace t.tbl stop cell;
-      seq
+    ) else
+      match Tbl.find t.tbl start with
+      | Empty -> invalid_arg "Tokens.consume"
+      | Node start_node as cell ->
+        let seq, after = aux cell in
+        start_node.value <- { start_node.value with desc = Child_node };
+        start_node.next <- after;
+        begin match after with
+        | Empty -> ()
+        | Node n -> n.prev <- cell
+        end;
+        Tbl.replace t.tbl start cell; (* has been removed by aux... *)
+        Tbl.replace t.tbl stop cell;
+        seq
 
   let consume t start stop =
     let res = consume t start stop in
