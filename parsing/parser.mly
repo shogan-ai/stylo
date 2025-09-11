@@ -170,7 +170,7 @@ let mkstrexp e attrs =
   { pstr_desc = Pstr_eval (e, attrs); pstr_loc = e.pexp_loc }
 
 let syntax_error () =
-  failwith "TODO"
+  failwith "Syntax error"
 
 let unclosed _opening_name _opening_loc _closing_name _closing_loc =
   let pos : Lexing.position = fst _opening_loc in
@@ -238,7 +238,10 @@ module Generic_array = struct
 end
 
 let expecting (_loc : Lexing.position * Lexing.position) _nonterm =
-  failwith "TODO"
+  let pos = fst _loc in
+  Printf.sprintf "%d:%d expected %s"
+    pos.pos_lnum (pos.pos_cnum - pos.pos_bol) _nonterm
+  |> failwith
 
 (* Using the function [not_expecting] in a semantic action means that this
    syntactic form is recognized by the parser but is in fact incorrect. This
@@ -254,7 +257,10 @@ let expecting (_loc : Lexing.position * Lexing.position) _nonterm =
    [not_expecting] should be marked with AVOID. *)
 
 let not_expecting _loc _nonterm =
-  failwith "TODO"
+  let pos = fst _loc in
+  Printf.sprintf "%d:%d did not expect %s"
+    pos.Lexing.pos_lnum (pos.pos_cnum - pos.pos_bol) _nonterm
+  |> failwith
 
 let mkexp_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
   match t with
@@ -544,7 +550,10 @@ let mkfunction ~loc ~attrs params body_constraint body =
    the assertions below should be turned into explicit checks. *)
 let package_type_of_module_type pmty =
   let err _loc _s =
-    failwith "TODO"
+    let pos = _loc.Location.loc_start in
+    Printf.sprintf "%d:%d %s"
+      pos.pos_lnum (pos.pos_cnum - pos.pos_bol) _s
+    |> failwith
   in
   let map_cstr = function
     | Pwith_type (lid, ptyp) ->
@@ -651,7 +660,10 @@ let unboxed_int _sloc _int_loc sign (n, m) =
   match m with
   | Some m -> Pconst_unboxed_integer (with_sign sign n, m)
   | None ->
-      failwith "TODO"
+    let pos = fst _sloc in
+    Printf.sprintf "%d:%d unboxed integer needs a width"
+      pos.Lexing.pos_lnum (pos.pos_cnum - pos.pos_bol)
+    |> failwith
 
 let unboxed_float sign (f, m) = Pconst_unboxed_float (with_sign sign f, m)
 
