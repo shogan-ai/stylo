@@ -174,8 +174,8 @@ let syntax_error () =
 
 let unclosed _opening_name _opening_loc _closing_name _closing_loc =
   let pos : Lexing.position = fst _opening_loc in
-  Format.eprintf "Unclosed %S at pos %d:%d@."
-    _opening_name pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
+  Format.eprintf "%s: Unclosed %S at pos %d:%d@."
+    pos.pos_fname _opening_name pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
   exit 1
 
 (* Normal mutable arrays and immutable arrays are parsed identically, just with
