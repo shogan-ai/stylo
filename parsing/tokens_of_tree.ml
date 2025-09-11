@@ -47,12 +47,14 @@ let pp_children =
 let combine_children ~loc top children =
   try [combine_children top children]
   with Assert_failure _ as exn ->
-    let pos = loc.Location.loc_start in
+    let start_pos = loc.Location.loc_start in
+    let stop_pos = loc.Location.loc_end in
     dprintf
-      "@[<h>loc:@ %d:%d@]@\n\
+      "@[<h>loc:@ %d:%d - %d:%d@]@\n\
        tokens:@[<hov 2>@ %a@]@\n\
        children:@[<v 2>@ {%a}@]@."
-      pos.pos_lnum (pos.pos_cnum - pos.pos_bol)
+      start_pos.pos_lnum (start_pos.pos_cnum - start_pos.pos_bol)
+      stop_pos.pos_lnum (stop_pos.pos_cnum - stop_pos.pos_bol)
       Tokens.pp_seq top
       pp_children children;
     raise exn
