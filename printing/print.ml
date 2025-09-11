@@ -213,7 +213,7 @@ end = struct
 (* FIXME: can't finish by '>', a space must be added *)
   let pp = function
     | PString _ -> assert false (* handled in Extension *)
-    | PStr s -> break 1 ^^ Structure.pp s
+    | PStr s -> break 1 ^^ Structure.pp_implementation s
     | PSig s -> break 0 ^^ S.colon ^/^ Signature.pp s
     | PTyp c -> break 0 ^^ S.colon ^/^ Core_type.pp c
     | PPat (p, eo) ->
