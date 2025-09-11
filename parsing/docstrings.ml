@@ -23,6 +23,8 @@ type docstring = Docstring.t
 
 let docstrings : docstring list ref = ref []
 
+let empty_ext_attr = { Parsetree.pea_ext = None; pea_attrs = [] }
+
 (* Warn for unused and ambiguous docstrings *)
 
 (* Docstring constructors and destructors *)
@@ -69,14 +71,16 @@ let docs_attr ds =
   let body = ds.ds_body in
   let loc = ds.ds_loc in
   let exp =
-    { pexp_desc = Pexp_constant (Pconst_string(body, loc, None));
+    { pexp_ext_attr = empty_ext_attr;
+      pexp_desc = Pexp_constant (Pconst_string(body, loc, None));
       pexp_loc = loc;
       pexp_attributes = [];
       pexp_tokens = [] (* FIXME! *);
     }
   in
   let item =
-    { pstr_desc = Pstr_eval (exp, []); pstr_loc = loc }
+    { pstr_ext_attrs = empty_ext_attr;
+      pstr_desc = Pstr_eval (exp, []); pstr_loc = loc }
   in
   let tok_elt = { Tokens.desc = Comment body; pos = loc.loc_start } in
   remember_token tok_elt;
@@ -125,14 +129,16 @@ let text_attr ds =
   let body = ds.ds_body in
   let loc = ds.ds_loc in
   let exp =
-    { pexp_desc = Pexp_constant (Pconst_string(body, loc, None));
+    { pexp_ext_attr = empty_ext_attr;
+      pexp_desc = Pexp_constant (Pconst_string(body, loc, None));
       pexp_loc = loc;
       pexp_attributes = [];
       pexp_tokens = [] (* FIXME! *);
     }
   in
   let item =
-    { pstr_desc = Pstr_eval (exp, []); pstr_loc = loc }
+    { pstr_ext_attrs = empty_ext_attr;
+      pstr_desc = Pstr_eval (exp, []); pstr_loc = loc }
   in
   let tok_elt = { Tokens.desc = Comment body; pos = loc.loc_start } in
   remember_token tok_elt;

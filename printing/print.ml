@@ -187,6 +187,19 @@ end = struct
     | attrs -> t ^/^ pp_list ?post attrs
 end
 
+and Ext_attribute : sig
+  val decorate : document -> ext_attribute -> document
+end = struct
+  let decorate kw { pea_ext; pea_attrs } =
+    Attribute.attach ~attrs:pea_attrs (
+      match pea_ext with
+      | None -> kw
+      | Some lst_loc ->
+        kw ^^ string "%" ^^
+        separate_map (group (S.dot ^^ break 0)) string lst_loc.txt
+    )
+end
+
 and Extension : sig
   val pp : ?floating:bool -> extension -> document
 end = struct
@@ -195,7 +208,7 @@ end = struct
     (if floating then S.lbracket_percentpercent else S.lbracket_percent)
     ^^ name ^^ Payload.pp payload ^^ S.rbracket
 
-  let pp ?(floating=false) (ext_name, ext_payload) =
+  let pp ?(floating=false) (ext_name, ext_payload, _tokens) =
     match ext_payload with
     | PString (s, delim) ->
       let ext_name = String.concat "." ext_name.txt in
@@ -330,7 +343,7 @@ end = struct
     in
     separate_map (break 1 ^^ S.star ^^ break 1) pp_elt elts
 
-  and package_type (lid, constraints) =
+  and package_type { ppt_ext_attr; ppt_name = lid; ppt_eqs = constraints } =
     let with_ =
       match constraints with
       | [] -> empty
@@ -339,7 +352,12 @@ end = struct
         break 1 ^^ S.with_ ^/^
         separate_map (break 1 ^^ S.and_ ^^ break 1) one constraints
     in
-    S.lparen ^^ S.module_ ^/^ longident lid.txt ^^ with_ ^^ break 0 ^^ S.rparen
+    let module_ =
+      match ppt_ext_attr with
+      | None -> S.module_
+      | Some ea -> Ext_attribute.decorate S.module_ ea
+    in
+    S.lparen ^^ module_ ^/^ longident lid.txt ^^ with_ ^^ break 0 ^^ S.rparen
 
   and row_field rf =
     Attribute.attach ~attrs:rf.prf_attributes (row_field_desc rf.prf_desc)
@@ -471,22 +489,25 @@ end = struct
     |> Attribute.attach ~attrs:e.pexp_attributes
 
   and pp_desc exp =
+    let (!!) kw = Ext_attribute.decorate kw exp.pexp_ext_attr in
     match exp.pexp_desc with
     | Pexp_ident lid -> longident lid.txt
     | Pexp_constant c -> constant c
     | Pexp_let (rf, vbs, body) ->
       group (
         Value_binding.pp_list vbs ~start:(
-          S.let_ ^^
+          !!S.let_ ^^
           match rf with
           | Nonrecursive -> empty
           | Recursive -> break 1 ^^ S.rec_
         ) ^/^ S.in_
       ) ^/^ pp body
-    | Pexp_function ([], _, body) -> Function_body.pp body
+    | Pexp_function ([], _, body) ->
+      (* pexp_ext_attr is empty in this case, we attach on the body. *)
+      Function_body.pp body
     | Pexp_function (params, constr, body) ->
       prefix (
-        prefix S.fun_ (
+        prefix !!S.fun_ (
           group (
             flow_map (break 1) Function_param.pp params ^/^
             group (Function_constraint.pp constr ^?^ S.rarrow)
@@ -499,11 +520,11 @@ end = struct
       pp arg1 ^/^ pp op ^/^ pp arg2
     | Pexp_apply (e, args) -> pp_apply e args
     | Pexp_match (e, cases) ->
-      group (S.match_ ^/^ pp e ^/^ S.with_) ^/^
+      group (!!S.match_ ^/^ pp e ^/^ S.with_) ^/^
       Case.pp_cases cases
         ~has_leading_pipe:(has_leading_pipe ~after:WITH exp.pexp_tokens)
     | Pexp_try (e, cases) ->
-      prefix S.try_ (pp e) ^/^ S.with_ ^/^
+      prefix !!S.try_ (pp e) ^/^ S.with_ ^/^
       Case.pp_cases cases
         ~has_leading_pipe:(has_leading_pipe ~after:WITH exp.pexp_tokens)
     | Pexp_tuple elts ->
@@ -535,19 +556,22 @@ end = struct
       separate_map (S.semi ^^ break 1) pp es ^/^
       cls
     | Pexp_ifthenelse (e1, e2, e3_o) ->
-      let if_cond_then = S.if_ ^^ nest 2 (break 1 ^^ pp e1) ^/^ S.then_ in
+      let if_cond_then = !!S.if_ ^^ nest 2 (break 1 ^^ pp e1) ^/^ S.then_ in
       prefix (group if_cond_then) (pp e2) ^?^
       begin match e3_o with
         | None -> empty
         | Some e3 -> prefix S.else_ (pp e3)
       end
-    | Pexp_sequence (e1, e2) -> pp e1 ^^ S.semi ^/^ pp e2
+    | Pexp_sequence (e1, e2) ->
+      (* FIXME: ext_attr not at the beginning, the token synchronisation is
+         going to have issues. *)
+      pp e1 ^^ !!S.semi ^/^ pp e2
     | Pexp_seq_empty e -> pp e ^^ S.semi
     | Pexp_while (e1, e2) ->
-      S.while_ ^/^ pp e1 ^/^ S.do_ ^/^ pp e2 ^/^
+      !!S.while_ ^/^ pp e1 ^/^ S.do_ ^/^ pp e2 ^/^
       S.done_
     | Pexp_for (p, e1, e2, dir, e3) ->
-      S.for_ ^/^
+      !!S.for_ ^/^
       Pattern.pp p ^/^ S.equals ^/^ pp e1 ^/^ direction dir ^/^
       pp e2 ^/^ S.do_ ^/^ pp e3 ^/^ S.done_
     | Pexp_constraint (e, None, modes) ->
@@ -567,7 +591,7 @@ end = struct
       in
       parens (pp e ^^ ct1 ^/^ S.coerce ^/^ Core_type.pp ct2)
     | Pexp_send (e, lbl) -> pp e ^/^ S.hash ^/^ string lbl.txt
-    | Pexp_new lid -> S.new_ ^/^ longident lid.txt
+    | Pexp_new lid -> !!S.new_ ^/^ longident lid.txt
     | Pexp_setinstvar (lbl, e) -> string lbl.txt ^/^ S.larrow ^/^ pp e
     | Pexp_override fields ->
       let field (lbl, eo) =
@@ -586,27 +610,27 @@ end = struct
         | None -> S.underscore
         | Some s -> string s
       in
-      S.let_ ^/^ S.module_ ^/^ name ^/^ S.equals ^/^
+      S.let_ ^/^ !!S.module_ ^/^ name ^/^ S.equals ^/^
       Module_expr.pp me ^/^ S.in_ ^/^
       pp body
     | Pexp_letexception (ec, body) ->
-      S.let_ ^/^ S.exception_ ^/^
+      S.let_ ^/^ !!S.exception_ ^/^
       Extension_constructor.pp ec ^/^ S.in_ ^/^
       pp body
-    | Pexp_assert e -> S.assert_ ^/^ pp e
-    | Pexp_lazy e -> S.lazy_ ^/^ pp e
+    | Pexp_assert e -> !!S.assert_ ^/^ pp e
+    | Pexp_lazy e -> !!S.lazy_ ^/^ pp e
     | Pexp_poly _ -> assert false (* FIXME: doesn't appear in concrete syntax *)
     | Pexp_object cs ->
-      S.object_ ^/^ Class_expr.pp_structure cs ^/^ S.end_
+      !!S.object_ ^/^ Class_expr.pp_structure cs ^/^ S.end_
     | Pexp_newtype (newty, jkind_o, body) ->
-      S.fun_ ^/^ S.lparen ^^ S.type_ ^/^ string newty.txt ^^
+      !!S.fun_ ^/^ S.lparen ^^ S.type_ ^/^ string newty.txt ^^
       begin match jkind_o with
         | None -> empty
         | Some jkind -> break 1 ^^ S.colon ^/^ Jkind_annotation.pp jkind
       end ^/^ S.rparen ^/^ S.rarrow ^/^
       pp body
     | Pexp_pack (me, ty) ->
-      S.lparen ^^ S.module_ ^/^ Module_expr.pp me ^^
+      S.lparen ^^ !!S.module_ ^/^ Module_expr.pp me ^^
       begin match ty with
       | None -> empty
       | Some ct -> break 1 ^^ Type_constraint.pp (Pconstraint ct)
@@ -615,7 +639,7 @@ end = struct
     | Pexp_dot_open (od, e) ->
       Open_declaration.pp od ^^ S.dot ^^ pp e
     | Pexp_let_open (od, e) ->
-      group (S.let_ ^/^ S.open_ ^/^ Open_declaration.pp od ^/^ S.in_) ^/^ pp e
+      group (S.let_ ^/^ !!S.open_ ^/^ Open_declaration.pp od ^/^ S.in_) ^/^ pp e
     | Pexp_letop lo -> Letop.pp lo
     | Pexp_extension ext -> Extension.pp ext
     | Pexp_unreachable  -> S.dot
@@ -865,11 +889,10 @@ end = struct
   let pp fb =
     match fb.pfb_desc with
     | Pfunction_body e -> Expression.pp e
-    | Pfunction_cases (cases, attrs) ->
-      S.function_ ^/^
+    | Pfunction_cases (cases, ext_attrs) ->
+      Ext_attribute.decorate S.function_ ext_attrs ^/^
       Case.pp_cases cases
         ~has_leading_pipe:(has_leading_pipe ~after:FUNCTION fb.pfb_tokens)
-      |> Attribute.attach ~attrs
 end
 
 and Type_constraint : sig
@@ -1680,9 +1703,12 @@ and Value_binding : sig
 
   val pp_list : start:document -> value_binding list -> document
 end = struct
-  let pp_core start { pvb_modes; pvb_pat; pvb_params; pvb_constraint;
-                      pvb_ret_modes; pvb_expr; pvb_attributes; pvb_pre_text;
-                      pvb_pre_doc; pvb_post_doc; pvb_loc = _; pvb_tokens = _ } =
+  let pp_core start
+        { pvb_modes; pvb_pat; pvb_params; pvb_constraint; pvb_ret_modes;
+          pvb_expr; pvb_attributes; pvb_pre_text; pvb_pre_doc; pvb_post_doc;
+          pvb_loc = _; pvb_tokens = _; pvb_ext_attrs } =
+    (* FIXME: doesn't work for "let rec" *)
+    let start = Ext_attribute.decorate start pvb_ext_attrs in
     let kw_and_modes = group (start ^?^ modes pvb_modes) in
     let pat = Pattern.pp pvb_pat in
     let params = List.map Function_param.pp pvb_params in

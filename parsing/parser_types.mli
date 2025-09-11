@@ -16,7 +16,8 @@ type let_binding_body =
     lbb_expr: expression option }
 
 type let_binding =
-  { lb_body: let_binding_body;
+  { lb_ext_attrs: ext_attribute;
+    lb_body: let_binding_body;
     lb_attributes: attributes;
     lb_docs: docs Lazy.t;
     lb_text: text Lazy.t;
@@ -25,5 +26,4 @@ type let_binding =
 
 type let_bindings =
   { lbs_bindings: let_binding list;
-    lbs_rec: rec_flag;
-    lbs_extension: string list loc option }
+    lbs_rec: rec_flag; }

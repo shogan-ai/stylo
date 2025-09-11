@@ -77,6 +77,11 @@ class to_tokens = object
       let sub_tokens = super#visit_attribute env a in
       combine_children ~loc:a.attr_loc a.attr_tokens sub_tokens
 
+  method! visit_extension env e =
+    let sub_tokens = super#visit_extension env e in
+    let (name,_,node_toks) = e in
+    combine_children ~loc:name.loc node_toks sub_tokens
+
   method! visit_core_type env ct =
     let sub_tokens = super#visit_core_type env ct in
     let node_toks = ct.ptyp_tokens in

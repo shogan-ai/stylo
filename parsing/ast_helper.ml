@@ -38,6 +38,9 @@ let with_default_loc l f =
   default_loc := l;
   Fun.protect ~finally:(fun () -> default_loc := orig) f
 
+let empty_ext_attr =
+  { pea_ext = None; pea_attrs = []; }
+
 module Const = struct
   let integer ?suffix i = Pconst_integer (i, suffix)
   let int ?suffix i = integer ?suffix (Int.to_string i)
@@ -78,7 +81,9 @@ module Typ = struct
   let alias ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Ptyp_alias (a, b, c))
   let variant ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Ptyp_variant (a, b, c))
   let poly ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ptyp_poly (a, b))
-  let package ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ptyp_package (a, b))
+  let package ?loc ?attrs ~tokens a b =
+    let pkg = { ppt_ext_attr = None; ppt_name = a; ppt_eqs = b } in
+    mk ?loc ?attrs ~tokens (Ptyp_package pkg)
   let extension ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ptyp_extension a)
   let open_ ?loc ?attrs ~tokens mod_ident t = mk ?loc ?attrs ~tokens (Ptyp_open (mod_ident, t))
 
@@ -130,12 +135,14 @@ module Typ = struct
               v, jkind) var_lst
             in
             Ptyp_poly(var_lst, loop core_type)
-        | Ptyp_package(longident,lst) ->
-            Ptyp_package(longident,List.map (fun (n,typ) -> (n,loop typ) ) lst)
+        | Ptyp_package pkg ->
+            Ptyp_package
+              { pkg with
+                ppt_eqs = List.map (fun (n,typ) -> (n,loop typ) ) pkg.ppt_eqs }
         | Ptyp_open (mod_ident, core_type) ->
             Ptyp_open (mod_ident, loop core_type)
-        | Ptyp_extension (s, arg) ->
-            Ptyp_extension (s, arg)
+        | Ptyp_extension (s, arg, tokens) ->
+            Ptyp_extension (s, arg, tokens)
         | Ptyp_parens ct -> Ptyp_parens (loop ct)
       in
       {t with ptyp_desc = desc}
@@ -173,7 +180,8 @@ end
 
 module Pat = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
-    {ppat_desc = d;
+    {ppat_ext_attr = empty_ext_attr;
+     ppat_desc = d;
      ppat_loc = loc;
      ppat_attributes = attrs;
      ppat_tokens = tokens}
@@ -204,7 +212,8 @@ end
 
 module Exp = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
-    {pexp_desc = d;
+    {pexp_ext_attr = empty_ext_attr;
+     pexp_desc = d;
      pexp_loc = loc;
      pexp_attributes = attrs;
      pexp_tokens = tokens}
@@ -305,7 +314,8 @@ module Mod = struct
 end
 
 module Sig = struct
-  let mk ?(loc = !default_loc) d = {psig_desc = d; psig_loc = loc}
+  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) d =
+    {psig_ext_attrs = ext_attr; psig_desc = d; psig_loc = loc}
 
   let value ?loc a = mk ?loc (Psig_value a)
   let type_ ?loc rec_flag a = mk ?loc (Psig_type (rec_flag, a))
@@ -337,7 +347,8 @@ module Sg = struct
 end
 
 module Str = struct
-  let mk ?(loc = !default_loc) d = {pstr_desc = d; pstr_loc = loc}
+  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) d =
+    {pstr_ext_attrs = ext_attr; pstr_desc = d; pstr_loc = loc}
 
   let eval ?loc ?(attrs = []) a = mk ?loc (Pstr_eval (a, attrs))
   let value ?loc a b = mk ?loc (Pstr_value (a, b))
@@ -561,7 +572,8 @@ module Incl = struct
 end
 
 module Vb = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens ?(docs = empty_docs)
+  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr)
+        ?(attrs = []) ~tokens ?(docs = empty_docs)
       ?(text = []) ?(params = []) ?(modes = []) ?value_constraint
       ?(ret_modes = []) pat expr =
     let pre_doc = simplify_ds docs.docs_pre in
@@ -585,6 +597,7 @@ module Vb = struct
     {
      pvb_pre_text = add_text_attrs text [];
      pvb_pre_doc = Option.map Docstrings.docs_attr pre_doc;
+     pvb_ext_attrs = ext_attr;
      pvb_pat = pat;
      pvb_params = params;
      pvb_expr = expr;

@@ -130,7 +130,7 @@ type attribute = {
           The compiler ignores unknown attributes.
        *)
 
-and extension = string list loc * payload
+and extension = string list loc * payload * tokens
 (** Extension points such as [[%id ARG] and [%%id ARG]].
 
          Sub-language placeholder -- rejected by the typechecker.
@@ -145,6 +145,11 @@ and payload =
   | PPat of pattern * expression option
       (** [? P]  or  [? P when E], in an attribute or an extension point *)
   | PString of string * string
+
+and ext_attribute = {
+  pea_ext: string list loc option;
+  pea_attrs: attributes;
+}
 
 (** {1 Core language} *)
 (** {2 Type expressions} *)
@@ -263,7 +268,10 @@ and arg_label = Asttypes.arg_label =
   | Labelled of string
   | Optional of string
 
-and package_type = longident loc * (longident loc * core_type) list
+and package_type =
+  { ppt_ext_attr: ext_attribute option;
+    ppt_name: longident loc;
+    ppt_eqs: (longident loc * core_type) list; }
 (** As {!package_type} typed values:
          - [(S, [])] represents [(module S)],
          - [(S, [(t1, T1) ; ... ; (tn, Tn)])]
@@ -305,6 +313,7 @@ and object_field_desc =
 
 and pattern =
     {
+     ppat_ext_attr: ext_attribute;
      ppat_desc: pattern_desc;
      ppat_loc: location;
      ppat_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
@@ -408,6 +417,7 @@ and pattern_desc =
 
 and expression =
     {
+     pexp_ext_attr: ext_attribute;
      pexp_desc: expression_desc;
      pexp_loc: location;
      pexp_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
@@ -689,7 +699,7 @@ and function_body =
 
 and function_body_desc =
   | Pfunction_body of expression
-  | Pfunction_cases of case list * attributes
+  | Pfunction_cases of case list * ext_attribute
   (** In [Pfunction_cases (_, loc, attrs)], the location extends from the
       start of the [function] keyword to the end of the last case. The compiler
       will only use typechecking-related attributes from [attrs], e.g. enabling
@@ -1170,6 +1180,7 @@ and signature =
 
 and signature_item =
     {
+     psig_ext_attrs: ext_attribute;
      psig_desc: signature_item_desc;
      psig_loc: location;
     }
@@ -1334,6 +1345,7 @@ and structure = structure_item list * tokens
 
 and structure_item =
     {
+     pstr_ext_attrs: ext_attribute;
      pstr_desc: structure_item_desc;
      pstr_loc: location;
     }
@@ -1391,6 +1403,7 @@ and value_binding =
   {
     pvb_pre_text: attributes;
     pvb_pre_doc: attribute option;
+    pvb_ext_attrs: ext_attribute;
     pvb_pat: pattern;
     pvb_params: function_param list;
     pvb_expr: expression option;

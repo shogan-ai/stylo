@@ -322,7 +322,7 @@ module Mod:
 (** Signature items *)
 module Sig:
   sig
-    val mk: ?loc:loc -> signature_item_desc -> signature_item
+    val mk: ?loc:loc -> ?ext_attr:ext_attribute -> signature_item_desc -> signature_item
 
     val value: ?loc:loc -> value_description -> signature_item
     val type_: ?loc:loc -> rec_flag -> type_declaration list -> signature_item
@@ -355,7 +355,7 @@ module Sg:
 (** Structure items *)
 module Str:
   sig
-    val mk: ?loc:loc -> structure_item_desc -> structure_item
+    val mk: ?loc:loc -> ?ext_attr:ext_attribute -> structure_item_desc -> structure_item
 
     val eval: ?loc:loc -> ?attrs:attributes -> expression -> structure_item
     val value: ?loc:loc -> rec_flag -> value_binding list -> structure_item
@@ -424,7 +424,8 @@ module Incl:
 (** Value bindings *)
 module Vb:
   sig
-    val mk: ?loc: loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?docs:docs -> ?text:text ->
+    val mk: ?loc: loc -> ?ext_attr:ext_attribute -> ?attrs:attrs ->
+      tokens:Tokens.seq -> ?docs:docs -> ?text:text ->
       ?params:function_param list -> ?modes:modes ->
       ?value_constraint:value_constraint -> ?ret_modes:modes -> pattern ->
       expression option -> value_binding
