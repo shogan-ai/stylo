@@ -103,7 +103,7 @@ class to_tokens = object
   method! visit_constructor_declaration env cd =
     let sub_tokens = super#visit_constructor_declaration env cd in
     let node_toks = cd.pcd_tokens in
-    combine_children ~loc:Location.none node_toks sub_tokens
+    combine_children ~loc:cd.pcd_loc node_toks sub_tokens
 
   method! visit_value_binding env vb =
     let sub_tokens = super#visit_value_binding env vb in
