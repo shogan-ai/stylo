@@ -863,12 +863,12 @@ and Function_body : sig
   val pp : function_body -> document
 end = struct
   let pp fb =
-    match fb.pfunbody_desc with
+    match fb.pfb_desc with
     | Pfunction_body e -> Expression.pp e
-    | Pfunction_cases (cases, _, attrs) ->
+    | Pfunction_cases (cases, attrs) ->
       S.function_ ^/^
       Case.pp_cases cases
-        ~has_leading_pipe:(has_leading_pipe ~after:FUNCTION fb.pfunbody_tokens)
+        ~has_leading_pipe:(has_leading_pipe ~after:FUNCTION fb.pfb_tokens)
       |> Attribute.attach ~attrs
 end
 

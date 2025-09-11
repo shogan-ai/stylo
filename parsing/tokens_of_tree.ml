@@ -97,8 +97,8 @@ class to_tokens = object
 
   method! visit_function_body env fb =
     let sub_tokens = super#visit_function_body env fb in
-    let node_toks = fb.pfunbody_tokens in
-    combine_children ~loc:Location.none node_toks sub_tokens
+    let node_toks = fb.pfb_tokens in
+    combine_children ~loc:fb.pfb_loc node_toks sub_tokens
 
   method! visit_constructor_declaration env cd =
     let sub_tokens = super#visit_constructor_declaration env cd in

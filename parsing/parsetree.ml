@@ -682,13 +682,14 @@ and function_param =
   }
 
 and function_body =
-  { pfunbody_desc : function_body_desc;
-    pfunbody_tokens: tokens;
+  { pfb_desc : function_body_desc;
+    pfb_loc: location;
+    pfb_tokens: tokens;
   }
 
 and function_body_desc =
   | Pfunction_body of expression
-  | Pfunction_cases of case list * location * attributes
+  | Pfunction_cases of case list * attributes
   (** In [Pfunction_cases (_, loc, attrs)], the location extends from the
       start of the [function] keyword to the end of the last case. The compiler
       will only use typechecking-related attributes from [attrs], e.g. enabling

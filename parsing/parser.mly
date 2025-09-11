@@ -528,7 +528,7 @@ let mkghost_newtype_function_body newtypes body_constraint body ~loc =
   mk_newtypes ~loc newtypes wrapped_body
 
 let mkfunction ~loc ~attrs params body_constraint body =
-  match body.pfunbody_desc with
+  match body.pfb_desc with
   | Pfunction_cases _ ->
       mkexp_attrs (Pexp_function (params, body_constraint, body)) attrs ~loc
   | Pfunction_body body_exp -> begin
@@ -2256,8 +2256,9 @@ class_type_declarations:
       { let loc = make_loc $sloc in
         let cases = $3 in
         let body =
-          { pfunbody_desc = Pfunction_cases (cases, loc, [])
-          ; pfunbody_tokens = Tokens.at $sloc }
+          { pfb_desc = Pfunction_cases (cases, [])
+          ; pfb_loc = loc
+          ; pfb_tokens = Tokens.at $sloc }
         in
         (* There are two choices of where to put attributes: on the
            Pexp_function node; on the Pfunction_cases body. We put them on the
@@ -3020,7 +3021,7 @@ strict_binding_modes:
       in
       let expr =
         let fb = $4 in
-        match fb.pfunbody_desc with
+        match fb.pfb_desc with
         | Pfunction_body e -> e
         | Pfunction_cases _ ->
             mkfunction [] empty_body_constraint fb ~loc:$loc($4)
@@ -3038,22 +3039,26 @@ fun_body:
       { let ext, attrs = $2 in
         match ext with
         | None ->
-            { pfunbody_desc = Pfunction_cases ($3, make_loc $sloc, attrs)
-            ; pfunbody_tokens = Tokens.at $sloc }
+            { pfb_desc = Pfunction_cases ($3, attrs)
+            ; pfb_loc = make_loc $sloc
+            ; pfb_tokens = Tokens.at $sloc }
         | Some _ ->
           (* FIXME: we don't care about that here! *)
           (* function%foo extension nodes interrupt the arity *)
           let cases =
-            { pfunbody_desc = Pfunction_cases ($3, make_loc $sloc, [])
-            ; pfunbody_tokens = Tokens.at $sloc }
+            { pfb_desc = Pfunction_cases ($3, [])
+            ; pfb_loc = make_loc $sloc
+            ; pfb_tokens = Tokens.at $sloc }
           in
           let function_ = mkfunction [] empty_body_constraint cases ~loc:$sloc ~attrs:$2 in
-          { pfunbody_desc = Pfunction_body function_
-          ; pfunbody_tokens = Tokens.at $sloc }
+          { pfb_desc = Pfunction_body function_
+          ; pfb_loc = make_loc $sloc
+          ; pfb_tokens = Tokens.at $sloc }
       }
   | fun_seq_expr
-      { { pfunbody_desc = Pfunction_body $1
-        ; pfunbody_tokens = Tokens.at $sloc } }
+      { { pfb_desc = Pfunction_body $1
+        ; pfb_loc = make_loc $sloc
+        ; pfb_tokens = Tokens.at $sloc } }
 ;
 %inline match_cases:
   xs = preceded_or_separated_nonempty_llist(BAR, match_case)
