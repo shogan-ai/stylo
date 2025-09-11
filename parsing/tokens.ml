@@ -453,3 +453,7 @@ end
 let at (startpos,endpos) =
   Indexed_list.(consume global startpos endpos)
 
+let rec replace_first_child ~subst = function
+  | [] -> invalid_arg "Tokens.replace_first_child: never saw a child"
+  | { desc = Child_node; _ } :: xs -> subst @ xs
+  | x :: xs -> x :: replace_first_child ~subst xs

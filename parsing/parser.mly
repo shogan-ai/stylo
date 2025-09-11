@@ -3257,8 +3257,17 @@ pattern_no_exn:
 %inline pattern_(self):
   | self COLONCOLON pattern
       { mkpat_cons ~loc:$sloc $loc($2) $1 $3 }
-  | self attribute
-      { Pat.attr $1 $2 }
+  | pat=self attr=attribute
+      { (* We are "patching" the pattern to add an attribute, we must also patch
+           the tokens attached to the pattern to account for the new tokens
+           relative to the attribute. *)
+        let tokens = Tokens.at $sloc in
+        let pat_with_attr = Pat.attr pat attr in
+        let ppat_tokens =
+          Tokens.replace_first_child tokens ~subst:pat.ppat_tokens
+        in
+        { pat_with_attr with ppat_tokens }
+      }
   | pattern_gen
       { $1 }
   | mkpat(
