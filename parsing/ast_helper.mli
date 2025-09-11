@@ -57,7 +57,8 @@ end
 
 (** {1 Attributes} *)
 module Attr : sig
-  val mk: ?loc:loc -> tokens:Tokens.seq -> str -> payload -> attribute
+  val mk: ?loc:loc -> tokens:Tokens.seq -> string list with_loc -> payload
+    -> attribute
 end
 
 (** {1 Core language} *)

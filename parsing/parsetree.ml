@@ -119,7 +119,7 @@ type include_kind = Structure | Functor
 (** {1 Extension points} *)
 
 type attribute = {
-    attr_name : string loc;
+    attr_name : string list loc;
     attr_payload : payload;
     attr_loc : location;
     attr_tokens : tokens;
@@ -130,7 +130,7 @@ type attribute = {
           The compiler ignores unknown attributes.
        *)
 
-and extension = string loc * payload
+and extension = string list loc * payload
 (** Extension points such as [[%id ARG] and [%%id ARG]].
 
          Sub-language placeholder -- rejected by the typechecker.

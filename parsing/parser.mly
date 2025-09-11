@@ -357,7 +357,7 @@ let wrap_mksig_ext ~loc (item, ext) =
   wrap_sig_ext ~loc (mksig ~loc item) ext
 
 let mk_quotedext ~loc:_ (id, idloc, str, _, delim) =
-  let exp_id = mkloc id idloc in
+  let exp_id = mkloc [id] idloc in
   (exp_id, PString (str, delim))
 
 let text_str pos = Str.text (rhs_text pos)
@@ -4882,8 +4882,8 @@ single_attr_id:
 
 attr_id:
   mkloc(
-      single_attr_id { $1 }
-    | single_attr_id DOT attr_id { $1 ^ "." ^ $3.txt }
+      single_attr_id { [$1] }
+    | single_attr_id DOT attr_id { $1 :: $3.txt }
   ) { $1 }
 ;
 attribute:

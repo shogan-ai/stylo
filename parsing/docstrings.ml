@@ -51,7 +51,7 @@ type docs =
 
 let empty_docs = { docs_pre = None; docs_post = None }
 
-let doc_loc = {txt = "ocaml.doc"; loc = Location.none}
+let doc_loc = {txt = ["ocaml";"doc"]; loc = Location.none}
 
 let docs_attr_tokens = Hashtbl.create 42
 let remember_token t =
@@ -118,7 +118,7 @@ type text = docstring list
 let empty_text = []
 let empty_text_lazy = lazy []
 
-let text_loc = {txt = "ocaml.text"; loc = Location.none}
+let text_loc = {txt = ["ocaml";"text"]; loc = Location.none}
 
 let text_attr ds =
   let open Parsetree in

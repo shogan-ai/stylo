@@ -21,4 +21,4 @@ type let_binding =
 type let_bindings =
   { lbs_bindings: let_binding list;
     lbs_rec: rec_flag;
-    lbs_extension: string Asttypes.loc option }
+    lbs_extension: string list loc option }

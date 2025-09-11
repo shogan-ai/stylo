@@ -163,18 +163,20 @@ end = struct
 
   let pp ?(post=false) { attr_name; attr_payload; _ } =
     match attr_name.txt with
-    | "ocaml.doc" | "ocaml.text" (* FIXME *) -> pp_doc attr_payload
-    | _ ->
+    | ["ocaml"; ("doc"|"text")]  (* FIXME *) -> pp_doc attr_payload
+    | attr_names ->
+      let attr_name = separate_map S.dot string attr_names in
       (if post then S.lbracket_atat else S.lbracket_at)
-      ^^ string attr_name.txt ^^ Payload.pp attr_payload
+      ^^  attr_name ^^ Payload.pp attr_payload
       ^^ S.rbracket
 
   let pp_floating { attr_name; attr_payload; _ } =
     match attr_name.txt with
-    | "ocaml.doc" | "ocaml.text" (* FIXME *) -> pp_doc attr_payload
-    | _ ->
+    | ["ocaml"; ("doc"|"text")]  (* FIXME *) -> pp_doc attr_payload
+    | attr_names ->
+      let attr_name = separate_map S.dot string attr_names in
       S.lbracket_atatat
-      ^^ string attr_name.txt ^^ Payload.pp attr_payload
+      ^^ attr_name ^^ Payload.pp attr_payload
       ^^ S.rbracket
 
   let pp_list ?post l = separate_map (break 0) (pp ?post) l
@@ -188,18 +190,20 @@ end
 and Extension : sig
   val pp : ?floating:bool -> extension -> document
 end = struct
-  let pp_classic ~floating name payload =
+  let pp_classic ~floating names payload =
+    let name = separate_map S.dot string names.txt in
     (if floating then S.lbracket_percentpercent else S.lbracket_percent)
-    ^^ string name.txt ^^ Payload.pp payload ^^ S.rbracket
+    ^^ name ^^ Payload.pp payload ^^ S.rbracket
 
   let pp ?(floating=false) (ext_name, ext_payload) =
     match ext_payload with
     | PString (s, delim) ->
+      let ext_name = String.concat "." ext_name.txt in
       (* Careful: single token! *)
       (* FIXME: dedicated printer, same as string literals *)
       let percent = if floating then "%%" else "%" in
       let blank = if delim <> "" then " " else "" in
-      stringf "{%s%s%s%s|%s|%s}" percent ext_name.txt blank delim s delim
+      stringf "{%s%s%s%s|%s|%s}" percent ext_name blank delim s delim
     | _ -> pp_classic ~floating ext_name ext_payload
 end
 

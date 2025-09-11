@@ -70,7 +70,7 @@ class to_tokens = object
 
   method! visit_attribute env a =
     match a.attr_name.txt with
-    | "ocaml.doc" | "ocaml.text" -> [a.attr_tokens]
+    | ["ocaml"; ("doc"|"text")] -> [a.attr_tokens]
     | _ ->
       let sub_tokens = super#visit_attribute env a in
       combine_children ~loc:a.attr_loc a.attr_tokens sub_tokens
