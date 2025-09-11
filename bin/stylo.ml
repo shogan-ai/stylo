@@ -3,6 +3,7 @@ open Ocaml_syntax
 let style_file fn =
   In_channel.with_open_text fn @@ fun ic ->
   let lexbuf = Lexing.from_channel ic in
+  Location.init lexbuf fn;
   let ast = Parse.structure lexbuf in
   let doc = Print.Structure.pp_implementation ast in
   let tokenizer = new Tokens_of_tree.to_tokens in

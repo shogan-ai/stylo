@@ -1,3 +1,8 @@
 (executable
   (name strip_comments)
+  (modules strip_comments)
   (libraries ocaml_syntax))
+
+(executable
+  (name spread_fuzzer_tests)
+  (modules spread_fuzzer_tests))

@@ -30,22 +30,8 @@ function fuzzer_output {
 
     cat <<EOF
 (rule
-  (write-file $BASE.sh
-        "#!/bin/bash
-
-(( j = 0 ))
-while read line; do
-    echo \$line > $BASE-\$j
-    (( j++ ))
-done"))
-
-(rule
-    (targets ${FILENAMES[@]})
-    (action
-      (progn
-        (bash "chmod +x %{dep:./$BASE.sh}")
-        (with-stdin-from %{dep:$1}
-          (run %{dep:./$BASE.sh})))))
+  (targets ${FILENAMES[@]})
+  (action (run ../tools/spread_fuzzer_tests.exe %{dep:$1})))
 
 (rule
   (alias $BASE)
