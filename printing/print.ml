@@ -501,10 +501,10 @@ end = struct
     | Pexp_let (rf, vbs, body) ->
       group (
         Value_binding.pp_list vbs ~start:(
-          !!S.let_ ^^
+          !!S.let_ ::
           match rf with
-          | Nonrecursive -> empty
-          | Recursive -> break 1 ^^ S.rec_
+          | Nonrecursive -> []
+          | Recursive -> [S.rec_]
         ) ^/^ S.in_
       ) ^/^ pp body
     | Pexp_function ([], _, body) ->
@@ -788,7 +788,7 @@ and Binding_op : sig
   val pp : binding_op -> document
 end = struct
   let pp { pbop_op; pbop_binding; _ }=
-    Value_binding.pp_list ~start:(string pbop_op.txt) [pbop_binding]
+    Value_binding.pp_list ~start:[string pbop_op.txt] [pbop_binding]
 end
 
 and Argument : sig
@@ -1289,10 +1289,10 @@ end = struct
     | Pcl_let (rf, vbs, body) ->
       (* FIXME: factorize with Pexp_let *)
       Value_binding.pp_list vbs ~start:(
-        S.let_ ^^
+        S.let_ ::
         match rf with
-        | Nonrecursive -> empty
-        | Recursive -> break 1 ^^ S.rec_
+        | Nonrecursive -> []
+        | Recursive -> [S.rec_]
       ) ^/^ S.in_ ^/^ pp body
     | Pcl_constraint (ce, ct) -> pp ce ^/^ S.colon ^/^ Class_type.pp ct
     | Pcl_extension ext -> Extension.pp ext
@@ -1593,15 +1593,17 @@ and Structure : sig
   val pp : structure -> document
   val pp_implementation : structure -> document
 end = struct
-  let pp_item_desc = function
+  let pp_item_desc item =
+    let (!!) kw = Ext_attribute.decorate kw item.pstr_ext_attrs in
+    match item.pstr_desc with
     | Pstr_eval (e, attrs) -> Attribute.attach ~attrs (Expression.pp e)
     | Pstr_value (rf, vbs) ->
       (* FIXME: factorize Pexp_let *)
       Value_binding.pp_list vbs ~start:(
-        S.let_ ^^
+        !!S.let_ ::
         match rf with
-        | Nonrecursive -> empty
-        | Recursive -> break 1 ^^ S.rec_
+        | Nonrecursive -> []
+        | Recursive -> [S.rec_]
       )
     | Pstr_primitive vd -> Value_description.pp vd
     (* FIXME: factorize with Psig_* *)
@@ -1629,7 +1631,7 @@ end = struct
       S.kind_abbrev__ ^/^ string name.txt ^/^ S.equals ^/^
       Jkind_annotation.pp k
 
-  let pp_item it = group (pp_item_desc it.pstr_desc)
+  let pp_item it = group (pp_item_desc it)
 
   let pp (items, _) =
     group (
@@ -1706,14 +1708,19 @@ end
 and Value_binding : sig
   val pp_core : value_binding -> document
 
-  val pp_list : start:document -> value_binding list -> document
+  val pp_list : start:document list -> value_binding list -> document
 end = struct
   let pp_core start
         { pvb_modes; pvb_pat; pvb_params; pvb_constraint; pvb_ret_modes;
           pvb_expr; pvb_attributes; pvb_pre_text; pvb_pre_doc; pvb_post_doc;
           pvb_loc = _; pvb_tokens = _; pvb_ext_attrs } =
-    (* FIXME: doesn't work for "let rec" *)
-    let start = Ext_attribute.decorate start pvb_ext_attrs in
+    let start =
+      match start with
+      | [] -> assert false
+      | first_kw :: other_kws ->
+        Ext_attribute.decorate first_kw pvb_ext_attrs
+          ^?^ separate (break 1) other_kws
+    in
     let kw_and_modes = group (start ^?^ modes pvb_modes) in
     let pat = Pattern.pp pvb_pat in
     let params = List.map Function_param.pp pvb_params in
@@ -1732,9 +1739,9 @@ end = struct
 
   let rec pp_list ~start = function
     | [] -> empty
-    | x :: xs -> pp_core start x ^?^ pp_list ~start:S.and_ xs
+    | x :: xs -> pp_core start x ^?^ pp_list ~start:[S.and_] xs
 
-  let pp_core = pp_core empty
+  let pp_core = pp_core [empty]
 
 end
 
