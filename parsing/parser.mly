@@ -1959,11 +1959,12 @@ method_:
       { (label, private_, Cfk_virtual ty), attrs }
   | override_flag noext_attributes private_flag mkrhs(label) strict_binding
       { let params, tc, ret_modes, e = $5 in
+        let pat = mkpat ~loc:$loc($4) (Ppat_var $4) in
         let vb =
           { pvb_pre_text = [];
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
-            pvb_pat = mkpat ~loc:$loc($4) (Ppat_var $4);
+            pvb_pat = pat;
             pvb_modes = []; pvb_params = params;
             pvb_constraint = tc; pvb_ret_modes = ret_modes;
             pvb_expr = Some e;
@@ -1979,11 +1980,12 @@ method_:
       { let constr =
           Pvc_constraint { locally_abstract_univars = []; typ = $6 }
         in
+        let pat = mkpat ~loc:$loc($4) (Ppat_var $4) in
         let vb =
           { pvb_pre_text = [];
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
-            pvb_pat = mkpat ~loc:$loc($4) (Ppat_var $4);
+            pvb_pat = pat;
             pvb_modes = []; pvb_params = [];
             pvb_constraint = Some constr; pvb_ret_modes = [];
             pvb_expr = Some $8;
@@ -1998,11 +2000,12 @@ method_:
       { let constr =
           Pvc_constraint { locally_abstract_univars = $7; typ = $9 }
         in
+        let pat = mkpat ~loc:$loc($4) (Ppat_var $4) in
         let vb =
           { pvb_pre_text = [];
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
-            pvb_pat = mkpat ~loc:$loc($4) (Ppat_var $4);
+            pvb_pat = pat;
             pvb_modes = []; pvb_params = [];
             pvb_constraint = Some constr; pvb_ret_modes = [];
             pvb_expr = Some $11;

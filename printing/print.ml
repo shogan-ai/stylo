@@ -71,10 +71,9 @@ let virtual_field = function
   | Cfk_virtual _ -> S.virtual_ ^^ break 1
   | Cfk_concrete _ -> empty
 
-let override_field = function
-  | Cfk_virtual _ -> empty
-  | Cfk_concrete (Fresh, _) -> empty
-  | Cfk_concrete (Override, _) -> S.bang
+let override_= function
+  | Asttypes.Fresh -> empty
+  | Override -> S.bang
 
 let param_info = Asttypes.(function
     | NoVariance, NoInjectivity -> empty
@@ -1329,23 +1328,35 @@ end = struct
         | None -> empty
         | Some s -> break 1 ^^ S.as_ ^/^ string s.txt
       end
-    | Pcf_val (lbl, mut, cfk) ->
-      S.val_ ^^ override_field cfk ^/^
-      mutable_ mut ^^ virtual_field cfk ^^ string lbl.txt ^/^
-      pp_field_kind cfk
-    | Pcf_method (lbl, priv, cfk) ->
-      S.method_ ^^ override_field cfk ^/^
-      private_ priv ^^ virtual_field cfk ^^ string lbl.txt ^/^
-      pp_field_kind cfk
+    | Pcf_val (lbl, mut, kind) -> pp_value lbl mut kind
+    | Pcf_method (lbl, priv, kind) -> pp_method lbl priv kind
     | Pcf_constraint (ct1, ct2) ->
       S.constraint_ ^/^ Core_type.pp ct1 ^/^ S.equals ^/^ Core_type.pp ct2
     | Pcf_initializer e -> S.initializer_ ^/^ Expression.pp e
     | Pcf_attribute attr -> Attribute.pp_floating attr
     | Pcf_extension ext -> Extension.pp ~floating:true ext
 
-  and pp_field_kind = function
-    | Cfk_virtual ct -> S.colon ^/^ Core_type.pp ct
-    | Cfk_concrete (_, vb) -> Value_binding.pp_core vb
+  and pp_value lbl mut = function
+    | Cfk_virtual ct ->
+      S.val_ ^/^ mutable_ mut ^^ S.virtual_ ^/^ string lbl.txt ^/^
+      S.colon ^/^ Core_type.pp ct
+    | Cfk_concrete (over, vb) ->
+      let start = [
+        S.val_ ^^ override_ over;
+        mutable_ mut
+      ] in
+      Value_binding.pp_list ~start [vb]
+
+  and pp_method lbl priv = function
+    | Cfk_virtual ct ->
+      S.method_ ^/^ private_ priv ^^ S.virtual_ ^/^ string lbl.txt ^/^
+      S.colon ^/^ Core_type.pp ct
+    | Cfk_concrete (over, vb) ->
+      let start = [
+        S.method_ ^^ override_ over;
+        private_ priv
+      ] in
+      Value_binding.pp_list ~start [vb]
 
   and pp { pcl_desc; pcl_attributes; _ } =
     pp_desc pcl_desc
