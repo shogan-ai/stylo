@@ -75,13 +75,22 @@ let rec walk_both seq doc =
     | T.Token LET, Doc.Token _ ->
       raise (Error (Desynchronized first.pos))
 
-    (* Synchronized, advance *)
-    | T.Token _, Doc.Token p
-    | (* FIXME: the token that was explicitely inserted might be the nth one
+    | (* FIXME: the comment that was explicitely inserted might be the nth one
          from a list of several comments.
          If we drop the first and advance, we will reinsert the token that is
-         already there... *)
-      T.Comment _, Doc.Comment p ->
+         already there...
+         So here we have this shitty check to see whether the comment should be
+         skipped or not.
+
+         TODO: improve *)
+      T.Comment c, Doc.Comment _
+      when Doc.comment c <> doc && Doc.docstring c <> doc ->
+      let rest, doc = walk_both rest doc in
+      rest, Doc.(comment c ^/^ doc)
+
+    (* Synchronized, advance *)
+    | T.Token _, Doc.Token p
+    | T.Comment _, Doc.Comment p ->
       dprintf "assume %a synced at %d:%d with << %a >>@."
         Tokens.pp_elt first
         first.pos.pos_lnum
