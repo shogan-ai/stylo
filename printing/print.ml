@@ -495,6 +495,12 @@ end = struct
   and pp_desc exp =
     let (!!) kw = Ext_attribute.decorate kw exp.pexp_ext_attr in
     match exp.pexp_desc with
+    | (* FIXME: doesn't handle [Mod.(op)].
+         Add tokens to longidents and handle there. *)
+      Pexp_ident { txt = Lident s; _ }
+      when List.exists (fun t -> t.Tokens.desc = Token LPAREN) exp.pexp_tokens
+           ->
+           S.lparen ^^ string s ^^ S.rparen
     | Pexp_ident lid -> longident lid.txt
     | Pexp_constant c -> constant c
     | Pexp_let (rf, vbs, body) ->
