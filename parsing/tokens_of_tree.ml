@@ -112,6 +112,11 @@ class to_tokens = object
     let node_toks = fb.pfb_tokens in
     combine_children ~loc:fb.pfb_loc node_toks sub_tokens
 
+  method! visit_type_declaration env td =
+    let sub_tokens = super#visit_type_declaration env td in
+    let node_toks = td.ptype_tokens in
+    combine_children ~loc:td.ptype_loc node_toks sub_tokens
+
   method! visit_label_declaration env ld =
     let sub_tokens = super#visit_label_declaration env ld in
     let node_toks = ld.pld_tokens in

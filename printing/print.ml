@@ -1049,7 +1049,7 @@ end
 and Type_declaration : sig
   val pp_rhs : ?subst:bool -> type_declaration -> document
 
-  val pp : start:document -> ?subst:bool -> type_declaration -> document
+  val pp : start:document list -> ?subst:bool -> type_declaration -> document
 
   val pp_list :
     ?subst:bool -> Asttypes.rec_flag -> type_declaration list -> document
@@ -1125,6 +1125,13 @@ end = struct
 
   let pp ~start ?subst td =
     let pp_param (x, info) = param_info info ^^ Core_type.pp x in
+    let start =
+      match start with
+      | [] -> assert false
+      | first_kw :: other_kws ->
+        Ext_attribute.decorate first_kw td.ptype_ext_attrs
+          ^?^ separate (break 1) other_kws
+    in
     prefix_nonempty (
       prefix start (
         type_app (string td.ptype_name.txt) (List.map pp_param td.ptype_params)
@@ -1136,13 +1143,24 @@ end = struct
     ) (pp_rhs ?subst td)
     |> Attribute.attach ~post:true ~attrs:td.ptype_attributes
 
+  let pp ~start ?subst td =
+    begin match td.ptype_pre_text with
+    | [] -> empty
+    | attrs ->
+      hardline ^^ hardline ^^
+      separate_map (break 1) Attribute.pp attrs ^^
+      hardline ^^ hardline
+    end ^^
+    optional Attribute.pp td.ptype_pre_doc ^?^
+    pp ~start ?subst td ^?^
+    optional Attribute.pp td.ptype_post_doc
+
   let rec pp_list ?subst start = function
     | [] -> empty
-    | td :: tds -> pp ?subst ~start td ^?^ pp_list ?subst S.and_ tds
+    | td :: tds -> pp ?subst ~start td ^?^ pp_list ?subst [S.and_] tds
 
   let pp_list ?subst rf tds =
-    let start = group (S.type_ ^?^ nonrec_ rf) in
-    pp_list ?subst start tds
+    pp_list ?subst [S.type_; nonrec_ rf] tds
 end
 
 and Type_extension : sig

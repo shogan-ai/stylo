@@ -794,6 +794,9 @@ and value_description =
 
 and type_declaration =
     {
+     ptype_pre_text: attributes;
+     ptype_pre_doc: attribute option;
+     ptype_ext_attrs: ext_attribute;
      ptype_name: string loc;
      ptype_params: (core_type * (variance * injectivity)) list;
       (** [('a1,...'an) t] *)
@@ -804,7 +807,9 @@ and type_declaration =
      ptype_manifest: core_type option;  (** represents [= T] *)
      ptype_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
      ptype_jkind_annotation: jkind_annotation option; (** for [: jkind] *)
+     ptype_post_doc: attribute option;
      ptype_loc: location;
+     ptype_tokens: tokens;
     }
 (**
    Here are type declarations and their representation,

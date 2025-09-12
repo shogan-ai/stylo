@@ -636,8 +636,8 @@ module Ci = struct
 end
 
 module Type = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(text = [])
+  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) ?(attrs = [])
+        ~tokens ?(docs = empty_docs) ?(text = [])
       ?(params = [])
       ?(cstrs = [])
       ?(kind = Ptype_abstract)
@@ -645,16 +645,39 @@ module Type = struct
       ?manifest
       ?jkind_annotation
       name =
+    let pre_doc = simplify_ds docs.docs_pre in
+    let post_doc = simplify_ds docs.docs_post in
+    (* Naive, will do better later *)
+    let tokens =
+      List.filter_map (function
+        | {Docstring.ds_body=""} -> None
+        | {ds_loc} -> Some { Tokens.desc = Child_node; pos = ds_loc.loc_start }
+      ) text @
+      begin match pre_doc with
+      | None -> []
+      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
+      end @
+      tokens @
+      begin match post_doc with
+      | None -> []
+      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
+      end
+    in
     {
+     ptype_pre_text = add_text_attrs text [];
+     ptype_pre_doc = Option.map Docstrings.docs_attr pre_doc;
+     ptype_ext_attrs = ext_attr;
      ptype_name = name;
      ptype_params = params;
      ptype_cstrs = cstrs;
      ptype_kind = kind;
      ptype_private = priv;
      ptype_manifest = manifest;
-     ptype_attributes = add_text_attrs text (add_docs_attrs docs attrs);
+     ptype_attributes = attrs;
+     ptype_post_doc = Option.map Docstrings.docs_attr post_doc;
      ptype_jkind_annotation = jkind_annotation;
      ptype_loc = loc;
+     ptype_tokens = tokens;
     }
 
   let constructor ?(loc = !default_loc) ?(attrs = []) ~tokens

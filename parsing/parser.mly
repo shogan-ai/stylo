@@ -74,8 +74,8 @@ let pstr_typext (te, ext) =
   (Pstr_typext te, ext)
 let pstr_primitive (vd, ext) =
   (Pstr_primitive vd, ext)
-let pstr_type ((nr, ext), tys) =
-  (Pstr_type (nr, tys), ext)
+let pstr_type (nr, tys) =
+  Pstr_type (nr, tys)
 let pstr_exception (te, ext) =
   (Pstr_exception te, ext)
 let pstr_recmodule (ext, bindings) =
@@ -85,11 +85,11 @@ let psig_typext (te, ext) =
   (Psig_typext te, ext)
 let psig_value (vd, ext) =
   (Psig_value vd, ext)
-let psig_type ((nr, ext), tys) =
-  (Psig_type (nr, tys), ext)
-let psig_typesubst ((nr, ext), tys) =
+let psig_type (nr, tys) =
+  Psig_type (nr, tys)
+let psig_typesubst (nr, tys) =
   assert (nr = Recursive); (* see [no_nonrec_flag] *)
-  (Psig_typesubst tys, ext)
+  Psig_typesubst tys
 let psig_exception (te, ext) =
   (Psig_exception te, ext)
 
@@ -1330,14 +1330,15 @@ structure_item:
     | kind_abbreviation_decl
         { let name, jkind = $1 in
           Pstr_kind_abbrev (name, jkind)
-        })
+        }
+    | type_declarations
+        { pstr_type $1 }
+    )
   | wrap_mkstr_ext(
       primitive_declaration
         { pstr_primitive $1 }
     | value_description
         { pstr_primitive $1 }
-    | type_declarations
-        { pstr_type $1 }
     | str_type_extension
         { pstr_typext $1 }
     | str_exception_declaration
@@ -1598,6 +1599,10 @@ signature_item:
         { let name, jkind = $1 in
           Psig_kind_abbrev (name, jkind)
         }
+    | type_declarations
+        { psig_type $1 }
+    | type_subst_declarations
+        { psig_typesubst $1 }
     )
     { $1 }
   | wrap_mksig_ext(
@@ -1605,10 +1610,6 @@ signature_item:
         { psig_value $1 }
     | primitive_declaration
         { psig_value $1 }
-    | type_declarations
-        { psig_type $1 }
-    | type_subst_declarations
-        { psig_typesubst $1 }
     | sig_type_extension
         { psig_typext $1 }
     | sig_exception_declaration
@@ -3492,7 +3493,7 @@ primitive_declaration:
 
 generic_type_declaration(flag, kind):
   TYPE
-  ext_attrs = ext_attributes
+  ext_attr = ext_attributes
   flag = flag
   params = type_parameters
   id = mkrhs(LIDENT)
@@ -3504,28 +3505,28 @@ generic_type_declaration(flag, kind):
       let (kind, priv, manifest) = kind_priv_manifest in
       let docs = symbol_docs $sloc in
       let loc = make_loc $sloc in
-      (flag, ext_attrs),
-      Type.mk id ~params ~cstrs ~kind ~priv ?manifest ~attrs ~loc ~docs
-        ?jkind_annotation
+      flag,
+      Type.mk id ~ext_attr
+        ~params ~cstrs ~kind ~priv ?manifest ~attrs ~loc ~docs
+        ?jkind_annotation ~tokens:(Tokens.at $sloc)
     }
 ;
 %inline generic_and_type_declaration(kind):
   AND
-  attrs1 = attributes
+  ext_attr = noext_attributes
   params = type_parameters
   id = mkrhs(LIDENT)
   jkind_annotation = jkind_constraint?
   kind_priv_manifest = kind
   cstrs = constraints
-  attrs2 = post_item_attributes
+  attrs = post_item_attributes
     {
       let (kind, priv, manifest) = kind_priv_manifest in
       let docs = symbol_docs $sloc in
-      let attrs = attrs1 @ attrs2 in
       let loc = make_loc $sloc in
       let text = symbol_text $symbolstartpos in
-      Type.mk id ~params ~cstrs ~kind ~priv ?manifest ~attrs ~loc ~docs ~text
-        ?jkind_annotation
+      Type.mk ~ext_attr id ~params ~cstrs ~kind ~priv ?manifest ~attrs ~loc
+        ~docs ~text ?jkind_annotation ~tokens:(Tokens.at $sloc)
     }
 ;
 %inline constraints:
@@ -3873,7 +3874,8 @@ with_constraint:
               ~cstrs:$6
               ~manifest:$5
               ~priv:$4
-              ~loc:(make_loc $sloc))) }
+              ~loc:(make_loc $sloc)
+              ~tokens:(Tokens.at $sloc))) }
     /* used label_longident instead of type_longident to disallow
        functor applications in type path */
   | TYPE type_parameters mkrhs(label_longident)
@@ -3884,7 +3886,8 @@ with_constraint:
            (Type.mk lident
               ~params:$2
               ~manifest:$5
-              ~loc:(make_loc $sloc))) }
+              ~loc:(make_loc $sloc)
+              ~tokens:(Tokens.at $sloc))) }
   | MODULE mkrhs(mod_longident) EQUAL mkrhs(mod_ext_longident)
       { Pwith_module ($2, $4) }
   | MODULE mkrhs(mod_longident) COLONEQUAL mkrhs(mod_ext_longident)
