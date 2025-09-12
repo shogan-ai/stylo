@@ -1350,6 +1350,7 @@ and structure_item =
      pstr_ext_attrs: ext_attribute;
      pstr_desc: structure_item_desc;
      pstr_loc: location;
+     pstr_tokens: tokens;
     }
 
 and structure_item_desc =

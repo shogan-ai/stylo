@@ -347,10 +347,12 @@ module Sg = struct
 end
 
 module Str = struct
-  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) d =
-    {pstr_ext_attrs = ext_attr; pstr_desc = d; pstr_loc = loc}
+  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) ~tokens d =
+    {pstr_ext_attrs = ext_attr; pstr_desc = d; pstr_loc = loc;
+     pstr_tokens = tokens}
 
-  let eval ?loc ?(attrs = []) a = mk ?loc (Pstr_eval (a, attrs))
+  let eval ?loc ?(attrs = []) ~tokens a = mk ?loc ~tokens (Pstr_eval (a, attrs))
+  (*
   let value ?loc a b = mk ?loc (Pstr_value (a, b))
   let primitive ?loc a = mk ?loc (Pstr_primitive a)
   let type_ ?loc rec_flag a = mk ?loc (Pstr_type (rec_flag, a))
@@ -365,11 +367,18 @@ module Str = struct
   let include_ ?loc a = mk ?loc (Pstr_include a)
   let extension ?loc ?(attrs = []) a = mk ?loc (Pstr_extension (a, attrs))
   let kind_abbrev ?loc a b = mk ?loc (Pstr_kind_abbrev (a, b))
-  let attribute ?loc a = mk ?loc (Pstr_attribute a)
+     *)
+  let attribute ?loc ~tokens a = mk ?loc ~tokens (Pstr_attribute a)
   let text txt =
     let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
     List.map
-      (fun ds -> attribute ~loc:(docstring_loc ds) (text_attr ds))
+      (fun ds ->
+         let loc = docstring_loc ds in
+         let _drop_source_tok = Tokens.at (loc.loc_start, loc.loc_end) in
+         dprintf "@[<hov 2>dropping:@ %a@]@."
+           Tokens.pp_seq _drop_source_tok;
+         let tok = { Tokens.desc = Child_node; pos = loc.loc_start } in
+         attribute ~loc ~tokens:[tok] (text_attr ds))
       f_txt
 end
 

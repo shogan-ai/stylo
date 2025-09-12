@@ -64,7 +64,9 @@ let mkexp ~loc ?attrs d =
 let mkmty ~loc ?attrs d = Mty.mk ~loc:(make_loc loc) ?attrs d
 let mksig ~loc ?ext_attr d = Sig.mk ?ext_attr ~loc:(make_loc loc) d
 let mkmod ~loc ?attrs d = Mod.mk ~loc:(make_loc loc) ?attrs d
-let mkstr ~loc ?ext_attr d = Str.mk ?ext_attr ~loc:(make_loc loc) d
+let mkstr ~loc ?ext_attr d =
+  let tokens = Tokens.at loc in
+  Str.mk ?ext_attr ~loc:(make_loc loc) ~tokens d
 let mkclass ~loc ?attrs d = Cl.mk ~loc:(make_loc loc) ?attrs d
 let mkcty ~loc ?attrs d = Cty.mk ~loc:(make_loc loc) ?attrs d
 
@@ -163,8 +165,8 @@ let mktailexp _nilloc elts = Pexp_list elts, _nilloc (* whatever *)
 
 let mktailpat _nilloc elts = Ppat_list elts, _nilloc (* whatever *)
 
-let mkstrexp e attrs =
-  Str.eval ~loc:e.pexp_loc ~attrs e
+let mkstrexp sloc e attrs =
+  Str.eval ~loc:(make_loc sloc) ~attrs ~tokens:(Tokens.at sloc) e
 
 let syntax_error () =
   failwith "Syntax error"
@@ -1303,7 +1305,7 @@ structure:
 %inline str_exp:
   e = seq_expr
   attrs = post_item_attributes
-    { mkstrexp e attrs }
+    { mkstrexp $sloc e attrs }
 ;
 
 (* A structure element is one of the following:

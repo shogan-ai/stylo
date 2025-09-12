@@ -355,9 +355,12 @@ module Sg:
 (** Structure items *)
 module Str:
   sig
-    val mk: ?loc:loc -> ?ext_attr:ext_attribute -> structure_item_desc -> structure_item
+    val mk: ?loc:loc -> ?ext_attr:ext_attribute ->
+      tokens:Tokens.seq -> structure_item_desc -> structure_item
 
-    val eval: ?loc:loc -> ?attrs:attributes -> expression -> structure_item
+    val eval: ?loc:loc -> ?attrs:attributes -> tokens:Tokens.seq ->
+      expression -> structure_item
+    (*
     val value: ?loc:loc -> rec_flag -> value_binding list -> structure_item
     val primitive: ?loc:loc -> value_description -> structure_item
     val type_: ?loc:loc -> rec_flag -> type_declaration list -> structure_item
@@ -374,6 +377,7 @@ module Str:
     val kind_abbrev: ?loc:loc -> label with_loc -> jkind_annotation ->
       structure_item
     val attribute: ?loc:loc -> attribute -> structure_item
+       *)
     val text: text -> structure_item list
   end
 

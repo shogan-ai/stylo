@@ -65,6 +65,11 @@ class to_tokens = object
 
   inherit [_] Parsetree.reduce as super
 
+  method! visit_structure_item env si =
+    let sub_tokens = super#visit_structure_item env si in
+    let node_toks = si.pstr_tokens in
+    combine_children ~loc:si.pstr_loc node_toks sub_tokens
+
   method! visit_structure env s =
     let sub_tokens = super#visit_structure env s in
     let node_toks = snd s in

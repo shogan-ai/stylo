@@ -80,7 +80,8 @@ let docs_attr ds =
   in
   let item =
     { pstr_ext_attrs = empty_ext_attr;
-      pstr_desc = Pstr_eval (exp, []); pstr_loc = loc }
+      pstr_desc = Pstr_eval (exp, []); pstr_loc = loc;
+      pstr_tokens = []; }
   in
   let tok_elt = { Tokens.desc = Comment body; pos = loc.loc_start } in
   remember_token tok_elt;
@@ -138,7 +139,8 @@ let text_attr ds =
   in
   let item =
     { pstr_ext_attrs = empty_ext_attr;
-      pstr_desc = Pstr_eval (exp, []); pstr_loc = loc }
+      pstr_desc = Pstr_eval (exp, []); pstr_loc = loc;
+      pstr_tokens = []; }
   in
   let tok_elt = { Tokens.desc = Comment body; pos = loc.loc_start } in
   remember_token tok_elt;
