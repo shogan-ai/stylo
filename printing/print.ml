@@ -855,7 +855,7 @@ end = struct
            begin match default with
              | None -> empty
              | Some d ->
-               S.equals ^^ Expression.pp d
+               S.equals ^/^ Expression.pp d
            end
       )
     | Parg_labelled {
@@ -876,7 +876,7 @@ end = struct
            begin match default with
              | None -> empty
              | Some d ->
-               S.equals ^^ Expression.pp d
+               S.equals ^/^ Expression.pp d
            end
       )
 end
