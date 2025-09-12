@@ -676,9 +676,20 @@ end = struct
     | Pexp_parens { begin_end = true; exp } ->
       prefix S.begin_ (pp exp) ^/^ S.end_
     | Pexp_list elts ->
-      brackets (
-        separate_map (S.semi ^^ break 1) pp elts
-      )
+      let semi_as_term =
+        List.filter
+          (function Tokens.{ desc = Token SEMI; _ } -> true | _ -> false)
+          exp.pexp_tokens
+        |> List.compare_lengths elts
+        |> (fun x -> 0 = x)
+      in
+      let elts =
+        if semi_as_term then
+          separate_map (break 1) (fun elt -> pp elt ^^ S.semi) elts
+        else
+          separate_map (S.semi ^^ break 1) pp elts
+      in
+      brackets elts
     | Pexp_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
     | Pexp_exclave exp -> S.exclave__ ^/^ pp exp
 
