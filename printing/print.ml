@@ -389,7 +389,12 @@ end = struct
 
   and pp_desc tokens = function
     | Ppat_any -> S.underscore
-    | Ppat_var name -> string name.txt
+    | Ppat_var name ->
+      let name = string name.txt in
+      if List.exists (fun t -> t.Tokens.desc = Token LPAREN) tokens then
+        S.lparen ^^ name ^^ S.rparen
+      else
+        name
     | Ppat_alias (p, alias) ->
       prefix (pp p) (group (S.as_ ^/^ string alias.txt))
     | Ppat_constant c -> constant c
