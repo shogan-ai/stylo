@@ -1291,7 +1291,13 @@ structure:
     optional_structure_standalone_expression,
     flatten(structure_element*)
   ))
-  { $1, Tokens.at $sloc }
+  { let str = $1 in
+    let start =
+      match str with
+      | [] -> $startpos
+      | x :: _ -> x.pstr_loc.loc_start
+    in
+    str, Tokens.at (start, $endpos) }
 ;
 
 (* An optional standalone expression is just an expression with attributes

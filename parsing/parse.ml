@@ -11,4 +11,6 @@ let lex_and_save lexbuf =
 let structure lb =
   Lexer.init ();
   Tokens.Indexed_list.reset_global ();
-  Parser.implementation lex_and_save lb
+  let (str, struct_tokens) = Parser.implementation lex_and_save lb in
+  let all_tokens = Tokens.Indexed_list.(consume_all global) in
+  str, Tokens.replace_first_child ~subst:struct_tokens all_tokens

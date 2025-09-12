@@ -133,5 +133,6 @@ let rec walk_both seq doc =
 
 let from_tokens tokens doc =
   match walk_both tokens doc with
-  | [], doc -> doc
+  | [], doc
+  | [ { desc = Token EOF; _ } ], doc -> doc
   | tokens, _ -> raise (Error (Output_shorter_than_input tokens))

@@ -329,6 +329,10 @@ module Indexed_list : sig
   val append : t -> pos:Lexing.position -> desc -> unit
   val consume : t -> Lexing.position -> Lexing.position -> seq
 
+  (* use on parser entry points to collect comments lying outside the parsed
+     symbol's position. *)
+  val consume_all : t -> seq
+
   val global : t
   val reset_global : unit -> unit
 end = struct
@@ -443,6 +447,16 @@ end = struct
     let res = consume t start stop in
     dprintf "consumed: @[<h 2>%a@]@." pp_seq res;
     res
+
+  let consume_all t =
+    let rec aux acc = function
+      | Empty ->
+        dprintf "consumed_all: @[<h 2>%a@]@." pp_seq acc;
+        acc
+      | Node n -> aux (n.value :: acc) n.prev
+    in
+    aux [] t.last
+
 
   let global = create ()
   let reset_global () =
