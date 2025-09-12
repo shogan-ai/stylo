@@ -868,6 +868,7 @@ and constructor_declaration =
      pcd_res: core_type option;
      pcd_loc: location;
      pcd_attributes: attributes;  (** [C of ... [\@id1] [\@id2]] *)
+     pcd_doc: attribute option;
      pcd_tokens: tokens;
     }
 

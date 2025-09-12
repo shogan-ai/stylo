@@ -1048,7 +1048,8 @@ and Type_declaration : sig
 end = struct
 
   let constructor_declaration pipe
-      { pcd_name; pcd_vars; pcd_args; pcd_res; pcd_attributes; _ } =
+      { pcd_name; pcd_vars; pcd_args; pcd_res; pcd_attributes;
+        pcd_doc; pcd_loc = _; pcd_tokens = _ } =
     let pcd_vars =
       match pcd_vars with
         | [] -> empty
@@ -1060,19 +1061,21 @@ end = struct
               Jkind_annotation.pp j ^^ S.rparen
           ) lst ^^ S.dot ^^ break 1
     in
-    prefix_nonempty
-      (group ((if pipe then S.pipe else empty) ^?^ string pcd_name.txt))
-      (begin match pcd_args, pcd_res with
-         | Pcstr_tuple [], None -> empty
-         | args, None ->
-           S.of_ ^/^ Constructor_argument.pp_args args
-         | Pcstr_tuple [], Some ct ->
-           S.colon ^/^ pcd_vars ^^ Core_type.pp ct
-         | args, Some ct ->
-           S.colon ^/^ pcd_vars ^^
-           Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct
-       end)
-    |> Attribute.attach ~attrs:pcd_attributes
+    Attribute.attach ~attrs:pcd_attributes (
+      prefix_nonempty
+        (group ((if pipe then S.pipe else empty) ^?^ string pcd_name.txt))
+        (begin match pcd_args, pcd_res with
+           | Pcstr_tuple [], None -> empty
+           | args, None ->
+             S.of_ ^/^ Constructor_argument.pp_args args
+           | Pcstr_tuple [], Some ct ->
+             S.colon ^/^ pcd_vars ^^ Core_type.pp ct
+           | args, Some ct ->
+             S.colon ^/^ pcd_vars ^^
+             Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct
+         end)
+    ) ^?^
+    optional Attribute.pp pcd_doc
 
   let pp_constrs ~has_leading_pipe =
     foldli (fun i accu x ->

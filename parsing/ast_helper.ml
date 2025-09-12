@@ -651,14 +651,21 @@ module Type = struct
   let constructor ?(loc = !default_loc) ?(attrs = []) ~tokens
         ?(info = empty_info)
         ?(vars = []) ?(args = Pcstr_tuple []) ?res name =
+    let info = simplify_ds info in
+    let info_tokens =
+      match info with
+      | None -> []
+      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
+    in
     {
      pcd_name = name;
      pcd_vars = vars;
      pcd_args = args;
      pcd_res = res;
      pcd_loc = loc;
-     pcd_attributes = add_info_attrs info attrs;
-     pcd_tokens = tokens;
+     pcd_attributes = attrs;
+     pcd_doc = Option.map Docstrings.info_attr info;
+     pcd_tokens = tokens @ info_tokens;
     }
 
   let constructor_arg ?(loc = !default_loc) ?(modalities = []) typ =
