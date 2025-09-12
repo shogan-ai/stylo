@@ -97,7 +97,7 @@ let type_app ?(parens=true) ty args =
   in
   begin match args with
     | [] -> empty
-    | [ x ] -> x ^^ break 1
+    | [ x ] when parens -> x ^^ break 1
     | _ -> left ^^ separate (S.comma ^^ break 1) args ^^ right ^^ break 1
   end ^^ ty
 
@@ -1296,7 +1296,7 @@ end = struct
       { pci_virt; pci_params; pci_name; pci_expr; pci_attributes; _ } =
     let pp_param (x, info) = param_info info ^^ Core_type.pp x in
     virtual_ pci_virt ^^
-    type_app (string pci_name.txt) (List.map pp_param pci_params) ^/^
+    type_app ~parens:false (string pci_name.txt) (List.map pp_param pci_params) ^/^
     S.equals ^/^ pp_expr pci_expr
     |> Attribute.attach ~post:true ~attrs:pci_attributes
 end
