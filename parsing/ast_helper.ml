@@ -675,7 +675,7 @@ module Type = struct
       pca_loc = loc;
     }
 
-  let field ?(loc = !default_loc) ?(attrs = []) ?(info = empty_info)
+  let field ?(loc = !default_loc) ?(attrs = []) ~tokens ?(info = empty_info)
         ?(mut = Immutable) ?(modalities = []) name typ =
     {
      pld_name = name;
@@ -684,6 +684,7 @@ module Type = struct
      pld_type = typ;
      pld_loc = loc;
      pld_attributes = add_info_attrs info attrs;
+     pld_tokens = tokens;
     }
 
 end

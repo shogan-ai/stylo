@@ -847,6 +847,7 @@ and label_declaration =
      pld_type: core_type;
      pld_loc: location;
      pld_attributes: attributes;  (** [l : T [\@id1] [\@id2]] *)
+     pld_tokens: tokens;
     }
 (**
    - [{ ...; l: T; ... }]

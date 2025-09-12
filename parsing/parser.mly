@@ -3794,7 +3794,8 @@ label_declaration:
       { let info = symbol_info $endpos in
         let mut, m0 = $1 in
         let modalities = m0 @ m1 in
-        Type.field $2 $4 ~mut ~modalities ~attrs ~loc:(make_loc $sloc) ~info}
+        Type.field $2 $4 ~mut ~modalities ~attrs
+          ~tokens:(Tokens.at $sloc) ~loc:(make_loc $sloc) ~info}
 ;
 label_declaration_semi:
     mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr m1=optional_atat_modalities_expr attrs0=attributes
@@ -3806,7 +3807,8 @@ label_declaration_semi:
        in
        let mut, m0 = $1 in
        let modalities = m0 @ m1 in
-       Type.field $2 $4 ~mut ~modalities ~attrs:(attrs0 @ attrs1) ~loc:(make_loc $sloc) ~info}
+       Type.field $2 $4 ~mut ~modalities ~attrs:(attrs0 @ attrs1)
+         ~tokens:(Tokens.at $sloc) ~loc:(make_loc $sloc) ~info}
 ;
 
 /* Type Extensions */

@@ -250,7 +250,7 @@ module Type:
     val constructor_arg: ?loc:loc -> ?modalities:modality with_loc list -> core_type ->
       constructor_argument
 
-    val field: ?loc:loc -> ?attrs:attrs -> ?info:info ->
+    val field: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?info:info ->
       ?mut:mutable_flag -> ?modalities:modality with_loc list -> str -> core_type ->
       label_declaration
   end

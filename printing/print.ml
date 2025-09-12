@@ -1015,6 +1015,12 @@ end = struct
        | ms -> break 1 ^^ S.atat ^/^ modalities ms
        end)
     |> Attribute.attach ~attrs:pld_attributes
+
+  let pp pld =
+    pp pld ^^
+    if List.exists (fun t -> t.Tokens.desc = Token SEMI) pld.pld_tokens
+    then S.semi
+    else empty
 end
 
 and Constructor_argument : sig
@@ -1033,7 +1039,7 @@ end = struct
     | Pcstr_tuple args ->
       separate_map (break 1 ^^ S.star ^^ break 1) pp args
     | Pcstr_record lbls ->
-      let lbls = separate_map (S.semi ^^ break 1) Label_declaration.pp lbls in
+      let lbls = separate_map (break 1) Label_declaration.pp lbls in
       prefix S.lbrace lbls ^/^ S.rbrace
 end
 
@@ -1094,10 +1100,10 @@ end = struct
         pp_constrs ~has_leading_pipe:(starts_with_pipe cd.pcd_tokens) cds
       end
     | Ptype_record lbls ->
-      let lbls = separate_map (S.semi ^^ break 1) Label_declaration.pp lbls in
+      let lbls = separate_map (break 1) Label_declaration.pp lbls in
       S.equals ^/^ private_ priv ^^ prefix S.lbrace lbls ^/^ S.rbrace
     | Ptype_record_unboxed_product lbls ->
-      let lbls = separate_map (S.semi ^^ break 1) Label_declaration.pp lbls in
+      let lbls = separate_map (break 1) Label_declaration.pp lbls in
       S.equals ^/^ private_ priv ^^ prefix S.hash_lbrace lbls ^/^ S.rbrace
     | Ptype_open -> S.equals ^/^ S.dotdot
 
