@@ -686,14 +686,21 @@ module Type = struct
 
   let field ?(loc = !default_loc) ?(attrs = []) ~tokens ?(info = empty_info)
         ?(mut = Immutable) ?(modalities = []) name typ =
+    let info = simplify_ds info in
+    let info_tokens =
+      match info with
+      | None -> []
+      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
+    in
     {
      pld_name = name;
      pld_mutable = mut;
      pld_modalities = modalities;
      pld_type = typ;
      pld_loc = loc;
-     pld_attributes = add_info_attrs info attrs;
-     pld_tokens = tokens;
+     pld_attributes = attrs;
+     pld_doc = Option.map Docstrings.info_attr info;
+     pld_tokens = tokens @ info_tokens;
     }
 
 end

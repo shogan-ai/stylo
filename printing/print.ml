@@ -1018,9 +1018,12 @@ end = struct
 
   let pp pld =
     pp pld ^^
-    if List.exists (fun t -> t.Tokens.desc = Token SEMI) pld.pld_tokens
-    then S.semi
-    else empty
+    begin if List.exists (fun t -> t.Tokens.desc = Token SEMI) pld.pld_tokens
+      then S.semi
+      else empty
+    end ^?^
+    optional Attribute.pp pld.pld_doc
+
 end
 
 and Constructor_argument : sig
