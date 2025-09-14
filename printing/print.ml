@@ -1264,16 +1264,18 @@ end = struct
       pp ct
 
   and pp_signature { pcsig_self; pcsig_fields } =
-    S.object_ ^^
-    begin match pcsig_self.ptyp_desc with
+    let obj_with_self =
+      S.object_ ^^
+      match pcsig_self.ptyp_desc with
       | Ptyp_any None -> empty
       | _otherwise -> parens (Core_type.pp pcsig_self)
-    end ^/^
-    separate_map (break 1) pp_field pcsig_fields ^/^
+    in
+    prefix obj_with_self
+      (separate_map (break 1) pp_field pcsig_fields) ^/^
     S.end_
 
   and pp_field { pctf_desc; pctf_attributes; _ } =
-    pp_field_desc pctf_desc
+    group (pp_field_desc pctf_desc)
     |> Attribute.attach ~attrs:pctf_attributes
 
   and pp_field_desc = function
@@ -1348,16 +1350,18 @@ end = struct
       S.in_ ^/^ pp ce
 
   and pp_structure { pcstr_self; pcstr_fields } =
-    S.object_ ^^
-    begin match pcstr_self.ppat_desc with
+    let obj_with_self =
+      S.object_ ^^
+      match pcstr_self.ppat_desc with
       | Ppat_any -> empty
       | _ -> Pattern.pp pcstr_self
-    end ^/^
-    separate_map (break 1) pp_field pcstr_fields ^/^
+    in
+    prefix obj_with_self
+      (separate_map (break 1) pp_field pcstr_fields) ^/^
     S.end_
 
   and pp_field { pcf_desc; pcf_attributes; _ } =
-    pp_field_desc pcf_desc
+    group (pp_field_desc pcf_desc)
     |> Attribute.attach ~post:true ~attrs:pcf_attributes
 
   and pp_field_desc = function
