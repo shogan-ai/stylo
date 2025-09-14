@@ -1691,15 +1691,29 @@ end = struct
 
   let pp_item it = group (pp_item_desc it)
 
-  let pp (items, _) =
-    group (
-      prefix S.struct_
-        (separate_map (break 1) pp_item items) ^/^
-      S.end_
-    )
+  (* We keep the list of items in sync with the list of "tokens" of the
+     structure (each [Child_node] is a structure item).
+     That tells us where to insert [;;]. *)
+  let rec pp_keeping_semi doc = function
+    | [], [] -> doc
+    | item :: items, Tokens.{ desc = Child_node; _ } :: tokens ->
+      pp_keeping_semi (doc ^?^ pp_item item) (items, tokens)
+    | _::_, [] -> assert false
+    | items, tok :: tokens ->
+      match tok.desc with
+      | Child_node -> assert false
+      | Token SEMISEMI ->
+        pp_keeping_semi (doc ^?^ S.semisemi) (items, tokens)
+      | Comment _
+      | Token EOF ->
+        pp_keeping_semi doc (items, tokens)
+      | Token _ -> assert false
 
-  let pp_implementation (s, _) =
-    group (separate_map (hardline ^^ hardline) pp_item s)
+  let pp str =
+    group (prefix S.struct_ (pp_keeping_semi empty str) ^/^ S.end_)
+
+  let pp_implementation str =
+    group (pp_keeping_semi empty str)
 end
 
 and Value_constraint : sig
