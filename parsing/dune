@@ -1,8 +1,5 @@
 (ocamllex lexer)
 
-; (menhir
-;   (modules parser_tokens)
-;   (flags --table --inspection --only-tokens))
 (rule
   (targets parser_tokens.ml parser_tokens.mli)
   (action
