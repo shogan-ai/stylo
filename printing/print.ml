@@ -288,12 +288,8 @@ end = struct
         | Open -> S.semi ^/^ S.dotdot
       end ^/^ S.gt
     | Ptyp_class (lid, args) ->
-      begin match args with
-        | [] -> empty
-        | [ x ] -> pp x ^^ break 1
-        | lst ->
-          S.lparen ^^ separate_map S.comma pp lst ^^ S.rparen ^^ break 1
-      end ^^ S.hash ^^ longident lid.txt
+      type_app (S.hash ^^ longident lid.txt)
+        (List.map pp args)
     | Ptyp_alias (ct, name, None) ->
       pp ct ^/^ S.as_ ^/^
       S.squote ^^ string (Option.get name).txt
@@ -398,15 +394,9 @@ end = struct
       prefix (pp p) (group (S.as_ ^/^ string alias.txt))
     | Ppat_constant c -> constant c
     | Ppat_interval (c1,c2) -> constant c1 ^/^ S.dotdot ^/^ constant c2
-    | Ppat_tuple (elts, closed) ->
-      separate_map (break 0 ^^ S.comma ^^ break 1) (Argument.pp pp) elts ^^
-      begin match closed with
-        | Closed -> empty
-        | Open -> break 0 ^^ S.comma ^^ break 1 ^^ S.dotdot
-      end
+    | Ppat_tuple (elts, closed) -> pp_tuple closed elts
     | Ppat_unboxed_tuple (elts, cf) ->
-      S.hash_lparen ^^ pp_desc tokens (* FIXME *)
-                         (Ppat_tuple (elts, cf)) ^^ S.rparen
+      S.hash_lparen ^^ nest 1 (pp_tuple cf elts) ^^ S.rparen
     | Ppat_construct (lid, arg) -> pp_construct lid arg
     | Ppat_variant (lbl, None) -> S.bquote ^^ string lbl
     | Ppat_variant (lbl, Some p) -> S.bquote ^^ string lbl ^/^ pp p
@@ -448,6 +438,13 @@ end = struct
         separate_map (S.semi ^^ break 1) pp elts
       )
     | Ppat_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
+
+  and pp_tuple closed elts =
+    separate_map (break 0 ^^ S.comma ^^ break 1) (Argument.pp pp) elts ^^
+    begin match closed with
+      | Closed -> empty
+      | Open -> break 0 ^^ S.comma ^^ break 1 ^^ S.dotdot
+    end
 
   and pp_construct name arg_opt =
     let name = constr_longident name.txt in
@@ -537,13 +534,9 @@ end = struct
       prefix !!S.try_ (pp e) ^/^ S.with_ ^/^
       Case.pp_cases cases
         ~has_leading_pipe:(has_leading_pipe ~after:WITH exp.pexp_tokens)
-    | Pexp_tuple elts ->
-      separate_map (S.comma ^^ break 1) (Argument.pp pp) elts
+    | Pexp_tuple elts -> pp_tuple elts
     | Pexp_unboxed_tuple elts ->
-      S.hash_lparen ^^
-      (* FIXME: ! *)
-      pp_desc { exp with pexp_desc = Pexp_tuple elts } ^^
-      S.rparen
+      S.hash_lparen ^^ nest 1 (pp_tuple elts) ^^ S.rparen
     | Pexp_construct (lid, arg) ->
       prefix_nonempty (constr_longident lid.txt) (optional pp arg)
     | Pexp_variant (lbl, eo) ->
@@ -698,6 +691,9 @@ end = struct
       brackets elts
     | Pexp_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
     | Pexp_exclave exp -> S.exclave__ ^/^ pp exp
+
+  and pp_tuple elts =
+    separate_map (S.comma ^^ break 1) (Argument.pp pp) elts
 
   and pp_apply e args = prefix (pp e) (Application.pp_args args)
 
