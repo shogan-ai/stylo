@@ -1330,7 +1330,7 @@ end = struct
       )
       ~rhs:(pp_expr pci_expr)
       ~attrs:pci_attributes
-      ~post:true
+      ~item:true (* [@@] expected for attributes, as for struct/sig items *)
       ?post_doc:pci_post_doc
 
   let rec pp_list pp_expr ~keywords = function
@@ -1387,7 +1387,7 @@ end = struct
       | _ -> Pattern.pp pcstr_self
     in
     prefix obj_with_self
-      (separate_map (break 1) pp_field pcstr_fields) ^/^
+      (separate_map (hardline ^^ hardline) pp_field pcstr_fields) ^/^
     S.end_
 
   and pp_field { pcf_desc; pcf_attributes; _ } =
@@ -1688,7 +1688,7 @@ end = struct
     | Pstr_eval (e, attrs) -> Attribute.attach ~attrs (Expression.pp e)
     | Pstr_value (rf, vbs) ->
       (* FIXME: factorize Pexp_let *)
-      Value_binding.pp_list vbs ~start:(
+      Value_binding.pp_list ~item:true vbs ~start:(
         !!S.let_ ::
         match rf with
         | Nonrecursive -> []
@@ -1716,13 +1716,19 @@ end = struct
 
   let pp_item it = group (pp_item_desc it)
 
+  let (^//^) before after =
+    if before = Empty then
+      after
+    else
+      before ^^ hardline ^^ hardline ^^ after
+
   (* We keep the list of items in sync with the list of "tokens" of the
      structure (each [Child_node] is a structure item).
      That tells us where to insert [;;]. *)
   let rec pp_keeping_semi doc = function
     | [], [] -> doc
     | item :: items, Tokens.{ desc = Child_node; _ } :: tokens ->
-      pp_keeping_semi (doc ^?^ pp_item item) (items, tokens)
+      pp_keeping_semi (doc ^//^ pp_item item) (items, tokens)
     | _::_, [] -> assert false
     | items, tok :: tokens ->
       match tok.desc with
@@ -1771,12 +1777,12 @@ end = struct
 end
 
 and Generic_binding : sig
-  val pp : ?post:bool -> ?pre_text:attributes -> ?pre_doc:attribute ->
+  val pp : ?item:bool -> ?pre_text:attributes -> ?pre_doc:attribute ->
     keyword:document -> ?params:document list -> ?constraint_:document ->
     ?rhs:document -> ?attrs:attributes -> ?post_doc:attribute -> document ->
     document
 end = struct
-  let pp ?post ?(pre_text=[]) ?pre_doc ~keyword ?(params=[])
+  let pp ?item ?(pre_text=[]) ?pre_doc ~keyword ?(params=[])
         ?(constraint_=empty) ?rhs ?(attrs=[]) ?post_doc bound =
     begin match pre_text with
     | [] -> empty
@@ -1786,7 +1792,7 @@ end = struct
       hardline ^^ hardline
     end ^^
     optional Attribute.pp pre_doc ^?^
-    Attribute.attach ?post ~attrs
+    Attribute.attach ?post:item ~attrs
       (match rhs with
        | None -> (* Punning *)
          prefix keyword (
@@ -1805,9 +1811,9 @@ end
 and Value_binding : sig
   val pp_core : value_binding -> document
 
-  val pp_list : start:document list -> value_binding list -> document
+  val pp_list : ?item:bool -> start:document list -> value_binding list -> document
 end = struct
-  let pp_core start
+  let pp_core ?item start
         { pvb_modes; pvb_pat; pvb_params; pvb_constraint; pvb_ret_modes;
           pvb_expr; pvb_attributes; pvb_pre_text; pvb_pre_doc; pvb_post_doc;
           pvb_loc = _; pvb_tokens = _; pvb_ext_attrs } =
@@ -1831,26 +1837,29 @@ end = struct
       ~keyword:kw_and_modes
       pat ~params ~constraint_
       ?rhs:(Option.map Expression.pp pvb_expr)
-      ~attrs:pvb_attributes
+      ?item ~attrs:pvb_attributes
       ?post_doc:pvb_post_doc
 
-  let rec pp_list ~start = function
+  let rec pp_list ?(item=false) ~start = function
     | [] -> empty
-    | x :: xs -> pp_core start x ^?^ pp_list ~start:[S.and_] xs
+    | [ x ] -> pp_core ~item start x
+    | x :: xs ->
+      let sep = if item then hardline ^^ hardline else break 1 in
+      pp_core ~item start x ^^ sep ^^ pp_list ~item ~start:[S.and_] xs
 
   let pp_core = pp_core [empty]
 
 end
 
 and Module_binding : sig
-  val pp : kw:document -> module_binding -> document
+  val pp : ?item:bool -> kw:document -> module_binding -> document
 
   val pp_recmods : module_binding list -> document
 end = struct
-  let pp ~kw { pmb_ext_attrs; pmb_name = (name, name_modes); pmb_params;
-               pmb_constraint; pmb_modes; pmb_expr; pmb_attributes;
-               pmb_pre_text; pmb_pre_doc; pmb_post_doc; pmb_loc = _;
-               pmb_tokens = _ } =
+  let pp ?item ~kw
+      { pmb_ext_attrs; pmb_name = (name, name_modes); pmb_params;
+        pmb_constraint; pmb_modes; pmb_expr; pmb_attributes; pmb_pre_text;
+        pmb_pre_doc; pmb_post_doc; pmb_loc = _; pmb_tokens = _ } =
     let kw = Ext_attribute.decorate kw pmb_ext_attrs in
     let bound =
       let name =
@@ -1873,12 +1882,15 @@ end = struct
     in
     Generic_binding.pp ~pre_text:pmb_pre_text ?pre_doc:pmb_pre_doc
       ~keyword:kw bound ~params ~constraint_
-      ~rhs:(Module_expr.pp pmb_expr) ~attrs:pmb_attributes
+      ~rhs:(Module_expr.pp pmb_expr)
+      ~attrs:pmb_attributes ?item
       ?post_doc:pmb_post_doc
 
   let rec pp_recmods kw = function
     | [] -> empty
-    | mb :: mbs -> pp ~kw mb ^?^ pp_recmods S.and_ mbs
+    | [ mb ] -> pp ~item:true ~kw mb
+    | mb :: mbs ->
+      pp ~item:true ~kw mb ^^ hardline ^^ hardline ^^ pp_recmods S.and_ mbs
 
   let pp_recmods = pp_recmods (group (S.module_ ^/^ S.rec_))
 end
