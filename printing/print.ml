@@ -1428,7 +1428,7 @@ end = struct
     | Pmty_ident lid -> longident lid.txt
     | Pmty_signature sg -> Signature.pp sg
     | Pmty_functor (fp, mty, modes) ->
-      S.functor_ ^/^ parens (Functor_parameter.pp fp) ^/^ S.rarrow ^/^
+      S.functor_ ^/^ Functor_parameter.pp fp ^/^ S.rarrow ^/^
       with_modes ~modes (pp mty)
     | Pmty_with (mty, cstrs) ->
       pp mty ^^
@@ -1461,6 +1461,8 @@ end = struct
         | None -> S.underscore
         | Some s -> string s
       end ^/^ S.colon ^/^ with_modes (Module_type.pp mty) ~modes
+
+  let pp fp = parens (pp fp)
 end
 
 and Signature : sig
@@ -1628,7 +1630,7 @@ end = struct
     | Pmod_ident lid -> longident lid.txt
     | Pmod_structure str -> Structure.pp str
     | Pmod_functor (fp, me) ->
-      S.functor_ ^/^ parens (Functor_parameter.pp fp) ^/^ S.rarrow ^/^ pp me
+      S.functor_ ^/^ Functor_parameter.pp fp ^/^ S.rarrow ^/^ pp me
     | Pmod_apply (m1, m2) ->
       pp m1 ^^ parens (pp m2)
     | Pmod_apply_unit me -> pp me ^^ S.lparen ^^ S.rparen
