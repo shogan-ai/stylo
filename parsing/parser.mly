@@ -1784,10 +1784,11 @@ module_type_subst:
   body = class_fun_binding
   attrs = post_item_attributes
   {
+    let (value_params, constraint_, body) = body in
     let loc = make_loc $sloc in
     let docs = symbol_docs $sloc in
     ext_attrs,
-    Ci.mk id body ~virt ~params ~attrs ~loc ~docs
+    Ci.mk id body ~virt ~params ~value_params ?constraint_ ~attrs ~loc ~docs
   }
 ;
 %inline and_class_declaration:
@@ -1799,23 +1800,24 @@ module_type_subst:
   body = class_fun_binding
   attrs2 = post_item_attributes
   {
+    let (value_params, constraint_, body) = body in
     let attrs = attrs1 @ attrs2 in
     let loc = make_loc $sloc in
     let docs = symbol_docs $sloc in
     let text = symbol_text $symbolstartpos in
-    Ci.mk id body ~virt ~params ~attrs ~loc ~text ~docs
+    Ci.mk id body ~virt ~params ~value_params ?constraint_ ~attrs ~loc
+      ~text ~docs
   }
 ;
 
 class_fun_binding:
     EQUAL class_expr
-      { $2 }
-  | mkclass(
-      COLON class_type EQUAL class_expr
-        { Pcl_constraint($4, $2) }
-    | labeled_simple_pattern class_fun_binding
-      { Pcl_fun($1, $2) }
-    ) { $1 }
+      { [], None, $2 }
+  | COLON class_type EQUAL class_expr
+      { [], Some $2, $4 }
+  | labeled_simple_pattern class_fun_binding
+      { let params, cstr, ce = $2 in
+        $1 :: params, cstr, ce }
 ;
 
 formal_class_parameters:

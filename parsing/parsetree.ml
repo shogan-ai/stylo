@@ -1021,6 +1021,8 @@ and 'a class_infos =
      pci_virt: virtual_flag;
      pci_params: (core_type * (variance * injectivity)) list;
      pci_name: string loc;
+     pci_value_params: pattern argument list;
+     pci_constraint: class_type option;
      pci_expr: 'a;
      pci_loc: location;
      pci_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
@@ -1415,9 +1417,9 @@ and value_binding =
     pvb_ext_attrs: ext_attribute;
     pvb_pat: pattern;
     pvb_params: function_param list;
-    pvb_expr: expression option;
     pvb_constraint: value_constraint option;
     pvb_modes: modes;
+    pvb_expr: expression option;
     pvb_ret_modes: modes;
     pvb_attributes: attributes;
     pvb_post_doc: attribute option;

@@ -1301,10 +1301,17 @@ and Class_infos : sig
   val pp : 'a. ('a -> document) -> 'a class_infos -> document
 end = struct
   let pp pp_expr
-      { pci_virt; pci_params; pci_name; pci_expr; pci_attributes; _ } =
+      { pci_virt; pci_params; pci_name; pci_expr; pci_attributes;
+        pci_value_params; pci_constraint; pci_loc = _ } =
     let pp_param (x, info) = param_info info ^^ Core_type.pp x in
     virtual_ pci_virt ^^
-    type_app ~parens:false (string pci_name.txt) (List.map pp_param pci_params) ^/^
+    type_app ~parens:false (string pci_name.txt)
+        (List.map pp_param pci_params) ^?^
+    flow_map (break 1) (Argument.pp Pattern.pp) pci_value_params ^?^
+    begin match pci_constraint with
+      | None -> empty
+      | Some ct -> S.colon ^/^ Class_type.pp ct
+    end ^?^
     S.equals ^/^ pp_expr pci_expr
     |> Attribute.attach ~post:true ~attrs:pci_attributes
 end

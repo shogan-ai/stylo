@@ -524,7 +524,8 @@ module Ci:
     val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
       ?virt:virtual_flag ->
       ?params:(core_type * (variance * injectivity)) list ->
-      str -> 'a -> 'a class_infos
+      str -> ?value_params:pattern argument list -> ?constraint_:class_type ->
+      'a -> 'a class_infos
   end
 
 (** Class signatures *)

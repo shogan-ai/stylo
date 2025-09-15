@@ -623,11 +623,14 @@ end
 module Ci = struct
   let mk ?(loc = !default_loc) ?(attrs = [])
         ?(docs = empty_docs) ?(text = [])
-        ?(virt = Concrete) ?(params = []) name expr =
+        ?(virt = Concrete) ?(params = []) name ?(value_params=[])
+        ?constraint_ expr =
     {
      pci_virt = virt;
      pci_params = params;
      pci_name = name;
+     pci_value_params = value_params;
+     pci_constraint = constraint_;
      pci_expr = expr;
      pci_attributes =
        add_text_attrs text (add_docs_attrs docs attrs);
