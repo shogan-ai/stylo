@@ -1923,11 +1923,12 @@ value:
     label = mkrhs(label) COLON ty = core_type
       { (label, mutable_, Cfk_virtual ty), attrs }
   | override_flag noext_attributes mutable_flag mkrhs(label) EQUAL seq_expr
-      { let vb =
+      { let pat = mkpat ~loc:$loc($4) (Ppat_var $4) in
+        let vb =
           { pvb_pre_text = [];
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
-            pvb_pat = mkpat ~loc:$loc($4) (Ppat_var $4);
+            pvb_pat = pat;
             pvb_modes = []; pvb_params = [];
             pvb_constraint = None; pvb_ret_modes = [];
             pvb_expr = Some $6; pvb_loc = make_loc $sloc;
@@ -1945,11 +1946,12 @@ value:
              Pvc_constraint { locally_abstract_univars = []; typ=t }
           | Pcoerce (ground, coercion) -> Pvc_coercion { ground; coercion}
         in
+        let pat = mkpat ~loc:$loc($4) (Ppat_var $4) in
         let vb =
           { pvb_pre_text = [];
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
-            pvb_pat = mkpat ~loc:$loc($4) (Ppat_var $4);
+            pvb_pat = pat;
             pvb_modes = []; pvb_params = [];
             pvb_constraint = Some t; pvb_ret_modes = [];
             pvb_expr = Some $7; pvb_loc = make_loc $sloc;
