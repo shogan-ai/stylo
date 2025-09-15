@@ -78,8 +78,6 @@ let pstr_type (nr, tys) =
   Pstr_type (nr, tys)
 let pstr_exception (te, ext) =
   (Pstr_exception te, ext)
-let pstr_recmodule (ext, bindings) =
-  (Pstr_recmodule bindings, ext)
 
 let psig_typext (te, ext) =
   (Psig_typext te, ext)
@@ -1339,6 +1337,14 @@ structure_item:
         }
     | type_declarations
         { pstr_type $1 }
+    | rec_module_bindings
+        { Pstr_recmodule (snd $1) }
+    | module_binding
+        { $1 }
+    | class_declarations
+        { let ((), l) = $1 in (Pstr_class l) }
+    | class_type_declarations
+        { let ((), l) = $1 in (Pstr_class_type l) }
     )
   | wrap_mkstr_ext(
       primitive_declaration
@@ -1349,18 +1355,10 @@ structure_item:
         { pstr_typext $1 }
     | str_exception_declaration
         { pstr_exception $1 }
-    | module_binding
-        { $1 }
-    | rec_module_bindings
-        { pstr_recmodule $1 }
     | module_type_declaration
         { let (body, ext) = $1 in (Pstr_modtype body, ext) }
     | open_declaration
         { let (body, ext) = $1 in (Pstr_open body, ext) }
-    | class_declarations
-        { let (ext, l) = $1 in (Pstr_class l, ext) }
-    | class_type_declarations
-        { let (ext, l) = $1 in (Pstr_class_type l, ext) }
     )
     { $1 }
   | include_statement(module_expr)
@@ -1372,7 +1370,7 @@ structure_item:
 (* A single module binding. *)
 %inline module_binding:
   MODULE
-  ext_attrs = ext_attributes
+  ext_attr = ext_attributes
   name = module_name_modal(at_mode_expr)
   body = module_binding_body
   attrs = post_item_attributes
@@ -1380,10 +1378,10 @@ structure_item:
       let loc = make_loc $sloc in
       let params, mty_opt, modes, me = body in
       let mb =
-        Mb.mk name params mty_opt modes me ~attrs ~loc ~docs
+        Mb.mk name params mty_opt modes me ~ext_attr ~attrs ~loc ~docs
           ~tokens:(Tokens.at $sloc)
       in
-      Pstr_module mb, ext_attrs }
+      Pstr_module mb }
 ;
 
 (* The body (right-hand side) of a module binding. *)
@@ -1411,7 +1409,7 @@ module_binding_body:
 (* The first binding in a group of recursive module bindings. *)
 %inline rec_module_binding:
   MODULE
-  ext_attrs = ext_attributes
+  ext_attr = ext_attributes
   REC
   name = module_name_modal(at_mode_expr)
   body = module_binding_body
@@ -1421,27 +1419,26 @@ module_binding_body:
     let docs = symbol_docs $sloc in
     let params, mty_opt, modes, me = body in
     let mb =
-      Mb.mk name params mty_opt modes me ~attrs ~loc ~docs
+      Mb.mk name params mty_opt modes me ~ext_attr ~attrs ~loc ~docs
         ~tokens:(Tokens.at $sloc)
     in
-    ext_attrs, mb
+    (), mb
   }
 ;
 
 (* The following bindings in a group of recursive module bindings. *)
 %inline and_module_binding:
   AND
-  attrs1 = attributes
+  ext_attr = noext_attributes
   name = module_name_modal(at_mode_expr)
   body = module_binding_body
-  attrs2 = post_item_attributes
+  attrs = post_item_attributes
   {
     let loc = make_loc $sloc in
-    let attrs = attrs1 @ attrs2 in
     let docs = symbol_docs $sloc in
     let text = symbol_text $symbolstartpos in
     let params, mty_opt, modes, me = body in
-    Mb.mk name params mty_opt modes me ~attrs ~loc ~text ~docs
+    Mb.mk name params mty_opt modes me ~ext_attr ~attrs ~loc ~text ~docs
       ~tokens:(Tokens.at $sloc)
   }
 ;
@@ -1609,6 +1606,10 @@ signature_item:
         { psig_type $1 }
     | type_subst_declarations
         { psig_typesubst $1 }
+    | class_descriptions
+        { let ((), l) = $1 in (Psig_class l) }
+    | class_type_declarations
+        { let ((), l) = $1 in (Psig_class_type l) }
     )
     { $1 }
   | wrap_mksig_ext(
@@ -1634,10 +1635,6 @@ signature_item:
         { let (body, ext) = $1 in (Psig_modtypesubst body, ext) }
     | open_description
         { let (body, ext) = $1 in (Psig_open body, ext) }
-    | class_descriptions
-        { let (ext, l) = $1 in (Psig_class l, ext) }
-    | class_type_declarations
-        { let (ext, l) = $1 in (Psig_class_type l, ext) }
     )
     { $1 }
   | include_statement(module_type) modalities = optional_atat_modalities_expr
@@ -1777,7 +1774,7 @@ module_type_subst:
 ;
 %inline class_declaration:
   CLASS
-  ext_attrs = ext_attributes
+  ext_attr = ext_attributes
   virt = virtual_flag
   params = formal_class_parameters
   id = mkrhs(LIDENT)
@@ -1787,26 +1784,26 @@ module_type_subst:
     let (value_params, constraint_, body) = body in
     let loc = make_loc $sloc in
     let docs = symbol_docs $sloc in
-    ext_attrs,
-    Ci.mk id body ~virt ~params ~value_params ?constraint_ ~attrs ~loc ~docs
+    (),
+    Ci.mk id body ~ext_attr ~virt ~params ~value_params ?constraint_ ~attrs ~loc
+      ~docs ~tokens:(Tokens.at $sloc)
   }
 ;
 %inline and_class_declaration:
   AND
-  attrs1 = attributes
+  ext_attr = noext_attributes
   virt = virtual_flag
   params = formal_class_parameters
   id = mkrhs(LIDENT)
   body = class_fun_binding
-  attrs2 = post_item_attributes
+  attrs = post_item_attributes
   {
     let (value_params, constraint_, body) = body in
-    let attrs = attrs1 @ attrs2 in
     let loc = make_loc $sloc in
     let docs = symbol_docs $sloc in
     let text = symbol_text $symbolstartpos in
-    Ci.mk id body ~virt ~params ~value_params ?constraint_ ~attrs ~loc
-      ~text ~docs
+    Ci.mk id body ~virt ~params ~value_params ?constraint_ ~ext_attr ~attrs ~loc
+      ~text ~docs ~tokens:(Tokens.at $sloc)
   }
 ;
 
@@ -2132,7 +2129,7 @@ constrain_field:
 ;
 %inline class_description:
   CLASS
-  ext_attrs = ext_attributes
+  ext_attr = ext_attributes
   virt = virtual_flag
   params = formal_class_parameters
   id = mkrhs(LIDENT)
@@ -2142,25 +2139,26 @@ constrain_field:
     {
       let loc = make_loc $sloc in
       let docs = symbol_docs $sloc in
-      ext_attrs,
-      Ci.mk id cty ~virt ~params ~attrs ~loc ~docs
+      (),
+      Ci.mk id cty ~virt ~params ~ext_attr ~attrs ~loc ~docs
+        ~tokens:(Tokens.at $sloc)
     }
 ;
 %inline and_class_description:
   AND
-  attrs1 = attributes
+  ext_attr = noext_attributes
   virt = virtual_flag
   params = formal_class_parameters
   id = mkrhs(LIDENT)
   COLON
   cty = class_type
-  attrs2 = post_item_attributes
+  attrs = post_item_attributes
     {
-      let attrs = attrs1 @ attrs2 in
       let loc = make_loc $sloc in
       let docs = symbol_docs $sloc in
       let text = symbol_text $symbolstartpos in
-      Ci.mk id cty ~virt ~params ~attrs ~loc ~text ~docs
+      Ci.mk id cty ~virt ~params ~ext_attr ~attrs ~loc ~text ~docs
+        ~tokens:(Tokens.at $sloc)
     }
 ;
 class_type_declarations:
@@ -2179,25 +2177,26 @@ class_type_declarations:
     {
       let loc = make_loc $sloc in
       let docs = symbol_docs $sloc in
-      ext_attr (* FIXME *),
-      Ci.mk id csig ~virt ~params ~attrs ~loc ~docs
+      (),
+      Ci.mk id csig ~ext_attr ~virt ~params ~attrs ~loc ~docs
+        ~tokens:(Tokens.at $sloc)
     }
 ;
 %inline and_class_type_declaration:
   AND
-  attrs1 = attributes
+  ext_attr = noext_attributes
   virt = virtual_flag
   params = formal_class_parameters
   id = mkrhs(LIDENT)
   EQUAL
   csig = class_signature
-  attrs2 = post_item_attributes
+  attrs = post_item_attributes
     {
-      let attrs = attrs1 @ attrs2 in
       let loc = make_loc $sloc in
       let docs = symbol_docs $sloc in
       let text = symbol_text $symbolstartpos in
-      Ci.mk id csig ~virt ~params ~attrs ~loc ~text ~docs
+      Ci.mk id csig ~virt ~params ~ext_attr ~attrs ~loc ~text ~docs
+        ~tokens:(Tokens.at $sloc)
     }
 ;
 

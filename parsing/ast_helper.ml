@@ -522,7 +522,7 @@ module Mtd = struct
 end
 
 module Mb = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens
+  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) ?(attrs = []) ~tokens
         ?(docs = empty_docs) ?(text = []) name params mty_opt modes expr =
     let pre_doc = simplify_ds docs.docs_pre in
     let post_doc = simplify_ds docs.docs_post in
@@ -545,6 +545,7 @@ module Mb = struct
     {
      pmb_pre_text = add_text_attrs text [];
      pmb_pre_doc = Option.map Docstrings.docs_attr pre_doc;
+     pmb_ext_attrs = ext_attr;
      pmb_name = name;
      pmb_params = params;
      pmb_constraint = mty_opt;
@@ -621,20 +622,42 @@ module Vb = struct
 end
 
 module Ci = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
+  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) ?(attrs = []) ~tokens
         ?(docs = empty_docs) ?(text = [])
         ?(virt = Concrete) ?(params = []) name ?(value_params=[])
         ?constraint_ expr =
+    let pre_doc = simplify_ds docs.docs_pre in
+    let post_doc = simplify_ds docs.docs_post in
+    (* Naive, will do better later *)
+    let tokens =
+      List.filter_map (function
+        | {Docstring.ds_body=""} -> None
+        | {ds_loc} -> Some { Tokens.desc = Child_node; pos = ds_loc.loc_start }
+      ) text @
+      begin match pre_doc with
+      | None -> []
+      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
+      end @
+      tokens @
+      begin match post_doc with
+      | None -> []
+      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
+      end
+    in
     {
+     pci_pre_text = add_text_attrs text [];
+     pci_pre_doc = Option.map Docstrings.docs_attr pre_doc;
      pci_virt = virt;
+     pci_ext_attrs = ext_attr;
      pci_params = params;
      pci_name = name;
      pci_value_params = value_params;
      pci_constraint = constraint_;
      pci_expr = expr;
-     pci_attributes =
-       add_text_attrs text (add_docs_attrs docs attrs);
+     pci_attributes = attrs;
+     pci_post_doc = Option.map Docstrings.docs_attr post_doc;
      pci_loc = loc;
+     pci_tokens = tokens;
     }
 end
 

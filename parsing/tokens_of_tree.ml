@@ -136,5 +136,10 @@ class to_tokens = object
     let sub_tokens = super#visit_module_binding env mb in
     let node_toks = mb.pmb_tokens in
     combine_children ~loc:mb.pmb_loc node_toks sub_tokens
+
+  method! visit_class_infos visit_elt env ci =
+    let sub_tokens = super#visit_class_infos visit_elt env ci in
+    let node_toks = ci.pci_tokens in
+    combine_children ~loc:ci.pci_loc node_toks sub_tokens
 end
 

@@ -406,8 +406,8 @@ module Mtd:
 (** Module bindings *)
 module Mb:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?docs:docs ->
-      ?text:text ->
+    val mk: ?loc:loc -> ?ext_attr:ext_attribute -> ?attrs:attrs ->
+      tokens:Tokens.seq -> ?docs:docs -> ?text:text ->
       str_opt * modes -> functor_parameter list -> module_type option ->
       modes -> module_expr -> module_binding
   end
@@ -521,7 +521,8 @@ module Cf:
 (** Classes *)
 module Ci:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
+    val mk: ?loc: loc -> ?ext_attr:ext_attribute -> ?attrs:attrs ->
+      tokens:Tokens.seq -> ?docs:docs -> ?text:text ->
       ?virt:virtual_flag ->
       ?params:(core_type * (variance * injectivity)) list ->
       str -> ?value_params:pattern argument list -> ?constraint_:class_type ->

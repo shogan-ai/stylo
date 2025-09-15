@@ -1018,7 +1018,10 @@ and class_type_field_desc =
 
 and 'a class_infos =
     {
+     pci_pre_text: attributes;
+     pci_pre_doc: attribute option;
      pci_virt: virtual_flag;
+     pci_ext_attrs: ext_attribute;
      pci_params: (core_type * (variance * injectivity)) list;
      pci_name: string loc;
      pci_value_params: pattern argument list;
@@ -1026,6 +1029,8 @@ and 'a class_infos =
      pci_expr: 'a;
      pci_loc: location;
      pci_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
+     pci_post_doc: attribute option;
+     pci_tokens: tokens;
     }
 (** Values of type [class_expr class_infos] represents:
     - [class c = ...]
@@ -1431,6 +1436,7 @@ and module_binding =
     {
      pmb_pre_text: attributes;
      pmb_pre_doc: attribute option;
+     pmb_ext_attrs: ext_attribute;
      pmb_name: string option loc * modes;
      pmb_params: functor_parameter list;
      pmb_constraint: module_type option;

@@ -64,7 +64,7 @@ let mutable_ = function
   | Immutable -> empty
 
 let virtual_ = function
-  | Asttypes.Virtual -> S.virtual_ ^^ break 1
+  | Asttypes.Virtual -> S.virtual_
   | Concrete -> empty
 
 let virtual_field = function
@@ -1281,10 +1281,10 @@ end = struct
   and pp_field_desc = function
     | Pctf_inherit ct -> S.inherit_ ^/^ pp ct
     | Pctf_val (lbl, mut, virt, ct) ->
-      S.val_ ^/^ mutable_ mut ^^ virtual_ virt ^^
+      S.val_ ^/^ mutable_ mut ^^ virtual_ virt ^?^
       string lbl.txt ^/^ S.colon ^/^ Core_type.pp ct
     | Pctf_method (lbl, priv, virt, ct) ->
-      S.method_ ^/^ private_ priv ^^ virtual_ virt ^^
+      S.method_ ^/^ private_ priv ^^ virtual_ virt ^?^
       string lbl.txt ^/^ S.colon ^/^ Core_type.pp ct
     | Pctf_constraint (ct1, ct2) ->
       S.constraint_ ^/^ Core_type.pp ct1 ^/^ S.equals ^/^ Core_type.pp ct2
@@ -1298,34 +1298,57 @@ end
 
 
 and Class_infos : sig
-  val pp : 'a. ('a -> document) -> 'a class_infos -> document
+  val pp : 'a. ('a -> document) -> keywords:document list ->
+    'a class_infos -> document
+
+  val pp_list : 'a. ('a -> document) -> keywords:document list ->
+    'a class_infos list -> document
 end = struct
-  let pp pp_expr
-      { pci_virt; pci_params; pci_name; pci_expr; pci_attributes;
-        pci_value_params; pci_constraint; pci_loc = _ } =
-    let pp_param (x, info) = param_info info ^^ Core_type.pp x in
-    virtual_ pci_virt ^^
-    type_app ~parens:false (string pci_name.txt)
-        (List.map pp_param pci_params) ^?^
-    flow_map (break 1) (Argument.pp Pattern.pp) pci_value_params ^?^
-    begin match pci_constraint with
-      | None -> empty
-      | Some ct -> S.colon ^/^ Class_type.pp ct
-    end ^?^
-    S.equals ^/^ pp_expr pci_expr
-    |> Attribute.attach ~post:true ~attrs:pci_attributes
+  let pp pp_expr ~keywords
+      { pci_ext_attrs; pci_virt; pci_params; pci_name; pci_expr; pci_attributes;
+        pci_value_params; pci_constraint; pci_loc = _; pci_tokens = _;
+        pci_pre_text; pci_pre_doc; pci_post_doc } =
+    let keywords =
+      match keywords with
+      | [] -> assert false
+      | first :: rest -> Ext_attribute.decorate first pci_ext_attrs :: rest
+    in
+    let value_params = List.map (Argument.pp Pattern.pp) pci_value_params in
+    let bound_class_thingy =
+      let pp_param (x, info) = param_info info ^^ Core_type.pp x in
+      type_app ~parens:false (string pci_name.txt)
+        (List.map pp_param pci_params)
+    in
+    Generic_binding.pp
+      ~pre_text:pci_pre_text
+      ?pre_doc:pci_pre_doc
+      ~keyword:(group (separate (break 1) keywords ^?^ virtual_ pci_virt))
+      bound_class_thingy
+      ~params:value_params
+      ?constraint_:(
+        Option.map (fun ct -> S.colon ^/^ Class_type.pp ct) pci_constraint
+      )
+      ~rhs:(pp_expr pci_expr)
+      ~attrs:pci_attributes
+      ~post:true
+      ?post_doc:pci_post_doc
+
+  let rec pp_list pp_expr ~keywords = function
+    | [] -> empty
+    | x :: xs ->
+      pp pp_expr ~keywords x ^?^ pp_list pp_expr ~keywords:[S.and_] xs
 end
 
 and Class_description : sig
-  val pp : class_description -> document
+  val pp_list : class_description list -> document
 end = struct
-  let pp = Class_infos.pp Class_type.pp
+  let pp_list = Class_infos.pp_list Class_type.pp ~keywords:[S.class_]
 end
 
 and Class_type_declaration : sig
-  val pp : class_type_declaration -> document
+  val pp_list : class_type_declaration list -> document
 end = struct
-  let pp = Class_infos.pp Class_type.pp
+  let pp_list = Class_infos.pp_list Class_type.pp ~keywords:[S.class_; S.type_]
 end
 
 (** {2 Value expressions for the class language} *)
@@ -1420,9 +1443,9 @@ end
 
 
 and Class_declaration : sig
-  val pp : class_declaration -> document
+  val pp_list : class_declaration list -> document
 end = struct
-  let pp = Class_infos.pp Class_expr.pp
+  let pp_list = Class_infos.pp_list Class_expr.pp ~keywords:[S.class_]
 end
 
 (** {1 Module language} *)
@@ -1495,13 +1518,8 @@ end = struct
     | Psig_open od -> S.open_ ^^ Open_description.pp od
     | Psig_include (incl, modalities) ->
       with_modalities ~modalities (Include_description.pp incl)
-    | Psig_class cds ->
-      S.class_ ^/^
-      separate_map (break 1 ^^ S.and_ ^^ break 1) Class_description.pp cds
-    | Psig_class_type ctds ->
-      S.class_ ^/^ S.type_ ^/^
-      separate_map (break 1 ^^ S.and_ ^^ break 1)
-        Class_type_declaration.pp ctds
+    | Psig_class cds -> Class_description.pp_list cds
+    | Psig_class_type ctds -> Class_type_declaration.pp_list ctds
     | Psig_attribute attr -> Attribute.pp_floating attr
     | Psig_extension (ext, attrs) ->
       Attribute.attach ~attrs (Extension.pp ~floating:true ext)
@@ -1686,14 +1704,8 @@ end = struct
     | Pstr_modtype mty ->
       S.module_ ^/^ S.type_ ^/^ Module_type_declaration.pp mty
     | Pstr_open od -> S.open_ ^/^ Open_declaration.pp od
-    | Pstr_class cds ->
-      S.class_ ^/^
-      separate_map (break 1 ^^ S.and_ ^^ break 1) Class_declaration.pp cds
-    | Pstr_class_type ctds ->
-      S.class_ ^/^ S.type_ ^/^
-      separate_map (break 1 ^^ S.and_ ^^ break 1)
-        Class_type_declaration.pp
-        ctds
+    | Pstr_class cds -> Class_declaration.pp_list cds
+    | Pstr_class_type ctds -> Class_type_declaration.pp_list ctds
     | Pstr_include incl -> Include_declaration.pp incl
     | Pstr_attribute a -> Attribute.pp_floating a
     | Pstr_extension (ext, attrs) ->
@@ -1835,9 +1847,11 @@ and Module_binding : sig
 
   val pp_recmods : module_binding list -> document
 end = struct
-  let pp ~kw { pmb_name = (name, name_modes); pmb_params; pmb_constraint;
-               pmb_modes; pmb_expr; pmb_attributes; pmb_pre_text; pmb_pre_doc;
-               pmb_post_doc; pmb_loc = _; pmb_tokens = _ } =
+  let pp ~kw { pmb_ext_attrs; pmb_name = (name, name_modes); pmb_params;
+               pmb_constraint; pmb_modes; pmb_expr; pmb_attributes;
+               pmb_pre_text; pmb_pre_doc; pmb_post_doc; pmb_loc = _;
+               pmb_tokens = _ } =
+    let kw = Ext_attribute.decorate kw pmb_ext_attrs in
     let bound =
       let name =
         match name.txt with
