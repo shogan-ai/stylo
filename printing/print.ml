@@ -1683,13 +1683,12 @@ and Structure : sig
   val pp_implementation : structure -> document
 end = struct
   let pp_item_desc item =
-    let (!!) kw = Ext_attribute.decorate kw item.pstr_ext_attrs in
     match item.pstr_desc with
     | Pstr_eval (e, attrs) -> Attribute.attach ~attrs (Expression.pp e)
     | Pstr_value (rf, vbs) ->
       (* FIXME: factorize Pexp_let *)
       Value_binding.pp_list ~item:true vbs ~start:(
-        !!S.let_ ::
+        S.let_ ::
         match rf with
         | Nonrecursive -> []
         | Recursive -> [S.rec_]

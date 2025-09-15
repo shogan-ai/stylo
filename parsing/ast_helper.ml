@@ -41,6 +41,31 @@ let with_default_loc l f =
 let empty_ext_attr =
   { pea_ext = None; pea_attrs = []; }
 
+module Tokens_and_doc = struct
+  let process ?(text = []) docs tokens =
+    let pre_doc = simplify_ds docs.docs_pre in
+    let post_doc = simplify_ds docs.docs_post in
+    (* Naive, will do better later *)
+    let tokens =
+      List.filter_map (function
+          | {Docstring.ds_body=""} -> None
+          | {ds_loc} -> Some { Tokens.desc = Child_node; pos = ds_loc.loc_start }
+        ) text @
+      begin match pre_doc with
+        | None -> []
+        | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
+      end @
+      tokens @
+      begin match post_doc with
+        | None -> []
+        | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
+      end
+    in
+    Option.map Docstrings.docs_attr pre_doc,
+    Option.map Docstrings.docs_attr post_doc,
+    tokens
+end
+
 module Const = struct
   let integer ?suffix i = Pconst_integer (i, suffix)
   let int ?suffix i = integer ?suffix (Int.to_string i)
@@ -314,9 +339,10 @@ module Mod = struct
 end
 
 module Sig = struct
-  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) d =
-    {psig_ext_attrs = ext_attr; psig_desc = d; psig_loc = loc}
+  let mk ?(loc = !default_loc) ~tokens d =
+    {psig_desc = d; psig_loc = loc; psig_tokens = tokens}
 
+  (*
   let value ?loc a = mk ?loc (Psig_value a)
   let type_ ?loc rec_flag a = mk ?loc (Psig_type (rec_flag, a))
   let type_subst ?loc a = mk ?loc (Psig_typesubst a)
@@ -333,11 +359,18 @@ module Sig = struct
   let class_type ?loc a = mk ?loc (Psig_class_type a)
   let extension ?loc ?(attrs = []) a = mk ?loc (Psig_extension (a, attrs))
   let kind_abbrev ?loc a b = mk ?loc (Psig_kind_abbrev (a, b))
-  let attribute ?loc a = mk ?loc (Psig_attribute a)
+  *)
+  let attribute ?loc ~tokens a = mk ?loc ~tokens (Psig_attribute a)
   let text txt =
     let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
     List.map
-      (fun ds -> attribute ~loc:(docstring_loc ds) (text_attr ds))
+      (fun ds ->
+         let loc = docstring_loc ds in
+         let _drop_source_tok = Tokens.at (loc.loc_start, loc.loc_end) in
+         dprintf "@[<hov 2>dropping:@ %a@]@."
+           Tokens.pp_seq _drop_source_tok;
+         let tok = { Tokens.desc = Child_node; pos = loc.loc_start } in
+         attribute ~loc ~tokens:[tok] (text_attr ds))
       f_txt
 end
 
@@ -347,9 +380,8 @@ module Sg = struct
 end
 
 module Str = struct
-  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) ~tokens d =
-    {pstr_ext_attrs = ext_attr; pstr_desc = d; pstr_loc = loc;
-     pstr_tokens = tokens}
+  let mk ?(loc = !default_loc) ~tokens d =
+    {pstr_desc = d; pstr_loc = loc; pstr_tokens = tokens}
 
   let eval ?loc ?(attrs = []) ~tokens a = mk ?loc ~tokens (Pstr_eval (a, attrs))
   (*
@@ -472,79 +504,89 @@ module Cf = struct
 end
 
 module Val = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(prim = []) ?(modalities=[]) name typ =
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
+      ~tokens ?(docs = empty_docs) ?(prim = []) ?(modalities=[]) name typ =
+    let pre_doc, post_doc, tokens = Tokens_and_doc.process docs tokens in
     {
+     pval_pre_doc = pre_doc;
+     pval_ext_attrs = ext_attrs;
      pval_name = name;
      pval_type = typ;
-     pval_attributes = add_docs_attrs docs attrs;
+     pval_attributes = attrs;
      pval_modalities = modalities;
      pval_loc = loc;
      pval_prim = prim;
+     pval_post_doc = post_doc;
+     pval_tokens = tokens;
     }
 end
 
 module Md = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(text = []) ?(modalities=[]) name typ =
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
+        ~tokens ?(docs = empty_docs) ?(text = []) ?(modalities=[]) name typ =
+    let pre_doc, post_doc, tokens =
+      Tokens_and_doc.process ~text docs tokens
+    in
     {
+     pmd_pre_text = add_text_attrs text [];
+     pmd_pre_doc = pre_doc;
+     pmd_ext_attrs = ext_attrs;
      pmd_name = name;
      pmd_type = typ;
      pmd_modalities = modalities;
-     pmd_attributes =
-       add_text_attrs text (add_docs_attrs docs attrs);
+     pmd_attributes = attrs;
+     pmd_post_doc = post_doc;
      pmd_loc = loc;
+     pmd_tokens = tokens;
     }
 end
 
 module Ms = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(text = []) name syn =
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
+        ~tokens ?(docs = empty_docs) ?(text = []) name syn =
+    let pre_doc, post_doc, tokens =
+      Tokens_and_doc.process ~text docs tokens
+    in
     {
+     pms_pre_text = add_text_attrs text [];
+     pms_pre_doc = pre_doc;
+     pms_ext_attrs = ext_attrs;
      pms_name = name;
      pms_manifest = syn;
-     pms_attributes =
-       add_text_attrs text (add_docs_attrs docs attrs);
+     pms_attributes = attrs;
+     pms_post_doc = post_doc;
      pms_loc = loc;
+     pms_tokens = tokens;
     }
 end
 
 module Mtd = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(text = []) ?typ name =
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
+        ~tokens ?(docs = empty_docs) ?typ name =
+    let pre_doc, post_doc, tokens =
+      Tokens_and_doc.process docs tokens
+    in
     {
+     pmtd_pre_doc = pre_doc;
+     pmtd_ext_attrs = ext_attrs;
      pmtd_name = name;
      pmtd_type = typ;
-     pmtd_attributes =
-       add_text_attrs text (add_docs_attrs docs attrs);
+     pmtd_attributes = attrs;
      pmtd_loc = loc;
+     pmtd_post_doc = post_doc;
+     pmtd_tokens = tokens;
     }
 end
 
 module Mb = struct
   let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) ?(attrs = []) ~tokens
         ?(docs = empty_docs) ?(text = []) name params mty_opt modes expr =
-    let pre_doc = simplify_ds docs.docs_pre in
-    let post_doc = simplify_ds docs.docs_post in
-    (* Naive, will do better later *)
-    let tokens =
-      List.filter_map (function
-        | {Docstring.ds_body=""} -> None
-        | {ds_loc} -> Some { Tokens.desc = Child_node; pos = ds_loc.loc_start }
-      ) text @
-      begin match pre_doc with
-      | None -> []
-      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
-      end @
-      tokens @
-      begin match post_doc with
-      | None -> []
-      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
-      end
+    let pmb_pre_doc, pmb_post_doc, pmb_tokens =
+      Tokens_and_doc.process ~text docs tokens
     in
     {
      pmb_pre_text = add_text_attrs text [];
-     pmb_pre_doc = Option.map Docstrings.docs_attr pre_doc;
+     pmb_pre_doc;
      pmb_ext_attrs = ext_attr;
      pmb_name = name;
      pmb_params = params;
@@ -552,31 +594,42 @@ module Mb = struct
      pmb_modes = modes;
      pmb_expr = expr;
      pmb_attributes = attrs;
-     pmb_post_doc = Option.map Docstrings.docs_attr post_doc;
+     pmb_post_doc;
      pmb_loc = loc;
-     pmb_tokens = tokens;
+     pmb_tokens;
     }
 end
 
 module Opn = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(override = Fresh) expr =
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
+      ~tokens ?(docs = empty_docs) ?(override = Fresh) expr =
+    let pre_doc, post_doc, tokens = Tokens_and_doc.process docs tokens in
     {
+     popen_pre_doc = pre_doc;
+     popen_ext_attrs = ext_attrs;
      popen_expr = expr;
      popen_override = override;
      popen_loc = loc;
-     popen_attributes = add_docs_attrs docs attrs;
+     popen_attributes = attrs;
+     popen_post_doc = post_doc;
+     popen_tokens = tokens;
     }
 end
 
 module Incl = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
+      ~tokens ?(docs = empty_docs)
     ?(kind = Structure) mexpr =
+    let pre_doc, post_doc, tokens = Tokens_and_doc.process docs tokens in
     {
+     pincl_pre_doc = pre_doc;
+     pincl_ext_attrs = ext_attrs;
      pincl_kind = kind;
      pincl_mod = mexpr;
      pincl_loc = loc;
-     pincl_attributes = add_docs_attrs docs attrs;
+     pincl_attributes = attrs;
+     pincl_post_doc = post_doc;
+     pincl_tokens = tokens;
     }
 
 end
@@ -586,27 +639,12 @@ module Vb = struct
         ?(attrs = []) ~tokens ?(docs = empty_docs)
       ?(text = []) ?(params = []) ?(modes = []) ?value_constraint
       ?(ret_modes = []) pat expr =
-    let pre_doc = simplify_ds docs.docs_pre in
-    let post_doc = simplify_ds docs.docs_post in
-    (* Naive, will do better later *)
-    let tokens =
-      List.filter_map (function
-        | {Docstring.ds_body=""} -> None
-        | {ds_loc} -> Some { Tokens.desc = Child_node; pos = ds_loc.loc_start }
-      ) text @
-      begin match pre_doc with
-      | None -> []
-      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
-      end @
-      tokens @
-      begin match post_doc with
-      | None -> []
-      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
-      end
+    let pre_doc, post_doc, tokens =
+      Tokens_and_doc.process ~text docs tokens
     in
     {
      pvb_pre_text = add_text_attrs text [];
-     pvb_pre_doc = Option.map Docstrings.docs_attr pre_doc;
+     pvb_pre_doc = pre_doc;
      pvb_ext_attrs = ext_attr;
      pvb_pat = pat;
      pvb_params = params;
@@ -615,7 +653,7 @@ module Vb = struct
      pvb_modes = modes;
      pvb_ret_modes = ret_modes;
      pvb_attributes = attrs;
-     pvb_post_doc = Option.map Docstrings.docs_attr post_doc;
+     pvb_post_doc = post_doc;
      pvb_loc = loc;
      pvb_tokens = tokens;
     }
@@ -626,27 +664,12 @@ module Ci = struct
         ?(docs = empty_docs) ?(text = [])
         ?(virt = Concrete) ?(params = []) name ?(value_params=[])
         ?constraint_ expr =
-    let pre_doc = simplify_ds docs.docs_pre in
-    let post_doc = simplify_ds docs.docs_post in
-    (* Naive, will do better later *)
-    let tokens =
-      List.filter_map (function
-        | {Docstring.ds_body=""} -> None
-        | {ds_loc} -> Some { Tokens.desc = Child_node; pos = ds_loc.loc_start }
-      ) text @
-      begin match pre_doc with
-      | None -> []
-      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
-      end @
-      tokens @
-      begin match post_doc with
-      | None -> []
-      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
-      end
+    let pre_doc, post_doc, tokens =
+      Tokens_and_doc.process ~text docs tokens
     in
     {
      pci_pre_text = add_text_attrs text [];
-     pci_pre_doc = Option.map Docstrings.docs_attr pre_doc;
+     pci_pre_doc = pre_doc;
      pci_virt = virt;
      pci_ext_attrs = ext_attr;
      pci_params = params;
@@ -655,7 +678,7 @@ module Ci = struct
      pci_constraint = constraint_;
      pci_expr = expr;
      pci_attributes = attrs;
-     pci_post_doc = Option.map Docstrings.docs_attr post_doc;
+     pci_post_doc = post_doc;
      pci_loc = loc;
      pci_tokens = tokens;
     }
@@ -671,27 +694,12 @@ module Type = struct
       ?manifest
       ?jkind_annotation
       name =
-    let pre_doc = simplify_ds docs.docs_pre in
-    let post_doc = simplify_ds docs.docs_post in
-    (* Naive, will do better later *)
-    let tokens =
-      List.filter_map (function
-        | {Docstring.ds_body=""} -> None
-        | {ds_loc} -> Some { Tokens.desc = Child_node; pos = ds_loc.loc_start }
-      ) text @
-      begin match pre_doc with
-      | None -> []
-      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
-      end @
-      tokens @
-      begin match post_doc with
-      | None -> []
-      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
-      end
+    let pre_doc, post_doc, tokens =
+      Tokens_and_doc.process ~text docs tokens
     in
     {
      ptype_pre_text = add_text_attrs text [];
-     ptype_pre_doc = Option.map Docstrings.docs_attr pre_doc;
+     ptype_pre_doc = pre_doc;
      ptype_ext_attrs = ext_attr;
      ptype_name = name;
      ptype_params = params;
@@ -700,7 +708,7 @@ module Type = struct
      ptype_private = priv;
      ptype_manifest = manifest;
      ptype_attributes = attrs;
-     ptype_post_doc = Option.map Docstrings.docs_attr post_doc;
+     ptype_post_doc = post_doc;
      ptype_jkind_annotation = jkind_annotation;
      ptype_loc = loc;
      ptype_tokens = tokens;
@@ -756,23 +764,34 @@ end
 
 (** Type extensions *)
 module Te = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(params = []) ?(priv = Public) path constructors =
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
+      ~tokens ?(docs = empty_docs) ?(params = []) ?(priv = Public) path
+      constructors =
+    let pre_doc, post_doc, tokens = Tokens_and_doc.process docs tokens in
     {
+     ptyext_pre_doc = pre_doc;
+     ptyext_ext_attrs = ext_attrs;
      ptyext_path = path;
      ptyext_params = params;
      ptyext_constructors = constructors;
      ptyext_private = priv;
      ptyext_loc = loc;
-     ptyext_attributes = add_docs_attrs docs attrs;
+     ptyext_attributes = attrs;
+     ptyext_post_doc = post_doc;
+     ptyext_tokens = tokens;
     }
 
-  let mk_exception ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-      constructor =
+  let mk_exception ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr)
+      ?(attrs = []) ~tokens ?(docs = empty_docs) constructor =
+    let pre_doc, post_doc, tokens = Tokens_and_doc.process docs tokens in
     {
+     ptyexn_pre_doc = pre_doc;
+     ptyexn_ext_attrs = ext_attrs;
      ptyexn_constructor = constructor;
      ptyexn_loc = loc;
      ptyexn_attributes = add_docs_attrs docs attrs;
+     ptyexn_post_doc = post_doc;
+     ptyexn_tokens = tokens;
     }
 
   let constructor ?(loc = !default_loc) ?(attrs = [])

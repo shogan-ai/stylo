@@ -225,7 +225,8 @@ module Exp:
 (** Value declarations *)
 module Val:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?prim:string list ->
+    val mk: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
+      tokens:Tokens.seq -> ?docs:docs -> ?prim:string list ->
       ?modalities:modality with_loc list -> str -> core_type -> value_description
   end
 
@@ -259,11 +260,13 @@ module Type:
 (** Type extensions *)
 module Te:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs ->
+    val mk: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
+      tokens:Tokens.seq -> ?docs:docs ->
       ?params:(core_type * (variance * injectivity)) list ->
       ?priv:private_flag -> lid -> extension_constructor list -> type_extension
 
-    val mk_exception: ?loc:loc -> ?attrs:attrs -> ?docs:docs ->
+    val mk_exception: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
+      tokens:Tokens.seq -> ?docs:docs ->
       extension_constructor -> type_exception
 
     val constructor: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?info:info ->
@@ -323,8 +326,10 @@ module Mod:
 (** Signature items *)
 module Sig:
   sig
-    val mk: ?loc:loc -> ?ext_attr:ext_attribute -> signature_item_desc -> signature_item
+    val mk: ?loc:loc -> tokens:Tokens.seq -> signature_item_desc ->
+      signature_item
 
+    (*
     val value: ?loc:loc -> value_description -> signature_item
     val type_: ?loc:loc -> rec_flag -> type_declaration list -> signature_item
     val type_subst: ?loc:loc -> type_declaration list -> signature_item
@@ -344,6 +349,7 @@ module Sig:
     val attribute: ?loc:loc -> attribute -> signature_item
     val kind_abbrev: ?loc:loc -> label with_loc -> jkind_annotation ->
       signature_item
+   *)
     val text: text -> signature_item list
   end
 
@@ -356,8 +362,8 @@ module Sg:
 (** Structure items *)
 module Str:
   sig
-    val mk: ?loc:loc -> ?ext_attr:ext_attribute ->
-      tokens:Tokens.seq -> structure_item_desc -> structure_item
+    val mk: ?loc:loc -> tokens:Tokens.seq -> structure_item_desc ->
+      structure_item
 
     val eval: ?loc:loc -> ?attrs:attributes -> tokens:Tokens.seq ->
       expression -> structure_item
@@ -385,21 +391,24 @@ module Str:
 (** Module declarations *)
 module Md:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?text:text -> ?modalities:modalities ->
+    val mk: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
+      tokens:Tokens.seq -> ?docs:docs -> ?text:text -> ?modalities:modalities ->
       str_opt -> module_type -> module_declaration
   end
 
 (** Module substitutions *)
 module Ms:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
+    val mk: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
+      tokens:Tokens.seq -> ?docs:docs -> ?text:text ->
       str -> lid -> module_substitution
   end
 
 (** Module type declarations *)
 module Mtd:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
+    val mk: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
+      tokens:Tokens.seq -> ?docs:docs ->
       ?typ:module_type -> str -> module_type_declaration
   end
 
@@ -415,14 +424,16 @@ module Mb:
 (** Opens *)
 module Opn:
   sig
-    val mk: ?loc: loc -> ?attrs:attrs -> ?docs:docs ->
+    val mk: ?loc: loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
+      tokens:Tokens.seq -> ?docs:docs ->
       ?override:override_flag -> 'a -> 'a open_infos
   end
 
 (** Includes *)
 module Incl:
   sig
-    val mk: ?loc: loc -> ?attrs:attrs -> ?docs:docs -> ?kind:include_kind -> 'a
+    val mk: ?loc: loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
+      tokens:Tokens.seq -> ?docs:docs -> ?kind:include_kind -> 'a
       -> 'a include_infos
   end
 

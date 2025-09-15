@@ -776,12 +776,16 @@ and comprehension_expression =
 
 and value_description =
     {
+     pval_pre_doc: attribute option;
+     pval_ext_attrs: ext_attribute;
      pval_name: string loc;
      pval_type: core_type;
      pval_modalities : modalities;
      pval_prim: string list;
      pval_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
+     pval_post_doc: attribute option;
      pval_loc: location;
+     pval_tokens: tokens;
     }
 (** Values of type {!value_description} represents:
     - [val x: T],
@@ -905,12 +909,16 @@ and constructor_arguments =
 
 and type_extension =
     {
+     ptyext_pre_doc: attribute option;
+     ptyext_ext_attrs: ext_attribute;
      ptyext_path: longident loc;
      ptyext_params: (core_type * (variance * injectivity)) list;
      ptyext_constructors: extension_constructor list;
      ptyext_private: private_flag;
      ptyext_loc: location;
      ptyext_attributes: attributes;  (** ... [\@\@id1] [\@\@id2] *)
+     ptyext_post_doc: attribute option;
+     ptyext_tokens: tokens;
     }
 (**
    Definition of new extensions constructors for the extensive sum type [t]
@@ -927,9 +935,13 @@ and extension_constructor =
 
 and type_exception =
   {
+    ptyexn_pre_doc: attribute option;
+    ptyexn_ext_attrs: ext_attribute;
     ptyexn_constructor : extension_constructor;
     ptyexn_loc : location;
     ptyexn_attributes : attributes;  (** [... [\@\@id1] [\@\@id2]] *)
+    ptyexn_post_doc: attribute option;
+    ptyexn_tokens: tokens;
   }
 (** Definition of a new exception ([exception E]). *)
 
@@ -1195,9 +1207,9 @@ and signature =
 
 and signature_item =
     {
-     psig_ext_attrs: ext_attribute;
      psig_desc: signature_item_desc;
      psig_loc: location;
+     psig_tokens: tokens;
     }
 
 and signature_item_desc =
@@ -1232,29 +1244,43 @@ and signature_item_desc =
 
 and module_declaration =
     {
+     pmd_pre_text: attributes;
+     pmd_pre_doc: attribute option;
+     pmd_ext_attrs: ext_attribute;
      pmd_name: string option loc;
      pmd_type: module_type;
      pmd_modalities: modalities;
      pmd_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
+     pmd_post_doc: attribute option;
      pmd_loc: location;
+     pmd_tokens : tokens;
     }
 (** Values of type [module_declaration] represents [S : MT] *)
 
 and module_substitution =
     {
+     pms_pre_text: attributes;
+     pms_pre_doc: attribute option;
+     pms_ext_attrs: ext_attribute;
      pms_name: string loc;
      pms_manifest: longident loc;
      pms_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
+     pms_post_doc: attribute option;
      pms_loc: location;
+     pms_tokens : tokens;
     }
 (** Values of type [module_substitution] represents [S := M] *)
 
 and module_type_declaration =
     {
+     pmtd_pre_doc: attribute option;
+     pmtd_ext_attrs: ext_attribute;
      pmtd_name: string loc;
      pmtd_type: module_type option;
      pmtd_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
+     pmtd_post_doc: attribute option;
      pmtd_loc: location;
+     pmtd_tokens : tokens;
     }
 (** Values of type [module_type_declaration] represents:
    - [S = MT],
@@ -1264,10 +1290,14 @@ and module_type_declaration =
 
 and 'a open_infos =
     {
+     popen_pre_doc: attribute option;
+     popen_ext_attrs: ext_attribute;
      popen_expr: 'a;
      popen_override: override_flag;
      popen_loc: location;
      popen_attributes: attributes;
+     popen_post_doc: attribute option;
+     popen_tokens : tokens;
     }
 (** Values of type ['a open_infos] represents:
     - [open! X] when {{!open_infos.popen_override}[popen_override]}
@@ -1290,10 +1320,14 @@ and open_declaration = module_expr open_infos
 
 and 'a include_infos =
     {
+     pincl_pre_doc: attribute option;
      pincl_kind : include_kind;
+     pincl_ext_attrs: ext_attribute;
      pincl_mod: 'a;
      pincl_loc: location;
      pincl_attributes: attributes;
+     pincl_post_doc: attribute option;
+     pincl_tokens : tokens;
     }
 
 and include_description = module_type include_infos
@@ -1360,7 +1394,6 @@ and structure = structure_item list * tokens
 
 and structure_item =
     {
-     pstr_ext_attrs: ext_attribute;
      pstr_desc: structure_item_desc;
      pstr_loc: location;
      pstr_tokens: tokens;

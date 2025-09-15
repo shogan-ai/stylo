@@ -65,16 +65,6 @@ class to_tokens = object
 
   inherit [_] Parsetree.reduce as super
 
-  method! visit_structure_item env si =
-    let sub_tokens = super#visit_structure_item env si in
-    let node_toks = si.pstr_tokens in
-    combine_children ~loc:si.pstr_loc node_toks sub_tokens
-
-  method! visit_structure env s =
-    let sub_tokens = super#visit_structure env s in
-    let node_toks = snd s in
-    combine_children ~loc:Location.none node_toks sub_tokens
-
   method! visit_attribute env a =
     match a.attr_name.txt with
     | ["ocaml"; ("doc"|"text")] -> [a.attr_tokens]
@@ -112,6 +102,11 @@ class to_tokens = object
     let node_toks = fb.pfb_tokens in
     combine_children ~loc:fb.pfb_loc node_toks sub_tokens
 
+  method! visit_value_description env vd =
+    let sub_tokens = super#visit_value_description env vd in
+    let node_toks = vd.pval_tokens in
+    combine_children ~loc:vd.pval_loc node_toks sub_tokens
+
   method! visit_type_declaration env td =
     let sub_tokens = super#visit_type_declaration env td in
     let node_toks = td.ptype_tokens in
@@ -127,6 +122,61 @@ class to_tokens = object
     let node_toks = cd.pcd_tokens in
     combine_children ~loc:cd.pcd_loc node_toks sub_tokens
 
+  method! visit_type_extension env te =
+    let sub_tokens = super#visit_type_extension env te in
+    let node_toks = te.ptyext_tokens in
+    combine_children ~loc:te.ptyext_loc node_toks sub_tokens
+
+  method! visit_type_exception env exn =
+    let sub_tokens = super#visit_type_exception env exn in
+    let node_toks = exn.ptyexn_tokens in
+    combine_children ~loc:exn.ptyexn_loc node_toks sub_tokens
+
+  method! visit_class_infos visit_elt env ci =
+    let sub_tokens = super#visit_class_infos visit_elt env ci in
+    let node_toks = ci.pci_tokens in
+    combine_children ~loc:ci.pci_loc node_toks sub_tokens
+
+  method! visit_signature_item env si =
+    let sub_tokens = super#visit_signature_item env si in
+    let node_toks = si.psig_tokens in
+    combine_children ~loc:si.psig_loc node_toks sub_tokens
+
+  method! visit_module_declaration env md =
+    let sub_tokens = super#visit_module_declaration env md in
+    let node_toks = md.pmd_tokens in
+    combine_children ~loc:md.pmd_loc node_toks sub_tokens
+
+  method! visit_module_substitution env ms =
+    let sub_tokens = super#visit_module_substitution env ms in
+    let node_toks = ms.pms_tokens in
+    combine_children ~loc:ms.pms_loc node_toks sub_tokens
+
+  method! visit_module_type_declaration env mtd =
+    let sub_tokens = super#visit_module_type_declaration env mtd in
+    let node_toks = mtd.pmtd_tokens in
+    combine_children ~loc:mtd.pmtd_loc node_toks sub_tokens
+
+  method! visit_open_infos visit_elt env opn =
+    let sub_tokens = super#visit_open_infos visit_elt env opn in
+    let node_toks = opn.popen_tokens in
+    combine_children ~loc:opn.popen_loc node_toks sub_tokens
+
+  method! visit_include_infos visit_elt env incl =
+    let sub_tokens = super#visit_include_infos visit_elt env incl in
+    let node_toks = incl.pincl_tokens in
+    combine_children ~loc:incl.pincl_loc node_toks sub_tokens
+
+  method! visit_structure env s =
+    let sub_tokens = super#visit_structure env s in
+    let node_toks = snd s in
+    combine_children ~loc:Location.none node_toks sub_tokens
+
+  method! visit_structure_item env si =
+    let sub_tokens = super#visit_structure_item env si in
+    let node_toks = si.pstr_tokens in
+    combine_children ~loc:si.pstr_loc node_toks sub_tokens
+
   method! visit_value_binding env vb =
     let sub_tokens = super#visit_value_binding env vb in
     let node_toks = vb.pvb_tokens in
@@ -136,10 +186,5 @@ class to_tokens = object
     let sub_tokens = super#visit_module_binding env mb in
     let node_toks = mb.pmb_tokens in
     combine_children ~loc:mb.pmb_loc node_toks sub_tokens
-
-  method! visit_class_infos visit_elt env ci =
-    let sub_tokens = super#visit_class_infos visit_elt env ci in
-    let node_toks = ci.pci_tokens in
-    combine_children ~loc:ci.pci_loc node_toks sub_tokens
 end
 
