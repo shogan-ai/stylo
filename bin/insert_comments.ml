@@ -6,7 +6,6 @@ module Doc = Wrapprint
 
 type error =
   | Output_longer_than_input of Doc.document
-  | Output_shorter_than_input of T.seq
   | Desynchronized of Lexing.position
   | Missing_token of Lexing.position
 
@@ -15,9 +14,6 @@ let pp_error ppf = function
     Format.fprintf ppf "Output longer than the input.";
     dprintf "remaining doc: << %a >>@."
       PPrint.ToFormatter.compact (Wrapprint.to_document doc)
-  | Output_shorter_than_input tokens ->
-    Format.eprintf "Output shorter than the input.";
-    dprintf "remaining:@ @[<hov 2>%a@]@." T.pp_seq tokens
   | Desynchronized pos ->
     Format.fprintf ppf "desynchronized at position %d:%d."
       pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
@@ -27,6 +23,18 @@ let pp_error ppf = function
       pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
 
 exception Error of error
+
+let append_trailing_comments (tokens, doc) =
+  let rec aux doc = function
+    | []
+    | [ T.{ desc = Token EOF; _ } ] -> doc
+    | tok :: toks ->
+      match tok.T.desc with
+      | Comment c -> aux Doc.(doc ^?^ comment c) toks
+      | Token _ -> raise (Error (Missing_token tok.pos))
+      | Child_node -> assert false
+  in
+  aux doc tokens
 
 let rec consume_leading_comments acc = function
   | [] -> acc, []
@@ -141,7 +149,5 @@ let rec walk_both seq doc =
     | T.Child_node, _ -> assert false
 
 let from_tokens tokens doc =
-  match walk_both tokens doc with
-  | [], doc
-  | [ { desc = Token EOF; _ } ], doc -> doc
-  | tokens, _ -> raise (Error (Output_shorter_than_input tokens))
+  walk_both tokens doc
+  |> append_trailing_comments
