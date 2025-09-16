@@ -95,8 +95,10 @@ let psig_exception te =
 
 let mkctf ~loc ?attrs ?docs d =
   Ctf.mk ~loc:(make_loc loc) ?attrs ?docs d
+    ~tokens:(Tokens.at loc)
 let mkcf ~loc ?attrs ?docs d =
   Cf.mk ~loc:(make_loc loc) ?attrs ?docs d
+    ~tokens:(Tokens.at loc)
 
 let mkrhs rhs loc = mkloc rhs (make_loc loc)
 
@@ -3744,9 +3746,10 @@ str_exception_declaration:
   attrs1 = attributes
   attrs = post_item_attributes
   { let loc = make_loc $sloc in
-    let docs = symbol_docs $sloc in
+    let info = symbol_info $endpos(attrs1) in
+    let rebind_toks = Tokens.at ($startpos(lid), $endpos(attrs1)) in
     Te.mk_exception ~attrs
-      (Te.rebind id lid ~attrs:attrs1 ~loc ~docs)
+      (Te.rebind id lid ~attrs:attrs1 ~loc ~info ~tokens:rebind_toks)
       ~ext_attrs
       ~tokens:(Tokens.at $sloc)
   }
@@ -3760,9 +3763,11 @@ sig_exception_declaration:
   attrs = post_item_attributes
     { let vars, args, res = vars_args_res in
       let loc = make_loc ($startpos, $endpos(attrs1)) in
-      let docs = symbol_docs $sloc in
+      let info = symbol_info $endpos(attrs1) in
+      let decl_toks = Tokens.at ($startpos, $endpos(attrs1)) in
       Te.mk_exception ~attrs
-        (Te.decl id ~vars ~args ?res ~attrs:attrs1 ~loc ~docs)
+        (Te.decl id ~vars ~args ?res ~attrs:attrs1 ~loc ~info
+          ~tokens:decl_toks)
         ~ext_attrs
         ~tokens:(Tokens.at $sloc)
     }
@@ -3770,7 +3775,9 @@ sig_exception_declaration:
 %inline let_exception_declaration:
     mkrhs(constr_ident) generalized_constructor_arguments attributes
       { let vars, args, res = $2 in
-        Te.decl $1 ~vars ~args ?res ~attrs:$3 ~loc:(make_loc $sloc) }
+        Te.decl $1 ~vars ~args ?res ~attrs:$3 ~loc:(make_loc $sloc)
+          ~tokens:(Tokens.at $sloc)
+      }
 ;
 
 generalized_constructor_arguments:
@@ -3863,6 +3870,7 @@ label_declaration_semi:
     {
       let name, vars, args, res, attrs, loc, info = d in
       Te.decl name ~vars ~args ?res ~attrs ~loc ~info
+        ~tokens:(Tokens.at $sloc)
     }
 ;
 extension_constructor_rebind(opening):
@@ -3872,7 +3880,9 @@ extension_constructor_rebind(opening):
   lid = mkrhs(constr_longident)
   attrs = attributes
       { let info = symbol_info $endpos in
-        Te.rebind cid lid ~attrs ~loc:(make_loc $sloc) ~info }
+        Te.rebind cid lid ~attrs ~loc:(make_loc $sloc) ~info
+          ~tokens:(Tokens.at $sloc)
+      }
 ;
 
 /* "with" constraints (additional type equations over signature components) */

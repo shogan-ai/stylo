@@ -269,15 +269,15 @@ module Te:
       tokens:Tokens.seq -> ?docs:docs ->
       extension_constructor -> type_exception
 
-    val constructor: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?info:info ->
-      str -> extension_constructor_kind -> extension_constructor
+    val constructor: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
+      ?info:info -> str -> extension_constructor_kind -> extension_constructor
 
-    val decl: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?info:info ->
+    val decl: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?info:info ->
       ?vars:(str * jkind_annotation option) list ->
       ?args:constructor_arguments -> ?res:core_type ->
       str ->
       extension_constructor
-    val rebind: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?info:info ->
+    val rebind: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?info:info ->
       str -> lid -> extension_constructor
   end
 
@@ -468,8 +468,9 @@ module Cty:
 (** Class type fields *)
 module Ctf:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs ->
+    val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?docs:docs ->
       class_type_field_desc -> class_type_field
+(*
     val attr: class_type_field -> attribute -> class_type_field
 
     val inherit_: ?loc:loc -> ?attrs:attrs -> class_type -> class_type_field
@@ -481,6 +482,7 @@ module Ctf:
       class_type_field
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> class_type_field
     val attribute: ?loc:loc -> attribute -> class_type_field
+*)
     val text: text -> class_type_field list
   end
 
@@ -507,10 +509,11 @@ module Cl:
 (** Class fields *)
 module Cf:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> class_field_desc ->
-      class_field
-    val attr: class_field -> attribute -> class_field
+    val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?docs:docs ->
+      class_field_desc -> class_field
 
+    (*
+    val attr: class_field -> attribute -> class_field
     val inherit_: ?loc:loc -> ?attrs:attrs -> override_flag -> class_expr ->
       str option -> class_field
     val val_: ?loc:loc -> ?attrs:attrs -> str -> mutable_flag ->
@@ -522,6 +525,7 @@ module Cf:
     val initializer_: ?loc:loc -> ?attrs:attrs -> expression -> class_field
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> class_field
     val attribute: ?loc:loc -> attribute -> class_field
+       *)
     val text: text -> class_field list
 
     val virtual_: core_type -> class_field_kind

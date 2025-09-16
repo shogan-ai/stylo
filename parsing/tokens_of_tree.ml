@@ -127,15 +127,30 @@ class to_tokens = object
     let node_toks = te.ptyext_tokens in
     combine_children ~loc:te.ptyext_loc node_toks sub_tokens
 
+  method! visit_extension_constructor env ec =
+    let sub_tokens = super#visit_extension_constructor env ec in
+    let node_toks = ec.pext_tokens in
+    combine_children ~loc:ec.pext_loc node_toks sub_tokens
+
   method! visit_type_exception env exn =
     let sub_tokens = super#visit_type_exception env exn in
     let node_toks = exn.ptyexn_tokens in
     combine_children ~loc:exn.ptyexn_loc node_toks sub_tokens
 
+  method! visit_class_type_field env ctf =
+    let sub_tokens = super#visit_class_type_field env ctf in
+    let node_toks = ctf.pctf_tokens in
+    combine_children ~loc:ctf.pctf_loc node_toks sub_tokens
+
   method! visit_class_infos visit_elt env ci =
     let sub_tokens = super#visit_class_infos visit_elt env ci in
     let node_toks = ci.pci_tokens in
     combine_children ~loc:ci.pci_loc node_toks sub_tokens
+
+  method! visit_class_field env cf =
+    let sub_tokens = super#visit_class_field env cf in
+    let node_toks = cf.pcf_tokens in
+    combine_children ~loc:cf.pcf_loc node_toks sub_tokens
 
   method! visit_signature_item env si =
     let sub_tokens = super#visit_signature_item env si in

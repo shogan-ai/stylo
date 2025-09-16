@@ -64,6 +64,14 @@ module Tokens_and_doc = struct
     Option.map Docstrings.docs_attr pre_doc,
     Option.map Docstrings.docs_attr post_doc,
     tokens
+
+  let info info =
+    let info = simplify_ds info in
+    match info with
+    | None -> None, []
+    | Some ds ->
+      Some (Docstrings.info_attr ds),
+      [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
 end
 
 module Const = struct
@@ -450,56 +458,80 @@ module Cty = struct
 end
 
 module Ctf = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
+  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens
            ?(docs = empty_docs) d =
+    let pre_doc, post_doc, tokens = Tokens_and_doc.process docs tokens in
     {
+     pctf_pre_doc = pre_doc;
      pctf_desc = d;
      pctf_loc = loc;
-     pctf_attributes = add_docs_attrs docs attrs;
+     pctf_attributes = attrs;
+     pctf_post_doc = post_doc;
+     pctf_tokens = tokens;
     }
 
+  (*
   let inherit_ ?loc ?attrs a = mk ?loc ?attrs (Pctf_inherit a)
   let val_ ?loc ?attrs a b c d = mk ?loc ?attrs (Pctf_val (a, b, c, d))
   let method_ ?loc ?attrs a b c d = mk ?loc ?attrs (Pctf_method (a, b, c, d))
   let constraint_ ?loc ?attrs a b = mk ?loc ?attrs (Pctf_constraint (a, b))
   let extension ?loc ?attrs a = mk ?loc ?attrs (Pctf_extension a)
+      *)
   let attribute ?loc a = mk ?loc (Pctf_attribute a)
   let text txt =
-   let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
-     List.map
-      (fun ds -> attribute ~loc:(docstring_loc ds) (text_attr ds))
+    let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
+    List.map
+      (fun ds ->
+         let loc = docstring_loc ds in
+         let _drop_source_tok = Tokens.at (loc.loc_start, loc.loc_end) in
+         dprintf "@[<hov 2>dropping:@ %a@]@."
+           Tokens.pp_seq _drop_source_tok;
+         let tok = { Tokens.desc = Child_node; pos = loc.loc_start } in
+         attribute ~loc ~tokens:[tok] (text_attr ds))
       f_txt
 
-  let attr d a = {d with pctf_attributes = d.pctf_attributes @ [a]}
+(*   let attr d a = {d with pctf_attributes = d.pctf_attributes @ [a]} *)
 
 end
 
 module Cf = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
+  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens
         ?(docs = empty_docs) d =
+    let pre_doc, post_doc, tokens = Tokens_and_doc.process docs tokens in
     {
+     pcf_pre_doc = pre_doc;
      pcf_desc = d;
      pcf_loc = loc;
-     pcf_attributes = add_docs_attrs docs attrs;
+     pcf_attributes = attrs;
+     pcf_post_doc = post_doc;
+     pcf_tokens = tokens;
     }
 
+  (*
   let inherit_ ?loc ?attrs a b c = mk ?loc ?attrs (Pcf_inherit (a, b, c))
   let val_ ?loc ?attrs a b c = mk ?loc ?attrs (Pcf_val (a, b, c))
   let method_ ?loc ?attrs a b c = mk ?loc ?attrs (Pcf_method (a, b, c))
   let constraint_ ?loc ?attrs a b = mk ?loc ?attrs (Pcf_constraint (a, b))
   let initializer_ ?loc ?attrs a = mk ?loc ?attrs (Pcf_initializer a)
   let extension ?loc ?attrs a = mk ?loc ?attrs (Pcf_extension a)
-  let attribute ?loc a = mk ?loc (Pcf_attribute a)
+   *)
+  let attribute ?loc ~tokens a = mk ?loc ~tokens (Pcf_attribute a)
   let text txt =
     let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
     List.map
-      (fun ds -> attribute ~loc:(docstring_loc ds) (text_attr ds))
+      (fun ds ->
+         let loc = docstring_loc ds in
+         let _drop_source_tok = Tokens.at (loc.loc_start, loc.loc_end) in
+         dprintf "@[<hov 2>dropping:@ %a@]@."
+           Tokens.pp_seq _drop_source_tok;
+         let tok = { Tokens.desc = Child_node; pos = loc.loc_start } in
+         attribute ~loc ~tokens:[tok] (text_attr ds))
       f_txt
 
   let virtual_ ct = Cfk_virtual ct
   let concrete o e = Cfk_concrete (o, e)
 
-  let attr d a = {d with pcf_attributes = d.pcf_attributes @ [a]}
+(*   let attr d a = {d with pcf_attributes = d.pcf_attributes @ [a]} *)
 
 end
 
@@ -716,12 +748,7 @@ module Type = struct
   let constructor ?(loc = !default_loc) ?(attrs = []) ~tokens
         ?(info = empty_info)
         ?(vars = []) ?(args = Pcstr_tuple []) ?res name =
-    let info = simplify_ds info in
-    let info_tokens =
-      match info with
-      | None -> []
-      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
-    in
+    let doc, info_tokens = Tokens_and_doc.info info in
     {
      pcd_name = name;
      pcd_vars = vars;
@@ -729,7 +756,7 @@ module Type = struct
      pcd_res = res;
      pcd_loc = loc;
      pcd_attributes = attrs;
-     pcd_doc = Option.map Docstrings.info_attr info;
+     pcd_doc = doc;
      pcd_tokens = tokens @ info_tokens;
     }
 
@@ -793,31 +820,40 @@ module Te = struct
      ptyexn_tokens = tokens;
     }
 
-  let constructor ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(info = empty_info) name kind =
+  let constructor ?(loc = !default_loc) ?(attrs = []) ~tokens
+        ?(info = empty_info) name kind =
+    let doc, info_tokens = Tokens_and_doc.info info in
     {
      pext_name = name;
      pext_kind = kind;
      pext_loc = loc;
-     pext_attributes = add_docs_attrs docs (add_info_attrs info attrs);
+     pext_attributes = attrs;
+     pext_doc = doc;
+     pext_tokens = tokens @ info_tokens;
     }
 
-  let decl ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
+  let decl ?(loc = !default_loc) ?(attrs = []) ~tokens
          ?(info = empty_info) ?(vars = []) ?(args = Pcstr_tuple []) ?res name =
+    let doc, info_tokens = Tokens_and_doc.info info in
     {
      pext_name = name;
      pext_kind = Pext_decl(vars, args, res);
      pext_loc = loc;
-     pext_attributes = add_docs_attrs docs (add_info_attrs info attrs);
+     pext_attributes = attrs;
+     pext_doc = doc;
+     pext_tokens = tokens @ info_tokens;
     }
 
-  let rebind ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(info = empty_info) name lid =
+  let rebind ?(loc = !default_loc) ?(attrs = []) ~tokens
+        ?(info = empty_info) name lid =
+    let doc, info_tokens = Tokens_and_doc.info info in
     {
      pext_name = name;
      pext_kind = Pext_rebind lid;
      pext_loc = loc;
-     pext_attributes = add_docs_attrs docs (add_info_attrs info attrs);
+     pext_attributes = attrs;
+     pext_doc = doc;
+     pext_tokens = tokens @ info_tokens;
     }
 
 end

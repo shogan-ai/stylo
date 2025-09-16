@@ -931,6 +931,8 @@ and extension_constructor =
      pext_kind: extension_constructor_kind;
      pext_loc: location;
      pext_attributes: attributes;  (** [C of ... [\@id1] [\@id2]] *)
+     pext_doc: attribute option;
+     pext_tokens: tokens;
    }
 
 and type_exception =
@@ -1010,9 +1012,12 @@ and class_signature =
 
 and class_type_field =
     {
+     pctf_pre_doc: attribute option;
      pctf_desc: class_type_field_desc;
      pctf_loc: location;
      pctf_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
+     pctf_post_doc: attribute option;
+     pctf_tokens: tokens;
     }
 
 and class_type_field_desc =
@@ -1116,9 +1121,12 @@ and class_structure =
 
 and class_field =
     {
+     pcf_pre_doc: attribute option;
      pcf_desc: class_field_desc;
      pcf_loc: location;
      pcf_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
+     pcf_post_doc: attribute option;
+     pcf_tokens: tokens;
     }
 
 and class_field_desc =

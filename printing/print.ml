@@ -1247,9 +1247,10 @@ end = struct
       end
     | Pext_rebind lid -> S.equals ^/^ longident lid.txt
 
-  let pp { pext_name; pext_kind; pext_attributes; pext_loc = _ } =
+  let pp { pext_name; pext_kind; pext_attributes; pext_doc;
+           pext_loc = _; pext_tokens = _ } =
     string pext_name.txt ^/^ pp_kind pext_kind
-    |> Attribute.attach ~attrs:pext_attributes
+    |> Attribute.attach ~attrs:pext_attributes ?post_doc:pext_doc
 end
 
 and Type_exception : sig
@@ -1291,9 +1292,11 @@ end = struct
       (separate_map (break 1) pp_field pcsig_fields) ^/^
     S.end_
 
-  and pp_field { pctf_desc; pctf_attributes; pctf_loc = _ } =
+  and pp_field { pctf_pre_doc; pctf_desc; pctf_attributes; pctf_post_doc;
+                 pctf_loc = _; pctf_tokens = _ } =
     group (pp_field_desc pctf_desc)
     |> Attribute.attach ~attrs:pctf_attributes
+      ?pre_doc:pctf_pre_doc ?post_doc:pctf_post_doc
 
   and pp_field_desc = function
     | Pctf_inherit ct -> S.inherit_ ^/^ pp ct
@@ -1406,9 +1409,11 @@ end = struct
       (separate_map (hardline ^^ hardline) pp_field pcstr_fields) ^/^
     S.end_
 
-  and pp_field { pcf_desc; pcf_attributes; pcf_loc = _ } =
+  and pp_field { pcf_pre_doc; pcf_desc; pcf_attributes; pcf_post_doc;
+                 pcf_loc = _; pcf_tokens = _ } =
     group (pp_field_desc pcf_desc)
     |> Attribute.attach ~item:true ~attrs:pcf_attributes
+      ?pre_doc:pcf_pre_doc ?post_doc:pcf_post_doc
 
   and pp_field_desc = function
     | Pcf_inherit (override, ce, alias) ->
