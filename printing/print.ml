@@ -48,7 +48,7 @@ let direction = function
   | Downto -> S.downto_
 
 let private_ = function
-  | Asttypes.Private -> S.private_ ^^ break 1
+  | Asttypes.Private -> S.private_
   | Public -> empty
 
 let rec_ = function
@@ -97,9 +97,9 @@ let type_app ?(parens=true) ty args =
   in
   begin match args with
     | [] -> empty
-    | [ x ] when parens -> x ^^ break 1
-    | _ -> left ^^ separate (S.comma ^^ break 1) args ^^ right ^^ break 1
-  end ^^ ty
+    | [ x ] when parens -> x
+    | _ -> left ^^ separate (S.comma ^^ break 1) args ^^ right
+  end ^?^ ty
 
 (* FIXME: handling of string literals is not good enough. *)
 (* N.B. stringf is important here: suffixed number come out of the lexer as a
@@ -379,14 +379,11 @@ and Pattern : sig
   val pp : pattern -> document
 end = struct
   let rec pp p =
-    group (pp_desc p.ppat_tokens p.ppat_desc)
-    |> Attribute.attach ~attrs:p.ppat_attributes
-
-  and pp_desc tokens = function
+    match p.ppat_desc with
     | Ppat_any -> S.underscore
     | Ppat_var name ->
       let name = string name.txt in
-      if List.exists (fun t -> t.Tokens.desc = Token LPAREN) tokens then
+      if List.exists (fun t -> t.Tokens.desc = Token LPAREN) p.ppat_tokens then
         S.lparen ^^ name ^^ S.rparen
       else
         name
@@ -400,9 +397,9 @@ end = struct
     | Ppat_construct (lid, arg) -> pp_construct lid arg
     | Ppat_variant (lbl, None) -> S.bquote ^^ string lbl
     | Ppat_variant (lbl, Some p) -> S.bquote ^^ string lbl ^/^ pp p
-    | Ppat_record (fields, cf) -> pp_record ~tokens cf fields
+    | Ppat_record (fields, cf) -> pp_record ~tokens:p.ppat_tokens cf fields
     | Ppat_record_unboxed_product (fields, cf) ->
-      pp_record ~unboxed:true ~tokens cf fields
+      pp_record ~unboxed:true ~tokens:p.ppat_tokens cf fields
     | Ppat_array (mut, ps) ->
       let opn, cls = array_delimiters mut in
       opn ^/^
@@ -421,15 +418,20 @@ end = struct
     (* FIXME: parser doesn't agree with what's written above I believe.
        Recognized form seems to depend on context... *)
     | Ppat_type lid -> S.hash ^^ longident lid.txt
-    | Ppat_lazy p -> S.lazy_ ^/^ pp p
+    | Ppat_lazy p ->
+      Ext_attribute.decorate S.lazy_ p.ppat_ext_attr ^/^ pp p
     | Ppat_unpack path ->
       let path =
         match path.txt with
         | None -> S.underscore
         | Some s -> string s
       in
-      S.lparen ^^ S.module_ ^/^ path ^^ S.rparen
-    | Ppat_exception p -> S.exception_ ^/^ pp  p
+      (* FIXME: pkg typ in ppat_unpack! *)
+      parens (
+        Ext_attribute.decorate S.module_ p.ppat_ext_attr ^/^ path
+      )
+    | Ppat_exception p ->
+      Ext_attribute.decorate S.exception_ p.ppat_ext_attr ^/^ pp  p
     | Ppat_extension ext -> Extension.pp ext
     | Ppat_open (lid, p) -> longident lid.txt ^^ S.dot ^^ pp p
     | Ppat_parens p -> parens (pp p)
@@ -478,6 +480,11 @@ end = struct
       | Open -> S.semi ^/^ S.underscore
     ) ^/^
     S.rbrace
+
+  let pp p =
+    group (pp p)
+    |> Attribute.attach ~attrs:p.ppat_attributes
+
 end
 
 (** {2 Value expressions} *)
@@ -641,7 +648,7 @@ end = struct
       S.rparen
     | Pexp_dot_open (lid, e) -> longident lid.txt ^^ S.dot ^^ pp e
     | Pexp_let_open (od, e) ->
-      group (S.let_ ^/^ !!S.open_ ^/^ Open_declaration.pp od ^/^ S.in_) ^/^ pp e
+      group (S.let_ ^/^ Open_declaration.pp od ^/^ S.in_) ^/^ pp e
     | Pexp_letop lo -> Letop.pp lo
     | Pexp_extension ext -> Extension.pp ext
     | Pexp_unreachable  -> S.dot
@@ -1002,6 +1009,7 @@ end = struct
       | [] -> S.val_
       | _ -> S.external_
     in
+    let kw = Ext_attribute.decorate kw vd.pval_ext_attrs in
     prefix (group (kw ^/^ string vd.pval_name.txt)) (
       with_modalities ~modalities:vd.pval_modalities
         (group (S.colon ^/^ Core_type.pp vd.pval_type))
@@ -1108,7 +1116,7 @@ end = struct
   let type_kind priv = function
     | Ptype_abstract -> empty
     | Ptype_variant cds ->
-      S.equals ^/^ private_ priv ^^
+      S.equals ^/^ private_ priv ^?^
       begin match cds with
       | [] -> S.pipe
       | cd :: _ ->
@@ -1116,10 +1124,10 @@ end = struct
       end
     | Ptype_record lbls ->
       let lbls = separate_map (break 1) Label_declaration.pp lbls in
-      S.equals ^/^ private_ priv ^^ prefix S.lbrace lbls ^/^ S.rbrace
+      S.equals ^/^ private_ priv ^?^ prefix S.lbrace lbls ^/^ S.rbrace
     | Ptype_record_unboxed_product lbls ->
       let lbls = separate_map (break 1) Label_declaration.pp lbls in
-      S.equals ^/^ private_ priv ^^ prefix S.hash_lbrace lbls ^/^ S.rbrace
+      S.equals ^/^ private_ priv ^?^ prefix S.hash_lbrace lbls ^/^ S.rbrace
     | Ptype_open -> S.equals ^/^ S.dotdot
 
   let pp_rhs ?(subst=false) td =
@@ -1179,20 +1187,14 @@ and Type_extension : sig
   val pp : type_extension -> document
 end = struct
   let pp { ptyext_path; ptyext_params; ptyext_constructors; ptyext_private;
-     ptyext_attributes; _ }=
-  (* FIXME: factorize with type_decl *)
-  let pp_param (x, info) = param_info info ^^ Core_type.pp x in
-  let params =
-    match ptyext_params with
-    | [] -> empty
-    | [ x ] -> pp_param x ^^ break 1
-    | xs ->
-      S.lparen ^^ separate_map (S.comma ^^ break 1) pp_param xs ^^ S.rparen ^^ break 1
-  in
-  params ^^ longident ptyext_path.txt ^/^
+           ptyext_attributes; ptyext_ext_attrs; _ }=
+  Ext_attribute.decorate S.type_ ptyext_ext_attrs ^/^
+  type_app (longident ptyext_path.txt)
+    (List.map (fun (x, i) -> param_info i ^^ Core_type.pp x) ptyext_params) ^/^
   S.plus_equals ^/^
-  private_ ptyext_private ^^
-  (* FIXME: leading pipe *)
+  private_ ptyext_private ^?^
+  (* FIXME: leading pipe!
+     Need tokens on extension constructors. *)
   separate_map (break 1 ^^ S.pipe ^^ break 1)
     Extension_constructor.pp ptyext_constructors
   |> Attribute.attach ~post:true ~attrs:ptyext_attributes
@@ -1234,8 +1236,9 @@ end
 and Type_exception : sig
   val pp : type_exception -> document
 end = struct
-  let pp { ptyexn_constructor ; ptyexn_attributes ; _ } =
-  S.exception_ ^/^
+  let pp { ptyexn_constructor ; ptyexn_attributes ; ptyexn_ext_attrs;
+         _ } =
+  Ext_attribute.decorate S.exception_ ptyexn_ext_attrs ^/^
   Extension_constructor.pp ptyexn_constructor
   |> Attribute.attach ~post:true ~attrs:ptyexn_attributes
 end
@@ -1254,9 +1257,7 @@ end = struct
       Core_type.pp_arrow [(* FIXME *)] lbl (Core_type.pp arg) (pp rhs)
     | Pcty_extension ext -> Extension.pp ext
     | Pcty_open (od, ct) ->
-      S.let_ ^/^ S.open_ ^^ Open_description.pp od ^/^
-      S.in_ ^/^
-      pp ct
+      S.let_ ^/^ Open_description.pp od ^/^ S.in_ ^/^ pp ct
 
   and pp_signature { pcsig_self; pcsig_fields } =
     let obj_with_self =
@@ -1371,8 +1372,7 @@ end = struct
     | Pcl_extension ext -> Extension.pp ext
     | Pcl_open (od, ce) ->
       (* FIXME: factorize *)
-      S.let_ ^/^ S.open_ ^^ Open_description.pp od ^/^
-      S.in_ ^/^ pp ce
+      S.let_ ^/^ Open_description.pp od ^/^ S.in_ ^/^ pp ce
 
   and pp_structure { pcstr_self; pcstr_fields } =
     let obj_with_self =
@@ -1497,20 +1497,14 @@ end = struct
     | Psig_value vd -> Value_description.pp vd
     | Psig_type (rf, tds) -> Type_declaration.pp_list rf tds
     | Psig_typesubst tds -> Type_declaration.pp_list ~subst:true Recursive tds
-    | Psig_typext te -> S.type_ ^/^ Type_extension.pp te
+    | Psig_typext te -> Type_extension.pp te
     | Psig_exception exn -> Type_exception.pp exn
-    | Psig_module md -> S.module_ ^/^ Module_declaration.pp md
-    | Psig_modsubst ms -> S.module_ ^/^ Module_substitution.pp ms
-    | Psig_recmodule mds ->
-      S.module_ ^/^ S.rec_ ^/^
-      separate_map (break 1 ^^ S.and_ ^^ break 1)
-        Module_declaration.pp mds
-    | Psig_modtype mty ->
-      S.module_ ^/^ S.type_ ^/^ Module_type_declaration.pp mty
-    | Psig_modtypesubst mty ->
-      S.module_ ^/^ S.type_ ^/^
-      Module_type_declaration.pp ~subst:true mty
-    | Psig_open od -> S.open_ ^^ Open_description.pp od
+    | Psig_module md -> Module_declaration.pp md
+    | Psig_modsubst ms -> Module_substitution.pp ms
+    | Psig_recmodule mds -> Module_declaration.pp_recmods mds
+    | Psig_modtype mty -> Module_type_declaration.pp mty
+    | Psig_modtypesubst mty -> Module_type_declaration.pp ~subst:true mty
+    | Psig_open od -> Open_description.pp od
     | Psig_include (incl, modalities) ->
       with_modalities ~modalities (Include_description.pp incl)
     | Psig_class cds -> Class_description.pp_list cds
@@ -1534,24 +1528,43 @@ end
 
 and Module_declaration : sig
   val pp : module_declaration -> document
+
+  val pp_recmods : module_declaration list -> document
 end = struct
-  let pp { pmd_name; pmd_type; pmd_modalities; pmd_attributes; _ } =
+  let pp keywords { pmd_name; pmd_type; pmd_modalities; pmd_attributes;
+                    pmd_ext_attrs; _ } =
+    let keywords =
+      Ext_attribute.decorate (List.hd keywords) pmd_ext_attrs
+        :: List.tl keywords
+    in
     let name =
       match pmd_name.txt with
       | None -> S.underscore
       | Some s -> string s
     in
-    begin match pmd_modalities with
-      | [] -> name
-      | l -> name ^/^ S.at ^/^ modalities l
-    end ^/^ S.equals ^/^ Module_type.pp pmd_type
+    group (
+      separate (break 1) keywords ^/^ name ^?^
+      match pmd_modalities with
+      | [] -> empty
+      | l -> S.at ^/^ modalities l
+    ) ^/^ S.equals ^/^ Module_type.pp pmd_type
     |> Attribute.attach ~post:true ~attrs:pmd_attributes
+
+  let pp_recmods = function
+    | [] -> empty (* assert false? *)
+    | md :: mds ->
+      pp [ S.module_; S.rec_ ] md ^?^
+      separate_map (break 1) (pp [ S.and_ ]) mds
+
+  let pp pmd = pp [ S.module_ ] pmd
+
 end
 
 and Module_substitution : sig
   val pp : module_substitution -> document
 end = struct
-  let pp { pms_name; pms_manifest; pms_attributes; _ } =
+  let pp { pms_name; pms_manifest; pms_attributes; pms_ext_attrs; _ } =
+    Ext_attribute.decorate S.module_ pms_ext_attrs ^/^
     string pms_name.txt ^/^ S.colon_equals ^/^ longident pms_manifest.txt
     |> Attribute.attach ~attrs:pms_attributes
 end
@@ -1559,7 +1572,9 @@ end
 and Module_type_declaration : sig
   val pp : ?subst:bool -> module_type_declaration -> document
 end = struct
-  let pp ?(subst=false) { pmtd_name; pmtd_type; pmtd_attributes; _ } =
+  let pp ?(subst=false) { pmtd_name; pmtd_type; pmtd_attributes; pmtd_ext_attrs;
+                          _ } =
+    Ext_attribute.decorate S.module_ pmtd_ext_attrs ^/^ S.type_ ^/^
     string pmtd_name.txt ^^
     begin match pmtd_type with
       | None -> empty
@@ -1573,11 +1588,10 @@ end
 and Open_infos : sig
   val pp : 'a. ('a -> document) -> 'a open_infos -> document
 end = struct
-  let pp pp_expr { popen_expr; popen_override; popen_attributes; _ } =
-    begin match popen_override with
-      | Override -> S.bang
-      | Fresh -> empty
-    end ^?^
+  let pp pp_expr { popen_expr; popen_override; popen_attributes;
+                   popen_ext_attrs; _ } =
+    Ext_attribute.decorate (S.open_ ^^ override_ popen_override)
+      popen_ext_attrs ^/^
     pp_expr popen_expr
     |> Attribute.attach ~attrs:popen_attributes
 end
@@ -1597,8 +1611,9 @@ end
 and Include_infos : sig
   val pp : 'a. ('a -> document) -> 'a include_infos -> document
 end = struct
-  let pp pp_mod { pincl_kind ; pincl_mod; pincl_attributes; _ } =
-    S.include_ ^/^
+  let pp pp_mod { pincl_kind ; pincl_mod; pincl_attributes; pincl_ext_attrs;
+                  _ } =
+    Ext_attribute.decorate S.include_ pincl_ext_attrs ^/^
     begin match pincl_kind with
       | Functor -> S.functor_ ^^ break 1
       | Structure -> empty
@@ -1695,9 +1710,8 @@ end = struct
     | Pstr_exception exn -> Type_exception.pp exn
     | Pstr_module mb -> Module_binding.pp ~kw:S.module_ mb
     | Pstr_recmodule mbs -> Module_binding.pp_recmods mbs
-    | Pstr_modtype mty ->
-      S.module_ ^/^ S.type_ ^/^ Module_type_declaration.pp mty
-    | Pstr_open od -> S.open_ ^/^ Open_declaration.pp od
+    | Pstr_modtype mty -> Module_type_declaration.pp mty
+    | Pstr_open od -> Open_declaration.pp od
     | Pstr_class cds -> Class_declaration.pp_list cds
     | Pstr_class_type ctds -> Class_type_declaration.pp_list ctds
     | Pstr_include incl -> Include_declaration.pp incl

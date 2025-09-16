@@ -2429,6 +2429,17 @@ fun_expr:
   | fun_expr_attrs
       { let desc, attrs = $1 in
         mkexp_attrs ~loc:$sloc desc attrs }
+  | LET OPEN override_flag ext_attributes module_expr IN seq_expr
+      { (* FIXME: extracted from fun_expr_attrs as the ext_attrs go into the
+          open_decl.
+          Could we push it into expr_? Should we care? *)
+        let open_loc = ($startpos($2), $endpos($5)) in
+        let od =
+          Opn.mk $5 ~override:$3 ~loc:(make_loc open_loc)
+            ~ext_attrs:$4
+            ~tokens:(Tokens.at open_loc)
+        in
+        mkexp ~loc:$sloc (Pexp_let_open(od, $7)) }
   | fun_
       { $1 }
   | expr_
@@ -2475,13 +2486,6 @@ fun_expr:
         Pexp_letmodule(name, body, $7), $3 }
   | LET EXCEPTION ext_attributes let_exception_declaration IN seq_expr
       { Pexp_letexception($4, $6), $3 }
-  | LET OPEN override_flag ext_attributes module_expr IN seq_expr
-      { let open_loc = ($startpos($2), $endpos($5)) in
-        let od =
-          Opn.mk $5 ~override:$3 ~loc:(make_loc open_loc)
-            ~tokens:(Tokens.at open_loc)
-        in
-        Pexp_let_open(od, $7), $4 }
   | MATCH ext_attributes seq_expr WITH match_cases
       { Pexp_match($3, $5), $2 }
   | TRY ext_attributes seq_expr WITH match_cases
