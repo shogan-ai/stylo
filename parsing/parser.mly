@@ -207,7 +207,7 @@ module Generic_array = struct
   module Expression = struct
     type t =
       | Simple of expression Simple.t
-      | Opened_literal of open_declaration *
+      | Opened_literal of Longident.t with_loc *
                         Lexing.position *
                         Lexing.position *
                         expression list
@@ -1506,9 +1506,7 @@ open_description:
 ;
 
 %inline open_dot_declaration: mkrhs(mod_longident)
-  { let loc = make_loc $loc($1) in
-    let me = Mod.ident ~loc $1 in
-    Opn.mk ~loc ~tokens:(Tokens.at $sloc) me }
+  { $1 }
 ;
 
 (* -------------------------------------------------------------------------- *)

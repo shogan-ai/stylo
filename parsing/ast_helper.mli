@@ -206,8 +206,8 @@ module Exp:
       expression  -> expression
     val pack: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?pkg_type:core_type -> module_expr ->
       expression
-    val open_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> open_declaration -> expression
-               -> expression
+    val open_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
+      longident with_loc -> expression -> expression
     val letop: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> binding_op
                -> binding_op list -> expression -> expression
     val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> expression

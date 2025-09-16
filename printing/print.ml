@@ -639,8 +639,7 @@ end = struct
       | Some ct -> break 1 ^^ Type_constraint.pp (Pconstraint ct)
       end ^^
       S.rparen
-    | Pexp_dot_open (od, e) ->
-      Open_declaration.pp od ^^ S.dot ^^ pp e
+    | Pexp_dot_open (lid, e) -> longident lid.txt ^^ S.dot ^^ pp e
     | Pexp_let_open (od, e) ->
       group (S.let_ ^/^ !!S.open_ ^/^ Open_declaration.pp od ^/^ S.in_) ^/^ pp e
     | Pexp_letop lo -> Letop.pp lo
