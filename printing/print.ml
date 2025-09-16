@@ -1752,7 +1752,7 @@ end = struct
     | Pstr_type (rf, tds) -> Type_declaration.pp_list rf tds
     | Pstr_typext te -> S.type_ ^/^ Type_extension.pp te
     | Pstr_exception exn -> Type_exception.pp exn
-    | Pstr_module mb -> Module_binding.pp ~kw:S.module_ mb
+    | Pstr_module mb -> Module_binding.pp ~keywords:[S.module_] mb
     | Pstr_recmodule mbs -> Module_binding.pp_recmods mbs
     | Pstr_modtype mty -> Module_type_declaration.pp mty
     | Pstr_open od -> Open_declaration.pp od
@@ -1895,15 +1895,18 @@ end = struct
 end
 
 and Module_binding : sig
-  val pp : ?item:bool -> kw:document -> module_binding -> document
+  val pp : ?item:bool -> keywords:document list -> module_binding -> document
 
   val pp_recmods : module_binding list -> document
 end = struct
-  let pp ?item ~kw
+  let pp ?item ~keywords
       { pmb_ext_attrs; pmb_name = (name, name_modes); pmb_params;
         pmb_constraint; pmb_modes; pmb_expr; pmb_attributes; pmb_pre_text;
         pmb_pre_doc; pmb_post_doc; pmb_loc = _; pmb_tokens = _ } =
-    let kw = Ext_attribute.decorate kw pmb_ext_attrs in
+    let kw =
+      Ext_attribute.decorate (List.hd keywords) pmb_ext_attrs ^?^
+        separate (break 1) (List.tl keywords)
+    in
     let bound =
       let name =
         match name.txt with
@@ -1924,18 +1927,20 @@ end = struct
       | None, at_modes -> S.at ^/^ modes at_modes
     in
     Generic_binding.pp ~pre_text:pmb_pre_text ?pre_doc:pmb_pre_doc
-      ~keyword:kw bound ~params ~constraint_
+      ~keyword:(group kw) bound ~params ~constraint_
       ~rhs:(Module_expr.pp pmb_expr)
       ~attrs:pmb_attributes ?item
       ?post_doc:pmb_post_doc
 
-  let rec pp_recmods kw = function
+  let rec pp_recmods keywords = function
     | [] -> empty
-    | [ mb ] -> pp ~item:true ~kw mb
+    | [ mb ] -> pp ~item:true ~keywords mb
     | mb :: mbs ->
-      pp ~item:true ~kw mb ^^ hardline ^^ hardline ^^ pp_recmods S.and_ mbs
+      pp ~item:true ~keywords mb ^^
+      hardline ^^ hardline ^^
+      pp_recmods [S.and_] mbs
 
-  let pp_recmods = pp_recmods (group (S.module_ ^/^ S.rec_))
+  let pp_recmods = pp_recmods [S.module_; S.rec_]
 end
 
 and Jkind_annotation : sig
