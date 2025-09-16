@@ -1578,7 +1578,8 @@ end = struct
       ~pre_text:pmd_pre_text ?pre_doc:pmd_pre_doc
       ~keyword:(separate (break 1) keywords)
       binding
-      ~rhs:(Module_type.pp pmd_type)
+      (* FIXME: pass as ~rhs *)
+      ~constraint_:(S.colon ^/^ Module_type.pp pmd_type)
       ~attrs:pmd_attributes
       ?post_doc:pmd_post_doc
 
