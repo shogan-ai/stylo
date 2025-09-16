@@ -1034,7 +1034,7 @@ end = struct
       begin match pval_prim with
         | [] -> empty
         | ps ->
-          S.equals ^/^ separate_map (break 1) (fun s -> dquotes (string s)) ps
+          S.equals ^/^ separate_map (break 1) (fun s -> stringf "%S" s) ps
       end
     )
     |> Attribute.attach ~item:true ?pre_doc:pval_pre_doc ?post_doc:pval_post_doc
