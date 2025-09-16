@@ -663,7 +663,7 @@ end = struct
       S.rparen
     | Pexp_dot_open (lid, e) -> longident lid.txt ^^ S.dot ^^ pp e
     | Pexp_let_open (od, e) ->
-      group (S.let_ ^/^ Open_declaration.pp od ^/^ S.in_) ^/^ pp e
+      group (S.let_ ^/^ Open_declaration.pp ~item:false od ^/^ S.in_) ^/^ pp e
     | Pexp_letop lo -> Letop.pp lo
     | Pexp_extension ext -> Extension.pp ext
     | Pexp_unreachable  -> S.dot
@@ -1627,15 +1627,15 @@ end = struct
 end
 
 and Open_infos : sig
-  val pp : 'a. ('a -> document) -> 'a open_infos -> document
+  val pp : 'a. ?item:bool -> ('a -> document) -> 'a open_infos -> document
 end = struct
-  let pp pp_expr { popen_expr; popen_override; popen_attributes;
-                   popen_ext_attrs; popen_pre_doc; popen_post_doc;
-                   popen_loc = _; popen_tokens = _ } =
+  let pp ?(item=true) pp_expr
+      { popen_expr; popen_override; popen_attributes; popen_ext_attrs;
+        popen_pre_doc; popen_post_doc; popen_loc = _; popen_tokens = _ } =
     Ext_attribute.decorate (S.open_ ^^ override_ popen_override)
       popen_ext_attrs ^/^
     pp_expr popen_expr
-    |> Attribute.attach ~attrs:popen_attributes
+    |> Attribute.attach ~item ~attrs:popen_attributes
       ?pre_doc:popen_pre_doc ?post_doc:popen_post_doc
 end
 
@@ -1646,9 +1646,9 @@ end = struct
 end
 
 and Open_declaration : sig
-  val pp : open_declaration -> document
+  val pp : ?item:bool -> open_declaration -> document
 end = struct
-  let pp = Open_infos.pp Module_expr.pp
+  let pp ?item = Open_infos.pp ?item Module_expr.pp
 end
 
 and Include_infos : sig
