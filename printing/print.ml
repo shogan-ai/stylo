@@ -85,8 +85,8 @@ let param_info = Asttypes.(function
   )
 
 let array_delimiters = function
-  | Asttypes.Mutable -> S.lbracket_colon, S.colon_rbracket
-  | Immutable -> S.lbracket_pipe, S.pipe_rbracket
+  | Asttypes.Immutable -> S.lbracket_colon, S.colon_rbracket
+  | Mutable -> S.lbracket_pipe, S.pipe_rbracket
 
 let type_app ?(parens=true) ty args =
   let left, right =
