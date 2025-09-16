@@ -543,12 +543,11 @@ end
 
 module Ms = struct
   let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
-        ~tokens ?(docs = empty_docs) ?(text = []) name syn =
+        ~tokens ?(docs = empty_docs) name syn =
     let pre_doc, post_doc, tokens =
-      Tokens_and_doc.process ~text docs tokens
+      Tokens_and_doc.process docs tokens
     in
     {
-     pms_pre_text = add_text_attrs text [];
      pms_pre_doc = pre_doc;
      pms_ext_attrs = ext_attrs;
      pms_name = name;

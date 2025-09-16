@@ -144,11 +144,18 @@ let include_kind = function
   | Functor -> S.functor_
 
 module rec Attribute : sig
-  val pp : ?post:bool -> attribute -> document
+  val pp : ?item:bool -> attribute -> document
   val pp_floating : attribute -> document
-  val pp_list : ?post:bool -> attributes -> document
+  val pp_list : ?item:bool -> attributes -> document
 
-  val attach : ?post:bool -> attrs:attributes -> document -> document
+  val attach
+    :  ?item:bool
+    -> ?text:attributes
+    -> ?pre_doc:attribute
+    -> ?post_doc:attribute
+    -> attrs:attributes
+    -> document
+    -> document
 end = struct
   let pp_doc : payload -> document = function
     | PStr ([ {
@@ -160,16 +167,17 @@ end = struct
       docstring s
     | _ -> assert false
 
-  let pp ?(post=false) { attr_name; attr_payload; _ } =
+  let pp ?(item=false)
+      { attr_name; attr_payload; attr_loc = _; attr_tokens = _ } =
     match attr_name.txt with
     | ["ocaml"; ("doc"|"text")]  (* FIXME *) -> pp_doc attr_payload
     | attr_names ->
       let attr_name = separate_map S.dot string attr_names in
-      (if post then S.lbracket_atat else S.lbracket_at)
+      (if item then S.lbracket_atat else S.lbracket_at)
       ^^  attr_name ^^ Payload.pp attr_payload
       ^^ S.rbracket
 
-  let pp_floating { attr_name; attr_payload; _ } =
+  let pp_floating { attr_name; attr_payload; attr_loc = _; attr_tokens = _ } =
     match attr_name.txt with
     | ["ocaml"; ("doc"|"text")]  (* FIXME *) -> pp_doc attr_payload
     | attr_names ->
@@ -178,12 +186,19 @@ end = struct
       ^^ attr_name ^^ Payload.pp attr_payload
       ^^ S.rbracket
 
-  let pp_list ?post l = separate_map (break 0) (pp ?post) l
+  let pp_list ?item l = separate_map (break 0) (pp ?item) l
 
-  let attach ?post ~attrs t =
-    match attrs with
-    | [] -> t
-    | attrs -> t ^/^ pp_list ?post attrs
+  let attach ?item ?(text = []) ?pre_doc ?post_doc ~attrs t =
+    begin match text with
+    | [] -> empty
+    | text ->
+      hardline ^^ hardline ^^
+      separate_map (break 1) pp text ^^
+      hardline ^^ hardline
+    end ^^
+    optional pp pre_doc ^?^
+    t ^?^ pp_list ?item attrs ^?^
+    optional pp post_doc
 end
 
 and Ext_attribute : sig
@@ -805,7 +820,7 @@ end
 and Binding_op : sig
   val pp : binding_op -> document
 end = struct
-  let pp { pbop_op; pbop_binding; _ }=
+  let pp { pbop_op; pbop_binding; pbop_loc = _ }=
     Value_binding.pp_list ~start:[string pbop_op.txt] [pbop_binding]
 end
 
@@ -1003,31 +1018,36 @@ end
 and Value_description : sig
   val pp : value_description -> document
 end = struct
-  let pp vd =
+  let pp { pval_pre_doc; pval_ext_attrs; pval_name; pval_type; pval_modalities;
+           pval_prim; pval_attributes; pval_post_doc; pval_loc = _ ;
+           pval_tokens = _ ; } =
     let kw =
-      match vd.pval_prim with
+      match pval_prim with
       | [] -> S.val_
       | _ -> S.external_
     in
-    let kw = Ext_attribute.decorate kw vd.pval_ext_attrs in
-    prefix (group (kw ^/^ string vd.pval_name.txt)) (
-      with_modalities ~modalities:vd.pval_modalities
-        (group (S.colon ^/^ Core_type.pp vd.pval_type))
+    let kw = Ext_attribute.decorate kw pval_ext_attrs in
+    prefix (group (kw ^/^ string pval_name.txt)) (
+      with_modalities ~modalities:pval_modalities
+        (group (S.colon ^/^ Core_type.pp pval_type))
       ^?^
-      begin match vd.pval_prim with
-      | [] -> empty
-      | ps ->
-        S.equals ^/^ separate_map (break 1) (fun s -> dquotes (string s)) ps
+      begin match pval_prim with
+        | [] -> empty
+        | ps ->
+          S.equals ^/^ separate_map (break 1) (fun s -> dquotes (string s)) ps
       end
     )
+    |> Attribute.attach ~item:true ?pre_doc:pval_pre_doc ?post_doc:pval_post_doc
+      ~attrs:pval_attributes
 end
 
 (** {2 Type declarations} *)
 and Label_declaration : sig
   val pp : label_declaration -> document
 end = struct
-  let pp
-      { pld_name; pld_mutable; pld_modalities; pld_type; pld_attributes; _ } =
+  let pp { pld_name; pld_mutable; pld_modalities; pld_type; pld_attributes;
+           pld_doc = _ (* explicitely handled in the wrapper below *);
+           pld_loc = _; pld_tokens = _ } =
     prefix (group (mutable_ pld_mutable ^^ string pld_name.txt ^/^ S.colon))
       (Core_type.pp pld_type ^^
        begin match pld_modalities with
@@ -1037,6 +1057,9 @@ end = struct
     |> Attribute.attach ~attrs:pld_attributes
 
   let pp pld =
+    (* N.B. we are "normalizing": docstring is always placed after the semicolon
+       if there is one.
+       Is that ok? *)
     pp pld ^^
     begin if List.exists (fun t -> t.Tokens.desc = Token SEMI) pld.pld_tokens
       then S.semi
@@ -1051,7 +1074,7 @@ and Constructor_argument : sig
 
   val pp_args : constructor_arguments -> document
 end = struct
-  let pp { pca_modalities; pca_type; _ } =
+  let pp { pca_modalities; pca_type; pca_loc = _ } =
     Core_type.pp pca_type ^^
     begin match pca_modalities with
       | [] -> empty
@@ -1161,19 +1184,11 @@ end = struct
         | Some j -> S.colon ^/^ Jkind_annotation.pp j
       )
     ) (pp_rhs ?subst td)
-    |> Attribute.attach ~post:true ~attrs:td.ptype_attributes
-
-  let pp ~start ?subst td =
-    begin match td.ptype_pre_text with
-    | [] -> empty
-    | attrs ->
-      hardline ^^ hardline ^^
-      separate_map (break 1) Attribute.pp attrs ^^
-      hardline ^^ hardline
-    end ^^
-    optional Attribute.pp td.ptype_pre_doc ^?^
-    pp ~start ?subst td ^?^
-    optional Attribute.pp td.ptype_post_doc
+    |> Attribute.attach ~item:true
+      ~text:td.ptype_pre_text
+      ?pre_doc:td.ptype_pre_doc
+      ~attrs:td.ptype_attributes
+      ?post_doc:td.ptype_post_doc
 
   let rec pp_list ?subst start = function
     | [] -> empty
@@ -1187,17 +1202,21 @@ and Type_extension : sig
   val pp : type_extension -> document
 end = struct
   let pp { ptyext_path; ptyext_params; ptyext_constructors; ptyext_private;
-           ptyext_attributes; ptyext_ext_attrs; _ }=
-  Ext_attribute.decorate S.type_ ptyext_ext_attrs ^/^
-  type_app (longident ptyext_path.txt)
-    (List.map (fun (x, i) -> param_info i ^^ Core_type.pp x) ptyext_params) ^/^
-  S.plus_equals ^/^
-  private_ ptyext_private ^?^
-  (* FIXME: leading pipe!
-     Need tokens on extension constructors. *)
-  separate_map (break 1 ^^ S.pipe ^^ break 1)
-    Extension_constructor.pp ptyext_constructors
-  |> Attribute.attach ~post:true ~attrs:ptyext_attributes
+           ptyext_attributes; ptyext_ext_attrs; ptyext_pre_doc; ptyext_post_doc;
+           ptyext_loc = _ ; ptyext_tokens = _ }=
+    Ext_attribute.decorate S.type_ ptyext_ext_attrs ^/^
+    type_app (longident ptyext_path.txt)
+      (List.map (fun (x, i) -> param_info i ^^ Core_type.pp x) ptyext_params)
+    ^/^
+    S.plus_equals ^/^
+    private_ ptyext_private ^?^
+    (* FIXME: leading pipe!
+       Need tokens on extension constructors. *)
+    separate_map (break 1 ^^ S.pipe ^^ break 1)
+      Extension_constructor.pp ptyext_constructors
+    |> Attribute.attach ~item:true ~attrs:ptyext_attributes
+      ?pre_doc:ptyext_pre_doc
+      ?post_doc:ptyext_post_doc
 end
 
 and Extension_constructor : sig
@@ -1228,7 +1247,7 @@ end = struct
       end
     | Pext_rebind lid -> S.equals ^/^ longident lid.txt
 
-  let pp { pext_name; pext_kind; pext_attributes; _ } =
+  let pp { pext_name; pext_kind; pext_attributes; pext_loc = _ } =
     string pext_name.txt ^/^ pp_kind pext_kind
     |> Attribute.attach ~attrs:pext_attributes
 end
@@ -1237,10 +1256,12 @@ and Type_exception : sig
   val pp : type_exception -> document
 end = struct
   let pp { ptyexn_constructor ; ptyexn_attributes ; ptyexn_ext_attrs;
-         _ } =
-  Ext_attribute.decorate S.exception_ ptyexn_ext_attrs ^/^
-  Extension_constructor.pp ptyexn_constructor
-  |> Attribute.attach ~post:true ~attrs:ptyexn_attributes
+           ptyexn_pre_doc; ptyexn_post_doc; ptyexn_loc = _; ptyexn_tokens = _} =
+    Ext_attribute.decorate S.exception_ ptyexn_ext_attrs ^/^
+    Extension_constructor.pp ptyexn_constructor
+    |> Attribute.attach ~item:true ~attrs:ptyexn_attributes
+      ?pre_doc:ptyexn_pre_doc
+      ?post_doc:ptyexn_post_doc
 end
 
 (** {1 Class language} *)
@@ -1270,7 +1291,7 @@ end = struct
       (separate_map (break 1) pp_field pcsig_fields) ^/^
     S.end_
 
-  and pp_field { pctf_desc; pctf_attributes; _ } =
+  and pp_field { pctf_desc; pctf_attributes; pctf_loc = _ } =
     group (pp_field_desc pctf_desc)
     |> Attribute.attach ~attrs:pctf_attributes
 
@@ -1287,9 +1308,9 @@ end = struct
     | Pctf_attribute attr -> Attribute.pp_floating attr
     | Pctf_extension ext -> Extension.pp ~floating:true ext
 
-  and pp { pcty_desc; pcty_attributes; _ } =
+  and pp { pcty_desc; pcty_attributes; pcty_loc = _ } =
     pp_desc pcty_desc
-    |> Attribute.attach ~post:true ~attrs:pcty_attributes
+    |> Attribute.attach ~item:true ~attrs:pcty_attributes
 end
 
 
@@ -1385,9 +1406,9 @@ end = struct
       (separate_map (hardline ^^ hardline) pp_field pcstr_fields) ^/^
     S.end_
 
-  and pp_field { pcf_desc; pcf_attributes; _ } =
+  and pp_field { pcf_desc; pcf_attributes; pcf_loc = _ } =
     group (pp_field_desc pcf_desc)
-    |> Attribute.attach ~post:true ~attrs:pcf_attributes
+    |> Attribute.attach ~item:true ~attrs:pcf_attributes
 
   and pp_field_desc = function
     | Pcf_inherit (override, ce, alias) ->
@@ -1431,9 +1452,9 @@ end = struct
       ] in
       Value_binding.pp_list ~start [vb]
 
-  and pp { pcl_desc; pcl_attributes; _ } =
+  and pp { pcl_desc; pcl_attributes; pcl_loc = _ } =
     pp_desc pcl_desc
-    |> Attribute.attach ~post:true ~attrs:pcl_attributes
+    |> Attribute.attach ~item:true ~attrs:pcl_attributes
 end
 
 
@@ -1471,7 +1492,7 @@ end = struct
     | Pmty_strengthen (mty, lid) ->
       pp mty ^/^ S.with_ ^/^ longident lid.txt
 
-  and pp { pmty_desc; pmty_attributes; _ } =
+  and pp { pmty_desc; pmty_attributes; pmty_loc = _ } =
     pp_desc pmty_desc
     |> Attribute.attach ~attrs:pmty_attributes
 end
@@ -1518,7 +1539,7 @@ end = struct
 
   let pp_item it = pp_item_desc it.psig_desc
 
-  let pp { psg_modalities ; psg_items ; _ } =
+  let pp { psg_modalities ; psg_items ; psg_loc = _ } =
     group (
       prefix (with_modalities S.sig_ ~modalities:psg_modalities)
         (separate_map (break 1) pp_item psg_items) ^/^
@@ -1532,23 +1553,29 @@ and Module_declaration : sig
   val pp_recmods : module_declaration list -> document
 end = struct
   let pp keywords { pmd_name; pmd_type; pmd_modalities; pmd_attributes;
-                    pmd_ext_attrs; _ } =
+                    pmd_ext_attrs; pmd_pre_text; pmd_pre_doc; pmd_post_doc;
+                    pmd_loc = _; pmd_tokens = _ } =
     let keywords =
       Ext_attribute.decorate (List.hd keywords) pmd_ext_attrs
         :: List.tl keywords
     in
-    let name =
-      match pmd_name.txt with
+    let binding =
+      begin match pmd_name.txt with
       | None -> S.underscore
       | Some s -> string s
-    in
-    group (
-      separate (break 1) keywords ^/^ name ^?^
+      end ^?^
+      (* FIXME: pass as ~constraint_ ? *)
       match pmd_modalities with
       | [] -> empty
       | l -> S.at ^/^ modalities l
-    ) ^/^ S.equals ^/^ Module_type.pp pmd_type
-    |> Attribute.attach ~post:true ~attrs:pmd_attributes
+    in
+    Generic_binding.pp ~item:true
+      ~pre_text:pmd_pre_text ?pre_doc:pmd_pre_doc
+      ~keyword:(separate (break 1) keywords)
+      binding
+      ~rhs:(Module_type.pp pmd_type)
+      ~attrs:pmd_attributes
+      ?post_doc:pmd_post_doc
 
   let pp_recmods = function
     | [] -> empty (* assert false? *)
@@ -1563,37 +1590,47 @@ end
 and Module_substitution : sig
   val pp : module_substitution -> document
 end = struct
-  let pp { pms_name; pms_manifest; pms_attributes; pms_ext_attrs; _ } =
-    Ext_attribute.decorate S.module_ pms_ext_attrs ^/^
-    string pms_name.txt ^/^ S.colon_equals ^/^ longident pms_manifest.txt
-    |> Attribute.attach ~attrs:pms_attributes
+  let pp { pms_name; pms_manifest; pms_attributes; pms_ext_attrs;
+           pms_pre_doc; pms_post_doc; pms_loc = _; pms_tokens = _ } =
+    (* TODO: Generic_binding *)
+    optional Attribute.pp pms_pre_doc ^?^ (
+      Ext_attribute.decorate S.module_ pms_ext_attrs ^/^
+      string pms_name.txt ^/^ S.colon_equals ^/^ longident pms_manifest.txt
+      |> Attribute.attach ~attrs:pms_attributes
+    ) ^?^
+    optional Attribute.pp pms_post_doc
 end
 
 and Module_type_declaration : sig
   val pp : ?subst:bool -> module_type_declaration -> document
 end = struct
-  let pp ?(subst=false) { pmtd_name; pmtd_type; pmtd_attributes; pmtd_ext_attrs;
-                          _ } =
+  let pp ?(subst=false)
+      { pmtd_name; pmtd_type; pmtd_attributes; pmtd_ext_attrs; pmtd_pre_doc;
+        pmtd_post_doc; pmtd_loc = _; pmtd_tokens = _ } =
+    (* TODO: Generic_binding *)
     Ext_attribute.decorate S.module_ pmtd_ext_attrs ^/^ S.type_ ^/^
     string pmtd_name.txt ^^
     begin match pmtd_type with
       | None -> empty
       | Some mty ->
         break 1 ^^ (if subst then S.colon_equals else S.equals) ^/^
-          Module_type.pp mty
+        Module_type.pp mty
     end
-    |> Attribute.attach ~post:true ~attrs:pmtd_attributes
+    |> Attribute.attach ~item:true ~attrs:pmtd_attributes
+      ?pre_doc:pmtd_pre_doc ?post_doc:pmtd_post_doc
 end
 
 and Open_infos : sig
   val pp : 'a. ('a -> document) -> 'a open_infos -> document
 end = struct
   let pp pp_expr { popen_expr; popen_override; popen_attributes;
-                   popen_ext_attrs; _ } =
+                   popen_ext_attrs; popen_pre_doc; popen_post_doc;
+                   popen_loc = _; popen_tokens = _ } =
     Ext_attribute.decorate (S.open_ ^^ override_ popen_override)
       popen_ext_attrs ^/^
     pp_expr popen_expr
     |> Attribute.attach ~attrs:popen_attributes
+      ?pre_doc:popen_pre_doc ?post_doc:popen_post_doc
 end
 
 and Open_description : sig
@@ -1612,7 +1649,8 @@ and Include_infos : sig
   val pp : 'a. ('a -> document) -> 'a include_infos -> document
 end = struct
   let pp pp_mod { pincl_kind ; pincl_mod; pincl_attributes; pincl_ext_attrs;
-                  _ } =
+                  pincl_pre_doc; pincl_post_doc; pincl_loc = _;
+                  pincl_tokens = _ } =
     Ext_attribute.decorate S.include_ pincl_ext_attrs ^/^
     begin match pincl_kind with
       | Functor -> S.functor_ ^^ break 1
@@ -1620,6 +1658,7 @@ end = struct
     end ^^
     pp_mod pincl_mod
     |> Attribute.attach ~attrs:pincl_attributes
+      ?pre_doc:pincl_pre_doc ?post_doc:pincl_post_doc
 end
 
 and Include_description : sig
@@ -1683,7 +1722,7 @@ end = struct
     | Pmod_unpack e -> parens (S.val_ ^/^ Expression.pp e)
     | Pmod_extension ext -> Extension.pp ext
 
-  and pp { pmod_desc; pmod_attributes; _ } =
+  and pp { pmod_desc; pmod_attributes; pmod_loc = _ } =
     pp_desc pmod_desc
     |> Attribute.attach ~attrs:pmod_attributes
 end
@@ -1790,17 +1829,9 @@ and Generic_binding : sig
     ?rhs:document -> ?attrs:attributes -> ?post_doc:attribute -> document ->
     document
 end = struct
-  let pp ?item ?(pre_text=[]) ?pre_doc ~keyword ?(params=[])
+  let pp ?item ?pre_text ?pre_doc ~keyword ?(params=[])
         ?(constraint_=empty) ?rhs ?(attrs=[]) ?post_doc bound =
-    begin match pre_text with
-    | [] -> empty
-    | attrs ->
-      hardline ^^ hardline ^^
-      separate_map (break 1) Attribute.pp attrs ^^
-      hardline ^^ hardline
-    end ^^
-    optional Attribute.pp pre_doc ^?^
-    Attribute.attach ?post:item ~attrs
+    Attribute.attach ?item ?text:pre_text ?pre_doc ?post_doc ~attrs
       (match rhs with
        | None -> (* Punning *)
          prefix keyword (
@@ -1812,8 +1843,7 @@ end = struct
              flow (break 1) (keyword :: bound :: params) ^?^
              group (constraint_ ^?^ S.equals)
            )
-         ) d) ^?^
-    optional Attribute.pp post_doc
+         ) d)
 end
 
 and Value_binding : sig

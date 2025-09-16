@@ -1259,7 +1259,6 @@ and module_declaration =
 
 and module_substitution =
     {
-     pms_pre_text: attributes;
      pms_pre_doc: attribute option;
      pms_ext_attrs: ext_attribute;
      pms_name: string loc;

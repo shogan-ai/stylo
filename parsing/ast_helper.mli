@@ -400,7 +400,7 @@ module Md:
 module Ms:
   sig
     val mk: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
-      tokens:Tokens.seq -> ?docs:docs -> ?text:text ->
+      tokens:Tokens.seq -> ?docs:docs ->
       str -> lid -> module_substitution
   end
 
