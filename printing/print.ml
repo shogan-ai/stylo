@@ -656,11 +656,8 @@ end = struct
       end ^/^ S.rparen ^/^ S.rarrow ^/^
       pp body
     | Pexp_pack (me, ty) ->
-      S.lparen ^^ !!S.module_ ^/^ Module_expr.pp me ^^
-      begin match ty with
-      | None -> empty
-      | Some ct -> break 1 ^^ Type_constraint.pp (Pconstraint ct)
-      end ^^
+      S.lparen ^^ !!S.module_ ^/^ Module_expr.pp me ^?^
+      optional (fun c -> S.colon ^/^ Module_expr.pp_package_type c) ty ^^
       S.rparen
     | Pexp_dot_open (lid, e) -> longident lid.txt ^^ S.dot ^^ pp e
     | Pexp_let_open (od, e) ->
@@ -1727,6 +1724,9 @@ end
 
 and Module_expr : sig
   val pp : module_expr -> document
+
+  (* TODO: not the most natural place for this. *)
+  val pp_package_type : core_type -> document
 end = struct
   let pp_package_type ct =
     match ct.ptyp_desc with
