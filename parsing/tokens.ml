@@ -440,7 +440,6 @@ end = struct
         | Node n -> n.prev <- cell
         end;
         Tbl.replace t.tbl start cell; (* has been removed by aux... *)
-        Tbl.replace t.tbl stop cell;
         seq
 
   let consume t start stop =
