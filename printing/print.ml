@@ -1136,10 +1136,9 @@ end = struct
         accu ^/^ constructor_declaration true x
     ) empty
 
-  let type_kind priv = function
+  let type_kind = function
     | Ptype_abstract -> empty
     | Ptype_variant cds ->
-      S.equals ^/^ private_ priv ^?^
       begin match cds with
       | [] -> S.pipe
       | cd :: _ ->
@@ -1147,11 +1146,11 @@ end = struct
       end
     | Ptype_record lbls ->
       let lbls = separate_map (break 1) Label_declaration.pp lbls in
-      S.equals ^/^ private_ priv ^?^ prefix S.lbrace lbls ^/^ S.rbrace
+      prefix S.lbrace lbls ^/^ S.rbrace
     | Ptype_record_unboxed_product lbls ->
       let lbls = separate_map (break 1) Label_declaration.pp lbls in
-      S.equals ^/^ private_ priv ^?^ prefix S.hash_lbrace lbls ^/^ S.rbrace
-    | Ptype_open -> S.equals ^/^ S.dotdot
+      prefix S.hash_lbrace lbls ^/^ S.rbrace
+    | Ptype_open -> S.dotdot
 
   let pp_constraints =
     separate_map (break 1) (fun (ct1, ct2, _) ->
@@ -1160,14 +1159,17 @@ end = struct
     )
 
   let pp_rhs ?(subst=false) td =
-    (* FIXME: private manifest *)
-    begin match td.ptype_manifest with
-      | None -> empty
-      | Some ct ->
-        (if subst then S.colon_equals else S.equals) ^/^
-        Core_type.pp ct
-    end ^?^
-    type_kind td.ptype_private td.ptype_kind ^?^ pp_constraints td.ptype_cstrs
+    let eq = if subst then S.colon_equals else S.equals in
+    begin match td.ptype_manifest, td.ptype_kind with
+    | None, Ptype_abstract -> empty
+    | Some ct, Ptype_abstract ->
+      eq ^?^ private_ td.ptype_private ^?^ Core_type.pp ct
+    | Some ct, kind ->
+      S.equals ^/^ Core_type.pp ct ^/^
+      S.equals ^?^ private_ td.ptype_private ^?^ type_kind kind
+    | None, kind ->
+      S.equals ^?^ private_ td.ptype_private ^?^ type_kind kind
+    end ^?^ pp_constraints td.ptype_cstrs
 
   let pp_param (x, info) = param_info info ^^ Core_type.pp x
 

@@ -807,13 +807,13 @@ and type_declaration =
      ptype_name: string loc;
      ptype_params: ptype_params;
       (** [('a1,...'an) t] *)
-     ptype_cstrs: ptype_constraint list;
-      (** [... constraint T1=T1'  ... constraint Tn=Tn'] *)
-     ptype_kind: type_kind;
+     ptype_jkind_annotation: jkind_annotation option; (** for [: jkind] *)
      ptype_private: private_flag;  (** for [= private ...] *)
      ptype_manifest: core_type option;  (** represents [= T] *)
+     ptype_kind: type_kind;
+     ptype_cstrs: ptype_constraint list;
+      (** [... constraint T1=T1'  ... constraint Tn=Tn'] *)
      ptype_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
-     ptype_jkind_annotation: jkind_annotation option; (** for [: jkind] *)
      ptype_post_doc: attribute option;
      ptype_loc: location;
      ptype_tokens: tokens;
