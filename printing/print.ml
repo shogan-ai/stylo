@@ -1794,7 +1794,7 @@ end = struct
     | Pstr_primitive vd -> Value_description.pp vd
     (* FIXME: factorize with Psig_* *)
     | Pstr_type (rf, tds) -> Type_declaration.pp_list rf tds
-    | Pstr_typext te -> S.type_ ^/^ Type_extension.pp te
+    | Pstr_typext te -> Type_extension.pp te
     | Pstr_exception exn -> Type_exception.pp exn
     | Pstr_module mb -> Module_binding.pp ~keywords:[S.module_] mb
     | Pstr_recmodule mbs -> Module_binding.pp_recmods mbs
