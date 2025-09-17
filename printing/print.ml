@@ -568,8 +568,8 @@ end = struct
         | None -> empty
         | Some e -> break 1 ^^ pp e
       end
-    | Pexp_record (fields, eo) -> pp_record ~tokens:exp.pexp_tokens eo fields
-    | Pexp_record_unboxed_product (fields, eo) ->
+    | Pexp_record (eo, fields) -> pp_record ~tokens:exp.pexp_tokens eo fields
+    | Pexp_record_unboxed_product (eo, fields) ->
       pp_record ~unboxed:true ~tokens:exp.pexp_tokens eo fields
     | Pexp_field (e, lid) -> pp e ^^ S.dot ^^ longident lid.txt
     | Pexp_unboxed_field (e, lid) ->

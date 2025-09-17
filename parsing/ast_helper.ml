@@ -263,9 +263,9 @@ module Exp = struct
   let unboxed_tuple ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_unboxed_tuple a)
   let construct ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_construct (a, b))
   let variant ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_variant (a, b))
-  let record ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_record (a, b))
+  let record ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_record (b, a))
   let record_unboxed_product ?loc ?attrs ~tokens a b =
-    mk ?loc ?attrs ~tokens (Pexp_record_unboxed_product (a, b))
+    mk ?loc ?attrs ~tokens (Pexp_record_unboxed_product (b, a))
   let field ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_field (a, b))
   let unboxed_field ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_unboxed_field (a, b))
   let setfield ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Pexp_setfield (a, b, c))

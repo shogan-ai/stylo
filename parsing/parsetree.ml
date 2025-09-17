@@ -499,15 +499,15 @@ and expression_desc =
             - [`A]   when [exp] is [None]
             - [`A E] when [exp] is [Some E]
          *)
-  | Pexp_record of expression record_field list * expression option
-      (** [Pexp_record([(l1,P1) ; ... ; (ln,Pn)], exp0)] represents
+  | Pexp_record of expression option * expression record_field list
+      (** [Pexp_record(exp0, [(l1,P1) ; ... ; (ln,Pn)])] represents
             - [{ l1=P1; ...; ln=Pn }]         when [exp0] is [None]
             - [{ E0 with l1=P1; ...; ln=Pn }] when [exp0] is [Some E0]
 
            Invariant: [n > 0]
          *)
-  | Pexp_record_unboxed_product of expression record_field list * expression option
-      (** [Pexp_record_unboxed_product([(l1,P1) ; ... ; (ln,Pn)], exp0)] represents
+  | Pexp_record_unboxed_product of expression option * expression record_field list
+      (** [Pexp_record_unboxed_product(exp0, [(l1,P1) ; ... ; (ln,Pn)])] represents
             - [#{ l1=P1; ...; ln=Pn }]         when [exp0] is [None]
             - [#{ E0 with l1=P1; ...; ln=Pn }] when [exp0] is [Some E0]
 
@@ -599,8 +599,8 @@ and expression_desc =
 
 and 'a record_field =
   { field_name: longident loc;
-    value: 'a option;
     typ: type_constraint option;
+    value: 'a option;
   }
 
 and case =
