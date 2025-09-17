@@ -1091,7 +1091,8 @@ end = struct
 end
 
 and Type_declaration : sig
-  val pp_rhs : ?subst:bool -> type_declaration -> document
+  val pp_constraints : ptype_constraint list -> document
+  val pp_param : ptype_param -> document
 
   val pp : start:document list -> ?subst:bool -> type_declaration -> document
 
@@ -1154,21 +1155,25 @@ end = struct
       S.equals ^/^ private_ priv ^?^ prefix S.hash_lbrace lbls ^/^ S.rbrace
     | Ptype_open -> S.equals ^/^ S.dotdot
 
+  let pp_constraints =
+    separate_map (break 1) (fun (ct1, ct2, _) ->
+      S.constraint_ ^/^ Core_type.pp ct1 ^/^ S.equals ^/^
+      Core_type.pp ct2
+    )
+
   let pp_rhs ?(subst=false) td =
+    (* FIXME: private manifest *)
     begin match td.ptype_manifest with
       | None -> empty
       | Some ct ->
         (if subst then S.colon_equals else S.equals) ^/^
         Core_type.pp ct
     end ^?^
-    type_kind td.ptype_private td.ptype_kind ^?^
-    separate_map (break 1) (fun (ct1, ct2, _) ->
-      S.constraint_ ^/^ Core_type.pp ct1 ^/^ S.equals ^/^
-      Core_type.pp ct2
-    ) td.ptype_cstrs
+    type_kind td.ptype_private td.ptype_kind ^?^ pp_constraints td.ptype_cstrs
+
+  let pp_param (x, info) = param_info info ^^ Core_type.pp x
 
   let pp ~start ?subst td =
-    let pp_param (x, info) = param_info info ^^ Core_type.pp x in
     let start =
       match start with
       | [] -> assert false
@@ -1684,8 +1689,12 @@ and With_constraint : sig
   val pp : with_constraint -> document
 end = struct
   let pp = function
-    | Pwith_type (lid, td) ->
-      S.type_ ^/^ longident lid.txt ^^ Type_declaration.pp_rhs td
+    | Pwith_type (params, lid, priv, ct, cstrs) ->
+      S.type_ ^/^
+      type_app (longident lid.txt)
+        (List.map Type_declaration.pp_param params) ^/^
+      S.equals ^?^ private_ priv ^?^
+      Core_type.pp ct ^?^ Type_declaration.pp_constraints cstrs
     | Pwith_module (lid1, lid2) ->
       S.module_ ^/^ longident lid1.txt ^/^ S.equals ^/^ longident lid2.txt
     | Pwith_modtype (lid, mty) ->
@@ -1694,9 +1703,11 @@ end = struct
     | Pwith_modtypesubst (lid, mty) ->
       S.module_ ^/^ S.type_ ^/^ longident lid.txt ^/^ S.colon_equals ^/^
       Module_type.pp mty
-    | Pwith_typesubst (lid, td) ->
-      S.type_ ^/^ longident lid.txt ^^
-      Type_declaration.pp_rhs ~subst:true td
+    | Pwith_typesubst (params, lid, ct) ->
+      S.type_ ^/^
+      type_app (longident lid.txt)
+        (List.map Type_declaration.pp_param params) ^/^
+      S.colon_equals ^/^ Core_type.pp ct
     | Pwith_modsubst (lid1, lid2) ->
       S.module_ ^/^ longident lid1.txt ^/^ S.colon_equals ^/^
       longident lid2.txt

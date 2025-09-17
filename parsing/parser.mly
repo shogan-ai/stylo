@@ -295,9 +295,6 @@ let indexop_unclosed_error loc_s s loc_e =
 let lapply ~loc p1 p2 =
   mklid ~loc (Lapply(p1, p2))
 
-let loc_last (id : Longident.t Location.loc) : string Location.loc =
-  Location.map Longident.last id
-
 let mk_newtypes ~loc newtypes exp =
   let mk_one (name, jkind) exp =
     ghexp ~loc (Pexp_newtype (name, jkind, exp))
@@ -516,23 +513,14 @@ let package_type_of_module_type pmty =
     |> failwith
   in
   let map_cstr = function
-    | Pwith_type (lid, ptyp) ->
-        let loc = ptyp.ptype_loc in
-        if ptyp.ptype_params <> [] then
+    | Pwith_type (params, lid, priv, ty, cstrs) ->
+        let loc = pmty.pmty_loc in
+        if params <> [] then
           err loc "Syntaxerr.Parameterized_types";
-        if ptyp.ptype_cstrs <> [] then
+        if cstrs <> [] then
           err loc "Syntaxerr.Constrained_types";
-        if ptyp.ptype_private <> Public then
+        if priv <> Public then
           err loc "Syntaxerr.Private_types";
-
-        (* restrictions below are checked by the 'with_constraint' rule *)
-        assert (ptyp.ptype_kind = Ptype_abstract);
-        assert (ptyp.ptype_attributes = []);
-        let ty =
-          match ptyp.ptype_manifest with
-          | Some ty -> ty
-          | None -> assert false
-        in
         (lid, ty)
     | _ ->
         err pmty.pmty_loc "Not_with_type"
@@ -3904,28 +3892,12 @@ extension_constructor_rebind(opening):
 with_constraint:
     TYPE type_parameters mkrhs(label_longident) with_type_binder
     core_type_no_attr constraints
-      { let lident = loc_last $3 in
-        Pwith_type
-          ($3,
-           (Type.mk lident
-              ~params:$2
-              ~cstrs:$6
-              ~manifest:$5
-              ~priv:$4
-              ~loc:(make_loc $sloc)
-              ~tokens:(Tokens.at $sloc))) }
+      { Pwith_type ($2, $3, $4, $5, $6) }
     /* used label_longident instead of type_longident to disallow
        functor applications in type path */
   | TYPE type_parameters mkrhs(label_longident)
     COLONEQUAL core_type_no_attr
-      { let lident = loc_last $3 in
-        Pwith_typesubst
-         ($3,
-           (Type.mk lident
-              ~params:$2
-              ~manifest:$5
-              ~loc:(make_loc $sloc)
-              ~tokens:(Tokens.at $sloc))) }
+      { Pwith_typesubst ($2, $3, $5) }
   | MODULE mkrhs(mod_longident) EQUAL mkrhs(mod_ext_longident)
       { Pwith_module ($2, $4) }
   | MODULE mkrhs(mod_longident) COLONEQUAL mkrhs(mod_ext_longident)

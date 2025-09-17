@@ -796,15 +796,18 @@ and value_description =
 
 (** {2 Type declarations} *)
 
+and ptype_param = core_type * (variance * injectivity)
+and ptype_params = ptype_param list
+and ptype_constraint = core_type * core_type * location
 and type_declaration =
     {
      ptype_pre_text: attributes;
      ptype_pre_doc: attribute option;
      ptype_ext_attrs: ext_attribute;
      ptype_name: string loc;
-     ptype_params: (core_type * (variance * injectivity)) list;
+     ptype_params: ptype_params;
       (** [('a1,...'an) t] *)
-     ptype_cstrs: (core_type * core_type * location) list;
+     ptype_cstrs: ptype_constraint list;
       (** [... constraint T1=T1'  ... constraint Tn=Tn'] *)
      ptype_kind: type_kind;
      ptype_private: private_flag;  (** for [= private ...] *)
@@ -1344,7 +1347,8 @@ and include_declaration = module_expr include_infos
 (** Values of type [include_declaration] represents [include ME] *)
 
 and with_constraint =
-  | Pwith_type of longident loc * type_declaration
+  | Pwith_type of ptype_params * longident loc *
+                  private_flag * core_type * ptype_constraint list
       (** [with type X.t = ...]
 
             Note: the last component of the longident must match
@@ -1355,7 +1359,7 @@ and with_constraint =
       (** [with module type X.Y = Z] *)
   | Pwith_modtypesubst of longident loc * module_type
       (** [with module type X.Y := sig end] *)
-  | Pwith_typesubst of longident loc * type_declaration
+  | Pwith_typesubst of ptype_params * longident loc * core_type
       (** [with type X.t := ..., same format as [Pwith_type]] *)
   | Pwith_modsubst of longident loc * longident loc
       (** [with module X.Y := Z] *)
