@@ -1553,7 +1553,7 @@ end = struct
     | Psig_class_type ctds -> Class_type_declaration.pp_list ctds
     | Psig_attribute attr -> Attribute.pp_floating attr
     | Psig_extension (ext, attrs) ->
-      Attribute.attach ~attrs (Extension.pp ~floating:true ext)
+      Attribute.attach ~item:true ~attrs (Extension.pp ~floating:true ext)
     | Psig_kind_abbrev (name, k) ->
       S.kind_abbrev__ ^/^ string name.txt ^/^ S.equals ^/^
         Jkind_annotation.pp k
@@ -1618,7 +1618,7 @@ end = struct
     optional Attribute.pp pms_pre_doc ^?^ (
       Ext_attribute.decorate S.module_ pms_ext_attrs ^/^
       string pms_name.txt ^/^ S.colon_equals ^/^ longident pms_manifest.txt
-      |> Attribute.attach ~attrs:pms_attributes
+      |> Attribute.attach ~item:true ~attrs:pms_attributes
     ) ^?^
     optional Attribute.pp pms_post_doc
 end
@@ -1679,7 +1679,7 @@ end = struct
       | Structure -> empty
     end ^^
     pp_mod pincl_mod
-    |> Attribute.attach ~attrs:pincl_attributes
+    |> Attribute.attach ~item:true ~attrs:pincl_attributes
       ?pre_doc:pincl_pre_doc ?post_doc:pincl_post_doc
 end
 
@@ -1781,7 +1781,8 @@ and Structure : sig
 end = struct
   let pp_item_desc item =
     match item.pstr_desc with
-    | Pstr_eval (e, attrs) -> Attribute.attach ~attrs (Expression.pp e)
+    | Pstr_eval (e, attrs) ->
+      Attribute.attach ~item:true ~attrs (Expression.pp e)
     | Pstr_value (rf, vbs) ->
       (* FIXME: factorize Pexp_let *)
       Value_binding.pp_list ~item:true vbs ~start:(
@@ -1804,7 +1805,7 @@ end = struct
     | Pstr_include incl -> Include_declaration.pp incl
     | Pstr_attribute a -> Attribute.pp_floating a
     | Pstr_extension (ext, attrs) ->
-      Attribute.attach ~attrs (Extension.pp ~floating:true ext)
+      Attribute.attach ~item:true ~attrs (Extension.pp ~floating:true ext)
     | Pstr_kind_abbrev (name, k) ->
       S.kind_abbrev__ ^/^ string name.txt ^/^ S.equals ^/^
       Jkind_annotation.pp k
