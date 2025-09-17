@@ -246,7 +246,7 @@ module Type:
       ?info:info ->
       ?vars:(str * jkind_annotation option) list ->
       ?args:constructor_arguments -> ?res:core_type ->
-      str ->
+      lid ->
       constructor_declaration
 
     val constructor_arg: ?loc:loc -> ?modalities:modality with_loc list -> core_type ->
@@ -270,15 +270,15 @@ module Te:
       extension_constructor -> type_exception
 
     val constructor: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
-      ?info:info -> str -> extension_constructor_kind -> extension_constructor
+      ?info:info -> lid -> extension_constructor_kind -> extension_constructor
 
     val decl: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?info:info ->
       ?vars:(str * jkind_annotation option) list ->
       ?args:constructor_arguments -> ?res:core_type ->
-      str ->
+      lid ->
       extension_constructor
     val rebind: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?info:info ->
-      str -> lid -> extension_constructor
+      lid -> lid -> extension_constructor
   end
 
 (** {1 Module language} *)

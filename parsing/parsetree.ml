@@ -875,7 +875,7 @@ and label_declaration =
 
 and constructor_declaration =
     {
-     pcd_name: string loc;
+     pcd_name: longident loc;
      pcd_vars: (string loc * jkind_annotation option) list;
       (** jkind annotations are [C : ('a : kind1) ('a2 : kind2). ...] *)
      pcd_args: constructor_arguments;
@@ -930,7 +930,7 @@ and type_extension =
 
 and extension_constructor =
     {
-     pext_name: string loc;
+     pext_name: longident loc;
      pext_kind: extension_constructor_kind;
      pext_loc: location;
      pext_attributes: attributes;  (** [C of ... [\@id1] [\@id2]] *)

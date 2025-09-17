@@ -1113,7 +1113,8 @@ end = struct
     in
     Attribute.attach ~attrs:pcd_attributes (
       prefix_nonempty
-        (group ((if pipe then S.pipe else empty) ^?^ string pcd_name.txt))
+        (group ((if pipe then S.pipe else empty) ^?^
+                constr_longident pcd_name.txt))
         (begin match pcd_args, pcd_res with
            | Pcstr_tuple [], None -> empty
            | args, None ->
@@ -1252,7 +1253,7 @@ end = struct
 
   let pp { pext_name; pext_kind; pext_attributes; pext_doc;
            pext_loc = _; pext_tokens = _ } =
-    string pext_name.txt ^/^ pp_kind pext_kind
+    constr_longident pext_name.txt ^/^ pp_kind pext_kind
     |> Attribute.attach ~attrs:pext_attributes ?post_doc:pext_doc
 end
 

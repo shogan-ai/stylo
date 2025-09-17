@@ -754,7 +754,7 @@ The precedences must be listed from low to high.
 ;
 
 %inline mklid(symb): symb
-    { mklid $1 ~loc:$sloc}
+    { mklid $1 ~loc:$sloc }
 ;
 
 %inline text_str(symb): symb
@@ -4577,9 +4577,9 @@ constr_extra_nonprefix_ident:
   | TRUE                                        { "true" }
 ;
 constr_ident:
-    UIDENT                                      { $1 }
-  | constr_extra_ident                          { $1 }
-  | constr_extra_nonprefix_ident                { $1 }
+    UIDENT                                      { mklid ~loc:$sloc @@ Lident $1 }
+  | constr_extra_ident                          { mklid ~loc:$sloc @@ Lident $1 }
+  | constr_extra_nonprefix_ident                { mklid ~loc:$sloc @@ Lident $1 }
 ;
 constr_longident:
     mod_longident       %prec below_DOT  { $1 } /* A.B.x vs (A).B.x */
