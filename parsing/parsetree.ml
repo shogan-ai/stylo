@@ -282,6 +282,7 @@ and row_field = {
   prf_desc : row_field_desc;
   prf_loc : location;
   prf_attributes : attributes;
+  prf_tokens: tokens;
 }
 
 and row_field_desc =

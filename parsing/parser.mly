@@ -4405,17 +4405,18 @@ row_field:
     tag_field
       { $1 }
   | core_type
-      { Rf.inherit_ ~loc:(make_loc $sloc) $1 }
+      { Rf.inherit_ ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) $1 }
 ;
 tag_field:
     mkrhs(name_tag) OF opt_ampersand amper_type_list attributes
       { let info = symbol_info $endpos in
         let attrs = add_info_attrs info $5 in
-        Rf.tag ~loc:(make_loc $sloc) ~attrs $1 $3 $4 }
+        Rf.tag ~loc:(make_loc $sloc) ~attrs ~tokens:(Tokens.at $sloc) $1 $3 $4 }
   | mkrhs(name_tag) attributes
       { let info = symbol_info $endpos in
         let attrs = add_info_attrs info $2 in
-        Rf.tag ~loc:(make_loc $sloc) ~attrs $1 true [] }
+        Rf.tag ~loc:(make_loc $sloc) ~attrs ~tokens:(Tokens.at $sloc)
+          $1 true [] }
 ;
 opt_ampersand:
     AMPERSAND                                   { true }

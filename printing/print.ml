@@ -22,6 +22,12 @@ let rec starts_with_pipe = function
   | Tokens.{ desc = Comment _; _ } :: rest -> starts_with_pipe rest
   | _ -> false
 
+let rec pipe_before_child = function
+  | []
+  | Tokens.{ desc = Child_node; _ } :: _ -> false
+  | Tokens.{ desc = Token BAR; _ } :: _ -> true
+  | _ :: rest -> pipe_before_child rest
+
 let rec has_leading_pipe ~after:after_kw = function
   | [] -> assert false
   | Tokens.{ desc = Token tok; _ } :: rest when tok = after_kw ->
@@ -322,22 +328,8 @@ end = struct
         | None -> S.underscore
         | Some s -> S.squote ^^ string s.txt
       ) ^^ S.colon ^^ Jkind_annotation.pp jkind ^^ break 0 ^^ S.rparen
-    | Ptyp_variant (fields, Closed, None) ->
-      (* FIXME: leading | *)
-      S.lbracket ^/^ separate_map (S.pipe ^^ break 1) row_field fields ^/^ S.rbracket
-    | Ptyp_variant (fields, Open, None) ->
-      (* FIXME: leading | *)
-      let trailing_break = if fields = [] then 0 else 1 in
-      S.lbracket_gt ^/^ separate_map (S.pipe ^^ break 1) row_field fields ^^
-      break trailing_break ^^ S.rbracket
-    | Ptyp_variant (fields, Closed, Some []) ->
-      (* FIXME: leading | *)
-      S.lbracket_lt ^/^ separate_map (S.pipe ^^ break 1) row_field fields ^/^ S.rbracket
-    | Ptyp_variant (fields, Closed, Some labels) ->
-      S.lbracket_lt ^/^ separate_map (S.pipe ^^ break 1) row_field fields ^/^
-      S.gt ^/^ separate_map (break 1) string labels ^/^
-      S.rbracket
-    | Ptyp_variant (_, Open, Some _) -> assert false
+    | Ptyp_variant (fields, cf, lbls) ->
+      pp_variant ~tokens:ct.ptyp_tokens fields cf lbls
     | Ptyp_poly (bound_vars, ct) ->
       let binding = function
         | var, None -> S.squote ^^ string var.Location.txt
@@ -350,6 +342,21 @@ end = struct
     | Ptyp_open (lid, ct) -> longident lid.txt ^^ S.dot ^^ pp ct
     | Ptyp_extension ext -> Extension.pp ext
     | Ptyp_parens ct -> parens (pp ct)
+
+  and pp_variant ~tokens fields (cf : Asttypes.closed_flag) lbls =
+    let fields =
+      (if pipe_before_child tokens then S.pipe else empty) ^?^
+      separate_map (break 1 ^^ S.pipe ^^ break 1) row_field fields
+    in
+    match cf, lbls with
+    | Closed, None -> S.lbracket ^/^ fields  ^/^ S.rbracket
+    | Open, None -> S.lbracket_gt ^/^ fields ^?^ S.rbracket
+    | Closed, Some [] -> S.lbracket_lt ^/^ fields ^/^ S.rbracket
+    | Closed, Some labels ->
+      S.lbracket_lt ^/^ fields ^/^
+      S.gt ^/^ separate_map (break 1) string labels ^/^
+      S.rbracket
+    | Open, Some _ -> assert false
 
   and pp_tuple elts =
     let pp_elt (lbl_opt, ct) =

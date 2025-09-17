@@ -560,10 +560,11 @@ module Cstr:
 (** Row fields *)
 module Rf:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> row_field_desc -> row_field
-    val tag: ?loc:loc -> ?attrs:attrs ->
+    val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
+      row_field_desc -> row_field
+    val tag: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
       label with_loc -> bool -> core_type list -> row_field
-    val inherit_: ?loc:loc -> core_type -> row_field
+    val inherit_: ?loc:loc -> tokens:Tokens.seq -> core_type -> row_field
   end
 
 (** Object fields *)

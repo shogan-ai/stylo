@@ -877,15 +877,16 @@ end
 
 (** Row fields *)
 module Rf = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) desc = {
+  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens desc = {
     prf_desc = desc;
     prf_loc = loc;
     prf_attributes = attrs;
+    prf_tokens = tokens;
   }
-  let tag ?loc ?attrs label const tys =
-    mk ?loc ?attrs (Rtag (label, const, tys))
-  let inherit_?loc ty =
-    mk ?loc (Rinherit ty)
+  let tag ?loc ?attrs ~tokens label const tys =
+    mk ?loc ?attrs ~tokens (Rtag (label, const, tys))
+  let inherit_?loc ~tokens ty =
+    mk ?loc ~tokens (Rinherit ty)
 end
 
 (** Object fields *)
