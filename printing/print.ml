@@ -1706,6 +1706,21 @@ end
 and Module_expr : sig
   val pp : module_expr -> document
 end = struct
+  let pp_package_type ct =
+    match ct.ptyp_desc with
+    | Ptyp_package { ppt_ext_attr = None; ppt_name; ppt_eqs } ->
+      let with_ =
+        match ppt_eqs with
+        | [] -> empty
+        | _ ->
+          let one (lid, ct) =
+            longident lid.txt ^/^ S.equals ^/^ Core_type.pp ct
+          in
+          S.with_ ^/^ separate_map (break 1 ^^ S.and_ ^^ break 1) one ppt_eqs
+      in
+      longident ppt_name.txt ^?^ with_
+    | _ -> assert false
+
   let rec pp_desc = function
     | Pmod_ident lid -> longident lid.txt
     | Pmod_structure str -> Structure.pp str
@@ -1725,7 +1740,12 @@ end = struct
           | l -> break 1 ^^ S.atat ^/^ modes l
         end
       )
-    | Pmod_unpack e -> parens (S.val_ ^/^ Expression.pp e)
+    | Pmod_unpack (e, ty1, ty2) ->
+      parens (
+        S.val_ ^/^ Expression.pp e ^?^
+        optional (fun c -> S.colon ^/^ pp_package_type c) ty1 ^?^
+        optional (fun c -> S.coerce ^/^ pp_package_type c) ty2
+      )
     | Pmod_extension ext -> Extension.pp ext
 
   and pp { pmod_desc; pmod_attributes; pmod_loc = _ } =

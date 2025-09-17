@@ -341,7 +341,8 @@ module Mod = struct
   let apply_unit ?loc ?attrs m1 = mk ?loc ?attrs (Pmod_apply_unit m1)
   let constraint_ ?loc ?attrs ty mode m =
     mk ?loc ?attrs (Pmod_constraint (m, ty, mode))
-  let unpack ?loc ?attrs e = mk ?loc ?attrs (Pmod_unpack e)
+  let unpack ?loc ?attrs ?constr ?coerce e =
+    mk ?loc ?attrs (Pmod_unpack (e, constr, coerce))
   let extension ?loc ?attrs a = mk ?loc ?attrs (Pmod_extension a)
 (*   let instance ?loc ?attrs a = mk ?loc ?attrs (Pmod_instance a) *)
 end

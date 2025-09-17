@@ -1381,7 +1381,8 @@ and module_expr_desc =
           - [(ME @ modes)]
           - [(ME : MT)]
       *)
-  | Pmod_unpack of expression  (** [(val E)] *)
+  | Pmod_unpack of expression * core_type option * core_type option
+      (** [(val E)] *)
   | Pmod_extension of extension  (** [[%id]] *)
       (*
   | Pmod_instance of module_instance
