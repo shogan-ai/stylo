@@ -1544,10 +1544,10 @@ module_type:
       mkrhs(mty_longident)
         { Pmty_ident $1 }
     | LPAREN RPAREN MINUSGREATER module_type optional_at_mode_expr
-        { Pmty_functor(Unit, $4, $5) }
+        { Pmty_functor_type(Unit, $4, $5) }
     | module_type m1=optional_at_mode_expr MINUSGREATER module_type m2=optional_at_mode_expr
         %prec below_WITH
-        { Pmty_functor(Named (mknoloc None, $1, m1), $4, m2) }
+        { Pmty_functor_type(Named (mknoloc None, $1, m1), $4, m2) }
     | module_type WITH separated_nonempty_llist(AND, with_constraint)
         { Pmty_with($1, $3) }
 /*  | LPAREN MODULE mkrhs(mod_longident) RPAREN

@@ -1487,6 +1487,9 @@ end = struct
     | Pmty_functor (fp, mty, modes) ->
       S.functor_ ^/^ Functor_parameter.pp fp ^/^ S.rarrow ^/^
       with_modes ~modes (pp mty)
+    | Pmty_functor_type (fp, mty, modes) ->
+      Functor_parameter.pp_type fp ^/^ S.rarrow ^/^
+      with_modes ~modes (pp mty)
     | Pmty_with (mty, cstrs) ->
       pp mty ^^
       begin match cstrs with
@@ -1510,7 +1513,14 @@ end
 
 and Functor_parameter : sig
   val pp : functor_parameter -> document
+  val pp_type : functor_parameter -> document
 end = struct
+  let pp_type = function
+    | Unit -> parens empty
+    | Named (lbl, mty, modes) ->
+      assert (lbl.txt = None);
+      with_modes (Module_type.pp mty) ~modes
+
   let pp = function
     | Unit -> empty
     | Named (lbl, mty, modes) ->
