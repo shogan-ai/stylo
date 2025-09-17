@@ -65,6 +65,11 @@ class to_tokens = object
 
   inherit [_] Parsetree.reduce as super
 
+  method! visit_longident env l =
+    let sub_tokens = super#visit_longident env l in
+    let node_toks = l.tokens in
+    combine_children ~loc:Location.none node_toks sub_tokens
+
   method! visit_attribute env a =
     match a.attr_name.txt with
     | ["ocaml"; ("doc"|"text")] -> [a.attr_tokens]

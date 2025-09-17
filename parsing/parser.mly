@@ -52,6 +52,8 @@ let ghost_loc (startpos, endpos) = {
   Location.loc_ghost = true;
 }
 
+let mklid ~loc d = { Longident.desc = d; tokens = Tokens.at loc }
+
 let mktyp ~loc ?attrs d =
   let tokens = Tokens.at loc in
   Typ.mk ~loc:(make_loc loc) ~tokens ?attrs d
@@ -103,7 +105,7 @@ let mkcf ~loc ?attrs ?docs d =
 let mkrhs rhs loc = mkloc rhs (make_loc loc)
 
 let mkexpvar ~loc (name : string) =
-  mkexp ~loc (Pexp_ident(mkrhs (Lident name) loc))
+  mkexp ~loc (Pexp_ident(mkrhs (mklid ~loc (Lident name)) loc))
 
 let mkoperator =
   mkexpvar
@@ -290,8 +292,8 @@ let indexop_unclosed_error loc_s s loc_e =
   let left, right = paren_to_strings s in
   unclosed left loc_s right loc_e
 
-let lapply ~loc:_ p1 p2 =
-  Lapply(p1, p2)
+let lapply ~loc p1 p2 =
+  mklid ~loc (Lapply(p1, p2))
 
 let loc_last (id : Longident.t Location.loc) : string Location.loc =
   Location.map Longident.last id
@@ -761,6 +763,10 @@ The precedences must be listed from low to high.
 %inline extra_rhs(symb): symb { extra_rhs_core_type $1 ~pos:$endpos($1) };
 %inline mkrhs(symb): symb
     { mkrhs $1 $sloc }
+;
+
+%inline mklid(symb): symb
+    { mklid $1 ~loc:$sloc}
 ;
 
 %inline text_str(symb): symb
@@ -2576,7 +2582,10 @@ simple_expr:
     { Pexp_parens { begin_end = true; exp = e }, $2 }
   | BEGIN ext_attributes END
       { (* FIXME! *)
-        Pexp_construct (mkloc (Lident "()") (make_loc $sloc), None), $2 }
+        Pexp_construct
+          (mkloc (mklid ~loc:$sloc (Lident "()")) (make_loc $sloc), None),
+        $2
+      }
   | BEGIN ext_attributes seq_expr error
       { unclosed "begin" $loc($1) "end" $loc($4) }
   | NEW ext_attributes mkrhs(class_longident)
@@ -2714,7 +2723,7 @@ comprehension_clause:
       { mkinfix $1 $2 $3 }
   | extension
       { Pexp_extension $1 }
-  | od=open_dot_declaration DOT mkrhs(LPAREN RPAREN {Lident "()"})
+  | od=open_dot_declaration DOT mkrhs(mklid(LPAREN RPAREN {Lident "()"}))
       { Pexp_dot_open(od, mkexp ~loc:($loc($3)) (Pexp_construct($3, None))) }
   | mod_longident DOT LPAREN seq_expr error
       { unclosed "(" $loc($3) ")" $loc($5) }
@@ -2750,7 +2759,7 @@ comprehension_clause:
           let tail_exp, _tail_loc = mktailexp $loc($5) $4 in
           mkexp ~loc:($startpos($3), $endpos) tail_exp in
         Pexp_dot_open(od, list_exp) }
-  | od=open_dot_declaration DOT mkrhs(LBRACKET RBRACKET {Lident "[]"})
+  | od=open_dot_declaration DOT mkrhs(mklid(LBRACKET RBRACKET {Lident "[]"}))
       { Pexp_dot_open(od, mkexp ~loc:$loc($3) (Pexp_construct($3, None))) }
   | mod_longident DOT
     LBRACKET expr_semi_list error
@@ -3336,9 +3345,9 @@ simple_pattern_not_ident:
       { Ppat_type ($2) }
   | mkrhs(mod_longident) DOT simple_delimited_pattern
       { Ppat_open($1, $3) }
-  | mkrhs(mod_longident) DOT mkrhs(LBRACKET RBRACKET {Lident "[]"})
+  | mkrhs(mod_longident) DOT mkrhs(mklid(LBRACKET RBRACKET {Lident "[]"}))
     { Ppat_open($1, mkpat ~loc:$sloc (Ppat_construct($3, None))) }
-  | mkrhs(mod_longident) DOT mkrhs(LPAREN RPAREN {Lident "()"})
+  | mkrhs(mod_longident) DOT mkrhs(mklid(LPAREN RPAREN {Lident "()"}))
     { Ppat_open($1, mkpat ~loc:$sloc (Ppat_construct($3, None))) }
   | mkrhs(mod_longident) DOT LPAREN pattern RPAREN
       { let sub =
@@ -4602,13 +4611,13 @@ constr_ident:
 ;
 constr_longident:
     mod_longident       %prec below_DOT  { $1 } /* A.B.x vs (A).B.x */
-  | mod_longident DOT constr_extra_ident { Ldot($1,$3) }
-  | constr_extra_ident                   { Lident $1 }
-  | constr_extra_nonprefix_ident         { Lident $1 }
+  | mod_longident DOT constr_extra_ident { mklid ~loc:$sloc @@ Ldot($1,$3) }
+  | constr_extra_ident                   { mklid ~loc:$sloc @@ Lident $1 }
+  | constr_extra_nonprefix_ident         { mklid ~loc:$sloc @@ Lident $1 }
 ;
 mk_longident(prefix,final):
-   | final            { Lident $1 }
-   | prefix DOT final { Ldot($1,$3) }
+   | final            { mklid ~loc:$sloc @@ Lident $1 }
+   | prefix DOT final { mklid ~loc:$sloc @@ Ldot($1,$3) }
 ;
 val_longident:
     mk_longident(mod_longident, val_ident) { $1 }
@@ -4657,7 +4666,7 @@ any_longident:
   | mk_longident (mod_ext_longident,
      ident | constr_extra_ident | val_extra_ident { $1 }
     ) { $1 }
-  | constr_extra_nonprefix_ident { Lident $1 }
+  | constr_extra_nonprefix_ident { mklid ~loc:$sloc @@ Lident $1 }
 ;
 /* END AVOID */
 

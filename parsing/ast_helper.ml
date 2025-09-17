@@ -144,7 +144,7 @@ module Typ = struct
             Ptyp_tuple (List.map (fun (l, t) -> l, loop t) lst)
         | Ptyp_unboxed_tuple lst ->
           Ptyp_unboxed_tuple (List.map (fun (l, t) -> l, loop t) lst)
-        | Ptyp_constr( { txt = Longident.Lident s }, [])
+        | Ptyp_constr( { txt = Longident.{ desc = Lident s; _ } }, [])
           when List.mem s var_names ->
             Ptyp_var (s, None)
         | Ptyp_constr(longident, lst) ->

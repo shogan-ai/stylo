@@ -31,14 +31,21 @@ let rec has_leading_pipe ~after:after_kw = function
 type 'a loc = 'a Location.loc = { txt: 'a; loc: Location.t }
 let stringf fmt = Printf.ksprintf string fmt
 
-let rec longident = function
-  | Longident.Lident s -> string s
+let rec longident (l : Longident.t) =
+  let needs_parens =
+    List.exists (fun t -> t.Tokens.desc = Token LPAREN) l.tokens
+  in
+  match l.desc with
+  | Lident s when needs_parens -> parens (string s)
+  | Lident s -> string s
+  | Ldot (lid, s) when needs_parens ->
+    longident lid ^^ S.dot ^^ parens (string s)
   | Ldot (lid, s) -> longident lid ^^ S.dot ^^ string s
   | Lapply (l1, l2) ->
     longident l1 ^^ S.lparen ^^ break 0 ^^ longident l2 ^^ break 0 ^^ S.rparen
 
 let constr_longident (cstr : Longident.t) =
-  match cstr with
+  match cstr.desc with
   | Lident "[]" -> S.lbracket ^^ S.rbracket
   | Lident "()" -> S.lparen ^^ S.rparen
   | _ -> longident cstr
@@ -514,12 +521,6 @@ end = struct
   and pp_desc exp =
     let (!!) kw = Ext_attribute.decorate kw exp.pexp_ext_attr in
     match exp.pexp_desc with
-    | (* FIXME: doesn't handle [Mod.(op)].
-         Add tokens to longidents and handle there. *)
-      Pexp_ident { txt = Lident s; _ }
-      when List.exists (fun t -> t.Tokens.desc = Token LPAREN) exp.pexp_tokens
-           ->
-           S.lparen ^^ string s ^^ S.rparen
     | Pexp_ident lid -> longident lid.txt
     | Pexp_constant c -> constant c
     | Pexp_let (rf, vbs, body) ->

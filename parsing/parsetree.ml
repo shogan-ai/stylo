@@ -32,11 +32,11 @@ type tokens = Tokens.seq
 
 class virtual ['self] predefs = object(_ : 'self)
   method visit_location : 'env. 'env -> _ = fun _ _l -> []
-  method visit_longident : 'env. 'env -> _ = fun _ _l -> [] (* FIXME *)
-
   method visit_loc :
     'env 'a. ('env -> 'a -> 'b) -> 'env -> 'a loc -> 'b =
     fun visit_arg acc ll -> visit_arg acc ll.txt
+
+  inherit ['self] Longident.reduce
 
   (* Must return the empty list: we need to explicitely access tokens from nodes
      embedding them.
