@@ -20,7 +20,8 @@ EOF
 }
 
 function fuzzer_output {
-    BASE=$(basename -s '.mls' $1)
+    local BASE=$(basename -s '.mls' $1)
+    local FILENAMES=()
 
     for j in $(seq 1 $(wc -l $1 | cut -d' ' -f1)); do
         (( i = j - 1 ))
