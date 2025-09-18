@@ -103,15 +103,6 @@ let override_= function
   | Asttypes.Fresh -> empty
   | Override -> S.bang
 
-let param_info = Asttypes.(function
-    | NoVariance, NoInjectivity -> empty
-    | Covariant, NoInjectivity -> S.plus
-    | Contravariant, NoInjectivity -> S.minus
-    | NoVariance, Injective -> S.bang
-    | Covariant, Injective -> S.plus ^^ S.bang (* FIXME: [S.bang ^^ S.plus] also ok *)
-    | Contravariant, Injective -> S.minus ^^ S.bang (* FIXME: likewise *)
-  )
-
 let array_delimiters = function
   | Asttypes.Immutable -> S.lbracket_colon, S.colon_rbracket
   | Mutable -> S.lbracket_pipe, S.pipe_rbracket
@@ -324,12 +315,13 @@ end = struct
     | Ptyp_constr (lid, args) ->
       type_app (longident lid.txt) (List.map pp args)
     | Ptyp_object (fields, closed) ->
+      let field_doc = separate_map (S.semi ^^ break 1) object_field fields in
       S.lt ^/^
-      separate_map (S.semi ^^ break 1) object_field fields ^^
-      begin match closed with
-        | Closed -> empty
-        | Open -> S.semi ^/^ S.dotdot
-      end ^/^ S.gt
+      begin match fields, closed with
+        | [], Open -> S.dotdot
+        | _, Open -> field_doc ^^ S.semi ^/^ S.dotdot
+        | _, Closed -> field_doc
+      end ^?^ S.gt
     | Ptyp_class (lid, args) ->
       type_app (S.hash ^^ longident lid.txt)
         (List.map pp args)
@@ -1110,9 +1102,40 @@ end = struct
       prefix S.lbrace lbls ^/^ S.rbrace
 end
 
+and Type_param : sig
+  val pp : ptype_param -> document
+end = struct
+  let var_inj_as_single_token =
+    (* C.f. rule [type_variance] in the grammar. *)
+    List.exists (function
+      | Tokens.{ desc = Token (PREFIXOP _ | INFIXOP2 _); _ } -> true
+      | _ -> false
+    )
+
+  let pp_infos tokens = Asttypes.(function
+    | NoVariance, NoInjectivity -> empty
+    | Covariant, NoInjectivity -> S.plus
+    | Contravariant, NoInjectivity -> S.minus
+    | NoVariance, Injective -> S.bang
+    | Covariant, Injective ->
+      (* N.B. we're normalizing here, in practice the order between variance and
+         injectivity is not fixed. *)
+      if var_inj_as_single_token tokens
+      then string "!+"
+      else S.plus ^^ S.bang
+    | Contravariant, Injective ->
+      if var_inj_as_single_token tokens
+      then string "!-"
+      else S.minus ^^ S.bang
+  )
+
+
+  let pp { ptp_typ; ptp_infos; ptp_tokens } =
+    pp_infos ptp_tokens ptp_infos ^^ Core_type.pp ptp_typ
+end
+
 and Type_declaration : sig
   val pp_constraints : ptype_constraint list -> document
-  val pp_param : ptype_param -> document
 
   val pp : start:document list -> ?subst:bool -> type_declaration -> document
 
@@ -1194,8 +1217,6 @@ end = struct
       S.equals ^?^ private_ td.ptype_private ^?^ type_kind kind
     end ^?^ pp_constraints td.ptype_cstrs
 
-  let pp_param (x, info) = param_info info ^^ Core_type.pp x
-
   let pp ~start ?subst td =
     let start =
       match start with
@@ -1206,7 +1227,8 @@ end = struct
     in
     prefix_nonempty (
       prefix start (
-        type_app (string td.ptype_name.txt) (List.map pp_param td.ptype_params)
+        type_app (string td.ptype_name.txt)
+          (List.map Type_param.pp td.ptype_params)
         ^?^
         match td.ptype_jkind_annotation with
         | None -> empty
@@ -1234,8 +1256,7 @@ end = struct
            ptyext_attributes; ptyext_ext_attrs; ptyext_pre_doc; ptyext_post_doc;
            ptyext_loc = _ ; ptyext_tokens = _ }=
     Ext_attribute.decorate S.type_ ptyext_ext_attrs ^/^
-    type_app (longident ptyext_path.txt)
-      (List.map (fun (x, i) -> param_info i ^^ Core_type.pp x) ptyext_params)
+    type_app (longident ptyext_path.txt) (List.map Type_param.pp ptyext_params)
     ^/^
     S.plus_equals ^/^
     private_ ptyext_private ^?^
@@ -1364,9 +1385,8 @@ end = struct
     in
     let value_params = List.map (Argument.pp Pattern.pp) pci_value_params in
     let bound_class_thingy =
-      let pp_param (x, info) = param_info info ^^ Core_type.pp x in
       type_app ~parens:false (string pci_name.txt)
-        (List.map pp_param pci_params)
+        (List.map Type_param.pp pci_params)
     in
     Generic_binding.pp
       ~pre_text:pci_pre_text
@@ -1725,7 +1745,7 @@ end = struct
     | Pwith_type (params, lid, priv, ct, cstrs) ->
       S.type_ ^/^
       type_app (longident lid.txt)
-        (List.map Type_declaration.pp_param params) ^/^
+        (List.map Type_param.pp params) ^/^
       S.equals ^?^ private_ priv ^?^
       Core_type.pp ct ^?^ Type_declaration.pp_constraints cstrs
     | Pwith_module (lid1, lid2) ->
@@ -1739,7 +1759,7 @@ end = struct
     | Pwith_typesubst (params, lid, ct) ->
       S.type_ ^/^
       type_app (longident lid.txt)
-        (List.map Type_declaration.pp_param params) ^/^
+        (List.map Type_param.pp params) ^/^
       S.colon_equals ^/^ Core_type.pp ct
     | Pwith_modsubst (lid1, lid2) ->
       S.module_ ^/^ longident lid1.txt ^/^ S.colon_equals ^/^

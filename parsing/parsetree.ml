@@ -798,7 +798,12 @@ and value_description =
 
 (** {2 Type declarations} *)
 
-and ptype_param = core_type * (variance * injectivity)
+and ptype_param = {
+  ptp_typ: core_type;
+  ptp_infos: variance * injectivity;
+  ptp_tokens: tokens;
+}
+
 and ptype_params = ptype_param list
 and ptype_constraint = core_type * core_type * location
 and type_declaration =
@@ -917,7 +922,7 @@ and type_extension =
      ptyext_pre_doc: attribute option;
      ptyext_ext_attrs: ext_attribute;
      ptyext_path: longident loc;
-     ptyext_params: (core_type * (variance * injectivity)) list;
+     ptyext_params: ptype_param list;
      ptyext_constructors: extension_constructor list;
      ptyext_private: private_flag;
      ptyext_loc: location;
@@ -1044,7 +1049,7 @@ and 'a class_infos =
      pci_pre_doc: attribute option;
      pci_virt: virtual_flag;
      pci_ext_attrs: ext_attribute;
-     pci_params: (core_type * (variance * injectivity)) list;
+     pci_params: ptype_param list;
      pci_name: string loc;
      pci_value_params: pattern argument list;
      pci_constraint: class_type option;

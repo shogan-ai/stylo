@@ -117,6 +117,11 @@ class to_tokens = object
     let node_toks = vd.pval_tokens in
     combine_children ~loc:vd.pval_loc node_toks sub_tokens
 
+  method! visit_ptype_param env tp =
+    let sub_tokens = super#visit_ptype_param env tp in
+    let node_toks = tp.ptp_tokens in
+    combine_children ~loc:Location.none node_toks sub_tokens
+
   method! visit_type_declaration env td =
     let sub_tokens = super#visit_type_declaration env td in
     let node_toks = td.ptype_tokens in

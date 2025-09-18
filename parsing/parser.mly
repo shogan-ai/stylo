@@ -3664,12 +3664,18 @@ kind_abbreviation_decl:
 parenthesized_type_parameter:
     type_parameter { $1 }
   | type_variance type_param_with_jkind
-    { $2, $1 }
+    { let typ = $2 in
+      let infos = $1 in
+      let tokens = Tokens.at $sloc in
+      { ptp_typ = typ; ptp_infos = infos; ptp_tokens = tokens } }
 ;
 
 type_parameter:
     type_variance type_variable attributes
-      { {$2 with ptyp_attributes = $3}, $1 }
+      { let typ = {$2 with ptyp_attributes = $3} in
+        let infos = $1 in
+        let tokens = Tokens.at $sloc in
+        { ptp_typ = typ; ptp_infos = infos; ptp_tokens = tokens } }
 ;
 
 %inline type_variable:

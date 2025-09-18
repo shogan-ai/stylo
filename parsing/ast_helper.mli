@@ -238,7 +238,7 @@ module Type:
   sig
     val mk: ?loc:loc -> ?ext_attr:ext_attribute -> ?attrs:attrs ->
       tokens:Tokens.seq -> ?docs:docs -> ?text:text ->
-      ?params:(core_type * (variance * injectivity)) list ->
+      ?params:ptype_param list ->
       ?cstrs:(core_type * core_type * loc) list ->
       ?kind:type_kind -> ?priv:private_flag -> ?manifest:core_type ->
       ?jkind_annotation:jkind_annotation ->
@@ -265,7 +265,7 @@ module Te:
   sig
     val mk: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
       tokens:Tokens.seq -> ?docs:docs ->
-      ?params:(core_type * (variance * injectivity)) list ->
+      ?params:ptype_param list ->
       ?priv:private_flag -> lid -> extension_constructor list -> type_extension
 
     val mk_exception: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
@@ -544,7 +544,7 @@ module Ci:
     val mk: ?loc: loc -> ?ext_attr:ext_attribute -> ?attrs:attrs ->
       tokens:Tokens.seq -> ?docs:docs -> ?text:text ->
       ?virt:virtual_flag ->
-      ?params:(core_type * (variance * injectivity)) list ->
+      ?params:ptype_param list ->
       str -> ?value_params:pattern argument list -> ?constraint_:class_type ->
       'a -> 'a class_infos
   end
