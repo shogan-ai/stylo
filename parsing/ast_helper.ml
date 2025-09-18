@@ -24,6 +24,7 @@ type loc = Location.t
 
 type lid = Longident.t with_loc
 type str = string with_loc
+type str_or_op = Longident.str_or_op with_loc
 type str_opt = string option with_loc
 type attrs = attribute list
 
@@ -144,7 +145,7 @@ module Typ = struct
             Ptyp_tuple (List.map (fun (l, t) -> l, loop t) lst)
         | Ptyp_unboxed_tuple lst ->
           Ptyp_unboxed_tuple (List.map (fun (l, t) -> l, loop t) lst)
-        | Ptyp_constr( { txt = Longident.{ desc = Lident s; _ } }, [])
+        | Ptyp_constr( { txt = Longident.{ desc = Lident (Str s); _ } }, [])
           when List.mem s var_names ->
             Ptyp_var (s, None)
         | Ptyp_constr(longident, lst) ->

@@ -29,6 +29,7 @@ type loc = Location.t
 
 type lid = Longident.t with_loc
 type str = string with_loc
+type str_or_op = Longident.str_or_op with_loc
 type str_opt = string option with_loc
 type attrs = attribute list
 
@@ -111,8 +112,9 @@ module Pat:
     val attr:pattern -> attribute -> pattern
 
     val any: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> unit -> pattern
-    val var: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str -> pattern
-    val alias: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern -> str -> pattern
+    val var: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str_or_op -> pattern
+    val alias: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern ->
+      str_or_op -> pattern
     val constant: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> constant -> pattern
     val interval: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> constant -> constant -> pattern
     val tuple: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern argument list ->
@@ -227,7 +229,8 @@ module Val:
   sig
     val mk: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
       tokens:Tokens.seq -> ?docs:docs -> ?prim:string list ->
-      ?modalities:modality with_loc list -> str -> core_type -> value_description
+      ?modalities:modality with_loc list -> str_or_op -> core_type ->
+      value_description
   end
 
 (** Type declarations *)
@@ -246,7 +249,7 @@ module Type:
       ?info:info ->
       ?vars:(str * jkind_annotation option) list ->
       ?args:constructor_arguments -> ?res:core_type ->
-      lid ->
+      str_or_op ->
       constructor_declaration
 
     val constructor_arg: ?loc:loc -> ?modalities:modality with_loc list -> core_type ->
@@ -270,15 +273,16 @@ module Te:
       extension_constructor -> type_exception
 
     val constructor: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
-      ?info:info -> lid -> extension_constructor_kind -> extension_constructor
+      ?info:info -> str_or_op -> extension_constructor_kind ->
+      extension_constructor
 
     val decl: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?info:info ->
       ?vars:(str * jkind_annotation option) list ->
       ?args:constructor_arguments -> ?res:core_type ->
-      lid ->
+      str_or_op ->
       extension_constructor
     val rebind: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?info:info ->
-      lid -> lid -> extension_constructor
+      str_or_op -> lid -> extension_constructor
   end
 
 (** {1 Module language} *)

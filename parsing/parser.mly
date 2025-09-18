@@ -53,6 +53,9 @@ let ghost_loc (startpos, endpos) = {
 }
 
 let mklid ~loc d = { Longident.desc = d; tokens = Tokens.at loc }
+let mkunit loc = mklid ~loc (Lident (Str "()"))
+
+let wrap_str = Location.map (fun s -> Longident.Str s)
 
 let mktyp ~loc ?attrs d =
   let tokens = Tokens.at loc in
@@ -102,9 +105,10 @@ let mkcf ~loc ?attrs ?docs d =
   Cf.mk ~loc:(make_loc loc) ?attrs ?docs d
     ~tokens:(Tokens.at loc)
 
-let mkrhs rhs loc = mkloc rhs (make_loc loc)
+let mkrhs : 'a. 'a -> (Lexing.position * Lexing.position) -> 'a with_loc =
+  fun rhs loc -> mkloc rhs (make_loc loc)
 
-let mkexpvar ~loc (name : string) =
+let mkexpvar ~loc (name : Longident.str_or_op) =
   mkexp ~loc (Pexp_ident(mkrhs (mklid ~loc (Lident name)) loc))
 
 let mkoperator =
@@ -1910,7 +1914,7 @@ value:
     label = mkrhs(label) COLON ty = core_type
       { (label, mutable_, Cfk_virtual ty), attrs }
   | override_flag noext_attributes mutable_flag mkrhs(label) EQUAL seq_expr
-      { let pat = mkpat ~loc:$loc($4) (Ppat_var $4) in
+      { let pat = mkpat ~loc:$loc($4) (Ppat_var (wrap_str $4)) in
         let vb =
           { pvb_pre_text = [];
             pvb_pre_doc = None;
@@ -1933,7 +1937,7 @@ value:
              Pvc_constraint { locally_abstract_univars = []; typ=t }
           | Pcoerce (ground, coercion) -> Pvc_coercion { ground; coercion}
         in
-        let pat = mkpat ~loc:$loc($4) (Ppat_var $4) in
+        let pat = mkpat ~loc:$loc($4) (Ppat_var (wrap_str $4)) in
         let vb =
           { pvb_pre_text = [];
             pvb_pre_doc = None;
@@ -1957,7 +1961,7 @@ method_:
       { (label, private_, Cfk_virtual ty), attrs }
   | override_flag noext_attributes private_flag mkrhs(label) strict_binding
       { let params, tc, ret_modes, e = $5 in
-        let pat = mkpat ~loc:$loc($4) (Ppat_var $4) in
+        let pat = mkpat ~loc:$loc($4) (Ppat_var (wrap_str $4)) in
         let vb =
           { pvb_pre_text = [];
             pvb_pre_doc = None;
@@ -1978,7 +1982,7 @@ method_:
       { let constr =
           Pvc_constraint { locally_abstract_univars = []; typ = $6 }
         in
-        let pat = mkpat ~loc:$loc($4) (Ppat_var $4) in
+        let pat = mkpat ~loc:$loc($4) (Ppat_var (wrap_str $4)) in
         let vb =
           { pvb_pre_text = [];
             pvb_pre_doc = None;
@@ -1998,7 +2002,7 @@ method_:
       { let constr =
           Pvc_constraint { locally_abstract_univars = $7; typ = $9 }
         in
-        let pat = mkpat ~loc:$loc($4) (Ppat_var $4) in
+        let pat = mkpat ~loc:$loc($4) (Ppat_var (wrap_str $4)) in
         let vb =
           { pvb_pre_text = [];
             pvb_pre_doc = None;
@@ -2303,7 +2307,7 @@ labeled_simple_pattern:
 
 pattern_var:
   mkpat(
-      mkrhs(LIDENT)     { Ppat_var $1 }
+      mkrhs(LIDENT)     { Ppat_var (wrap_str $1) }
     | UNDERSCORE        { Ppat_any }
   ) { $1 }
 ;
@@ -2570,8 +2574,7 @@ simple_expr:
     { Pexp_parens { begin_end = true; exp = e }, $2 }
   | BEGIN ext_attributes END
       { (* FIXME! *)
-        Pexp_construct
-          (mkloc (mklid ~loc:$sloc (Lident "()")) (make_loc $sloc), None),
+        Pexp_construct (mkloc (mkunit $sloc) (make_loc $sloc), None),
         $2
       }
   | BEGIN ext_attributes seq_expr error
@@ -2680,9 +2683,9 @@ comprehension_clause:
       { Pexp_construct($1, None) }
   | name_tag %prec prec_constant_constructor
       { Pexp_variant($1, None) }
-  | op(PREFIXOP) simple_expr
+  | op(PREFIXOP { Op $1 }) simple_expr
       { Pexp_prefix_apply($1, $2) }
-  | op(BANG {"!"}) simple_expr
+  | op(BANG {Op "!"}) simple_expr
       { Pexp_prefix_apply($1, $2) }
   | LBRACELESS object_expr_content GREATERRBRACE
       { Pexp_override $2 }
@@ -2707,11 +2710,11 @@ comprehension_clause:
       { unclosed "{<" $loc($3) ">}" $loc($5) }
   | simple_expr hash mkrhs(label)
       { Pexp_send($1, $3) }
-  | simple_expr op(HASHOP) simple_expr
+  | simple_expr op(HASHOP { Op $1 }) simple_expr
       { mkinfix $1 $2 $3 }
   | extension
       { Pexp_extension $1 }
-  | od=open_dot_declaration DOT mkrhs(mklid(LPAREN RPAREN {Lident "()"}))
+  | od=open_dot_declaration DOT mkrhs(LPAREN RPAREN {mkunit $sloc})
       { Pexp_dot_open(od, mkexp ~loc:($loc($3)) (Pexp_construct($3, None))) }
   | mod_longident DOT LPAREN seq_expr error
       { unclosed "(" $loc($3) ")" $loc($5) }
@@ -2747,7 +2750,8 @@ comprehension_clause:
           let tail_exp, _tail_loc = mktailexp $loc($5) $4 in
           mkexp ~loc:($startpos($3), $endpos) tail_exp in
         Pexp_dot_open(od, list_exp) }
-  | od=open_dot_declaration DOT mkrhs(mklid(LBRACKET RBRACKET {Lident "[]"}))
+  | od=open_dot_declaration DOT
+    mkrhs(mklid(LBRACKET RBRACKET {Lident (Str "[]")}))
       { Pexp_dot_open(od, mkexp ~loc:$loc($3) (Pexp_construct($3, None))) }
   | mod_longident DOT
     LBRACKET expr_semi_list error
@@ -3333,9 +3337,9 @@ simple_pattern_not_ident:
       { Ppat_type ($2) }
   | mkrhs(mod_longident) DOT simple_delimited_pattern
       { Ppat_open($1, $3) }
-  | mkrhs(mod_longident) DOT mkrhs(mklid(LBRACKET RBRACKET {Lident "[]"}))
+  | mkrhs(mod_longident) DOT mkrhs(mklid(LBRACKET RBRACKET {Lident (Str "[]")}))
     { Ppat_open($1, mkpat ~loc:$sloc (Ppat_construct($3, None))) }
-  | mkrhs(mod_longident) DOT mkrhs(mklid(LPAREN RPAREN {Lident "()"}))
+  | mkrhs(mod_longident) DOT mkrhs(mklid(LPAREN RPAREN {Lident (Str "()")}))
     { Ppat_open($1, mkpat ~loc:$sloc (Ppat_construct($3, None))) }
   | mkrhs(mod_longident) DOT LPAREN pattern RPAREN
       { let sub =
@@ -4506,6 +4510,8 @@ signed_constant:
 
 /* Identifiers and long identifiers */
 
+%inline str_not_op(sym): sym { Longident.Str $1 }
+
 ident:
     UIDENT                    { $1 }
   | LIDENT                    { $1 }
@@ -4517,21 +4523,21 @@ val_extra_ident:
   | LPAREN MODULE error       { expecting $loc($3) "module-expr" }
 ;
 val_ident:
-    LIDENT                    { $1 }
+    LIDENT                    { Str $1 }
   | val_extra_ident           { $1 }
 ;
 operator:
-    PREFIXOP                                    { $1 }
-  | LETOP                                       { $1 }
-  | ANDOP                                       { $1 }
-  | DOTOP LPAREN index_mod RPAREN               { "."^ $1 ^"(" ^ $3 ^ ")" }
-  | DOTOP LPAREN index_mod RPAREN LESSMINUS     { "."^ $1 ^ "(" ^ $3 ^ ")<-" }
-  | DOTOP LBRACKET index_mod RBRACKET           { "."^ $1 ^"[" ^ $3 ^ "]" }
-  | DOTOP LBRACKET index_mod RBRACKET LESSMINUS { "."^ $1 ^ "[" ^ $3 ^ "]<-" }
-  | DOTOP LBRACE index_mod RBRACE               { "."^ $1 ^"{" ^ $3 ^ "}" }
-  | DOTOP LBRACE index_mod RBRACE LESSMINUS     { "."^ $1 ^ "{" ^ $3 ^ "}<-" }
-  | HASHOP                                      { $1 }
-  | BANG                                        { "!" }
+    PREFIXOP                                    { Op $1 }
+  | LETOP                                       { Op $1 }
+  | ANDOP                                       { Op $1 }
+  | DOTOP LPAREN index_mod RPAREN               { DotOp ($1,`Paren,$3,false) }
+  | DOTOP LPAREN index_mod RPAREN LESSMINUS     { DotOp ($1,`Paren, $3, true) }
+  | DOTOP LBRACKET index_mod RBRACKET           { DotOp ($1,`Bracket,$3,false) }
+  | DOTOP LBRACKET index_mod RBRACKET LESSMINUS { DotOp ($1,`Bracket,$3,true) }
+  | DOTOP LBRACE index_mod RBRACE               { DotOp ($1,`Brace,$3,false) }
+  | DOTOP LBRACE index_mod RBRACE LESSMINUS     { DotOp ($1,`Brace,$3,true) }
+  | HASHOP                                      { Op $1 }
+  | BANG                                        { Op "!" }
   | infix_operator                              { $1 }
 ;
 %inline infixop3:
@@ -4539,29 +4545,29 @@ operator:
   | MOD           { "mod" }
 ;
 %inline infix_operator:
-  | op = INFIXOP0 { op }
+  | op = INFIXOP0  { Op op }
   /* Still support the two symbols as infix operators */
-  | AT             {"@"}
-  | ATAT           {"@@"}
-  | op = INFIXOP1 { op }
-  | op = INFIXOP2 { op }
-  | op = infixop3 { op }
-  | op = INFIXOP4 { op }
-  | PLUS           {"+"}
-  | PLUSDOT       {"+."}
-  | PLUSEQ        {"+="}
-  | MINUS          {"-"}
-  | MINUSDOT      {"-."}
-  | STAR           {"*"}
-  | PERCENT        {"%"}
-  | EQUAL          {"="}
-  | LESS           {"<"}
-  | GREATER        {">"}
-  | OR            {"or"}
-  | BARBAR        {"||"}
-  | AMPERSAND      {"&"}
-  | AMPERAMPER    {"&&"}
-  | COLONEQUAL    {":="}
+  | AT             { Op "@"}
+  | ATAT           { Op "@@"}
+  | op = INFIXOP1  { Op op }
+  | op = INFIXOP2  { Op op }
+  | op = infixop3  { Op op }
+  | op = INFIXOP4  { Op op }
+  | PLUS           { Op "+"}
+  | PLUSDOT        { Op "+."}
+  | PLUSEQ         { Op "+="}
+  | MINUS          { Op "-"}
+  | MINUSDOT       { Op "-."}
+  | STAR           { Op "*"}
+  | PERCENT        { Op "%"}
+  | EQUAL          { Op "="}
+  | LESS           { Op "<"}
+  | GREATER        { Op ">"}
+  | OR             { Op "or"}
+  | BARBAR         { Op "||"}
+  | AMPERSAND      { Op "&"}
+  | AMPERAMPER     { Op "&&"}
+  | COLONEQUAL     { Op ":="}
 ;
 index_mod:
 | { "" }
@@ -4569,18 +4575,18 @@ index_mod:
 ;
 
 %inline constr_extra_ident:
-  | LPAREN COLONCOLON RPAREN                    { "::" }
+  | LPAREN COLONCOLON RPAREN      { Op "::" }
 ;
 constr_extra_nonprefix_ident:
-  | LBRACKET RBRACKET                           { "[]" }
-  | LPAREN RPAREN                               { "()" }
-  | FALSE                                       { "false" }
-  | TRUE                                        { "true" }
+  | LBRACKET RBRACKET             { Str "[]" }
+  | LPAREN RPAREN                 { Str "()" }
+  | FALSE                         { Str "false" }
+  | TRUE                          { Str "true" }
 ;
 constr_ident:
-    UIDENT                                      { mklid ~loc:$sloc @@ Lident $1 }
-  | constr_extra_ident                          { mklid ~loc:$sloc @@ Lident $1 }
-  | constr_extra_nonprefix_ident                { mklid ~loc:$sloc @@ Lident $1 }
+    UIDENT                        { Str $1 }
+  | constr_extra_ident            { $1 }
+  | constr_extra_nonprefix_ident  { $1 }
 ;
 constr_longident:
     mod_longident       %prec below_DOT  { $1 } /* A.B.x vs (A).B.x */
@@ -4596,7 +4602,7 @@ val_longident:
     mk_longident(mod_longident, val_ident) { $1 }
 ;
 label_longident:
-    mk_longident(mod_longident, LIDENT) { $1 }
+    mk_longident(mod_longident, str_not_op(LIDENT)) { $1 }
 ;
 type_trailing_no_hash:
   LIDENT  { $1 } %prec below_HASH
@@ -4605,30 +4611,30 @@ type_trailing_hash:
   LIDENT HASH_SUFFIX  { $1 ^ "#" }
 ;
 type_longident:
-    mk_longident(mod_ext_longident, type_trailing_no_hash)  { $1 }
+    mk_longident(mod_ext_longident, str_not_op(type_trailing_no_hash))  { $1 }
 ;
 type_unboxed_longident:
-    mk_longident(mod_ext_longident, type_trailing_hash)  { $1 }
+    mk_longident(mod_ext_longident, str_not_op(type_trailing_hash))  { $1 }
 ;
 
 mod_longident:
-    mk_longident(mod_longident, UIDENT)  { $1 }
+    mk_longident(mod_longident, str_not_op(UIDENT))  { $1 }
 ;
 mod_ext_longident:
-    mk_longident(mod_ext_longident, UIDENT) { $1 }
+    mk_longident(mod_ext_longident, str_not_op(UIDENT)) { $1 }
   | mod_ext_longident LPAREN mod_ext_longident RPAREN
       { lapply ~loc:$sloc $1 $3 }
   | mod_ext_longident LPAREN error
       { expecting $loc($3) "module path" }
 ;
 mty_longident:
-    mk_longident(mod_ext_longident,ident) { $1 }
+    mk_longident(mod_ext_longident,str_not_op(ident)) { $1 }
 ;
 clty_longident:
-    mk_longident(mod_ext_longident,LIDENT) { $1 }
+    mk_longident(mod_ext_longident,str_not_op(LIDENT)) { $1 }
 ;
 class_longident:
-   mk_longident(mod_longident,LIDENT) { $1 }
+   mk_longident(mod_longident,str_not_op(LIDENT)) { $1 }
 ;
 
 /* BEGIN AVOID */
@@ -4637,7 +4643,7 @@ class_longident:
    the path prefix is only valid for types: (e.g. F(X).(::)) */
 any_longident:
   | mk_longident (mod_ext_longident,
-     ident | constr_extra_ident | val_extra_ident { $1 }
+     str_not_op(ident) | constr_extra_ident | val_extra_ident { $1 }
     ) { $1 }
   | constr_extra_nonprefix_ident { mklid ~loc:$sloc @@ Lident $1 }
 ;

@@ -23,14 +23,19 @@
 
 *)
 
+type str_or_op =
+  | Str of string
+  | Op of string
+  | DotOp of string * [ `Paren | `Brace | `Bracket ] * string * bool
+
 type desc =
-    Lident of string
-  | Ldot of t * string
+    Lident of str_or_op
+  | Ldot of t * str_or_op
   | Lapply of t * t
 
 and t = { desc: desc; tokens: Tokens.seq }
 
-val last: t -> string
+val last: t -> str_or_op
 
 class virtual ['self] reduce : object('self)
   method virtual visit_tokens : 'env. 'env -> Tokens.seq -> 'a

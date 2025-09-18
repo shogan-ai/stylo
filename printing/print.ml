@@ -37,23 +37,38 @@ let rec has_leading_pipe ~after:after_kw = function
 type 'a loc = 'a Location.loc = { txt: 'a; loc: Location.t }
 let stringf fmt = Printf.ksprintf string fmt
 
+let str_or_op (so : Longident.str_or_op) =
+  group @@
+  match so with
+  | Str s -> string s
+  | Op s -> parens (string s)
+  | DotOp (op, paren_kind, index_mod, assign) ->
+    let index_mod = if index_mod = "" then empty else S.semi ^^ S.dotdot in
+    let left, right =
+      match paren_kind with
+      | `Brace -> S.lbrace, S.rbrace
+      | `Bracket -> S.lbracket, S.rbracket
+      | `Paren -> S.lparen, S.rparen
+    in
+    let assign = if assign then S.larrow else empty in
+    parens (stringf ".%s" op ^^ left ^^ index_mod ^^ right ^^ assign)
+
 let rec longident (l : Longident.t) =
-  let needs_parens =
-    List.exists (fun t -> t.Tokens.desc = Token LPAREN) l.tokens
-  in
   match l.desc with
-  | Lident s when needs_parens -> parens (string s)
-  | Lident s -> string s
-  | Ldot (lid, s) when needs_parens ->
-    longident lid ^^ S.dot ^^ parens (string s)
-  | Ldot (lid, s) -> longident lid ^^ S.dot ^^ string s
+  | Lident so -> str_or_op so
+  | Ldot (lid, s) -> longident lid ^^ S.dot ^^ str_or_op s
   | Lapply (l1, l2) ->
     longident l1 ^^ S.lparen ^^ break 0 ^^ longident l2 ^^ break 0 ^^ S.rparen
 
+let constr_ident = function
+  | Longident.Str "[]" -> S.lbracket ^^ S.rbracket
+  | Str "()" -> S.lparen ^^ S.rparen
+  | so -> str_or_op so
+
 let constr_longident (cstr : Longident.t) =
   match cstr.desc with
-  | Lident "[]" -> S.lbracket ^^ S.rbracket
-  | Lident "()" -> S.lparen ^^ S.rparen
+  | Lident (Str "[]") -> S.lbracket ^^ S.rbracket
+  | Lident (Str "()") -> S.lparen ^^ S.rparen
   | _ -> longident cstr
 
 let direction = function
@@ -410,14 +425,9 @@ end = struct
   let rec pp p =
     match p.ppat_desc with
     | Ppat_any -> S.underscore
-    | Ppat_var name ->
-      let name = string name.txt in
-      if List.exists (fun t -> t.Tokens.desc = Token LPAREN) p.ppat_tokens then
-        S.lparen ^^ name ^^ S.rparen
-      else
-        name
+    | Ppat_var name -> str_or_op name.txt
     | Ppat_alias (p, alias) ->
-      prefix (pp p) (group (S.as_ ^/^ string alias.txt))
+      prefix (pp p) (group (S.as_ ^/^ str_or_op alias.txt))
     | Ppat_constant c -> constant c
     | Ppat_interval (c1,c2) -> constant c1 ^/^ S.dotdot ^/^ constant c2
     | Ppat_tuple (elts, closed) -> pp_tuple closed elts
@@ -521,6 +531,12 @@ end
 and Expression : sig
   val pp : expression -> document
 end = struct
+  let pp_op op =
+    match op.pexp_desc with
+    | Pexp_ident { txt = { desc = Lident Op s; _ }; _ } ->
+      string s
+    | _ -> assert false
+
   let rec pp e =
     group (pp_desc e)
     |> Attribute.attach ~attrs:e.pexp_attributes
@@ -551,10 +567,10 @@ end = struct
           )
         )
       ) (Function_body.pp body)
-    | Pexp_prefix_apply (op, arg) -> pp op ^^ pp arg
+    | Pexp_prefix_apply (op, arg) -> pp_op op ^^ pp arg
     | Pexp_add_or_sub (op, arg) -> string op ^^ pp arg
     | Pexp_infix_apply {op; arg1; arg2} ->
-      pp arg1 ^/^ pp op ^/^ pp arg2
+      pp arg1 ^/^ pp_op op ^/^ pp arg2
     | Pexp_apply (e, args) -> pp_apply e args
     | Pexp_match (e, cases) ->
       group (!!S.match_ ^/^ pp e ^/^ S.with_) ^/^
@@ -1032,7 +1048,7 @@ end = struct
       | _ -> S.external_
     in
     let kw = Ext_attribute.decorate kw pval_ext_attrs in
-    prefix (group (kw ^/^ string pval_name.txt)) (
+    prefix (group (kw ^/^ str_or_op pval_name.txt)) (
       with_modalities ~modalities:pval_modalities
         (group (S.colon ^/^ Core_type.pp pval_type))
       ^?^
@@ -1121,7 +1137,7 @@ end = struct
     Attribute.attach ~attrs:pcd_attributes (
       prefix_nonempty
         (group ((if pipe then S.pipe else empty) ^?^
-                constr_longident pcd_name.txt))
+                constr_ident pcd_name.txt))
         (begin match pcd_args, pcd_res with
            | Pcstr_tuple [], None -> empty
            | args, None ->
@@ -1262,7 +1278,7 @@ end = struct
 
   let pp { pext_name; pext_kind; pext_attributes; pext_doc;
            pext_loc = _; pext_tokens = _ } =
-    constr_longident pext_name.txt ^/^ pp_kind pext_kind
+    constr_ident pext_name.txt ^/^ pp_kind pext_kind
     |> Attribute.attach ~attrs:pext_attributes ?post_doc:pext_doc
 end
 

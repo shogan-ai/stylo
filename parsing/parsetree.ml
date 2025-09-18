@@ -36,6 +36,7 @@ class virtual ['self] predefs = object(_ : 'self)
     'env 'a. ('env -> 'a -> 'b) -> 'env -> 'a loc -> 'b =
     fun visit_arg acc ll -> visit_arg acc ll.txt
 
+  method visit_str_or_op : 'env. 'env -> _ = fun _ _ -> []
   inherit ['self] Longident.reduce
 
   (* Must return the empty list: we need to explicitely access tokens from nodes
@@ -323,8 +324,8 @@ and pattern =
 
 and pattern_desc =
   | Ppat_any  (** The pattern [_]. *)
-  | Ppat_var of string loc  (** A variable pattern such as [x] *)
-  | Ppat_alias of pattern * string loc
+  | Ppat_var of Longident.str_or_op loc  (** A variable pattern such as [x] *)
+  | Ppat_alias of pattern * Longident.str_or_op loc
       (** An alias pattern such as [P as 'a] *)
   | Ppat_constant of constant
       (** Patterns such as [1], ['a'], ["true"], [1.0], [1l], [1L], [1n] *)
@@ -779,7 +780,7 @@ and value_description =
     {
      pval_pre_doc: attribute option;
      pval_ext_attrs: ext_attribute;
-     pval_name: string loc;
+     pval_name: Longident.str_or_op loc;
      pval_type: core_type;
      pval_modalities : modalities;
      pval_prim: string list;
@@ -876,7 +877,7 @@ and label_declaration =
 
 and constructor_declaration =
     {
-     pcd_name: longident loc;
+     pcd_name: Longident.str_or_op loc;
      pcd_vars: (string loc * jkind_annotation option) list;
       (** jkind annotations are [C : ('a : kind1) ('a2 : kind2). ...] *)
      pcd_args: constructor_arguments;
@@ -931,7 +932,7 @@ and type_extension =
 
 and extension_constructor =
     {
-     pext_name: longident loc;
+     pext_name: Longident.str_or_op loc;
      pext_kind: extension_constructor_kind;
      pext_loc: location;
      pext_attributes: attributes;  (** [C of ... [\@id1] [\@id2]] *)
