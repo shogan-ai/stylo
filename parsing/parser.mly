@@ -2413,8 +2413,17 @@ fun_expr:
     { mkexp ~loc:$sloc $1 }
   | indexop_expr(qualified_dotop, expr_semi_list, LESSMINUS v=expr {Some v})
     { mkexp ~loc:$sloc $1 }
-  | fun_expr attribute
-      { Exp.attr $1 $2 }
+  | exp = fun_expr attribute
+      { (* We are "patching" the expr to add an attribute, we must also patch
+           the tokens attached to the expression to account for the new tokens
+           relative to the attribute. *)
+        let tokens = Tokens.at $sloc in
+        let exp_with_attrs = Exp.attr exp $2 in
+        let pexp_tokens =
+          Tokens.replace_first_child tokens ~subst:exp.pexp_tokens
+        in
+        { exp_with_attrs with pexp_tokens; pexp_loc = make_loc $sloc }
+    }
   | UNDERSCORE
     { mkexp ~loc:$sloc Pexp_hole }
   | mode=mode_legacy exp=seq_expr
