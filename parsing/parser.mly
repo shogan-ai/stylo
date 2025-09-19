@@ -470,14 +470,15 @@ let package_type_of_module_type pmty =
         err pmty.pmty_loc "Not_with_type"
   in
   match pmty with
-  | {pmty_desc = Pmty_ident lid} -> (lid, [], pmty.pmty_attributes)
+  | {pmty_desc = Pmty_ident lid} ->
+      (lid, [], pmty.pmty_attributes, pmty.pmty_tokens)
   | {pmty_desc = Pmty_with({pmty_desc = Pmty_ident lid; pmty_attributes = inner_attributes}, cstrs)} ->
       begin match inner_attributes with
       | [] -> ()
       | attr :: _ ->
         err attr.attr_loc "Syntaxerr.Misplaced_attribute"
       end;
-      (lid, List.map map_cstr cstrs, pmty.pmty_attributes)
+      (lid, List.map map_cstr cstrs, pmty.pmty_attributes, pmty.pmty_tokens)
   | _ ->
       err pmty.pmty_loc "Neither_identifier_nor_with_type"
 
@@ -4341,14 +4342,14 @@ atomic_type:
 
 %inline package_type_ext_attr: module_type
     { fun loc ext_attr ->
-        let (lid, cstrs, attrs) = package_type_of_module_type $1 in
+        let (lid, cstrs, attrs, tokens) = package_type_of_module_type $1 in
         let pack_ty =
           { ppt_ext_attr = ext_attr;
             ppt_name = lid;
             ppt_eqs = cstrs; }
         in
         let descr = Ptyp_package pack_ty in
-        mktyp ~loc ~attrs descr }
+        Typ.mk ~loc:(make_loc loc) ~tokens ~attrs descr }
 ;
 %inline package_type: package_type_ext_attr { $1 $sloc None }
 ;
