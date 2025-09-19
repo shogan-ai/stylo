@@ -281,10 +281,6 @@ let mkexp_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
       mk ~loc (Pexp_coerce(e, t1, t2))
      | _ :: _ -> not_expecting loc "mode annotations"
 
-let mkexp_opt_type_constraint_with_modes ?ghost ~loc ~modes e = function
-  | None -> e
-  | Some c -> mkexp_type_constraint_with_modes ?ghost ~loc ~modes e c
-
 (* Helper functions for desugaring array indexing operators *)
 
 let paren_to_strings = function
@@ -298,14 +294,6 @@ let indexop_unclosed_error loc_s s loc_e =
 
 let lapply ~loc p1 p2 =
   mklid ~loc (Lapply(p1, p2))
-
-let mk_newtypes ~loc newtypes exp =
-  let mk_one (name, jkind) exp =
-    ghexp ~loc (Pexp_newtype (name, jkind, exp))
-  in
-  let exp = List.fold_right mk_one newtypes exp in
-  (* outermost expression should have non-ghost location *)
-  { exp with pexp_loc = make_loc loc }
 
 let wrap_exp_attrs ~loc:_ body pexp_ext_attr =
   { body with pexp_ext_attr }
@@ -447,64 +435,11 @@ let class_of_let_bindings ~loc lbs body =
   in
     mkclass ~loc (Pcl_let (lbs.lbs_rec, List.rev bindings, body))
 
-(* If all the parameters are [Pparam_newtype x], then return [Some xs] where
-   [xs] is the corresponding list of values [x]. This function is optimized for
-   the common case, where a list of parameters contains at least one value
-   parameter.
-*)
-let all_params_as_newtypes =
-  let is_newtype { pparam_desc; _ } =
-    match pparam_desc with
-    | Pparam_newtype _ -> true
-    | Pparam_val _ -> false
-  in
-  let as_newtype { pparam_desc; _ } =
-    match pparam_desc with
-    | Pparam_newtype (x, jkind) -> Some (x, jkind)
-    | Pparam_val _ -> None
-  in
-  fun params ->
-    if List.for_all is_newtype params
-    then Some (List.filter_map as_newtype params)
-    else None
-
 let empty_body_constraint =
   { ret_type_constraint = None; mode_annotations = []; ret_mode_annotations = []}
 
-(* Given a construct [fun (type a b c) : t -> e], we construct
-   [Pexp_newtype(a, Pexp_newtype(b, Pexp_newtype(c, Pexp_constraint(e, t))))]
-   rather than a [Pexp_function].
-*)
-let mkghost_newtype_function_body newtypes body_constraint body ~loc =
-  let wrapped_body =
-    let { ret_type_constraint; mode_annotations; ret_mode_annotations } =
-      body_constraint
-    in
-    let modes = mode_annotations @ ret_mode_annotations in
-    let {Location.loc_start; loc_end} = body.pexp_loc in
-    let loc = loc_start, loc_end in
-    mkexp_opt_type_constraint_with_modes ~ghost:true ~loc ~modes body ret_type_constraint
-  in
-  mk_newtypes ~loc newtypes wrapped_body
-
 let mkfunction ~loc ~ext_attrs params body_constraint body =
-  match body.pfb_desc with
-  | Pfunction_cases _ ->
-      mkexp_attrs (Pexp_function (params, body_constraint, body)) ext_attrs ~loc
-  | Pfunction_body body_exp -> begin
-    (* If all the params are newtypes, then we don't create a function node;
-       we create nested newtype nodes. *)
-      match all_params_as_newtypes params with
-      | None ->
-          mkexp_attrs (Pexp_function (params, body_constraint, body))
-            ext_attrs ~loc
-      | Some newtypes ->
-          wrap_exp_attrs
-            ~loc
-            (mkghost_newtype_function_body newtypes body_constraint body_exp
-                ~loc)
-            ext_attrs
-    end
+  mkexp_attrs (Pexp_function (params, body_constraint, body)) ext_attrs ~loc
 
 (* Alternatively, we could keep the generic module type in the Parsetree
    and extract the package type during type-checking. In that case,
@@ -2999,20 +2934,10 @@ exp_unreachable:
 ;
 fun_param_as_list:
   | LPAREN TYPE ty_params = newtypes RPAREN
-      { (* We desugar (type a b c) to (type a) (type b) (type c).
-            If we do this desugaring, the loc for each parameter is a ghost.
-        *)
-        let loc =
-          match ty_params with
-          | [] | [_] -> make_loc $sloc
-          | _ :: _ :: _ -> ghost_loc $sloc
-        in
-        List.map
-          (fun (newtype, jkind) ->
-             { pparam_loc = loc;
-               pparam_desc = Pparam_newtype (newtype, jkind)
-             })
-          ty_params
+      { [ { pparam_loc = make_loc $sloc;
+            pparam_desc = Pparam_newtypes ty_params
+          }
+        ]
       }
   | LPAREN TYPE mkrhs(LIDENT) COLON jkind_annotation RPAREN
       { [ { pparam_loc = make_loc $sloc;

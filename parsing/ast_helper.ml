@@ -287,7 +287,6 @@ module Exp = struct
   let lazy_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_lazy a)
   let poly ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_poly (a, b))
   let object_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_object a)
-  let newtype ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Pexp_newtype (a, b, c))
   let pack ?loc ?attrs ~tokens ?pkg_type a = mk ?loc ?attrs ~tokens (Pexp_pack (a, pkg_type))
   let open_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_dot_open (a, b))
   let letop ?loc ?attrs ~tokens let_ ands body =

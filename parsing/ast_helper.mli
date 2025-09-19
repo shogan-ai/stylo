@@ -205,8 +205,6 @@ module Exp:
     val poly: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> core_type option
               -> expression
     val object_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> class_structure -> expression
-    val newtype: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str -> jkind_annotation option ->
-      expression  -> expression
     val pack: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?pkg_type:core_type -> module_expr ->
       expression
     val open_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->

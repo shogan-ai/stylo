@@ -557,8 +557,6 @@ and expression_desc =
            {{!class_field_kind.Cfk_concrete}[Cfk_concrete]} for methods (not
            values). *)
   | Pexp_object of class_structure  (** [object ... end] *)
-  | Pexp_newtype of string loc * jkind_annotation option * expression
-      (** [fun (type t) -> E] or [fun (type t : k) -> E] *)
   | Pexp_pack of module_expr * core_type option
       (** [(module ME)].
 
@@ -664,6 +662,7 @@ and function_param_desc =
       {{!Asttypes.arg_label.Optional}[Optional]} is allowed.
   *)
   | Pparam_newtype of string loc * jkind_annotation option
+  | Pparam_newtypes of (string loc * jkind_annotation option) list
   (** [Pparam_newtype x] represents the parameter [(type x)].
       [x] carries the location of the identifier, whereas the [pparam_loc]
       on the enclosing [function_param] node is the location of the [(type x)]

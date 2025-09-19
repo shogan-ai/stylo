@@ -669,13 +669,6 @@ end = struct
     | Pexp_poly _ -> assert false (* FIXME: doesn't appear in concrete syntax *)
     | Pexp_object cs ->
       !!S.object_ ^/^ Class_expr.pp_structure cs ^/^ S.end_
-    | Pexp_newtype (newty, jkind_o, body) ->
-      !!S.fun_ ^/^ S.lparen ^^ S.type_ ^/^ string newty.txt ^^
-      begin match jkind_o with
-        | None -> empty
-        | Some jkind -> break 1 ^^ S.colon ^/^ Jkind_annotation.pp jkind
-      end ^/^ S.rparen ^/^ S.rarrow ^/^
-      pp body
     | Pexp_pack (me, ty) ->
       S.lparen ^^ !!S.module_ ^/^ Module_expr.pp me ^?^
       optional (fun c -> S.colon ^/^ Module_expr.pp_package_type c) ty ^^
@@ -927,15 +920,18 @@ and Function_param : sig
   val pp : function_param -> document
   val pp_desc : function_param_desc -> document
 end = struct
+  let pp_newtype ?(needs_parens=true) = function
+    | name, None -> string name.txt
+    | name, Some jkind ->
+      let doc = string name.txt ^/^ S.colon ^/^ Jkind_annotation.pp jkind in
+      if needs_parens then parens doc else doc
+
   let pp_desc = function
     | Pparam_val arg -> Argument.pp Pattern.pp arg
-    | Pparam_newtype (lat, jkind_o) ->
-      S.lparen ^^ S.type_ ^/^ string lat.txt ^^
-      begin match jkind_o with
-        | None -> empty
-        | Some j -> break 1 ^^ S.colon ^/^ Jkind_annotation.pp j
-      end ^^
-      S.rparen
+    | Pparam_newtype (name, jkind) ->
+      parens (S.type_ ^/^ pp_newtype ~needs_parens:false (name, jkind))
+    | Pparam_newtypes lst ->
+      parens (S.type_ ^/^ separate_map (break 1) pp_newtype lst)
 
   let pp fp = pp_desc fp.pparam_desc
 end
