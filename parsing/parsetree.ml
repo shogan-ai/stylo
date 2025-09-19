@@ -1204,6 +1204,7 @@ and module_type_desc =
   | Pmty_alias of longident loc  (** [(module M)] *)
   (*_ [Pmty_strengthen] might be a better fit for [with_constraint] *)
   | Pmty_strengthen of module_type * longident loc (** [MT with S] *)
+  | Pmty_parens of module_type
 
 and functor_parameter =
   | Unit  (** [()] *)

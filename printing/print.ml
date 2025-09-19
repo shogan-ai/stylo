@@ -1550,6 +1550,7 @@ end = struct
     | Pmty_alias lid -> longident lid.txt
     | Pmty_strengthen (mty, lid) ->
       pp mty ^/^ S.with_ ^/^ longident lid.txt
+    | Pmty_parens mty -> parens (pp mty)
 
   and pp { pmty_desc; pmty_attributes; pmty_loc = _ } =
     pp_desc pmty_desc
