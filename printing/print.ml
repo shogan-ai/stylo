@@ -693,8 +693,8 @@ end = struct
       pp access.seq ^/^
       begin match access.op with
         | None -> S.dot
-        | Some (None, op) -> string op
-        | Some (Some lid, op) -> S.dot ^^ longident lid ^^ string op
+        | Some (None, op) -> stringf ".%s" op
+        | Some (Some lid, op) -> S.dot ^^ longident lid ^^ stringf ".%s" op
       end ^^
       left ^^
       separate_map (S.semi ^^ break 1) pp access.indices ^^
