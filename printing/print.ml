@@ -1554,7 +1554,7 @@ end = struct
       pp mty ^/^ S.with_ ^/^ longident lid.txt
     | Pmty_parens mty -> parens (pp mty)
 
-  and pp { pmty_desc; pmty_attributes; pmty_loc = _ } =
+  and pp { pmty_desc; pmty_attributes; pmty_loc = _; pmty_tokens = _ } =
     pp_desc pmty_desc
     |> Attribute.attach ~attrs:pmty_attributes
 end
@@ -1800,8 +1800,7 @@ end = struct
     | Pmod_structure str -> Structure.pp str
     | Pmod_functor (fp, me) ->
       S.functor_ ^/^ Functor_parameter.pp fp ^/^ S.rarrow ^/^ pp me
-    | Pmod_apply (m1, m2) ->
-      pp m1 ^^ parens (pp m2)
+    | Pmod_apply (m1, m2) -> pp m1 ^^ pp m2
     | Pmod_apply_unit me -> pp me ^^ S.lparen ^^ S.rparen
     | Pmod_constraint (me, None, modes) ->
       (* FIXME: parens? shouldn't that be part of cst? *)
@@ -1821,8 +1820,9 @@ end = struct
         optional (fun c -> S.coerce ^/^ pp_package_type c) ty2
       )
     | Pmod_extension ext -> Extension.pp ext
+    | Pmod_parens me -> parens (pp me)
 
-  and pp { pmod_desc; pmod_attributes; pmod_loc = _ } =
+  and pp { pmod_desc; pmod_attributes; pmod_loc = _; pmod_tokens = _ } =
     pp_desc pmod_desc
     |> Attribute.attach ~attrs:pmod_attributes
 end

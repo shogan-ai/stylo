@@ -66,11 +66,15 @@ let mkpat ~loc ?attrs d =
 let mkexp ~loc ?attrs d =
   let tokens = Tokens.at loc in
   Exp.mk ~loc:(make_loc loc) ~tokens ?attrs d
-let mkmty ~loc ?attrs d = Mty.mk ~loc:(make_loc loc) ?attrs d
+let mkmty ~loc ?attrs d =
+  let tokens = Tokens.at loc in
+  Mty.mk ~loc:(make_loc loc) ?attrs ~tokens d
 let mksig ~loc d =
   let tokens = Tokens.at loc in
   Sig.mk ~loc:(make_loc loc) ~tokens d
-let mkmod ~loc ?attrs d = Mod.mk ~loc:(make_loc loc) ?attrs d
+let mkmod ~loc ?attrs d =
+  let tokens = Tokens.at loc in
+  Mod.mk ~loc:(make_loc loc) ?attrs ~tokens d
 let mkstr ~loc d =
   let tokens = Tokens.at loc in
   Str.mk ~loc:(make_loc loc) ~tokens d
@@ -561,7 +565,7 @@ let unboxed_type sloc lident tys =
 let maybe_pmod_constraint mode expr =
   match mode with
   | [] -> expr
-  | _ :: _ -> Mod.constraint_ None mode expr
+  | _ :: _ -> Mod.constraint_ ~tokens:(failwith "TODO") None mode expr
 %}
 
 
@@ -1147,12 +1151,15 @@ module_expr:
   | me = paren_module_expr
       { me }
   | me = module_expr attr = attribute
-      { (* match attr with
-        | { attr_name = { txt = "jane.non_erasable.instances"; loc = _ };
-            attr_payload = PStr [];
-          } -> mkmod ~loc:$sloc (pmod_instance me)
-        | attr -> *) Mod.attr me attr
-      }
+      { (* We are "patching" the module expr to add an attribute, we must also
+           patch the tokens attached to the me to account for the new tokens
+           relative to the attribute. *)
+        let tokens = Tokens.at $sloc in
+        let me_with_attr = Mod.attr me attr in
+        let pmod_tokens =
+          Tokens.replace_first_child tokens ~subst:me.pmod_tokens
+        in
+        { me_with_attr with pmod_tokens } }
   | mkmod(
       (* A module identifier. *)
       x = mkrhs(mod_longident)
@@ -1183,7 +1190,7 @@ paren_module_expr:
       { unclosed "(" $loc($1) ")" $loc($5) }
   | (* A module expression within parentheses. *)
     LPAREN me = module_expr RPAREN
-      { me (* TODO consider reloc *) }
+      { mkmod ~loc:$sloc (Pmod_parens me)  }
   | LPAREN module_expr error
       { unclosed "(" $loc($1) ")" $loc($3) }
   | (* A core language expression that produces a first-class module.
@@ -1476,8 +1483,16 @@ module_type:
       { mkmty ~loc:$sloc (Pmty_parens $2) }
   | LPAREN module_type error
       { unclosed "(" $loc($1) ")" $loc($3) }
-  | module_type attribute
-      { Mty.attr $1 $2 }
+  | mty = module_type attr = attribute
+      { (* We are "patching" the module type to add an attribute, we must also
+           patch the tokens attached to the mty to account for the new tokens
+           relative to the attribute. *)
+        let tokens = Tokens.at $sloc in
+        let mty_with_attr = Mty.attr mty attr in
+        let pmty_tokens =
+          Tokens.replace_first_child tokens ~subst:mty.pmty_tokens
+        in
+        { mty_with_attr with pmty_tokens } }
   | mkmty(
       mkrhs(mty_longident)
         { Pmty_ident $1 }
@@ -1615,7 +1630,7 @@ module_declaration_body(optional_atat_modal_expr):
 ;
 %inline module_expr_alias:
   id = mkrhs(mod_longident)
-    { Mty.alias ~loc:(make_loc $sloc) id }
+    { Mty.alias ~tokens:(Tokens.at $sloc) ~loc:(make_loc $sloc) id }
 ;
 (* A module substitution (in a signature). *)
 module_subst:
@@ -3886,8 +3901,16 @@ possibly_poly(X):
 core_type:
     core_type_no_attr
       { $1 }
-  | core_type attribute
-      { Typ.attr $1 $2 }
+  | ty = core_type attribute
+      { (* We are "patching" the type to add an attribute, we must also patch
+           the tokens attached to the type to account for the new tokens
+           relative to the attribute. *)
+        let tokens = Tokens.at $sloc in
+        let typ_with_attr = Typ.attr ty $2 in
+        let ptyp_tokens =
+          Tokens.replace_first_child tokens ~subst:ty.ptyp_tokens
+        in
+        { typ_with_attr with ptyp_tokens } }
 ;
 
 (* A core type without attributes is currently defined as an alias type, but

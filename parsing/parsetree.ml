@@ -1192,6 +1192,7 @@ and module_type =
      pmty_desc: module_type_desc;
      pmty_loc: location;
      pmty_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
+     pmty_tokens: tokens;
     }
 
 and module_type_desc =
@@ -1377,6 +1378,7 @@ and module_expr =
      pmod_desc: module_expr_desc;
      pmod_loc: location;
      pmod_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
+     pmod_tokens: tokens;
     }
 
 and module_expr_desc =
@@ -1394,6 +1396,7 @@ and module_expr_desc =
   | Pmod_unpack of expression * core_type option * core_type option
       (** [(val E)] *)
   | Pmod_extension of extension  (** [[%id]] *)
+  | Pmod_parens of module_expr
       (*
   | Pmod_instance of module_instance
       (** [Foo(Param1)(Arg1(Param2)(Arg2)) [@jane.non_erasable.instances]]

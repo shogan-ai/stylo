@@ -289,40 +289,40 @@ module Te:
 (** Module type expressions *)
 module Mty:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> module_type_desc -> module_type
+    val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_type_desc -> module_type
     val attr: module_type -> attribute -> module_type
 
-    val ident: ?loc:loc -> ?attrs:attrs -> lid -> module_type
-    val alias: ?loc:loc -> ?attrs:attrs -> lid -> module_type
-    val signature: ?loc:loc -> ?attrs:attrs -> signature -> module_type
-    val functor_: ?loc:loc -> ?attrs:attrs -> ?ret_mode:modes ->
+    val ident: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> module_type
+    val alias: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> module_type
+    val signature: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> signature -> module_type
+    val functor_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?ret_mode:modes ->
       functor_parameter -> module_type -> module_type
-    val with_: ?loc:loc -> ?attrs:attrs -> module_type ->
+    val with_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_type ->
       with_constraint list -> module_type
-    val typeof_: ?loc:loc -> ?attrs:attrs -> module_expr -> module_type
-    val extension: ?loc:loc -> ?attrs:attrs -> extension -> module_type
-    val strengthen: ?loc:loc -> ?attrs:attrs -> module_type -> lid ->
+    val typeof_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_expr -> module_type
+    val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> module_type
+    val strengthen: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_type -> lid ->
       module_type
   end
 
 (** Module expressions *)
 module Mod:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> module_expr_desc -> module_expr
+    val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_expr_desc -> module_expr
     val attr: module_expr -> attribute -> module_expr
 
-    val ident: ?loc:loc -> ?attrs:attrs -> lid -> module_expr
-    val structure: ?loc:loc -> ?attrs:attrs -> structure -> module_expr
-    val functor_: ?loc:loc -> ?attrs:attrs ->
+    val ident: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> module_expr
+    val structure: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> structure -> module_expr
+    val functor_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
       functor_parameter -> module_expr -> module_expr
-    val apply: ?loc:loc -> ?attrs:attrs -> module_expr -> module_expr ->
+    val apply: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_expr -> module_expr ->
       module_expr
-    val apply_unit: ?loc:loc -> ?attrs:attrs -> module_expr -> module_expr
-    val constraint_: ?loc:loc -> ?attrs:attrs -> module_type option -> modes ->
+    val apply_unit: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_expr -> module_expr
+    val constraint_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_type option -> modes ->
       module_expr -> module_expr
-    val unpack: ?loc:loc -> ?attrs:attrs -> ?constr:core_type ->
+    val unpack: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?constr:core_type ->
       ?coerce:core_type -> expression -> module_expr
-    val extension: ?loc:loc -> ?attrs:attrs -> extension -> module_expr
+    val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> module_expr
 (*     val instance: ?loc:loc -> ?attrs:attrs -> module_instance -> module_expr
        *)
   end

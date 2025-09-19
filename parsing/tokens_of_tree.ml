@@ -167,6 +167,11 @@ class to_tokens = object
     let node_toks = cf.pcf_tokens in
     combine_children ~loc:cf.pcf_loc node_toks sub_tokens
 
+  method! visit_module_type env mty =
+    let sub_tokens = super#visit_module_type env mty in
+    let node_toks = mty.pmty_tokens in
+    combine_children ~loc:mty.pmty_loc node_toks sub_tokens
+
   method! visit_signature_item env si =
     let sub_tokens = super#visit_signature_item env si in
     let node_toks = si.psig_tokens in
@@ -196,6 +201,11 @@ class to_tokens = object
     let sub_tokens = super#visit_include_infos visit_elt env incl in
     let node_toks = incl.pincl_tokens in
     combine_children ~loc:incl.pincl_loc node_toks sub_tokens
+
+  method! visit_module_expr env me =
+    let sub_tokens = super#visit_module_expr env me in
+    let node_toks = me.pmod_tokens in
+    combine_children ~loc:me.pmod_loc node_toks sub_tokens
 
   method! visit_structure env s =
     let sub_tokens = super#visit_structure env s in

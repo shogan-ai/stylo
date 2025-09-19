@@ -314,36 +314,38 @@ module Exp = struct
 end
 
 module Mty = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) d =
-    {pmty_desc = d; pmty_loc = loc; pmty_attributes = attrs}
+  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
+    {pmty_desc = d; pmty_loc = loc; pmty_attributes = attrs;
+     pmty_tokens = tokens}
   let attr d a = {d with pmty_attributes = d.pmty_attributes @ [a]}
 
-  let ident ?loc ?attrs a = mk ?loc ?attrs (Pmty_ident a)
-  let alias ?loc ?attrs a = mk ?loc ?attrs (Pmty_alias a)
-  let signature ?loc ?attrs a = mk ?loc ?attrs (Pmty_signature a)
-  let functor_ ?loc ?attrs ?(ret_mode=[]) a b = mk ?loc ?attrs (Pmty_functor (a, b, ret_mode))
-  let with_ ?loc ?attrs a b = mk ?loc ?attrs (Pmty_with (a, b))
-  let typeof_ ?loc ?attrs a = mk ?loc ?attrs (Pmty_typeof a)
-  let extension ?loc ?attrs a = mk ?loc ?attrs (Pmty_extension a)
-  let strengthen ?loc ?attrs a b = mk ?loc ?attrs (Pmty_strengthen (a, b))
+  let ident ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_ident a)
+  let alias ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_alias a)
+  let signature ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_signature a)
+  let functor_ ?loc ?attrs ~tokens ?(ret_mode=[]) a b = mk ?loc ?attrs ~tokens (Pmty_functor (a, b, ret_mode))
+  let with_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pmty_with (a, b))
+  let typeof_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_typeof a)
+  let extension ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_extension a)
+  let strengthen ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pmty_strengthen (a, b))
 end
 
 module Mod = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) d =
-    {pmod_desc = d; pmod_loc = loc; pmod_attributes = attrs}
+  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
+    {pmod_desc = d; pmod_loc = loc; pmod_attributes = attrs;
+     pmod_tokens = tokens}
   let attr d a = {d with pmod_attributes = d.pmod_attributes @ [a]}
 
-  let ident ?loc ?attrs x = mk ?loc ?attrs (Pmod_ident x)
-  let structure ?loc ?attrs x = mk ?loc ?attrs (Pmod_structure x)
-  let functor_ ?loc ?attrs arg body =
-    mk ?loc ?attrs (Pmod_functor (arg, body))
-  let apply ?loc ?attrs m1 m2 = mk ?loc ?attrs (Pmod_apply (m1, m2))
-  let apply_unit ?loc ?attrs m1 = mk ?loc ?attrs (Pmod_apply_unit m1)
-  let constraint_ ?loc ?attrs ty mode m =
-    mk ?loc ?attrs (Pmod_constraint (m, ty, mode))
-  let unpack ?loc ?attrs ?constr ?coerce e =
-    mk ?loc ?attrs (Pmod_unpack (e, constr, coerce))
-  let extension ?loc ?attrs a = mk ?loc ?attrs (Pmod_extension a)
+  let ident ?loc ?attrs ~tokens x = mk ?loc ?attrs ~tokens (Pmod_ident x)
+  let structure ?loc ?attrs ~tokens x = mk ?loc ?attrs ~tokens (Pmod_structure x)
+  let functor_ ?loc ?attrs ~tokens arg body =
+    mk ?loc ?attrs ~tokens (Pmod_functor (arg, body))
+  let apply ?loc ?attrs ~tokens m1 m2 = mk ?loc ?attrs ~tokens (Pmod_apply (m1, m2))
+  let apply_unit ?loc ?attrs ~tokens m1 = mk ?loc ?attrs ~tokens (Pmod_apply_unit m1)
+  let constraint_ ?loc ?attrs ~tokens ty mode m =
+    mk ?loc ?attrs ~tokens (Pmod_constraint (m, ty, mode))
+  let unpack ?loc ?attrs ~tokens ?constr ?coerce e =
+    mk ?loc ?attrs ~tokens (Pmod_unpack (e, constr, coerce))
+  let extension ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmod_extension a)
 (*   let instance ?loc ?attrs a = mk ?loc ?attrs (Pmod_instance a) *)
 end
 
