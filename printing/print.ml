@@ -1261,9 +1261,7 @@ end = struct
     ^/^
     S.plus_equals ^/^
     private_ ptyext_private ^?^
-    (* FIXME: leading pipe!
-       Need tokens on extension constructors. *)
-    separate_map (break 1 ^^ S.pipe ^^ break 1)
+    separate_map (break 1)
       Extension_constructor.pp ptyext_constructors
     |> Attribute.attach ~item:true ~attrs:ptyext_attributes
       ?pre_doc:ptyext_pre_doc
@@ -1299,7 +1297,8 @@ end = struct
     | Pext_rebind lid -> S.equals ^/^ longident lid.txt
 
   let pp { pext_name; pext_kind; pext_attributes; pext_doc;
-           pext_loc = _; pext_tokens = _ } =
+           pext_loc = _; pext_tokens } =
+    (if starts_with_pipe pext_tokens then S.pipe else empty) ^?^
     constr_ident pext_name.txt ^/^ pp_kind pext_kind
     |> Attribute.attach ~attrs:pext_attributes ?post_doc:pext_doc
 end
