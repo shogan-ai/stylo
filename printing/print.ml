@@ -667,8 +667,7 @@ end = struct
     | Pexp_assert e -> !!S.assert_ ^/^ pp e
     | Pexp_lazy e -> !!S.lazy_ ^/^ pp e
     | Pexp_poly _ -> assert false (* FIXME: doesn't appear in concrete syntax *)
-    | Pexp_object cs ->
-      !!S.object_ ^/^ Class_expr.pp_structure cs ^/^ S.end_
+    | Pexp_object cs -> Class_expr.pp_structure exp.pexp_ext_attr cs
     | Pexp_pack (me, ty) ->
       S.lparen ^^ !!S.module_ ^/^ Module_expr.pp me ^?^
       optional (fun c -> S.colon ^/^ Module_expr.pp_package_type c) ty ^^
@@ -1426,14 +1425,16 @@ end
 
 and Class_expr : sig
   val pp : class_expr -> document
-  val pp_structure : class_structure -> document
+  val pp_structure : ext_attribute -> class_structure -> document
 end = struct
-  let rec pp_desc = function
+  let rec pp_desc ext_attr d =
+    let (!!) kw = Ext_attribute.decorate kw ext_attr in
+    match d with
     | Pcl_constr (lid, args) ->
       type_app ~parens:false (longident lid.txt) (List.map Core_type.pp args)
-    | Pcl_structure cs -> pp_structure cs
+    | Pcl_structure cs -> pp_structure ext_attr cs
     | Pcl_fun (arg, rhs) ->
-      Argument.pp Pattern.pp arg ^/^ S.rarrow ^/^ pp rhs
+      !!S.fun_ ^/^ Argument.pp Pattern.pp arg ^/^ S.rarrow ^/^ pp rhs
     | Pcl_apply (ce, args) -> pp ce ^/^ Application.pp_args args
     | Pcl_let (rf, vbs, body) ->
       (* FIXME: factorize with Pexp_let *)
@@ -1443,15 +1444,17 @@ end = struct
         | Nonrecursive -> []
         | Recursive -> [S.rec_]
       ) ^/^ S.in_ ^/^ pp body
-    | Pcl_constraint (ce, ct) -> pp ce ^/^ S.colon ^/^ Class_type.pp ct
+    | Pcl_constraint (ce, ct) ->
+      parens (pp ce ^/^ S.colon ^/^ Class_type.pp ct)
     | Pcl_extension ext -> Extension.pp ext
     | Pcl_open (od, ce) ->
       (* FIXME: factorize *)
       S.let_ ^/^ Open_description.pp od ^/^ S.in_ ^/^ pp ce
+    | Pcl_parens ce -> parens (pp ce)
 
-  and pp_structure { pcstr_self; pcstr_fields } =
+  and pp_structure ext_attr { pcstr_self; pcstr_fields } =
     let obj_with_self =
-      S.object_ ^^
+      Ext_attribute.decorate S.object_ ext_attr ^^
       match pcstr_self.ppat_desc with
       | Ppat_any -> empty
       | _ -> Pattern.pp pcstr_self
@@ -1508,8 +1511,8 @@ end = struct
       ] in
       Value_binding.pp_list ~start [vb]
 
-  and pp { pcl_desc; pcl_attributes; pcl_loc = _ } =
-    pp_desc pcl_desc
+  and pp { pcl_ext_attrs; pcl_desc; pcl_attributes; pcl_loc = _ } =
+    pp_desc pcl_ext_attrs pcl_desc
     |> Attribute.attach ~item:true ~attrs:pcl_attributes
 end
 

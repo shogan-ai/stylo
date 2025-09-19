@@ -1070,6 +1070,7 @@ and class_type_declaration = class_type class_infos
 
 and class_expr =
     {
+     pcl_ext_attrs: ext_attribute;
      pcl_desc: class_expr_desc;
      pcl_loc: location;
      pcl_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
@@ -1112,6 +1113,7 @@ and class_expr_desc =
   | Pcl_constraint of class_expr * class_type  (** [(CE : CT)] *)
   | Pcl_extension of extension  (** [[%id]] *)
   | Pcl_open of open_description * class_expr  (** [let open M in CE] *)
+  | Pcl_parens of class_expr
 
 and class_structure =
     {

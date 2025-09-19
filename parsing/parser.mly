@@ -74,7 +74,8 @@ let mkmod ~loc ?attrs d = Mod.mk ~loc:(make_loc loc) ?attrs d
 let mkstr ~loc d =
   let tokens = Tokens.at loc in
   Str.mk ~loc:(make_loc loc) ~tokens d
-let mkclass ~loc ?attrs d = Cl.mk ~loc:(make_loc loc) ?attrs d
+let mkclass ~loc ?ext_attrs ?attrs d =
+  Cl.mk ~loc:(make_loc loc) ?ext_attrs ?attrs d
 let mkcty ~loc ?attrs d = Cty.mk ~loc:(make_loc loc) ?attrs d
 
 let pstr_typext te =
@@ -307,8 +308,8 @@ let wrap_pat_attrs ~loc:_ pat ext_attr =
 let mkpat_attrs ~loc d attrs =
   wrap_pat_attrs ~loc (mkpat ~loc d) attrs
 
-let wrap_class_attrs ~loc:_ body attrs =
-  {body with pcl_attributes = attrs @ body.pcl_attributes}
+let wrap_class_ext_attrs ~loc body ext_attrs =
+  {body with pcl_ext_attrs = ext_attrs; pcl_loc = make_loc loc }
 let wrap_mod_attrs ~loc:_ attrs body =
   {body with pmod_attributes = attrs @ body.pmod_attributes}
 let wrap_mty_attrs ~loc:_ attrs body =
@@ -1752,16 +1753,16 @@ formal_class_parameters:
 class_expr:
     class_simple_expr
       { $1 }
-  | FUN attributes class_fun_def
-      { wrap_class_attrs ~loc:$sloc $3 $2 }
+  | FUN noext_attributes class_fun_def
+      { wrap_class_ext_attrs ~loc:$sloc $3 $2 }
   | let_bindings(noext_attributes) IN class_expr
       { class_of_let_bindings ~loc:$sloc $1 $3 }
-  | LET OPEN override_flag attributes mkrhs(mod_longident) IN class_expr
+  | LET OPEN override_flag noext_attributes mkrhs(mod_longident) IN class_expr
       { let loc = ($startpos($2), $endpos($5)) in
         let od =
-          Opn.mk ~override:$3 ~loc:(make_loc loc) ~tokens:(Tokens.at loc) $5
+          Opn.mk ~ext_attrs:$4 ~override:$3 ~loc:(make_loc loc) ~tokens:(Tokens.at loc) $5
         in
-        mkclass ~loc:$sloc ~attrs:$4 (Pcl_open(od, $7)) }
+        mkclass ~loc:$sloc (Pcl_open(od, $7)) }
   | class_expr attribute
       { Cl.attr $1 $2 }
   | mkclass(
@@ -1772,12 +1773,12 @@ class_expr:
     ) { $1 }
 ;
 class_simple_expr:
-  | LPAREN class_expr RPAREN
-      { $2 }
-  | LPAREN class_expr error
-      { unclosed "(" $loc($1) ")" $loc($3) }
   | mkclass(
-      tys = actual_class_parameters cid = mkrhs(class_longident)
+      LPAREN class_expr RPAREN
+        { Pcl_parens $2 }
+    | LPAREN class_expr error
+        { unclosed "(" $loc($1) ")" $loc($3) }
+    | tys = actual_class_parameters cid = mkrhs(class_longident)
         { Pcl_constr(cid, tys) }
     | OBJECT attributes class_structure error
         { unclosed "object" $loc($1) "end" $loc($4) }
@@ -1786,8 +1787,8 @@ class_simple_expr:
     | LPAREN class_expr COLON class_type error
         { unclosed "(" $loc($1) ")" $loc($5) }
     ) { $1 }
-  | OBJECT attributes class_structure END
-    { mkclass ~loc:$sloc ~attrs:$2 (Pcl_structure $3) }
+  | OBJECT noext_attributes class_structure END
+    { mkclass ~loc:$sloc ~ext_attrs:$2 (Pcl_structure $3) }
 ;
 
 class_fun_def:

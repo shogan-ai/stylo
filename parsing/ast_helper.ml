@@ -424,8 +424,9 @@ module Str = struct
 end
 
 module Cl = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) d =
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = []) d =
     {
+     pcl_ext_attrs = ext_attrs;
      pcl_desc = d;
      pcl_loc = loc;
      pcl_attributes = attrs;

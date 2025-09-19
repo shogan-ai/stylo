@@ -493,7 +493,8 @@ module Ctf:
 (** Class expressions *)
 module Cl:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> class_expr_desc -> class_expr
+    val mk: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
+      class_expr_desc -> class_expr
     val attr: class_expr -> attribute -> class_expr
 
     val constr: ?loc:loc -> ?attrs:attrs -> lid -> core_type list -> class_expr
