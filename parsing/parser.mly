@@ -3312,11 +3312,9 @@ simple_pattern_not_ident:
   | simple_delimited_pattern
       { $1 }
   | LPAREN MODULE ext_attributes mkrhs(module_name) RPAREN
-      { mkpat_attrs ~loc:$sloc (Ppat_unpack $4) $3 }
+      { mkpat_attrs ~loc:$sloc (Ppat_unpack ($4, None)) $3 }
   | LPAREN MODULE ext_attributes mkrhs(module_name) COLON package_type RPAREN
-      { mkpat_attrs ~loc:$sloc
-          (Ppat_constraint(mkpat ~loc:$loc($4) (Ppat_unpack $4), Some $6, []))
-          $3 }
+      { mkpat_attrs ~loc:$sloc (Ppat_unpack ($4, Some $6)) $3 }
   | simple_pattern_not_ident_
       { $1 }
   | signed_constant { mkpat (Ppat_constant $1) ~loc:$sloc }

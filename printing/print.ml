@@ -384,7 +384,7 @@ end = struct
       | [] -> empty
       | _ ->
         let one (lid, ct) = longident lid.txt ^/^ S.equals ^/^ pp ct in
-        break 1 ^^ S.with_ ^/^
+        break 1 ^^ S.with_ ^/^ S.type_ ^/^
         separate_map (break 1 ^^ S.and_ ^^ break 1) one constraints
     in
     let module_ =
@@ -455,16 +455,7 @@ end = struct
     | Ppat_type lid -> S.hash ^^ longident lid.txt
     | Ppat_lazy p ->
       Ext_attribute.decorate S.lazy_ p.ppat_ext_attr ^/^ pp p
-    | Ppat_unpack path ->
-      let path =
-        match path.txt with
-        | None -> S.underscore
-        | Some s -> string s
-      in
-      (* FIXME: pkg typ in ppat_unpack! *)
-      parens (
-        Ext_attribute.decorate S.module_ p.ppat_ext_attr ^/^ path
-      )
+    | Ppat_unpack (path, ty) -> pp_unpack p.ppat_ext_attr path ty
     | Ppat_exception p ->
       Ext_attribute.decorate S.exception_ p.ppat_ext_attr ^/^ pp  p
     | Ppat_extension ext -> Extension.pp ext
@@ -475,6 +466,17 @@ end = struct
         separate_map (S.semi ^^ break 1) pp elts
       )
     | Ppat_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
+
+  and pp_unpack ext_attrs path ty =
+    let path =
+      match path.txt with
+      | None -> S.underscore
+      | Some s -> string s
+    in
+    parens (
+      Ext_attribute.decorate S.module_ ext_attrs ^/^ path ^?^
+      optional (fun c -> S.colon ^/^ Module_expr.pp_package_type c) ty
+    )
 
   and pp_tuple closed elts =
     separate_map (break 0 ^^ S.comma ^^ break 1) (Argument.pp pp) elts ^^
@@ -1788,7 +1790,8 @@ end = struct
           let one (lid, ct) =
             longident lid.txt ^/^ S.equals ^/^ Core_type.pp ct
           in
-          S.with_ ^/^ separate_map (break 1 ^^ S.and_ ^^ break 1) one ppt_eqs
+          S.with_ ^/^ S.type_ ^/^
+          separate_map (break 1 ^^ S.and_ ^^ break 1) one ppt_eqs
       in
       longident ppt_name.txt ^?^ with_
     | _ -> assert false

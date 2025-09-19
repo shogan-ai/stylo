@@ -136,7 +136,8 @@ module Pat:
                      -> mode with_loc list -> pattern
     val type_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> pattern
     val lazy_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern -> pattern
-    val unpack: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str_opt -> pattern
+    val unpack: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str_opt ->
+      core_type option -> pattern
     val open_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq  -> lid -> pattern -> pattern
     val exception_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern -> pattern
     val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> pattern
