@@ -46,7 +46,14 @@ let str_or_op (so : Longident.str_or_op) =
   group @@
   match so with
   | Str s -> string s
-  | Op s -> parens (string s)
+  | Op s ->
+    let s =
+      if String.get s 0 = '*' || String.get s (String.length s - 1) = '*' then
+        break 1 ^^ string s ^^ break 1
+      else
+        string s
+    in
+    parens s
   | DotOp (op, paren_kind, index_mod, assign) ->
     let index_mod = if index_mod = "" then empty else S.semi ^^ S.dotdot in
     let left, right =
