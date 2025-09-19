@@ -120,20 +120,24 @@ let type_app ?(parens=true) ty args =
     | _ -> left ^^ separate (S.comma ^^ break 1) args ^^ right
   end ^?^ ty
 
-(* FIXME: handling of string literals is not good enough. *)
 (* N.B. stringf is important here: suffixed number come out of the lexer as a
    single token. We can't use ^^ here. *)
 let constant = function
-  | Pconst_float (nb, None)
-  | Pconst_integer (nb, None) -> string nb
-  | Pconst_float (nb, Some suffix)
-  | Pconst_integer (nb, Some suffix) -> stringf "%s%c" nb suffix
-  | Pconst_unboxed_integer (nb, suffix) -> stringf "#%s%c" nb suffix
+  | Pconst_float (sign, nb, None)
+  | Pconst_integer (sign, nb, None) -> optional string sign ^^ string nb
+  | Pconst_float (sign, nb, Some suffix)
+  | Pconst_integer (sign, nb, Some suffix) ->
+    optional string sign ^^ stringf "%s%c" nb suffix
+  | Pconst_unboxed_integer (sign, nb, suffix) ->
+    optional string sign ^^ stringf "#%s%c" nb suffix
+  | Pconst_unboxed_float (sign, nb, None) ->
+    optional string sign ^^ stringf "#%s" nb
+  | Pconst_unboxed_float (sign, nb, Some suffix) ->
+    optional string sign ^^ stringf "#%s%c" nb suffix
   | Pconst_char c -> stringf "'%s'" (Char.escaped c)
+  (* FIXME: handling of string literals is not good enough. *)
   | Pconst_string (s, _, None) -> stringf "%S" s
   | Pconst_string (s, _, Some delim) -> stringf "{%s|%s|%s}" delim s delim
-  | Pconst_unboxed_float (nb, None) -> stringf "#%s" nb
-  | Pconst_unboxed_float (nb, Some suffix) -> stringf "#%s%c" nb suffix
 
 let separate_loc_list sep f = separate_map sep (fun l -> f l.txt)
 

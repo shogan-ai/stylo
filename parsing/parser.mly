@@ -603,21 +603,19 @@ let mk_directive ~loc name arg =
    may also get re-inlined at that point *)
 type sign = Positive | Negative
 
-let with_sign sign num =
-  match sign with
-  | Positive -> num
-  | Negative -> "-" ^ num
-
-let unboxed_int _sloc _int_loc sign (n, m) =
+let unboxed_int _sloc _int_loc ?sign (n, m) =
+  let sign = Option.map (function Positive -> "+" | Negative -> "-") sign in
   match m with
-  | Some m -> Pconst_unboxed_integer (with_sign sign n, m)
+  | Some m -> Pconst_unboxed_integer (sign, n, m)
   | None ->
     let pos = fst _sloc in
     Printf.sprintf "%d:%d unboxed integer needs a width"
       pos.Lexing.pos_lnum (pos.pos_cnum - pos.pos_bol)
     |> failwith
 
-let unboxed_float sign (f, m) = Pconst_unboxed_float (with_sign sign f, m)
+let unboxed_float ?sign (f, m) =
+  let sign = Option.map (function Positive -> "+" | Negative -> "-") sign in
+  Pconst_unboxed_float (sign, f, m)
 
 (* Invariant: [lident] must end with an [Lident] that ends with a ["#"]. *)
 let unboxed_type sloc lident tys =
@@ -4484,15 +4482,15 @@ meth_list:
 /* Constants */
 
 value_constant:
-  | INT               { let (n, m) = $1 in Pconst_integer (n, m) }
+  | INT               { let (n, m) = $1 in Pconst_integer (None, n, m) }
   | CHAR              { Pconst_char $1 }
   | STRING            { let (s, strloc, d) = $1 in
                         Pconst_string (s, strloc, d) }
-  | FLOAT             { let (f, m) = $1 in Pconst_float (f, m) }
+  | FLOAT             { let (f, m) = $1 in Pconst_float (None, f, m) }
 ;
 unboxed_constant:
-  | HASH_INT          { unboxed_int $sloc $sloc Positive $1 }
-  | HASH_FLOAT        { unboxed_float Positive $1 }
+  | HASH_INT          { unboxed_int $sloc $sloc $1 }
+  | HASH_FLOAT        { unboxed_float $1 }
 ;
 constant:
     value_constant    { $1 }
@@ -4500,18 +4498,18 @@ constant:
 ;
 signed_value_constant:
     value_constant    { $1 }
-  | MINUS INT         { let (n, m) = $2 in Pconst_integer("-" ^ n, m) }
-  | MINUS FLOAT       { let (f, m) = $2 in Pconst_float("-" ^ f, m) }
-  | PLUS INT          { let (n, m) = $2 in Pconst_integer (n, m) }
-  | PLUS FLOAT        { let (f, m) = $2 in Pconst_float(f, m) }
+  | MINUS INT         { let (n, m) = $2 in Pconst_integer(Some "-", n, m) }
+  | MINUS FLOAT       { let (f, m) = $2 in Pconst_float(Some "-", f, m) }
+  | PLUS INT          { let (n, m) = $2 in Pconst_integer (Some "+", n, m) }
+  | PLUS FLOAT        { let (f, m) = $2 in Pconst_float(Some "+", f, m) }
 ;
 signed_constant:
     signed_value_constant { $1 }
   | unboxed_constant      { $1 }
-  | MINUS HASH_INT        { unboxed_int $sloc $loc($2) Negative $2 }
-  | MINUS HASH_FLOAT      { unboxed_float Negative $2 }
-  | PLUS HASH_INT         { unboxed_int $sloc $loc($2) Positive $2 }
-  | PLUS HASH_FLOAT       { unboxed_float Positive $2 }
+  | MINUS HASH_INT        { unboxed_int $sloc $loc($2) ~sign:Negative $2 }
+  | MINUS HASH_FLOAT      { unboxed_float ~sign:Negative $2 }
+  | PLUS HASH_INT         { unboxed_int $sloc $loc($2) ~sign:Positive $2 }
+  | PLUS HASH_FLOAT       { unboxed_float ~sign:Positive $2 }
 ;
 
 /* Identifiers and long identifiers */

@@ -72,13 +72,13 @@ end
 (**************************************************************)
 
 type constant =
-  | Pconst_integer of string * char option
-      (** Integer constants such as [3] [3l] [3L] [3n].
+  | Pconst_integer of string option * string * char option
+      (** Integer constants such as [3] [-3] [-3l] [3L] [3n].
 
      Suffixes [[g-z][G-Z]] are accepted by the parser.
      Suffixes except ['l'], ['L'] and ['n'] are rejected by the typechecker
   *)
-  | Pconst_unboxed_integer of string * char
+  | Pconst_unboxed_integer of string option * string * char
       (** Integer constants such as [#3] [#3l] [#3L] [#3n].
 
           A suffix [[g-z][G-Z]] is required by the parser.
@@ -91,13 +91,13 @@ type constant =
 
      The location span the content of the string, without the delimiters.
   *)
-  | Pconst_float of string * char option
+  | Pconst_float of string option * string * char option
       (** Float constant such as [3.4], [2e5] or [1.4e-4].
 
      Suffixes [g-z][G-Z] are accepted by the parser.
      Suffixes except ['s'] are rejected by the typechecker.
   *)
-  | Pconst_unboxed_float of string * char option
+  | Pconst_unboxed_float of string option * string * char option
   (** Float constant such as [#3.4], [#2e5] or [#1.4e-4].
 
       Suffixes [g-z][G-Z] are accepted by the parser.
