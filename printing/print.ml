@@ -17,6 +17,11 @@ let optional f v_opt =
   | None -> empty
   | Some v -> f v
 
+let nb_semis =
+  List.fold_left (fun nb tok ->
+    if tok.Tokens.desc = Token SEMI then nb + 1 else nb
+  ) 0
+
 let rec starts_with_pipe = function
   | Tokens.{ desc = Token BAR; _ } :: _ -> true
   | Tokens.{ desc = Comment _; _ } :: rest -> starts_with_pipe rest
@@ -432,9 +437,9 @@ end = struct
     | Ppat_construct (lid, arg) -> pp_construct lid arg
     | Ppat_variant (lbl, None) -> S.bquote ^^ string lbl
     | Ppat_variant (lbl, Some p) -> S.bquote ^^ string lbl ^/^ pp p
-    | Ppat_record (fields, cf) -> pp_record ~tokens:p.ppat_tokens cf fields
+    | Ppat_record (fields, cf) -> pp_record (nb_semis p.ppat_tokens) cf fields
     | Ppat_record_unboxed_product (fields, cf) ->
-      pp_record ~unboxed:true ~tokens:p.ppat_tokens cf fields
+      pp_record ~unboxed:true (nb_semis p.ppat_tokens) cf fields
     | Ppat_array (mut, ps) ->
       let opn, cls = array_delimiters mut in
       opn ^/^
@@ -502,18 +507,20 @@ end = struct
         pp arg_pat
       )
 
-  and pp_record ?(unboxed=false) ~tokens closed_flag fields =
+  and pp_record ?(unboxed=false) nb_semis closed_flag fields =
     let semi_as_term =
-      List.filter
-        (function Tokens.{ desc = Token SEMI; _ } -> true | _ -> false) tokens
-      |> List.compare_lengths fields
-      |> (fun x -> 0 = x) (* FIXME: handle printing of parenthesized ops *)
+      let nb_fields =
+        List.length fields +
+        if closed_flag = Closed then 0 else 1 (* underscore as extra field *)
+      in
+      (* [;] is used as a terminator if there are as many as there are fields *)
+      nb_fields = nb_semis
     in
     prefix (if unboxed then S.hash_lbrace else S.lbrace) (
       Record_field.pp_list ~semi_as_term pp fields ^^
       match closed_flag with
       | Asttypes.Closed -> empty
-      | Open when semi_as_term -> S.underscore
+      | Open when semi_as_term -> S.underscore ^/^ S.semi
       | Open -> S.semi ^/^ S.underscore
     ) ^/^
     S.rbrace
@@ -589,19 +596,15 @@ end = struct
         | None -> empty
         | Some e -> break 1 ^^ pp e
       end
-    | Pexp_record (eo, fields) -> pp_record ~tokens:exp.pexp_tokens eo fields
+    | Pexp_record (eo, fields) -> pp_record (nb_semis exp.pexp_tokens) eo fields
     | Pexp_record_unboxed_product (eo, fields) ->
-      pp_record ~unboxed:true ~tokens:exp.pexp_tokens eo fields
+      pp_record ~unboxed:true (nb_semis exp.pexp_tokens) eo fields
     | Pexp_field (e, lid) -> pp e ^^ S.dot ^^ longident lid.txt
     | Pexp_unboxed_field (e, lid) ->
       pp e ^^ S.dot ^^ S.hash ^^ longident lid.txt
     | Pexp_setfield (e1, lid, e2) ->
       pp e1 ^^ S.dot ^^ longident lid.txt ^/^ S.larrow ^/^ pp e2
-    | Pexp_array (mut, es) ->
-      let opn, cls = array_delimiters mut in
-      opn ^/^
-      separate_map (S.semi ^^ break 1) pp es ^/^
-      cls
+    | Pexp_array (mut, es) -> pp_array (nb_semis exp.pexp_tokens) mut es
     | Pexp_ifthenelse (e1, e2, e3_o) ->
       let if_cond_then = !!S.if_ ^^ nest 2 (break 1 ^^ pp e1) ^/^ S.then_ in
       prefix (group if_cond_then) (pp e2) ^?^
@@ -706,36 +709,33 @@ end = struct
     | Pexp_parens { begin_end = false; exp } -> parens (pp exp)
     | Pexp_parens { begin_end = true; exp } ->
       prefix S.begin_ (pp exp) ^/^ S.end_
-    | Pexp_list elts ->
-      let semi_as_term =
-        List.filter
-          (function Tokens.{ desc = Token SEMI; _ } -> true | _ -> false)
-          exp.pexp_tokens
-        |> List.compare_lengths elts
-        |> (fun x -> 0 = x)
-      in
-      let elts =
-        if semi_as_term then
-          separate_map (break 1) (fun elt -> pp elt ^^ S.semi) elts
-        else
-          separate_map (S.semi ^^ break 1) pp elts
-      in
-      brackets elts
+    | Pexp_list elts -> pp_list (nb_semis exp.pexp_tokens) elts
     | Pexp_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
     | Pexp_exclave exp -> S.exclave__ ^/^ pp exp
+
+  and pp_delimited_seq (opn, cls) nb_semis elts =
+    let semi_as_term = List.compare_length_with elts nb_semis = 0 in
+    let elts =
+      if semi_as_term then
+        separate_map (break 1) (fun elt -> pp elt ^^ S.semi) elts
+      else
+        separate_map (S.semi ^^ break 1) pp elts
+    in
+    prefix_nonempty opn elts ^?^ cls
+
+  and pp_array nb_semis mut elts =
+    pp_delimited_seq (array_delimiters mut) nb_semis elts
+
+  and pp_list nb_semis elts =
+    pp_delimited_seq (S.lbracket, S.rbracket) nb_semis elts
 
   and pp_tuple elts =
     separate_map (S.comma ^^ break 1) (Argument.pp pp) elts
 
   and pp_apply e args = prefix (pp e) (Application.pp_args args)
 
-  and pp_record ?(unboxed = false) ~tokens expr_opt fields =
-    let semi_as_term =
-      List.filter
-        (function Tokens.{ desc = Token SEMI; _ } -> true | _ -> false) tokens
-      |> List.compare_lengths fields
-      |> (fun x -> 0 = x)
-    in
+  and pp_record ?(unboxed = false) nb_semis expr_opt fields =
+    let semi_as_term = List.compare_length_with fields nb_semis = 0 in
     let eo =
       match expr_opt with
       | None -> empty
