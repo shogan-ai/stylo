@@ -2501,6 +2501,11 @@ fun_expr:
       { mkexp ~loc:$sloc (mkinfix e1 op e2) }
 ;
 
+unboxed_access:
+  | DOTHASH mkrhs(label_longident)
+      { Uaccess_unboxed_field $2 }
+;
+
 simple_expr:
   | LPAREN seq_expr RPAREN
       { mkexp ~loc:$sloc (Pexp_parens { begin_end = false; exp = $2 }) }
@@ -2642,6 +2647,52 @@ comprehension_clause:
   | HASH_SUFFIX { () }
 ;
 
+%inline indexop_block_access(dot, index):
+  | d=dot LPAREN i=index RPAREN
+    { d, Paren,   i }
+  | d=dot LBRACE i=index RBRACE
+    { d, Brace,   i }
+  | d=dot LBRACKET i=index RBRACKET
+    { d, Bracket, i }
+;
+
+block_access:
+  | DOT mkrhs(label_longident)
+    { Baccess_field $2 }
+  | DOT _p=LPAREN i=seq_expr RPAREN
+    { Baccess_array (Mutable, Index_int, i) }
+  | DOTOP _p=LPAREN i=seq_expr RPAREN
+    {
+      match $1 with
+      | ":" -> Baccess_array (Immutable, Index_int, i)
+      | _ -> syntax_error () (* FIXME *)
+(*           raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
+*)
+    }
+  | DOT ident _p=LPAREN i=seq_expr RPAREN
+    {
+      match $2 with
+      | "L" -> Baccess_array (Mutable, Index_unboxed_int64, i)
+      | "l" -> Baccess_array (Mutable, Index_unboxed_int32, i)
+      | "n" -> Baccess_array (Mutable, Index_unboxed_nativeint, i)
+      | "idx_imm" -> Baccess_block (Immutable, i)
+      | "idx_mut" -> Baccess_block (Mutable, i)
+      | _ -> syntax_error () (* FIXME *)
+(*         raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p)))) *)
+    }
+  | DOTOP ident _p=LPAREN i=seq_expr RPAREN
+    {
+      match $1, $2 with
+      | ":", "L" -> Baccess_array (Immutable, Index_unboxed_int64, i)
+      | ":", "l" -> Baccess_array (Immutable, Index_unboxed_int32, i)
+      | ":", "n" -> Baccess_array (Immutable, Index_unboxed_nativeint, i)
+      | _ -> syntax_error () (* FIXME *)
+(*         raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p)))) *)
+    }
+  | DOT ident _p=LPAREN seq_expr _e=error
+    { indexop_unclosed_error $loc(_p) Paren $loc(_e) }
+;
+
 %inline simple_expr_:
   | mkrhs(val_longident)
       { Pexp_ident ($1) }
@@ -2663,6 +2714,8 @@ comprehension_clause:
       { Pexp_field($1, $3) }
   | simple_expr DOTHASH mkrhs(label_longident)
       { Pexp_unboxed_field($1, $3) }
+  | LPAREN block_access llist(unboxed_access) RPAREN
+      { Pexp_idx ($2, $3) }
   | od=open_dot_declaration DOT LPAREN seq_expr RPAREN
       { let exp =
           let loc = $startpos($3), $endpos($5) in

@@ -616,6 +616,7 @@ end = struct
     | Pexp_setfield (e1, lid, e2) ->
       pp e1 ^^ S.dot ^^ longident lid.txt ^/^ S.larrow ^/^ pp e2
     | Pexp_array (mut, es) -> pp_array (nb_semis exp.pexp_tokens) mut es
+    | Pexp_idx (ba, uas) -> pp_block_idx ba uas
     | Pexp_ifthenelse (e1, e2, e3_o) ->
       let if_cond_then = !!S.if_ ^^ nest 2 (break 1 ^^ pp e1) ^/^ S.then_ in
       prefix (group if_cond_then) (pp e2) ^?^
@@ -740,6 +741,12 @@ end = struct
   and pp_list nb_semis elts =
     pp_delimited_seq (S.lbracket, S.rbracket) nb_semis elts
 
+  and pp_block_idx block_access unboxed_accesses =
+    Block_access.pp block_access ^^
+    separate_map (break 0) (fun (Uaccess_unboxed_field lid) ->
+      S.dothash ^^ longident lid.txt
+    ) unboxed_accesses
+
   and pp_tuple elts =
     separate_map (S.comma ^^ break 1) (Argument.pp pp) elts
 
@@ -788,6 +795,33 @@ end = struct
       ) fields
     in
     separate (break 1) fields
+end
+
+and Block_access : sig
+  val pp : block_access -> document
+end = struct
+  let pp = function
+  | Baccess_field lid -> S.dot ^^ longident lid.txt
+  | Baccess_array (mut, idx_kind, e) ->
+    let dot_or_dotop =
+      match mut with
+      | Mutable -> S.dot
+      | Immutable -> string ".:"
+    in
+    let idx_kind =
+      match idx_kind with
+      | Index_int -> empty
+      | Index_unboxed_int32 -> char 'l'
+      | Index_unboxed_int64 -> char 'L'
+      | Index_unboxed_nativeint -> char 'n'
+    in
+    dot_or_dotop ^^ idx_kind ^^ parens (Expression.pp e)
+  | Baccess_block (mut, e) ->
+    S.dot ^^
+    begin match mut with
+    | Immutable -> string "idx_imm"
+    | Mutable -> string "idx_mut"
+    end ^^ parens (Expression.pp e)
 end
 
 and Application : sig
