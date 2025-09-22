@@ -30,6 +30,7 @@
 %token COMMA                  ","
 %token CONSTRAINT             "constraint"
 %token DO                     "do"
+%token DOLLAR                 "$"
 %token DONE                   "done"
 %token DOT                    "."
 %token DOTDOT                 ".."
@@ -86,6 +87,7 @@
 %token LBRACKETPERCENT        "[%"
 %token LBRACKETPERCENTPERCENT "[%%"
 %token LESS                   "<"
+%token LESSLBRACKET           "<["
 %token LESSMINUS              "<-"
 %token LET                    "let"
 %token <string> LIDENT        "lident" (* just an example *)
@@ -122,6 +124,7 @@
 %token QUOTE                  "'"
 %token RBRACE                 "}"
 %token RBRACKET               "]"
+%token RBRACKETGREATER        "]>"
 %token REC                    "rec"
 %token RPAREN                 ")"
 %token SEMI                   ";"

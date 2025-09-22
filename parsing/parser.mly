@@ -187,6 +187,12 @@ let unclosed _opening_name _opening_loc _closing_name _closing_loc =
     pos.pos_fname _opening_name pos.pos_lnum (pos.pos_cnum - pos.pos_bol)
   |> failwith
 
+let quotation_reserved name loc =
+  let pos : Lexing.position = fst loc in
+  Format.sprintf "%s %d:%d: Syntax error `%s` is reserverd for use in runtime metaprog"
+    pos.pos_fname pos.pos_lnum (pos.pos_cnum - pos.pos_bol) name
+  |> failwith
+
 (* Normal mutable arrays and immutable arrays are parsed identically, just with
    different delimiters.  The parsing is done by the [array_exprs] rule, and the
    [Generic_array] module provides (1) a type representing the possible results,
@@ -660,7 +666,7 @@ The precedences must be listed from low to high.
 /* Finally, the first tokens of simple_expr are above everything else. */
 %nonassoc BACKQUOTE BANG BEGIN CHAR FALSE FLOAT HASH_FLOAT INT HASH_INT OBJECT
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
-          NEW PREFIXOP STRING TRUE UIDENT
+          NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR
           LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN
 
 
@@ -2722,6 +2728,12 @@ comprehension_clause:
           mkexp_attrs ~loc:($startpos($3), $endpos)
             (Pexp_pack ($6, Some $8)) $5 in
         Pexp_dot_open(od, modexp) }
+  | LESSLBRACKET expr_semi_list RBRACKETGREATER
+      { quotation_reserved "<[" $loc($1) }
+  | LESSLBRACKET expr_semi_list error
+      { unclosed "<[" $loc($1) "]>" $loc($3) }
+  | DOLLAR error
+      { quotation_reserved "$" $loc($1) }
   | mod_longident DOT
     LPAREN MODULE ext_attributes module_expr COLON error
       { unclosed "(" $loc($3) ")" $loc($8) }
@@ -4335,6 +4347,12 @@ atomic_type:
       { mktyp ~loc:$sloc (Ptyp_any (Some jkind)) }
   | LPAREN TYPE COLON jkind=jkind_annotation RPAREN
       { mktyp ~loc:$sloc (Ptyp_of_kind jkind) }
+  | LESSLBRACKET core_type RBRACKETGREATER
+      { quotation_reserved "<[" $loc($1) }
+  | LESSLBRACKET core_type error
+      { unclosed "<[" $loc($1) "]>" $loc($3) }
+  | DOLLAR error
+      { quotation_reserved "$" $loc($1) }
 
 
 (* This is the syntax of the actual type parameters in an application of

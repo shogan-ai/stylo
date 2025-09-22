@@ -24,6 +24,7 @@ module Raw = struct
   | COMMA  -> "COMMA"
   | CONSTRAINT  -> "CONSTRAINT"
   | DO  -> "DO"
+  | DOLLAR  -> "DOLLAR"
   | DONE  -> "DONE"
   | DOT  -> "DOT"
   | DOTDOT  -> "DOTDOT"
@@ -80,6 +81,7 @@ module Raw = struct
   | LBRACKETPERCENT  -> "LBRACKETPERCENT"
   | LBRACKETPERCENTPERCENT  -> "LBRACKETPERCENTPERCENT"
   | LESS  -> "LESS"
+  | LESSLBRACKET -> "LESSLBRACKET"
   | LESSMINUS  -> "LESSMINUS"
   | LET  -> "LET"
   | LIDENT _ -> "LIDENT"
@@ -115,6 +117,7 @@ module Raw = struct
   | QUOTE  -> "QUOTE"
   | RBRACE  -> "RBRACE"
   | RBRACKET  -> "RBRACKET"
+  | RBRACKETGREATER  -> "RBRACKETGREATER"
   | REC  -> "REC"
   | RPAREN  -> "RPAREN"
   | SEMI  -> "SEMI"
@@ -169,6 +172,7 @@ module Raw = struct
   | COMMA , COMMA -> true
   | CONSTRAINT , CONSTRAINT -> true
   | DO , DO -> true
+  | DOLLAR, DOLLAR -> true
   | DONE , DONE -> true
   | DOT , DOT -> true
   | DOTDOT , DOTDOT -> true
@@ -225,6 +229,7 @@ module Raw = struct
   | LBRACKETPERCENT , LBRACKETPERCENT -> true
   | LBRACKETPERCENTPERCENT , LBRACKETPERCENTPERCENT -> true
   | LESS , LESS -> true
+  | LESSLBRACKET , LESSLBRACKET -> true
   | LESSMINUS , LESSMINUS -> true
   | LET , LET -> true
   | LIDENT _, LIDENT _-> true
@@ -260,6 +265,7 @@ module Raw = struct
   | QUOTE , QUOTE -> true
   | RBRACE , RBRACE -> true
   | RBRACKET , RBRACKET -> true
+  | RBRACKETGREATER , RBRACKETGREATER -> true
   | REC , REC -> true
   | RPAREN , RPAREN -> true
   | SEMI , SEMI -> true
