@@ -86,6 +86,7 @@ type constant =
           Suffixes except ['l'], ['L'] and ['n'] are rejected by the typechecker
       *)
   | Pconst_char of char  (** Character such as ['c']. *)
+  | Pconst_untagged_char of char  (** Character such as [#'c']. *)
   | Pconst_string of string * location * string option
       (** Constant string such as ["constant"] or
           [{delim|other constant|delim}].

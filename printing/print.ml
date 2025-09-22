@@ -147,6 +147,7 @@ let constant = function
   | Pconst_unboxed_float (sign, nb, Some suffix) ->
     optional string sign ^^ stringf "#%s%c" nb suffix
   | Pconst_char c -> stringf "'%s'" (Char.escaped c)
+  | Pconst_untagged_char c -> stringf "#'%s'" (Char.escaped c)
   (* FIXME: handling of string literals is not good enough. *)
   | Pconst_string (s, _, None) -> stringf "%S" s
   | Pconst_string (s, _, Some delim) -> stringf "{%s|%s|%s}" delim s delim

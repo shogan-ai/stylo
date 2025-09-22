@@ -15,6 +15,7 @@ module Raw = struct
   | BARRBRACKET  -> "BARRBRACKET"
   | BEGIN  -> "BEGIN"
   | CHAR _ -> "CHAR"
+  | HASH_CHAR _ -> "HASH_CHAR"
   | CLASS  -> "CLASS"
   | COLON  -> "COLON"
   | COLONCOLON  -> "COLONCOLON"
@@ -163,6 +164,7 @@ module Raw = struct
   | BARRBRACKET , BARRBRACKET -> true
   | BEGIN , BEGIN -> true
   | CHAR _, CHAR _-> true
+  | HASH_CHAR _, HASH_CHAR _-> true
   | CLASS , CLASS -> true
   | COLON , COLON -> true
   | COLONCOLON , COLONCOLON -> true

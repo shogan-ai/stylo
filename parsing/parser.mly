@@ -664,7 +664,8 @@ The precedences must be listed from low to high.
 %nonassoc below_DOT
 %nonassoc DOT DOTHASH DOTOP
 /* Finally, the first tokens of simple_expr are above everything else. */
-%nonassoc BACKQUOTE BANG BEGIN CHAR FALSE FLOAT HASH_FLOAT INT HASH_INT OBJECT
+%nonassoc BACKQUOTE BANG BEGIN CHAR HASH_CHAR FALSE FLOAT HASH_FLOAT
+          INT HASH_INT OBJECT
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
           NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR
           LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN
@@ -4542,6 +4543,7 @@ value_constant:
 unboxed_constant:
   | HASH_INT          { unboxed_int $sloc $sloc $1 }
   | HASH_FLOAT        { unboxed_float $1 }
+  | HASH_CHAR         { Pconst_untagged_char $1 }
 ;
 constant:
     value_constant    { $1 }
