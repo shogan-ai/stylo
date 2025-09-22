@@ -175,6 +175,8 @@ module Typ = struct
                 ppt_eqs = List.map (fun (n,typ) -> (n,loop typ) ) pkg.ppt_eqs }
         | Ptyp_open (mod_ident, core_type) ->
             Ptyp_open (mod_ident, loop core_type)
+        | Ptyp_of_kind jkind ->
+            Ptyp_of_kind (loop_jkind jkind)
         | Ptyp_extension (s, arg, tokens) ->
             Ptyp_extension (s, arg, tokens)
         | Ptyp_parens ct -> Ptyp_parens (loop ct)
