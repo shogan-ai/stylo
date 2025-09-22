@@ -21,4 +21,5 @@ type let_binding =
 
 type let_bindings =
   { lbs_bindings: let_binding list;
+    lbs_mutable: mutable_flag;
     lbs_rec: rec_flag; }

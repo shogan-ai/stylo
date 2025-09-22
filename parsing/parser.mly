@@ -376,9 +376,10 @@ let addlb lbs lb =
 *)
   { lbs with lbs_bindings = lb :: lbs.lbs_bindings }
 
-let mklbs rf lb =
+let mklbs mf rf lb =
   let lbs = {
     lbs_bindings = [];
+    lbs_mutable = mf;
     lbs_rec = rf;
   } in
   addlb lbs lb
@@ -399,7 +400,14 @@ let val_of_let_bindings ~loc lbs =
            lb.lb_body.lbb_pat lb.lb_body.lbb_expr)
       lbs.lbs_bindings
   in
-  mkstr ~loc (Pstr_value(lbs.lbs_rec, List.rev bindings))
+  match lbs.lbs_mutable with
+  | Mutable -> syntax_error () (* FIXME: loc, err msg, etc. *)
+  | Immutable -> mkstr ~loc (Pstr_value(lbs.lbs_rec, List.rev bindings))
+
+let binding_with_params bindings =
+  List.find_opt (fun binding -> binding.lb_body.lbb_params <> [])
+  bindings
+  |> Option.map (fun binding -> binding.lb_loc)
 
 let expr_of_let_bindings ~loc lbs body =
   let bindings =
@@ -417,7 +425,12 @@ let expr_of_let_bindings ~loc lbs body =
            lb.lb_body.lbb_pat lb.lb_body.lbb_expr)
       lbs.lbs_bindings
   in
-    mkexp ~loc (Pexp_let(lbs.lbs_rec, List.rev bindings, body))
+  (* Disallow [let mutable f x y = ..] but still allow
+   * [let mutable f = fun x y -> ..]. *)
+  match lbs.lbs_mutable, binding_with_params lbs.lbs_bindings with
+  | Mutable, Some _loc -> syntax_error () (* FIXME *)
+  | _ ->
+    mkexp ~loc (Pexp_let(lbs.lbs_mutable, lbs.lbs_rec, List.rev bindings, body))
 
 let class_of_let_bindings ~loc lbs body =
   let bindings =
@@ -435,6 +448,9 @@ let class_of_let_bindings ~loc lbs body =
            lb.lb_body.lbb_pat lb.lb_body.lbb_expr)
       lbs.lbs_bindings
   in
+  match lbs.lbs_mutable with
+  | Mutable -> syntax_error () (* FIXME *)
+  | Immutable ->
     mkclass ~loc (Pcl_let (lbs.lbs_rec, List.rev bindings, body))
 
 let empty_body_constraint =
@@ -2391,7 +2407,7 @@ fun_expr:
   | fun_expr COLONCOLON expr
       { mkexp_cons ~loc:$sloc $loc($2) $1 $3 }
   | mkrhs(label) LESSMINUS expr
-      { mkexp ~loc:$sloc (Pexp_setinstvar($1, $3)) }
+      { mkexp ~loc:$sloc (Pexp_setvar($1, $3)) }
   | simple_expr DOT mkrhs(label_longident) LESSMINUS expr
       { mkexp ~loc:$sloc (Pexp_setfield($1, $3, $5)) }
   | indexop_expr(DOT { None }, seq_expr { [$1] }, LESSMINUS v=expr {Some v})
@@ -2837,11 +2853,12 @@ let_bindings(EXT_ATTR):
 %inline let_binding(EXT_ATTR):
   LET
   ext_attrs = EXT_ATTR
+  mutable_flag = mutable_flag
   rec_flag = rec_flag
   body = let_binding_body
   attrs = post_item_attributes
     {
-      mklbs rec_flag (mklb ~loc:$sloc true body ext_attrs attrs)
+      mklbs mutable_flag rec_flag (mklb ~loc:$sloc true body ext_attrs attrs)
     }
 ;
 and_let_binding:

@@ -430,7 +430,7 @@ and expression_desc =
   | Pexp_constant of constant
       (** Expressions constant such as [1], ['a'], ["true"], [1.0], [1l],
             [1L], [1n] *)
-  | Pexp_let of rec_flag * value_binding list * expression
+  | Pexp_let of mutable_flag * rec_flag * value_binding list * expression
       (** [Pexp_let(flag, [(P1,E1) ; ... ; (Pn,En)], E)] represents:
             - [let P1 = E1 and ... and Pn = EN in E]
                when [flag] is {{!Asttypes.rec_flag.Nonrecursive}[Nonrecursive]},
@@ -538,7 +538,7 @@ and expression_desc =
          *)
   | Pexp_send of expression * string loc  (** [E # m] *)
   | Pexp_new of longident loc  (** [new M.c] *)
-  | Pexp_setinstvar of string loc * expression  (** [x <- 2] *)
+  | Pexp_setvar of string loc * expression  (** [x <- 2] *)
   | Pexp_override of (string loc * expression option) list
       (** [{< x1 = E1; ...; xn = En >}] *)
   | Pexp_letmodule of string option loc * module_expr * expression

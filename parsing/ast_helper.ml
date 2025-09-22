@@ -257,7 +257,7 @@ module Exp = struct
 
   let ident ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_ident a)
   let constant ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_constant a)
-  let let_ ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Pexp_let (a, b, c))
+  let let_ ?loc ?attrs ~tokens a b c d = mk ?loc ?attrs ~tokens (Pexp_let (a, b, c, d))
   let function_ ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Pexp_function (a, b, c))
   let apply ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_apply (a, b))
   let match_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_match (a, b))
@@ -281,7 +281,7 @@ module Exp = struct
   let coerce ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Pexp_coerce (a, b, c))
   let send ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_send (a, b))
   let new_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_new a)
-  let setinstvar ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_setinstvar (a, b))
+  let setinstvar ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_setvar (a, b))
   let override ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_override a)
   let letmodule ?loc ?attrs ~tokens a b c= mk ?loc ?attrs ~tokens (Pexp_letmodule (a, b, c))
   let letexception ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_letexception (a, b))

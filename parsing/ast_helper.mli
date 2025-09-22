@@ -151,8 +151,8 @@ module Exp:
 
     val ident: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> expression
     val constant: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> constant -> expression
-    val let_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> rec_flag -> value_binding list
-              -> expression -> expression
+    val let_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> mutable_flag ->
+      rec_flag -> value_binding list -> expression -> expression
     val function_ : ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> function_param list
                    -> function_constraint -> function_body
                    -> expression

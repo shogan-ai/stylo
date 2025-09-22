@@ -560,13 +560,15 @@ end = struct
     match exp.pexp_desc with
     | Pexp_ident lid -> longident lid.txt
     | Pexp_constant c -> constant c
-    | Pexp_let (rf, vbs, body) ->
+    | Pexp_let (mf, rf, vbs, body) ->
       group (
         Value_binding.pp_list vbs ~start:(
           !!S.let_ ::
-          match rf with
-          | Nonrecursive -> []
-          | Recursive -> [S.rec_]
+          match mf, rf with
+          | Immutable, Nonrecursive -> []
+          | Immutable, Recursive -> [S.rec_]
+          | Mutable, Nonrecursive -> [S.mutable_]
+          | Mutable, Recursive -> [S.mutable_; S.rec_]
         ) ^/^ S.in_
       ) ^/^ pp body
     | Pexp_function ([], _, body) ->
@@ -651,7 +653,7 @@ end = struct
       parens (pp e ^^ ct1 ^/^ S.coerce ^/^ Core_type.pp ct2)
     | Pexp_send (e, lbl) -> pp e ^/^ S.hash ^/^ string lbl.txt
     | Pexp_new lid -> !!S.new_ ^/^ longident lid.txt
-    | Pexp_setinstvar (lbl, e) -> string lbl.txt ^/^ S.larrow ^/^ pp e
+    | Pexp_setvar (lbl, e) -> string lbl.txt ^/^ S.larrow ^/^ pp e
     | Pexp_override fields ->
       let field (lbl, eo) =
         string lbl.txt ^^
