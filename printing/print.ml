@@ -811,6 +811,8 @@ end = struct
     let idx_kind =
       match idx_kind with
       | Index_int -> empty
+      | Index_unboxed_int8 -> char 's'
+      | Index_unboxed_int16 -> char 'S'
       | Index_unboxed_int32 -> char 'l'
       | Index_unboxed_int64 -> char 'L'
       | Index_unboxed_nativeint -> char 'n'
