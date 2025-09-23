@@ -1245,6 +1245,7 @@ and signature =
     psg_modalities : modalities;
     psg_items : signature_item list;
     psg_loc : location;
+    psg_tokens: tokens;
   }
 
 and signature_item =

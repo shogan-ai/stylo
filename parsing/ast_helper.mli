@@ -359,7 +359,8 @@ module Sig:
 
 module Sg:
   sig
-    val mk : ?loc:loc -> ?modalities:modality with_loc list ->
+    val mk : ?loc:loc -> tokens:Tokens.seq ->
+      ?modalities:modality with_loc list ->
       signature_item list -> signature
   end
 

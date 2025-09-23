@@ -172,6 +172,11 @@ class to_tokens = object
     let node_toks = mty.pmty_tokens in
     combine_children ~loc:mty.pmty_loc node_toks sub_tokens
 
+  method! visit_signature env sg =
+    let sub_tokens = super#visit_signature env sg in
+    let node_toks = sg.psg_tokens in
+    combine_children ~loc:sg.psg_loc node_toks sub_tokens
+
   method! visit_signature_item env si =
     let sub_tokens = super#visit_signature_item env si in
     let node_toks = si.psig_tokens in

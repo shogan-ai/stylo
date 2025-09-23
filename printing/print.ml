@@ -1630,6 +1630,8 @@ end
 
 and Signature : sig
   val pp : signature -> document
+
+  val pp_interface : signature -> document
 end = struct
   let pp_item_desc = function
     | Psig_value vd -> Value_description.pp vd
@@ -1656,12 +1658,39 @@ end = struct
 
   let pp_item it = pp_item_desc it.psig_desc
 
-  let pp { psg_modalities ; psg_items ; psg_loc = _ } =
+  (* TODO: duplicated from Structure *)
+  let (^//^) before after =
+    if before = Empty then
+      after
+    else
+      before ^^ hardline ^^ hardline ^^ after
+
+  (* We keep the list of items in sync with the list of "tokens" of the
+     structure (each [Child_node] is a structure item).
+     That tells us where to insert [;;]. *)
+  let rec pp_keeping_semi doc = function
+    | [], [] -> doc
+    | item :: items, Tokens.{ desc = Child_node; _ } :: tokens ->
+      pp_keeping_semi (doc ^//^ pp_item item) (items, tokens)
+    | _::_, [] -> assert false
+    | items, tok :: tokens ->
+      match tok.desc with
+      | Child_node -> assert false
+      | Token SEMISEMI ->
+        pp_keeping_semi (doc ^?^ S.semisemi) (items, tokens)
+      | Comment _
+      | Token EOF ->
+        pp_keeping_semi doc (items, tokens)
+      | Token _ -> assert false
+
+  let pp { psg_modalities ; psg_items ; psg_tokens; psg_loc = _ } =
     group (
       prefix (with_modalities S.sig_ ~modalities:psg_modalities)
-        (separate_map (break 1) pp_item psg_items) ^/^
+        (pp_keeping_semi empty (psg_items, psg_tokens)) ^/^
       S.end_
     )
+  let pp_interface sg =
+    group (pp_keeping_semi empty (sg.psg_items, sg.psg_tokens))
 end
 
 and Module_declaration : sig

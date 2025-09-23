@@ -4,12 +4,19 @@ let style_file fn =
   In_channel.with_open_text fn @@ fun ic ->
   let lexbuf = Lexing.from_channel ic in
   Location.init lexbuf fn;
-  let ast = Parse.structure lexbuf in
-  let doc = Print.Structure.pp_implementation ast in
   let tokenizer = new Tokens_of_tree.to_tokens in
+  let doc, tokens =
+    if Filename.check_suffix fn ".mli" then (
+      let sg = Parse.interface lexbuf in
+      Print.Signature.pp_interface sg, tokenizer # visit_signature () sg
+    ) else (
+      let str = Parse.implementation lexbuf in
+      Print.Structure.pp_implementation str, tokenizer # visit_structure () str
+    )
+  in
   let tokens =
-    tokenizer # visit_structure () ast
-    |> List.flatten (* FIXME: shouldn't be needed when tokenizer is completed *)
+    (* FIXME: shouldn't be needed when tokenizer is completed *)
+    List.flatten tokens
   in
   Dbg_print.dprintf "%a@." Tokens.pp_seq tokens;
   Insert_comments.from_tokens tokens doc

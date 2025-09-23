@@ -388,8 +388,9 @@ module Sig = struct
 end
 
 module Sg = struct
-  let mk ?(loc = !default_loc) ?(modalities = []) a =
-    {psg_items = a; psg_modalities = modalities; psg_loc = loc}
+  let mk ?(loc = !default_loc) ~tokens ?(modalities = []) a =
+    {psg_items = a; psg_modalities = modalities; psg_loc = loc;
+     psg_tokens = tokens}
 end
 
 module Str = struct

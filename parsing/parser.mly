@@ -1562,9 +1562,19 @@ module_type:
    is a list of signature elements. *)
 signature:
   optional_atat_modalities_expr extra_sig(flatten(signature_element*))
-    { { psg_modalities = $1;
+    { let start =
+        match $1 with
+        | x :: _ -> x.loc.loc_start
+        | [] ->
+          match $2 with
+          | [] -> $startpos
+          | item :: _ -> item.psig_loc.loc_start
+      in
+      let loc = start, $endpos in
+      { psg_modalities = $1;
         psg_items = $2;
-        psg_loc = make_loc $sloc; } }
+        psg_loc = make_loc loc;
+        psg_tokens = Tokens.at loc } }
 ;
 
 (* A signature element is one of the following:
