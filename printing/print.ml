@@ -904,6 +904,16 @@ end = struct
     | Some doc -> doc
     | None -> (if optional then S.qmark else S.tilde) ^^ string name ^^ S.colon
 
+  let pp_generic ?default legacy_modes arg_doc typ_constraint at_modes =
+    let typ_and_modes =
+      optional Type_constraint.pp typ_constraint
+      |> with_modes ~modes:at_modes
+    in
+    modes legacy_modes ^?^ arg_doc ^?^ typ_and_modes ^?^
+    match default with
+    | None -> empty
+    | Some d -> S.equals ^/^ Expression.pp d
+
   let pp pp_arg arg =
     let parenthesize doc =
       if had_parens arg
@@ -911,59 +921,25 @@ end = struct
       else doc
     in
     match arg.parg_desc with
-    | Parg_unlabelled
-        { legacy_modes = []; arg; typ_constraint = None; modes = []; } ->
+    | Parg_unlabelled { legacy_modes=[]; arg; typ_constraint=None; modes=[] } ->
       pp_arg arg
-    | Parg_unlabelled { legacy_modes; arg; typ_constraint; modes = m; } ->
-      parens (
-        modes legacy_modes ^/^ pp_arg arg ^^
-        begin match typ_constraint with
-          | None -> empty
-          | Some ct -> break 1 ^^ Type_constraint.pp ct
-        end
-        |> with_modes ~modes:m (* FIXME @ or @@ ? *)
-      )
+    | Parg_unlabelled { legacy_modes; arg; typ_constraint; modes } ->
+      parens (pp_generic legacy_modes (pp_arg arg) typ_constraint modes)
     | Parg_labelled {
-        optional; legacy_modes; name: string; maybe_punned = None; typ_constraint;
-        modes = m; default;
+        optional; legacy_modes; name: string; maybe_punned = None;
+        typ_constraint; modes; default;
       } ->
       (if optional then S.qmark else S.tilde) ^^
       parenthesize (
-        begin match legacy_modes with
-        | [] -> empty
-        | _ -> modes legacy_modes ^^ break 1
-        end ^^ string name ^^
-        begin (match typ_constraint with
-          | None -> empty
-          | Some ct -> break 1 ^^ Type_constraint.pp ct)
-              |> with_modes ~modes:m (* FIXME @ or @@ ? *)
-        end ^^
-           begin match default with
-             | None -> empty
-             | Some d ->
-               S.equals ^/^ Expression.pp d
-           end
+        pp_generic legacy_modes (string name) typ_constraint modes ?default
       )
     | Parg_labelled {
         optional; legacy_modes; name: string; maybe_punned = Some a;
-        typ_constraint; modes = m; default;
+        typ_constraint; modes; default;
       } ->
       single_or_multi_token arg.parg_tokens ~optional name ^^
       parenthesize (
-        begin match legacy_modes with
-        | [] -> empty
-        | _ -> modes legacy_modes ^^ break 1
-        end ^^ pp_arg a ^^
-        begin (match typ_constraint with
-          | None -> empty
-          | Some ct -> break 1 ^^ Type_constraint.pp ct)
-              |> with_modes ~modes:m (* FIXME @ or @@ ? *)
-        end ^^
-           begin match default with
-             | None -> empty
-             | Some d ->
-               S.equals ^/^ Expression.pp d
-           end
+        pp_generic legacy_modes (pp_arg a) typ_constraint modes ?default
       )
 end
 
