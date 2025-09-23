@@ -1575,6 +1575,8 @@ end
 
 and Module_type : sig
   val pp : module_type -> document
+
+  val as_rhs : module_type -> Generic_binding.rhs
 end = struct
   let rec pp_desc = function
     | Pmty_ident lid -> longident lid.txt
@@ -1605,6 +1607,15 @@ end = struct
   and pp { pmty_desc; pmty_attributes; pmty_loc = _; pmty_tokens = _ } =
     pp_desc pmty_desc
     |> Attribute.attach ~attrs:pmty_attributes
+
+  let as_rhs ({ pmty_desc; pmty_attributes; pmty_loc=_; pmty_tokens=_ } as mty)
+    : Generic_binding.rhs =
+    match pmty_desc with
+    | Pmty_signature sg ->
+      let start, main, stop = Signature.pp_parts sg in
+      let stop = Attribute.attach stop ~attrs:pmty_attributes in
+      Three_parts { start; main; stop }
+    | _ -> Single_part (pp mty)
 end
 
 and Functor_parameter : sig
@@ -1630,6 +1641,7 @@ end
 
 and Signature : sig
   val pp : signature -> document
+  val pp_parts : signature -> document * document * document
 
   val pp_interface : signature -> document
 end = struct
@@ -1689,6 +1701,12 @@ end = struct
         (pp_keeping_semi empty (psg_items, psg_tokens)) ^/^
       S.end_
     )
+
+  let pp_parts { psg_modalities ; psg_items ; psg_tokens; psg_loc = _ } =
+    with_modalities S.sig_ ~modalities:psg_modalities,
+    pp_keeping_semi empty (psg_items, psg_tokens),
+    S.end_
+
   let pp_interface sg =
     group (pp_keeping_semi empty (sg.psg_items, sg.psg_tokens))
 end
@@ -1850,6 +1868,7 @@ end
 
 and Module_expr : sig
   val pp : module_expr -> document
+  val as_rhs : module_expr -> Generic_binding.rhs
 
   (* TODO: not the most natural place for this. *)
   val pp_package_type : core_type -> document
@@ -1900,10 +1919,22 @@ end = struct
   and pp { pmod_desc; pmod_attributes; pmod_loc = _; pmod_tokens = _ } =
     pp_desc pmod_desc
     |> Attribute.attach ~attrs:pmod_attributes
+
+  let as_rhs
+        ({ pmod_desc; pmod_attributes; pmod_loc = _; pmod_tokens = _ } as me)
+    : Generic_binding.rhs =
+    match pmod_desc with
+    | Pmod_structure str ->
+      let start, main, stop = Structure.pp_parts str in
+      let stop = Attribute.attach stop ~attrs:pmod_attributes in
+      Three_parts { start; main; stop }
+    | _ -> Single_part (pp me)
 end
 
 and Structure : sig
   val pp : structure -> document
+  val pp_parts : structure -> document * document * document
+
   val pp_implementation : structure -> document
 end = struct
   let pp_item_desc item =
@@ -1965,6 +1996,9 @@ end = struct
 
   let pp str =
     group (prefix S.struct_ (pp_keeping_semi empty str) ^/^ S.end_)
+
+  let pp_parts str =
+    S.struct_, group (pp_keeping_semi empty str), S.end_
 
   let pp_implementation str =
     group (pp_keeping_semi empty str)
@@ -2134,6 +2168,18 @@ and Module_binding : sig
 
   val pp_recmods : module_binding list -> document
 end = struct
+  let modal_constraint constr mode_l : Generic_binding.rhs option =
+    match Option.map Module_type.as_rhs constr, mode_l with
+    | None, [] -> None
+    | Some Three_parts { start; main; stop }, modes ->
+      Some (Three_parts { start; main; stop = with_atat_modes stop ~modes })
+    | Some Single_part mty, modes ->
+      Some (Single_part (
+        S.colon ^/^ mty
+        |> with_atat_modes ~modes
+      ))
+    | None, at_modes -> Some (Single_part (S.at ^/^ modes at_modes))
+
   let pp ?item ~keywords
       { pmb_ext_attrs; pmb_name = (name, name_modes); pmb_params;
         pmb_constraint; pmb_modes; pmb_expr; pmb_attributes; pmb_pre_text;
@@ -2153,21 +2199,11 @@ end = struct
       | modes -> parens (with_modes name ~modes)
     in
     let params = List.map Functor_parameter.pp pmb_params in
-    let open Generic_binding in
-    let constraint_ =
-      match pmb_constraint, pmb_modes with
-      | None, [] -> None
-      | Some mty, modes ->
-        Some (Single_part (
-          S.colon ^/^ Module_type.pp mty
-          |> with_atat_modes ~modes
-        ))
-      | None, at_modes -> Some (Single_part (S.at ^/^ modes at_modes))
-    in
-    pp ~pre_text:pmb_pre_text ?pre_doc:pmb_pre_doc
+    let constraint_ = modal_constraint pmb_constraint pmb_modes in
+    Generic_binding.pp ~pre_text:pmb_pre_text ?pre_doc:pmb_pre_doc
       ~keyword:(group kw) bound ~params
       ?constraint_
-      ~rhs:(Single_part (Module_expr.pp pmb_expr))
+      ~rhs:(Module_expr.as_rhs pmb_expr)
       ~attrs:pmb_attributes ?item
       ?post_doc:pmb_post_doc
 
