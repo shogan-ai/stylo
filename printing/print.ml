@@ -1434,16 +1434,16 @@ end = struct
       type_app ~parens:false (string pci_name.txt)
         (List.map Type_param.pp pci_params)
     in
-    Generic_binding.pp ?equal_sign
+    let open Generic_binding in
+    let mk_constraint ct = Single_part (S.colon ^/^ Class_type.pp ct) in
+    pp ?equal_sign
       ~pre_text:pci_pre_text
       ?pre_doc:pci_pre_doc
       ~keyword:(group (separate (break 1) keywords ^?^ virtual_ pci_virt))
       bound_class_thingy
       ~params:value_params
-      ?constraint_:(
-        Option.map (fun ct -> S.colon ^/^ Class_type.pp ct) pci_constraint
-      )
-      ~rhs:(pp_expr pci_expr)
+      ?constraint_:(Option.map mk_constraint pci_constraint)
+      ~rhs:(Single_part (pp_expr pci_expr))
       ~attrs:pci_attributes
       ~item:true (* [@@] expected for attributes, as for struct/sig items *)
       ?post_doc:pci_post_doc
@@ -1720,7 +1720,7 @@ end = struct
       ~keyword:(separate (break 1) keywords)
       binding
       ~equal_sign:S.colon
-      ~rhs:(Module_type.pp pmd_type)
+      ~rhs:(Generic_binding.Single_part (Module_type.pp pmd_type))
       ~attrs:pmd_attributes
       ?post_doc:pmd_post_doc
 
@@ -1743,7 +1743,7 @@ end = struct
       ?pre_doc:pms_pre_doc
       ~keyword:(Ext_attribute.decorate S.module_ pms_ext_attrs)
       (string pms_name.txt)
-      ~rhs:(longident pms_manifest.txt)
+      ~rhs:(Generic_binding.Single_part (longident pms_manifest.txt))
       ~attrs:pms_attributes
       ?post_doc:pms_post_doc
 end
@@ -1754,12 +1754,13 @@ end = struct
   let pp ?(subst=false)
       { pmtd_name; pmtd_type; pmtd_attributes; pmtd_ext_attrs; pmtd_pre_doc;
         pmtd_post_doc; pmtd_loc = _; pmtd_tokens = _ } =
+    let mk_rhs mty = Generic_binding.Single_part (Module_type.pp mty) in
     Generic_binding.pp ~item:true
       ?pre_doc:pmtd_pre_doc
       ~keyword:(Ext_attribute.decorate S.module_ pmtd_ext_attrs ^/^ S.type_)
       (string pmtd_name.txt)
       ~equal_sign:(if subst then S.colon_equals else S.equals)
-      ?rhs:(Option.map Module_type.pp pmtd_type)
+      ?rhs:(Option.map mk_rhs pmtd_type)
       ~attrs:pmtd_attributes
       ?post_doc:pmtd_post_doc
 end
@@ -1999,6 +2000,15 @@ end = struct
 end
 
 and Generic_binding : sig
+  type rhs =
+    | Single_part of document
+    | Three_parts of { start: document; main: document; stop: document }
+    (** Meant for [struct/sig .. end]: we try to keep [start] on the same line
+        as what preceeds it, [main] is indented, [stop] is not.
+
+        N.B. also used for value bindings in cases such as
+        [let f = function ...], there [start = function] and [stop] is empty. *)
+
   val pp
     : ?item:bool
     -> ?equal_sign:document
@@ -2006,28 +2016,71 @@ and Generic_binding : sig
     -> ?pre_doc:attribute
     -> keyword:document
     -> ?params:document list
-    -> ?constraint_:document
-    -> ?rhs:document
+    -> ?constraint_:rhs
+    -> ?rhs:rhs
     -> ?attrs:attributes
     -> ?post_doc:attribute
     -> document
     -> document
 end = struct
+  type rhs =
+    | Single_part of document
+    | Three_parts of { start: document; main: document; stop: document }
+
+  let pp ~equal_sign ~keyword ~params ?constraint_ ?rhs bound =
+    let bindings = nest 2 (flow (break 1) (keyword :: bound :: params)) in
+    match constraint_, rhs with
+    | None, None ->
+      (* let-punning and abstract module types *)
+      bindings
+    | None, Some Single_part doc ->
+      prefix (group (bindings ^/^ equal_sign)) doc
+    | Some Single_part doc, None ->
+      (* FIXME: weird asymmtry the "colon" is already part of [constraint_] but
+         [equal_sign] is not part of [rhs]... *)
+      prefix bindings doc
+    | Some Single_part typ, Some Single_part exp ->
+      prefix
+        (prefix bindings (group (typ ^/^ equal_sign)))
+        exp
+    | None, Some Three_parts { start; main; stop } ->
+      prefix
+        (prefix bindings (group (equal_sign ^/^ start)))
+        main ^/^
+      stop
+    | Some Three_parts { start; main; stop }, None ->
+      (* FIXME: here the "colon" is not included??? *)
+      prefix
+        (prefix bindings (group (S.colon ^/^ start)))
+        main ^/^
+      stop
+    | Some Three_parts { start; main; stop }, Some Single_part doc ->
+      (* FIXME: here the "colon" is not included??? *)
+      prefix
+        (prefix bindings (group (S.colon ^/^ start)))
+        main ^/^
+      prefix
+        (group (stop ^/^ equal_sign))
+        doc
+    | Some Single_part doc, Some Three_parts { start; main; stop } ->
+      prefix
+        (prefix bindings (group (doc ^/^ equal_sign ^/^ start)))
+        main ^/^
+      stop
+    | Some Three_parts typ, Some Three_parts exp ->
+      prefix
+        (prefix bindings (group (S.colon ^/^ typ.start)))
+        typ.main ^/^
+      prefix
+        (group (typ.stop ^/^ equal_sign ^/^ exp.start))
+        exp.main ^/^
+      exp.stop
+
+
   let pp ?item ?(equal_sign = S.equals) ?pre_text ?pre_doc ~keyword ?(params=[])
-        ?(constraint_=empty) ?rhs ?(attrs=[]) ?post_doc bound =
-    Attribute.attach ?item ?text:pre_text ?pre_doc ?post_doc ~attrs
-      (match rhs with
-       | None -> (* Punning *)
-         prefix keyword (
-           group (prefix_nonempty bound (flow (break 1) params) ^?^ constraint_)
-         )
-       | Some d ->
-         prefix (
-           group @@ nest 2 (
-             flow (break 1) (keyword :: bound :: params) ^?^
-             group (constraint_ ^?^ equal_sign)
-           )
-         ) d)
+        ?constraint_ ?rhs ?(attrs=[]) ?post_doc bound =
+    pp ~equal_sign ~keyword ~params ?constraint_ ?rhs bound
+    |> Attribute.attach ?item ?text:pre_text ?pre_doc ?post_doc ~attrs
 end
 
 and Value_binding : sig
@@ -2049,16 +2102,19 @@ end = struct
     let kw_and_modes = group (start ^?^ modes pvb_modes) in
     let pat = Pattern.pp pvb_pat in
     let params = List.map Function_param.pp pvb_params in
+    let open Generic_binding in
     let constraint_ =
-      optional (fun vc ->
-        Value_constraint.pp vc
-        |> with_modes ~modes:pvb_ret_modes
+      Option.map (fun vc ->
+        Single_part (
+          Value_constraint.pp vc
+          |> with_modes ~modes:pvb_ret_modes
+        )
       ) pvb_constraint
     in
-    Generic_binding.pp ~pre_text:pvb_pre_text ?pre_doc:pvb_pre_doc
+    pp ~pre_text:pvb_pre_text ?pre_doc:pvb_pre_doc
       ~keyword:kw_and_modes
-      pat ~params ~constraint_
-      ?rhs:(Option.map Expression.pp pvb_expr)
+      pat ~params ?constraint_
+      ?rhs:(Option.map (fun e -> Single_part (Expression.pp e)) pvb_expr)
       ?item ~attrs:pvb_attributes
       ?post_doc:pvb_post_doc
 
@@ -2097,17 +2153,21 @@ end = struct
       | modes -> parens (with_modes name ~modes)
     in
     let params = List.map Functor_parameter.pp pmb_params in
+    let open Generic_binding in
     let constraint_ =
       match pmb_constraint, pmb_modes with
-      | None, [] -> empty
+      | None, [] -> None
       | Some mty, modes ->
-        S.colon ^/^ Module_type.pp mty
-        |> with_atat_modes ~modes
-      | None, at_modes -> S.at ^/^ modes at_modes
+        Some (Single_part (
+          S.colon ^/^ Module_type.pp mty
+          |> with_atat_modes ~modes
+        ))
+      | None, at_modes -> Some (Single_part (S.at ^/^ modes at_modes))
     in
-    Generic_binding.pp ~pre_text:pmb_pre_text ?pre_doc:pmb_pre_doc
-      ~keyword:(group kw) bound ~params ~constraint_
-      ~rhs:(Module_expr.pp pmb_expr)
+    pp ~pre_text:pmb_pre_text ?pre_doc:pmb_pre_doc
+      ~keyword:(group kw) bound ~params
+      ?constraint_
+      ~rhs:(Single_part (Module_expr.pp pmb_expr))
       ~attrs:pmb_attributes ?item
       ?post_doc:pmb_post_doc
 
