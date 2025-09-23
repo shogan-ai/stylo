@@ -587,7 +587,8 @@ end = struct
     | Pexp_prefix_apply (op, arg) -> pp_op op ^^ pp arg
     | Pexp_add_or_sub (op, arg) -> string op ^^ pp arg
     | Pexp_infix_apply {op; arg1; arg2} ->
-      pp arg1 ^/^ pp_op op ^/^ pp arg2
+      (* N.B. the associativity of [op] will impact the nesting... *)
+      prefix (group (prefix (pp arg1) (pp_op op))) (pp arg2)
     | Pexp_apply (e, args) -> pp_apply e args
     | Pexp_match (e, cases) ->
       group (!!S.match_ ^/^ pp e ^/^ S.with_) ^/^
@@ -700,31 +701,34 @@ end = struct
       S.overwrite__ ^/^ pp e1 ^/^ S.with_ ^/^ pp e2
     | Pexp_hole -> S.underscore
     | Pexp_index_op access ->
-      let left, right =
-        match access.kind with
-        | Paren -> S.lparen, S.rparen
-        | Brace -> S.lbrace, S.rbrace
-        | Bracket -> S.lbracket, S.rbracket
-      in
-      pp access.seq ^/^
-      begin match access.op with
-        | None -> S.dot
-        | Some (None, op) -> stringf ".%s" op
-        | Some (Some lid, op) -> S.dot ^^ longident lid ^^ stringf ".%s" op
-      end ^^
-      left ^^
-      separate_map (S.semi ^^ break 1) pp access.indices ^^
-      right ^^
-      begin match access.assign with
-        | None -> empty
-        | Some e -> break 1 ^^ S.larrow ^/^ pp e
-      end
+      pp_index_op access.kind access.seq access.op access.indices access.assign
     | Pexp_parens { begin_end = false; exp } -> parens (pp exp)
     | Pexp_parens { begin_end = true; exp } ->
       prefix S.begin_ (pp exp) ^/^ S.end_
     | Pexp_list elts -> pp_list (nb_semis exp.pexp_tokens) elts
     | Pexp_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
     | Pexp_exclave exp -> S.exclave__ ^/^ pp exp
+
+  and pp_index_op kind seq op indices assign =
+    let left, right =
+      match kind with
+      | Paren -> S.lparen, S.rparen
+      | Brace -> S.lbrace, S.rbrace
+      | Bracket -> S.lbracket, S.rbracket
+    in
+    pp seq ^/^
+    begin match op with
+    | None -> S.dot
+    | Some (None, op) -> stringf ".%s" op
+    | Some (Some lid, op) -> S.dot ^^ longident lid ^^ stringf ".%s" op
+    end ^^
+    left ^^
+    separate_map (S.semi ^^ break 1) pp indices ^^
+    right ^^
+    begin match assign with
+    | None -> empty
+    | Some e -> break 1 ^^ S.larrow ^/^ pp e
+    end
 
   and pp_delimited_seq (opn, cls) nb_semis elts =
     let semi_as_term = List.compare_length_with elts nb_semis = 0 in
