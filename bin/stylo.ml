@@ -69,10 +69,12 @@ let lex_and_compare input_fn doc =
 
 let inputs = ref []
 let check = ref false
+let ast_check = ref false
 
 let () =
   Arg.parse
-    ["-only-check", Arg.Set check, "Compare result with input, no printing"]
+    ["-only-check", Arg.Set check, "Compare result with input, no printing"
+    ;"-ast-check", Arg.Set ast_check, "Compare official AST after reparsing"]
     (fun fn -> inputs := fn :: !inputs)
     "stylo.exe [-only-check] FILENAME*"
 
@@ -94,7 +96,17 @@ let () =
     | doc ->
       if !check then
         lex_and_compare fn doc
-      else (
+      else if !ast_check then (
+        let b = Buffer.create 42 in
+        PPrint.ToBuffer.pretty 1. 80 b doc;
+        let source = In_channel.(with_open_text fn input_all) in
+        let reprinted = Buffer.contents b in
+        if Ast_checker.check_same_ast ~impl:true source reprinted then
+          ()
+        else
+          (* TODO: location, etc *)
+          Format.eprintf "%s: ast changed@." fn
+      ) else (
         PPrint.ToChannel.pretty 1. 80 stdout doc;
         print_newline ();
         flush stdout
