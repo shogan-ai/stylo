@@ -1739,13 +1739,13 @@ and Module_substitution : sig
 end = struct
   let pp { pms_name; pms_manifest; pms_attributes; pms_ext_attrs;
            pms_pre_doc; pms_post_doc; pms_loc = _; pms_tokens = _ } =
-    (* TODO: Generic_binding *)
-    optional Attribute.pp pms_pre_doc ^?^ (
-      Ext_attribute.decorate S.module_ pms_ext_attrs ^/^
-      string pms_name.txt ^/^ S.colon_equals ^/^ longident pms_manifest.txt
-      |> Attribute.attach ~item:true ~attrs:pms_attributes
-    ) ^?^
-    optional Attribute.pp pms_post_doc
+    Generic_binding.pp ~item:true ~equal_sign:S.colon_equals
+      ?pre_doc:pms_pre_doc
+      ~keyword:(Ext_attribute.decorate S.module_ pms_ext_attrs)
+      (string pms_name.txt)
+      ~rhs:(longident pms_manifest.txt)
+      ~attrs:pms_attributes
+      ?post_doc:pms_post_doc
 end
 
 and Module_type_declaration : sig
@@ -1754,17 +1754,14 @@ end = struct
   let pp ?(subst=false)
       { pmtd_name; pmtd_type; pmtd_attributes; pmtd_ext_attrs; pmtd_pre_doc;
         pmtd_post_doc; pmtd_loc = _; pmtd_tokens = _ } =
-    (* TODO: Generic_binding *)
-    Ext_attribute.decorate S.module_ pmtd_ext_attrs ^/^ S.type_ ^/^
-    string pmtd_name.txt ^^
-    begin match pmtd_type with
-      | None -> empty
-      | Some mty ->
-        break 1 ^^ (if subst then S.colon_equals else S.equals) ^/^
-        Module_type.pp mty
-    end
-    |> Attribute.attach ~item:true ~attrs:pmtd_attributes
-      ?pre_doc:pmtd_pre_doc ?post_doc:pmtd_post_doc
+    Generic_binding.pp ~item:true
+      ?pre_doc:pmtd_pre_doc
+      ~keyword:(Ext_attribute.decorate S.module_ pmtd_ext_attrs ^/^ S.type_)
+      (string pmtd_name.txt)
+      ~equal_sign:(if subst then S.colon_equals else S.equals)
+      ?rhs:(Option.map Module_type.pp pmtd_type)
+      ~attrs:pmtd_attributes
+      ?post_doc:pmtd_post_doc
 end
 
 and Open_infos : sig
