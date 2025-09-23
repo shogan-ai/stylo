@@ -1416,13 +1416,11 @@ end
 
 
 and Class_infos : sig
-  val pp : 'a. ('a -> document) -> keywords:document list ->
-    'a class_infos -> document
-
-  val pp_list : 'a. ('a -> document) -> keywords:document list ->
+  val pp_list :
+    'a. ?equal_sign:document -> ('a -> document) -> keywords:document list ->
     'a class_infos list -> document
 end = struct
-  let pp pp_expr ~keywords
+  let pp ?equal_sign pp_expr ~keywords
       { pci_ext_attrs; pci_virt; pci_params; pci_name; pci_expr; pci_attributes;
         pci_value_params; pci_constraint; pci_loc = _; pci_tokens = _;
         pci_pre_text; pci_pre_doc; pci_post_doc } =
@@ -1436,7 +1434,7 @@ end = struct
       type_app ~parens:false (string pci_name.txt)
         (List.map Type_param.pp pci_params)
     in
-    Generic_binding.pp
+    Generic_binding.pp ?equal_sign
       ~pre_text:pci_pre_text
       ?pre_doc:pci_pre_doc
       ~keyword:(group (separate (break 1) keywords ^?^ virtual_ pci_virt))
@@ -1450,16 +1448,18 @@ end = struct
       ~item:true (* [@@] expected for attributes, as for struct/sig items *)
       ?post_doc:pci_post_doc
 
-  let rec pp_list pp_expr ~keywords = function
+  let rec pp_list ?equal_sign pp_expr ~keywords = function
     | [] -> empty
     | x :: xs ->
-      pp pp_expr ~keywords x ^?^ pp_list pp_expr ~keywords:[S.and_] xs
+      pp ?equal_sign pp_expr ~keywords x ^?^
+      pp_list ?equal_sign pp_expr ~keywords:[S.and_] xs
 end
 
 and Class_description : sig
   val pp_list : class_description list -> document
 end = struct
-  let pp_list = Class_infos.pp_list Class_type.pp ~keywords:[S.class_]
+  let pp_list =
+    Class_infos.pp_list ~equal_sign:S.colon Class_type.pp ~keywords:[S.class_]
 end
 
 and Class_type_declaration : sig
@@ -1719,8 +1719,8 @@ end = struct
       ~pre_text:pmd_pre_text ?pre_doc:pmd_pre_doc
       ~keyword:(separate (break 1) keywords)
       binding
-      (* FIXME: pass as ~rhs *)
-      ~constraint_:(S.colon ^/^ Module_type.pp pmd_type)
+      ~equal_sign:S.colon
+      ~rhs:(Module_type.pp pmd_type)
       ~attrs:pmd_attributes
       ?post_doc:pmd_post_doc
 
@@ -2002,12 +2002,21 @@ end = struct
 end
 
 and Generic_binding : sig
-  val pp : ?item:bool -> ?pre_text:attributes -> ?pre_doc:attribute ->
-    keyword:document -> ?params:document list -> ?constraint_:document ->
-    ?rhs:document -> ?attrs:attributes -> ?post_doc:attribute -> document ->
-    document
+  val pp
+    : ?item:bool
+    -> ?equal_sign:document
+    -> ?pre_text:attributes
+    -> ?pre_doc:attribute
+    -> keyword:document
+    -> ?params:document list
+    -> ?constraint_:document
+    -> ?rhs:document
+    -> ?attrs:attributes
+    -> ?post_doc:attribute
+    -> document
+    -> document
 end = struct
-  let pp ?item ?pre_text ?pre_doc ~keyword ?(params=[])
+  let pp ?item ?(equal_sign = S.equals) ?pre_text ?pre_doc ~keyword ?(params=[])
         ?(constraint_=empty) ?rhs ?(attrs=[]) ?post_doc bound =
     Attribute.attach ?item ?text:pre_text ?pre_doc ?post_doc ~attrs
       (match rhs with
@@ -2019,7 +2028,7 @@ end = struct
          prefix (
            group @@ nest 2 (
              flow (break 1) (keyword :: bound :: params) ^?^
-             group (constraint_ ^?^ S.equals)
+             group (constraint_ ^?^ equal_sign)
            )
          ) d)
 end
