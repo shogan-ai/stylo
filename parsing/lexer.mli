@@ -48,6 +48,13 @@ val handle_docstrings: bool ref
 val comments : (string * Location.t) Queue.t
 val token_with_comments : Lexing.lexbuf -> Parser_tokens.token
 
+(* Syntax mode configuration *)
+module Syntax_mode : sig
+  val quotations : bool ref
+end
+
+val reset_syntax_mode : unit -> unit
+
 (*
   [set_preprocessor init preprocessor] registers [init] as the function
 to call to initialize the preprocessor when the lexer is initialized,
