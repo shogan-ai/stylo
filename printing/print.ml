@@ -985,14 +985,25 @@ end
 
 and Function_body : sig
   val pp : function_body -> document
+  val as_rhs : function_body -> Generic_binding.rhs
 end = struct
+  let pp_cases ~tokens cases ext_attrs =
+    Ext_attribute.decorate S.function_ ext_attrs,
+    Case.pp_cases cases
+      ~has_leading_pipe:(has_leading_pipe ~after:FUNCTION tokens)
   let pp fb =
     match fb.pfb_desc with
     | Pfunction_body e -> Expression.pp e
     | Pfunction_cases (cases, ext_attrs) ->
-      Ext_attribute.decorate S.function_ ext_attrs ^/^
-      Case.pp_cases cases
-        ~has_leading_pipe:(has_leading_pipe ~after:FUNCTION fb.pfb_tokens)
+      let kw, cases = pp_cases ~tokens:fb.pfb_tokens cases ext_attrs in
+      kw ^/^ cases
+
+  let as_rhs fb =
+    match fb.pfb_desc with
+    | Pfunction_body _ -> assert false (* can't be on value binding rhs *)
+    | Pfunction_cases (cases, ext_attrs) ->
+      let kw, cases = pp_cases ~tokens:fb.pfb_tokens cases ext_attrs in
+      Generic_binding.Three_parts { start = kw; main = cases; stop = empty}
 end
 
 and Type_constraint : sig
@@ -2118,11 +2129,16 @@ end = struct
 end
 
 and Value_binding : sig
-  val pp_core : value_binding -> document
-
   val pp_list : ?item:bool -> start:document list -> value_binding list -> document
 end = struct
-  let pp_core ?item start
+  let rhs e =
+    (* FIXME: attributes ! *)
+    match e.pexp_desc with
+    | Pexp_function ([], _, body) ->
+      Function_body.as_rhs body
+    | _ -> Single_part (Expression.pp e)
+
+  let pp ?item start
         { pvb_modes; pvb_pat; pvb_params; pvb_constraint; pvb_ret_modes;
           pvb_expr; pvb_attributes; pvb_pre_text; pvb_pre_doc; pvb_post_doc;
           pvb_loc = _; pvb_tokens = _; pvb_ext_attrs } =
@@ -2148,19 +2164,16 @@ end = struct
     pp ~pre_text:pvb_pre_text ?pre_doc:pvb_pre_doc
       ~keyword:kw_and_modes
       pat ~params ?constraint_
-      ?rhs:(Option.map (fun e -> Single_part (Expression.pp e)) pvb_expr)
+      ?rhs:(Option.map rhs pvb_expr)
       ?item ~attrs:pvb_attributes
       ?post_doc:pvb_post_doc
 
   let rec pp_list ?(item=false) ~start = function
     | [] -> empty
-    | [ x ] -> pp_core ~item start x
+    | [ x ] -> pp ~item start x
     | x :: xs ->
       let sep = if item then hardline ^^ hardline else break 1 in
-      pp_core ~item start x ^^ sep ^^ pp_list ~item ~start:[S.and_] xs
-
-  let pp_core = pp_core [empty]
-
+      pp ~item start x ^^ sep ^^ pp_list ~item ~start:[S.and_] xs
 end
 
 and Module_binding : sig
