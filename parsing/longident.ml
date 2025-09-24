@@ -15,6 +15,7 @@
 
 type str_or_op =
   | Str of string
+  | Str_trailing_hash of string (* FIXME? *)
   | Op of string
   | DotOp of string * [ `Paren | `Brace | `Bracket ] * string * bool
 

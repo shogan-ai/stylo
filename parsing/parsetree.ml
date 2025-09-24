@@ -169,7 +169,15 @@ and core_type_desc =
   | Ptyp_any of jkind_annotation option (** [_] or [_ : k] *)
   | Ptyp_var of string * jkind_annotation option
     (** A type variable such as ['a] or ['a : k] *)
-  | Ptyp_arrow of arg_label * core_type * modes * core_type * modes
+  | Ptyp_arrow of
+      { lbl: arg_label;
+        dom_legacy_modes: modes;
+        dom_type: core_type;
+        dom_modes: modes;
+        codom_legacy_modes: modes;
+        codom_type: core_type;
+        codom_modes: modes
+      }
       (** [Ptyp_arrow(lbl, T1, M1, T2, M2)] represents:
             - [T1 @ M1 -> T2 @ M2]    when [lbl] is
                                      {{!arg_label.Nolabel}[Nolabel]},
@@ -193,7 +201,7 @@ and core_type_desc =
 
            Invariant: [n >= 2].
         *)
-  | Ptyp_constr of longident loc * core_type list
+  | Ptyp_constr of core_type list * longident loc
       (** [Ptyp_constr(lident, l)] represents:
             - [tconstr]               when [l=[]],
             - [T tconstr]             when [l=[T]],
@@ -598,6 +606,7 @@ and expression_desc =
   | Pexp_list of expression list
   | Pexp_cons of expression * expression
   | Pexp_exclave of expression
+  | Pexp_mode_legacy of mode loc * expression
 
 and 'a record_field =
   { field_name: longident loc;
@@ -1408,7 +1417,7 @@ and module_expr =
 
 and module_expr_desc =
   | Pmod_ident of longident loc  (** [X] *)
-  | Pmod_structure of structure  (** [struct ... end] *)
+  | Pmod_structure of attributes * structure  (** [struct[@attrs] ... end] *)
   | Pmod_functor of functor_parameter * module_expr
       (** [functor(X : MT1) -> ME] *)
   | Pmod_apply of module_expr * module_expr  (** [ME1(ME2)] *)
@@ -1537,6 +1546,7 @@ and jkind_annotation_desc =
   | With of jkind_annotation * core_type * modalities
   | Kind_of of core_type
   | Product of jkind_annotation list
+  | Parens of jkind_annotation_desc
 
 and jkind_annotation =
   { pjkind_loc : location

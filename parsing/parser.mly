@@ -594,7 +594,7 @@ let unboxed_float ?sign (f, m) =
 (* Invariant: [lident] must end with an [Lident] that ends with a ["#"]. *)
 let unboxed_type sloc lident tys =
   let loc = make_loc sloc in
-  Ptyp_constr (mkloc lident loc, tys)
+  Ptyp_constr (tys, mkloc lident loc)
 
 let maybe_pmod_constraint mode expr =
   match mode with
@@ -1173,7 +1173,7 @@ module_name_modal(at_modal_expr):
 
 module_expr:
   | STRUCT attrs = attributes s = structure END
-      { mkmod ~loc:$sloc ~attrs (Pmod_structure s) }
+      { mkmod ~loc:$sloc (Pmod_structure (attrs, s)) }
   | STRUCT attributes structure error
       { unclosed "struct" $loc($1) "end" $loc($4) }
   | SIG error
@@ -2447,7 +2447,7 @@ fun_expr:
   | UNDERSCORE
     { mkexp ~loc:$sloc Pexp_hole }
   | mode=mode_legacy exp=seq_expr
-     { mkexp_constraint ~loc:$sloc ~exp ~cty:None ~modes:[mode] }
+     { mkexp ~loc:$sloc (Pexp_mode_legacy (mode, exp)) }
   | EXCLAVE seq_expr
      { mkexp ~loc:$sloc (Pexp_exclave $2) }
 ;
@@ -2740,8 +2740,8 @@ block_access:
         in
         Pexp_dot_open(od, exp) }
   | od=open_dot_declaration DOT LBRACELESS object_expr_content GREATERRBRACE
-      { (* TODO: review the location of Pexp_override *)
-        Pexp_dot_open(od, mkexp ~loc:$sloc (Pexp_override $4)) }
+      { let override_loc = $startpos($3), $endpos in
+        Pexp_dot_open(od, mkexp ~loc:override_loc (Pexp_override $4)) }
   | mod_longident DOT LBRACELESS object_expr_content error
       { unclosed "{<" $loc($3) ">}" $loc($5) }
   | simple_expr hash mkrhs(label)
@@ -3377,9 +3377,9 @@ simple_pattern_not_ident:
   | mkrhs(mod_longident) DOT simple_delimited_pattern
       { Ppat_open($1, $3) }
   | mkrhs(mod_longident) DOT mkrhs(mklid(LBRACKET RBRACKET {Lident (Str "[]")}))
-    { Ppat_open($1, mkpat ~loc:$sloc (Ppat_construct($3, None))) }
+    { Ppat_open($1, mkpat ~loc:$loc($3) (Ppat_construct($3, None))) }
   | mkrhs(mod_longident) DOT mkrhs(mklid(LPAREN RPAREN {Lident (Str "()")}))
-    { Ppat_open($1, mkpat ~loc:$sloc (Ppat_construct($3, None))) }
+    { Ppat_open($1, mkpat ~loc:$loc($3) (Ppat_construct($3, None))) }
   | mkrhs(mod_longident) DOT LPAREN pattern RPAREN
       { let sub =
           let loc = ($startpos($3), $endpos) in
@@ -3648,7 +3648,7 @@ jkind_desc:
       Product (List.rev $1)
     }
   | LPAREN jkind_desc RPAREN {
-      $2
+      Parens $2
     }
 ;
 
@@ -4087,8 +4087,16 @@ strict_function_or_labeled_tuple_type:
       domain_with_modes = with_optional_mode_expr(extra_rhs(param_type))
       MINUSGREATER
       codomain = strict_function_or_labeled_tuple_type
-        { let (domain, (_ : Lexing.position * Lexing.position)), arg_modes = domain_with_modes in
-          Ptyp_arrow(label, domain , arg_modes, codomain, []) }
+        { let arg_legacy_m, (domain, (_ : Lexing.position * Lexing.position)), arg_modes = domain_with_modes in
+           Ptyp_arrow
+             { lbl = label;
+              dom_legacy_modes = arg_legacy_m;
+              dom_type = domain ;
+              dom_modes = arg_modes;
+              codom_legacy_modes = [];
+              codom_type = codomain;
+              codom_modes = [] }
+             }
     )
     { $1 }
   | mktyp(
@@ -4097,11 +4105,17 @@ strict_function_or_labeled_tuple_type:
       MINUSGREATER
       codomain_with_modes = with_optional_mode_expr(tuple_type)
       %prec MINUSGREATER
-        { let (domain, (_ : Lexing.position * Lexing.position)), arg_modes = domain_with_modes in
-          let (codomain, codomain_loc), ret_modes = codomain_with_modes in
-          Ptyp_arrow(label,
-            domain,
-            arg_modes, maybe_curry_typ codomain codomain_loc, ret_modes) }
+        { let arg_legacy_m, (domain, (_ : Lexing.position * Lexing.position)), arg_modes = domain_with_modes in
+          let ret_legacy_modes, (codomain, codomain_loc), ret_modes = codomain_with_modes in
+          Ptyp_arrow
+            { lbl = label;
+              dom_legacy_modes = arg_legacy_m;
+              dom_type = domain ;
+              dom_modes = arg_modes;
+              codom_legacy_modes = ret_legacy_modes;
+              codom_type = maybe_curry_typ codomain codomain_loc;
+              codom_modes = ret_modes }
+        }
     )
     { $1 }
   (* These next three cases are for labled tuples - see comment on [tuple_type]
@@ -4122,12 +4136,20 @@ strict_function_or_labeled_tuple_type:
       MINUSGREATER
       codomain = strict_function_or_labeled_tuple_type
          {
-           let (tuple, tuple_loc), arg_modes = tuple_with_modes in
+           let arg_legacy_m, (tuple, tuple_loc), arg_modes = tuple_with_modes in
            let ty, ltys = tuple in
            let label = Labelled label in
            let domain = mktyp ~loc:tuple_loc (Ptyp_tuple ((None, ty) :: ltys)) in
            let domain = extra_rhs_core_type domain ~pos:(snd tuple_loc) in
-           Ptyp_arrow(label, domain, arg_modes, codomain, []) }
+           Ptyp_arrow
+             { lbl = label;
+              dom_legacy_modes = arg_legacy_m;
+              dom_type = domain ;
+              dom_modes = arg_modes;
+              codom_legacy_modes = [];
+              codom_type = codomain;
+              codom_modes = [] }
+         }
     )
     { $1 }
   | mktyp(
@@ -4136,17 +4158,21 @@ strict_function_or_labeled_tuple_type:
       MINUSGREATER
       codomain_with_modes = with_optional_mode_expr(tuple_type)
       %prec MINUSGREATER
-         { let (tuple, tuple_loc), arg_modes = tuple_with_modes in
-           let (codomain, codomain_loc), ret_modes = codomain_with_modes in
+         { let arg_legacy_m, (tuple, tuple_loc), arg_modes = tuple_with_modes in
+           let ret_legacy_modes, (codomain, codomain_loc), ret_modes =
+             codomain_with_modes
+           in
            let ty, ltys = tuple in
            let label = Labelled label in
            let domain = mktyp ~loc:tuple_loc (Ptyp_tuple ((None, ty) :: ltys)) in
            let domain = extra_rhs_core_type domain ~pos:(snd tuple_loc) in
-           Ptyp_arrow(label,
-            domain ,
-            arg_modes,
-            maybe_curry_typ codomain codomain_loc,
-            ret_modes)
+           Ptyp_arrow{ lbl = label;
+            dom_legacy_modes = arg_legacy_m;
+            dom_type = domain ;
+            dom_modes = arg_modes;
+            codom_legacy_modes = ret_legacy_modes;
+            codom_type = maybe_curry_typ codomain codomain_loc;
+            codom_modes = ret_modes }
          }
     )
     { $1 }
@@ -4209,8 +4235,7 @@ at_mode_expr:
 
 %inline with_optional_mode_expr(ty):
   | m0=optional_mode_expr_legacy ty=ty m1=optional_at_mode_expr {
-    let m = m0 @ m1 in
-    (ty, $loc(ty)), m
+    m0, (ty, $loc(ty)), m1
   }
 ;
 
@@ -4245,7 +4270,9 @@ optional_atat_modalities_expr:
 %inline param_type:
   | mktyp(
     LPAREN bound_vars = typevar_list DOT inner_type = core_type RPAREN
-      { Ptyp_poly (bound_vars, inner_type) }
+      { let poly_loc = $startpos(bound_vars), $endpos(inner_type) in
+        let poly = mktyp ~loc:poly_loc (Ptyp_poly (bound_vars, inner_type)) in
+        Ptyp_parens poly }
     )
     { $1 }
   | ty = tuple_type
@@ -4393,7 +4420,7 @@ atomic_type:
   | mktyp( /* begin mktyp group */
       tys = actual_type_parameters
       tid = mkrhs(type_longident)
-        { Ptyp_constr (tid, tys) }
+        { Ptyp_constr (tys, tid) }
     | tys = actual_type_parameters
       tid = mkrhs(type_unboxed_longident)
         { unboxed_type $loc(tid) tid.txt tys }
@@ -4412,11 +4439,17 @@ atomic_type:
   )
   { $1 } /* end mktyp group */
   | LPAREN QUOTE name=ident COLON jkind=jkind_annotation RPAREN
-      { mktyp ~loc:$sloc (Ptyp_var (name, Some jkind)) }
+      { let sub_loc = $startpos($2), $endpos(jkind) in
+        let sub = mktyp ~loc:sub_loc (Ptyp_var (name, Some jkind)) in
+        mktyp ~loc:$sloc (Ptyp_parens sub) }
   | LPAREN UNDERSCORE COLON jkind=jkind_annotation RPAREN
-      { mktyp ~loc:$sloc (Ptyp_any (Some jkind)) }
+      { let sub_loc = $startpos($2), $endpos(jkind) in
+        let sub = mktyp ~loc:sub_loc (Ptyp_any (Some jkind)) in
+        mktyp ~loc:$sloc (Ptyp_parens sub) }
   | LPAREN TYPE COLON jkind=jkind_annotation RPAREN
-      { mktyp ~loc:$sloc (Ptyp_of_kind jkind) }
+      { let sub_loc = $startpos($2), $endpos(jkind) in
+        let sub = mktyp ~loc:sub_loc (Ptyp_of_kind jkind) in
+        mktyp ~loc:$sloc (Ptyp_parens sub) }
   | LESSLBRACKET core_type RBRACKETGREATER
       { quotation_reserved "<[" $loc($1) }
   | LESSLBRACKET core_type error
@@ -4674,16 +4707,16 @@ label_longident:
     mk_longident(mod_longident, str_not_op(LIDENT)) { $1 }
 ;
 type_trailing_no_hash:
-  LIDENT  { $1 } %prec below_HASH
+  LIDENT  { Longident.Str $1 } %prec below_HASH
 ;
 type_trailing_hash:
-  LIDENT HASH_SUFFIX  { $1 ^ "#" }
+  LIDENT HASH_SUFFIX  { Longident.Str_trailing_hash $1 }
 ;
 type_longident:
-    mk_longident(mod_ext_longident, str_not_op(type_trailing_no_hash))  { $1 }
+    mk_longident(mod_ext_longident, type_trailing_no_hash)  { $1 }
 ;
 type_unboxed_longident:
-    mk_longident(mod_ext_longident, str_not_op(type_trailing_hash))  { $1 }
+    mk_longident(mod_ext_longident, type_trailing_hash)  { $1 }
 ;
 
 mod_longident:

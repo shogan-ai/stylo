@@ -73,12 +73,15 @@ module Typ :
     val any: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> jkind_annotation option -> core_type
     val var: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> string -> jkind_annotation option
       -> core_type
+(*
     val arrow: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> arg_label -> core_type ->
       mode with_loc list -> core_type -> mode with_loc list -> core_type
+*)
     val tuple: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> (string option * core_type) list -> core_type
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq
                        -> (string option * core_type) list -> core_type
-    val constr: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> core_type list -> core_type
+    val constr: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
+      core_type list -> lid -> core_type
     val object_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> object_field list
                    -> closed_flag -> core_type
     val class_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> core_type list -> core_type
@@ -312,7 +315,8 @@ module Mod:
     val attr: module_expr -> attribute -> module_expr
 
     val ident: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> module_expr
-    val structure: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> structure -> module_expr
+    val structure: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> attrs ->
+      structure -> module_expr
     val functor_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
       functor_parameter -> module_expr -> module_expr
     val apply: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_expr -> module_expr ->

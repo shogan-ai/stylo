@@ -46,6 +46,7 @@ let str_or_op (so : Longident.str_or_op) =
   group @@
   match so with
   | Str s -> string s
+  | Str_trailing_hash s -> string s ^^ S.hash
   | Op s ->
     let s =
       if String.get s 0 = '*' || String.get s (String.length s - 1) = '*' then
@@ -164,6 +165,11 @@ let with_modalities ~modalities:l t =
 
 let mode (Mode s) = string s
 let modes = separate_loc_list (break 1) mode
+
+let mode_legacy = function
+  | Mode ("local" | "once" | "unique" as s) -> stringf "%s_" s
+  | _ -> assert false
+let modes_legacy = separate_loc_list (break 1) mode_legacy
 
 let with_modes ~modes:l t =
   match l with
@@ -323,13 +329,18 @@ end = struct
         | None -> var
         | Some k -> var ^/^ S.colon ^/^ Jkind_annotation.pp k
       end
-    | Ptyp_arrow (lbl, arg_ty, arg_mods, ret_ty, ret_mods) ->
+    | Ptyp_arrow { lbl; dom_legacy_modes; dom_type; dom_modes;
+                   codom_legacy_modes; codom_type; codom_modes } ->
+      let pp_surrounded pre_m post_m ty =
+        modes_legacy pre_m ^?^ pp ty
+        |> with_modes ~modes:post_m
+      in
       pp_arrow ct.ptyp_tokens lbl
-        (with_modes ~modes:arg_mods (pp arg_ty))
-        (with_modes ~modes:ret_mods (pp ret_ty))
+        (pp_surrounded dom_legacy_modes dom_modes dom_type)
+        (pp_surrounded codom_legacy_modes codom_modes codom_type)
     | Ptyp_tuple elts -> pp_tuple elts
     | Ptyp_unboxed_tuple elts -> S.hash_lparen ^^ pp_tuple elts ^^ S.rparen
-    | Ptyp_constr (lid, args) ->
+    | Ptyp_constr (args, lid) ->
       type_app (longident lid.txt) (List.map pp args)
     | Ptyp_object (fields, closed) ->
       let field_doc = separate_map (S.semi ^^ break 1) object_field fields in
@@ -364,8 +375,7 @@ end = struct
       separate_map (break 1) binding bound_vars ^^ break 0 ^^ S.dot ^/^ pp ct
     | Ptyp_package pkg -> package_type pkg
     | Ptyp_open (lid, ct) -> longident lid.txt ^^ S.dot ^^ pp ct
-    | Ptyp_of_kind jkind ->
-      parens (S.type_ ^/^ S.colon ^/^ Jkind_annotation.pp jkind)
+    | Ptyp_of_kind jkind -> S.type_ ^/^ S.colon ^/^ Jkind_annotation.pp jkind
     | Ptyp_extension ext -> Extension.pp ext
     | Ptyp_parens ct -> parens (pp ct)
 
@@ -434,6 +444,11 @@ and Pattern : sig
   val pp : pattern -> document
 end = struct
   let rec pp p =
+    group (pp_desc p)
+    |> Attribute.attach ~attrs:p.ppat_attributes
+
+  and pp_desc p =
+    let (!!) kw = Ext_attribute.decorate kw p.ppat_ext_attr in
     match p.ppat_desc with
     | Ppat_any -> S.underscore
     | Ppat_var name -> str_or_op name.txt
@@ -450,11 +465,7 @@ end = struct
     | Ppat_record (fields, cf) -> pp_record (nb_semis p.ppat_tokens) cf fields
     | Ppat_record_unboxed_product (fields, cf) ->
       pp_record ~unboxed:true (nb_semis p.ppat_tokens) cf fields
-    | Ppat_array (mut, ps) ->
-      let opn, cls = array_delimiters mut in
-      opn ^/^
-      separate_map (S.semi ^^ break 1) pp ps ^/^
-      cls
+    | Ppat_array (mut, ps) -> pp_array (nb_semis p.ppat_tokens) mut ps
     | Ppat_or (p1, p2) -> pp p1 ^/^ S.pipe ^/^ pp p2
     | Ppat_constraint (p, None, modes) ->
       parens (with_modes ~modes (pp p))
@@ -468,19 +479,28 @@ end = struct
     (* FIXME: parser doesn't agree with what's written above I believe.
        Recognized form seems to depend on context... *)
     | Ppat_type lid -> S.hash ^^ longident lid.txt
-    | Ppat_lazy p ->
-      Ext_attribute.decorate S.lazy_ p.ppat_ext_attr ^/^ pp p
+    | Ppat_lazy p -> !!S.lazy_ ^/^ pp p
     | Ppat_unpack (path, ty) -> pp_unpack p.ppat_ext_attr path ty
-    | Ppat_exception p ->
-      Ext_attribute.decorate S.exception_ p.ppat_ext_attr ^/^ pp  p
+    | Ppat_exception p -> !!S.exception_ ^/^ pp  p
     | Ppat_extension ext -> Extension.pp ext
     | Ppat_open (lid, p) -> longident lid.txt ^^ S.dot ^^ pp p
     | Ppat_parens p -> parens (pp p)
-    | Ppat_list elts ->
-      brackets (
-        separate_map (S.semi ^^ break 1) pp elts
-      )
+    | Ppat_list elts -> pp_list (nb_semis p.ppat_tokens) elts
     | Ppat_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
+
+  and pp_delimited_seq (opn, cls) nb_semis elts =
+    let semi_as_term = List.compare_length_with elts nb_semis = 0 in
+    let elts =
+      if semi_as_term then
+        separate_map (break 1) (fun elt -> pp elt ^^ S.semi) elts
+      else
+        separate_map (S.semi ^^ break 1) pp elts
+    in
+    prefix_nonempty opn elts ^?^ cls
+
+  and pp_array nb_semis mut = pp_delimited_seq (array_delimiters mut) nb_semis
+
+  and pp_list nb_semis = pp_delimited_seq (S.lbracket, S.rbracket) nb_semis
 
   and pp_unpack ext_attrs path ty =
     let path =
@@ -534,10 +554,6 @@ end = struct
       | Open -> S.semi ^/^ S.underscore
     ) ^/^
     S.rbrace
-
-  let pp p =
-    group (pp p)
-    |> Attribute.attach ~attrs:p.ppat_attributes
 
 end
 
@@ -614,7 +630,7 @@ end = struct
       pp_record ~unboxed:true (nb_semis exp.pexp_tokens) eo fields
     | Pexp_field (e, lid) -> pp e ^^ S.dot ^^ longident lid.txt
     | Pexp_unboxed_field (e, lid) ->
-      pp e ^^ S.dot ^^ S.hash ^^ longident lid.txt
+      pp e ^^ S.dothash ^^ longident lid.txt
     | Pexp_setfield (e1, lid, e2) ->
       pp e1 ^^ S.dot ^^ longident lid.txt ^/^ S.larrow ^/^ pp e2
     | Pexp_array (mut, es) -> pp_array (nb_semis exp.pexp_tokens) mut es
@@ -701,16 +717,18 @@ end = struct
       S.overwrite__ ^/^ pp e1 ^/^ S.with_ ^/^ pp e2
     | Pexp_hole -> S.underscore
     | Pexp_index_op access ->
-      pp_index_op access.kind access.seq access.op access.indices access.assign
+      pp_index_op (nb_semis exp.pexp_tokens)
+        access.kind access.seq access.op access.indices access.assign
     | Pexp_parens { begin_end = false; exp } -> parens (pp exp)
     | Pexp_parens { begin_end = true; exp } ->
       prefix S.begin_ (pp exp) ^/^ S.end_
     | Pexp_list elts -> pp_list (nb_semis exp.pexp_tokens) elts
     | Pexp_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
     | Pexp_exclave exp -> S.exclave__ ^/^ pp exp
+    | Pexp_mode_legacy (m, exp) -> mode_legacy m.txt ^/^ pp exp
 
-  and pp_index_op kind seq op indices assign =
-    let left, right =
+  and pp_index_op nb_semis kind seq op indices assign =
+    let delims =
       match kind with
       | Paren -> S.lparen, S.rparen
       | Brace -> S.lbrace, S.rbrace
@@ -722,9 +740,7 @@ end = struct
     | Some (None, op) -> stringf ".%s" op
     | Some (Some lid, op) -> S.dot ^^ longident lid ^^ stringf ".%s" op
     end ^^
-    left ^^
-    separate_map (S.semi ^^ break 1) pp indices ^^
-    right ^^
+    pp_delimited_seq delims nb_semis indices ^^
     begin match assign with
     | None -> empty
     | Some e -> break 1 ^^ S.larrow ^/^ pp e
@@ -747,10 +763,12 @@ end = struct
     pp_delimited_seq (S.lbracket, S.rbracket) nb_semis elts
 
   and pp_block_idx block_access unboxed_accesses =
-    Block_access.pp block_access ^^
-    separate_map (break 0) (fun (Uaccess_unboxed_field lid) ->
-      S.dothash ^^ longident lid.txt
-    ) unboxed_accesses
+    parens (
+      Block_access.pp block_access ^^
+      separate_map (break 0) (fun (Uaccess_unboxed_field lid) ->
+        S.dothash ^^ longident lid.txt
+      ) unboxed_accesses
+    )
 
   and pp_tuple elts =
     separate_map (S.comma ^^ break 1) (Argument.pp pp) elts
@@ -909,7 +927,7 @@ end = struct
       optional Type_constraint.pp typ_constraint
       |> with_modes ~modes:at_modes
     in
-    modes legacy_modes ^?^ arg_doc ^?^ typ_and_modes ^?^
+    modes_legacy legacy_modes ^?^ arg_doc ^?^ typ_and_modes ^?^
     match default with
     | None -> empty
     | Some d -> S.equals ^/^ Expression.pp d
@@ -1882,7 +1900,7 @@ end = struct
 
   let rec pp_desc = function
     | Pmod_ident lid -> longident lid.txt
-    | Pmod_structure str -> Structure.pp str
+    | Pmod_structure (attrs, str) -> Structure.pp ~attrs str
     | Pmod_functor (fp, me) ->
       S.functor_ ^/^ Functor_parameter.pp fp ^/^ S.rarrow ^/^ pp me
     | Pmod_apply (m1, m2) -> pp m1 ^^ pp m2
@@ -1915,16 +1933,16 @@ end = struct
         ({ pmod_desc; pmod_attributes; pmod_loc = _; pmod_tokens = _ } as me)
     : Generic_binding.rhs =
     match pmod_desc with
-    | Pmod_structure str ->
-      let start, main, stop = Structure.pp_parts str in
+    | Pmod_structure (attrs, str) ->
+      let start, main, stop = Structure.pp_parts attrs str in
       let stop = Attribute.attach stop ~attrs:pmod_attributes in
       Three_parts { start; main; stop }
     | _ -> Single_part (pp me)
 end
 
 and Structure : sig
-  val pp : structure -> document
-  val pp_parts : structure -> document * document * document
+  val pp : ?attrs:attributes -> structure -> document
+  val pp_parts : attributes -> structure -> document * document * document
 
   val pp_implementation : structure -> document
 end = struct
@@ -1985,11 +2003,13 @@ end = struct
         pp_keeping_semi doc (items, tokens)
       | Token _ -> assert false
 
-  let pp str =
-    group (prefix S.struct_ (pp_keeping_semi empty str) ^/^ S.end_)
+  let pp ?(attrs=[]) str =
+    let struct_ = Attribute.attach ~attrs S.struct_ in
+    group (prefix struct_ (pp_keeping_semi empty str) ^/^ S.end_)
 
-  let pp_parts str =
-    S.struct_, group (pp_keeping_semi empty str), S.end_
+  let pp_parts attrs str =
+    Attribute.attach ~attrs S.struct_,
+    group (pp_keeping_semi empty str), S.end_
 
   let pp_implementation str =
     group (pp_keeping_semi empty str)
@@ -2134,12 +2154,11 @@ end = struct
     let params = List.map Function_param.pp pvb_params in
     let open Generic_binding in
     let constraint_ =
-      Option.map (fun vc ->
-        Single_part (
-          Value_constraint.pp vc
-          |> with_modes ~modes:pvb_ret_modes
-        )
-      ) pvb_constraint
+      match pvb_constraint, pvb_ret_modes with
+      | None, [] -> None
+      | None, lst -> Some (Single_part (S.at ^/^ modes lst))
+      | Some vc, lst ->
+        Some (Single_part (with_modes (Value_constraint.pp vc) ~modes:lst))
     in
     pp ~pre_text:pvb_pre_text ?pre_doc:pvb_pre_doc
       ~keyword:kw_and_modes
@@ -2214,7 +2233,7 @@ end
 and Jkind_annotation : sig
   val pp : jkind_annotation -> document
 end = struct
-  let jkind_annotation_desc = function
+  let rec jkind_annotation_desc = function
     | Default -> S.underscore
     | Abbreviation s -> string s
     | Mod (jk, ms) -> Jkind_annotation.pp jk ^/^ S.mod_ ^/^ modes ms
@@ -2224,6 +2243,7 @@ end = struct
     | Kind_of ct -> S.kind_of__ ^/^ Core_type.pp ct
     | Product jks ->
       separate_map (break 1 ^^ S.ampersand ^^ break 1) Jkind_annotation.pp jks
+    | Parens jkd -> parens (jkind_annotation_desc jkd)
 
   let pp jk = jkind_annotation_desc jk.pjkind_desc
 end

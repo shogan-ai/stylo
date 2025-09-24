@@ -106,7 +106,8 @@ module Typ = struct
 
   let any ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ptyp_any a)
   let var ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ptyp_var (a, b))
-  let arrow ?loc ?attrs ~tokens a b c d e = mk ?loc ?attrs ~tokens (Ptyp_arrow (a, b, c, d, e))
+(*   let arrow ?loc ?attrs ~tokens a b c d e = mk ?loc ?attrs ~tokens
+     (Ptyp_arrow (a, b, c, d, e)) *)
   let tuple ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ptyp_tuple a)
   let unboxed_tuple ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ptyp_unboxed_tuple a)
   let constr ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ptyp_constr (a, b))
@@ -139,17 +140,26 @@ module Typ = struct
             let jkind = Option.map loop_jkind jkind in
             check_variable var_names t.ptyp_loc x;
             Ptyp_var (x, jkind)
-        | Ptyp_arrow (label,core_type,modes,core_type',modes') ->
-            Ptyp_arrow(label, loop core_type, modes, loop core_type', modes')
+        | Ptyp_arrow { lbl; dom_legacy_modes; dom_type; dom_modes;
+                       codom_legacy_modes; codom_type; codom_modes } ->
+            Ptyp_arrow {
+              lbl;
+              dom_legacy_modes;
+              dom_type = loop dom_type;
+              dom_modes;
+              codom_legacy_modes;
+              codom_type = loop codom_type;
+              codom_modes
+            }
         | Ptyp_tuple lst ->
             Ptyp_tuple (List.map (fun (l, t) -> l, loop t) lst)
         | Ptyp_unboxed_tuple lst ->
           Ptyp_unboxed_tuple (List.map (fun (l, t) -> l, loop t) lst)
-        | Ptyp_constr( { txt = Longident.{ desc = Lident (Str s); _ } }, [])
+        | Ptyp_constr([], { txt = Longident.{ desc = Lident (Str s); _ } })
           when List.mem s var_names ->
             Ptyp_var (s, None)
-        | Ptyp_constr(longident, lst) ->
-            Ptyp_constr(longident, List.map loop lst)
+        | Ptyp_constr(lst, longident) ->
+            Ptyp_constr(List.map loop lst, longident)
         | Ptyp_object (lst, o) ->
             Ptyp_object (List.map loop_object_field lst, o)
         | Ptyp_class (longident, lst) ->
@@ -183,15 +193,16 @@ module Typ = struct
       in
       {t with ptyp_desc = desc}
     and loop_jkind jkind =
-      let pjkind_desc =
-        match jkind.pjkind_desc with
+      let rec pjkind_desc = function
         | Default as x -> x
         | Abbreviation _ as x -> x
         | Mod (jkind, modes) -> Mod (loop_jkind jkind, modes)
         | With (jkind, typ, modalities) -> With (loop_jkind jkind, loop typ, modalities)
         | Kind_of typ -> Kind_of (loop typ)
         | Product jkinds -> Product (List.map loop_jkind jkinds)
+        | Parens jkd -> pjkind_desc jkd
       in
+      let pjkind_desc = pjkind_desc jkind.pjkind_desc in
       { jkind with pjkind_desc }
     and loop_row_field field =
       let prf_desc = match field.prf_desc with
@@ -338,7 +349,8 @@ module Mod = struct
   let attr d a = {d with pmod_attributes = d.pmod_attributes @ [a]}
 
   let ident ?loc ?attrs ~tokens x = mk ?loc ?attrs ~tokens (Pmod_ident x)
-  let structure ?loc ?attrs ~tokens x = mk ?loc ?attrs ~tokens (Pmod_structure x)
+  let structure ?loc ?attrs ~tokens a x =
+    mk ?loc ?attrs ~tokens (Pmod_structure (a, x))
   let functor_ ?loc ?attrs ~tokens arg body =
     mk ?loc ?attrs ~tokens (Pmod_functor (arg, body))
   let apply ?loc ?attrs ~tokens m1 m2 = mk ?loc ?attrs ~tokens (Pmod_apply (m1, m2))
