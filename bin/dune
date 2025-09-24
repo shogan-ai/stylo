@@ -1,3 +1,9 @@
 (executable
   (name stylo)
-  (libraries ast_checker ocaml_syntax print wrapprint dbg_print))
+  (libraries ast_checker ocaml_syntax print wrapprint dbg_print)
+  (modules :standard \ fuzzer_driver))
+
+(executable
+  (name fuzzer_driver)
+  (libraries unix)
+  (modules fuzzer_driver))

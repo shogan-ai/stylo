@@ -29,6 +29,8 @@ module Ocaml_syntax = struct end (* https://github.com/ocaml/dune/issues/2450 *)
 module Str = Ast_helper.Str (* For ocamldep *)
 [@@@ocaml.warning "+60"]
 
+let failwith s = raise (Parser_types.Failwith s)
+
 open Asttypes
 open Longident
 open Parsetree
