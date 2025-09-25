@@ -335,7 +335,8 @@ module Mty = struct
   let ident ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_ident a)
   let alias ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_alias a)
   let signature ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_signature a)
-  let functor_ ?loc ?attrs ~tokens ?(ret_mode=[]) a b = mk ?loc ?attrs ~tokens (Pmty_functor (a, b, ret_mode))
+  let functor_ ?loc ?attrs ~tokens ?(ret_mode=[]) a b c =
+    mk ?loc ?attrs ~tokens (Pmty_functor (a, b, c,ret_mode))
   let with_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pmty_with (a, b))
   let typeof_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_typeof a)
   let extension ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_extension a)
@@ -351,8 +352,8 @@ module Mod = struct
   let ident ?loc ?attrs ~tokens x = mk ?loc ?attrs ~tokens (Pmod_ident x)
   let structure ?loc ?attrs ~tokens a x =
     mk ?loc ?attrs ~tokens (Pmod_structure (a, x))
-  let functor_ ?loc ?attrs ~tokens arg body =
-    mk ?loc ?attrs ~tokens (Pmod_functor (arg, body))
+  let functor_ ?loc ?attrs ~tokens attributes args body =
+    mk ?loc ?attrs ~tokens (Pmod_functor (attributes, args, body))
   let apply ?loc ?attrs ~tokens m1 m2 = mk ?loc ?attrs ~tokens (Pmod_apply (m1, m2))
   let apply_unit ?loc ?attrs ~tokens m1 = mk ?loc ?attrs ~tokens (Pmod_apply_unit m1)
   let constraint_ ?loc ?attrs ~tokens ty mode m =
@@ -461,19 +462,20 @@ module Cl = struct
 end
 
 module Cty = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) d =
+  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
     {
      pcty_desc = d;
      pcty_loc = loc;
      pcty_attributes = attrs;
+     pcty_tokens = tokens;
     }
   let attr d a = {d with pcty_attributes = d.pcty_attributes @ [a]}
 
-  let constr ?loc ?attrs a b = mk ?loc ?attrs (Pcty_constr (a, b))
-  let signature ?loc ?attrs a = mk ?loc ?attrs (Pcty_signature a)
-  let arrow ?loc ?attrs a b c = mk ?loc ?attrs (Pcty_arrow (a, b, c))
-  let extension ?loc ?attrs a = mk ?loc ?attrs (Pcty_extension a)
-  let open_ ?loc ?attrs a b = mk ?loc ?attrs (Pcty_open (a, b))
+  let constr ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pcty_constr (a, b))
+  let signature ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pcty_signature a)
+  let arrow ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Pcty_arrow (a, b, c))
+  let extension ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pcty_extension a)
+  let open_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pcty_open (a, b))
 end
 
 module Ctf = struct
@@ -834,7 +836,7 @@ module Te = struct
      ptyexn_ext_attrs = ext_attrs;
      ptyexn_constructor = constructor;
      ptyexn_loc = loc;
-     ptyexn_attributes = add_docs_attrs docs attrs;
+     ptyexn_attributes = attrs;
      ptyexn_post_doc = post_doc;
      ptyexn_tokens = tokens;
     }

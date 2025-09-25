@@ -82,7 +82,9 @@ let mkstr ~loc d =
   Str.mk ~loc:(make_loc loc) ~tokens d
 let mkclass ~loc ?ext_attrs ?attrs d =
   Cl.mk ~loc:(make_loc loc) ?ext_attrs ?attrs d
-let mkcty ~loc ?attrs d = Cty.mk ~loc:(make_loc loc) ?attrs d
+let mkcty ~loc ?attrs d =
+  let tokens = Tokens.at loc in
+  Cty.mk ~loc:(make_loc loc) ?attrs ~tokens d
 
 let pstr_typext te =
   Pstr_typext te
@@ -319,10 +321,6 @@ let mkpat_attrs ~loc d attrs =
 
 let wrap_class_ext_attrs ~loc body ext_attrs =
   {body with pcl_ext_attrs = ext_attrs; pcl_loc = make_loc loc }
-let wrap_mod_attrs ~loc:_ attrs body =
-  {body with pmod_attributes = attrs @ body.pmod_attributes}
-let wrap_mty_attrs ~loc:_ attrs body =
-  {body with pmty_attributes = attrs @ body.pmty_attributes}
 
 let mk_quotedext ~loc (id, idloc, str, _, delim) =
   let exp_id = mkloc [id] idloc in
@@ -462,22 +460,10 @@ let class_of_let_bindings ~loc lbs body =
     mkclass ~loc (Pcl_let (lbs.lbs_rec, List.rev bindings, body))
 
 let empty_body_constraint =
-  { ret_type_constraint = None; mode_annotations = []; ret_mode_annotations = []}
+  { ret_type_constraint = None; ret_mode_annotations = []}
 
 let mkfunction ~loc ~ext_attrs params body_constraint body =
   mkexp_attrs (Pexp_function (params, body_constraint, body)) ext_attrs ~loc
-
-let mk_functor_typ args mty_mm =
-  let mty, _ =
-    List.fold_left (fun (mty, mm) (startpos, arg) ->
-      let mty =
-        mkmty ~loc:(startpos, mty.pmty_loc.loc_end) (Pmty_functor (arg, mty, mm))
-      in
-      let mm = [] in
-      mty, mm)
-    mty_mm args
-  in
-  mty
 
 (* Alternatively, we could keep the generic module type in the Parsetree
    and extract the package type during type-checking. In that case,
@@ -1134,19 +1120,17 @@ parse_any_longident:
 
 %inline functor_args:
   reversed_nonempty_llist(functor_arg)
-    { $1 }
-    (* Produce a reversed list on purpose;
-       later processed using [fold_left]. *)
+    { List.rev $1 }
 ;
 
 functor_arg:
     (* An anonymous and untyped argument. *)
     LPAREN RPAREN
-      { $startpos, Unit }
+      { Unit }
   | (* An argument accompanied with an explicit type. *)
     LPAREN x = mkrhs(module_name) COLON mty_mm = module_type_with_optional_modes RPAREN
       { let mty, mm = mty_mm in
-        $startpos, Named (x, mty, mm) }
+        Named (x, mty, mm) }
 ;
 
 module_name:
@@ -1179,11 +1163,7 @@ module_expr:
   | SIG error
       { expecting $loc($1) "struct" }
   | FUNCTOR attrs = attributes args = functor_args MINUSGREATER me = module_expr
-      { wrap_mod_attrs ~loc:$sloc attrs (
-          List.fold_left (fun acc (startpos, arg) ->
-            mkmod ~loc:(startpos, $endpos) (Pmod_functor (arg, acc))
-          ) me args
-        ) }
+      { mkmod ~loc:$sloc (Pmod_functor (attrs, args, me)) }
   | me = paren_module_expr
       { me }
   | me = module_expr attr = attribute
@@ -1371,9 +1351,8 @@ module_binding_body:
       {
         let mty, mm = mty_mm in
         [], mty, mm, me }
-  | arg_and_pos = functor_arg body = module_binding_body
-      { let (_, arg) = arg_and_pos in
-        let args, mty, mm, me = body in
+  | arg = functor_arg body = module_binding_body
+      { let args, mty, mm, me = body in
         arg :: args, mty, mm, me }
 ;
 
@@ -1523,11 +1502,13 @@ module_type:
   | FUNCTOR attrs = attributes args = functor_args
     MINUSGREATER mty_mm = module_type_with_optional_modes
       %prec below_WITH
-      { wrap_mty_attrs ~loc:$sloc attrs (mk_functor_typ args mty_mm) }
+      { let mty, mm = mty_mm in
+        mkmty ~loc:$sloc (Pmty_functor (attrs, args, mty, mm)) }
   | args = functor_args
     MINUSGREATER mty_mm = module_type_with_optional_modes
       %prec below_WITH
-      { mk_functor_typ args mty_mm }
+      { let mty, mm = mty_mm in
+        mkmty ~loc:$sloc (Pmty_functor_type (args, mty, mm)) }
   | MODULE TYPE OF attributes module_expr %prec below_LBRACKETAT
       { mkmty ~loc:$sloc ~attrs:$4 (Pmty_typeof $5) }
   | mty = module_type attr = attribute
@@ -1545,7 +1526,7 @@ module_type:
         %prec below_WITH
         { let mty0, mm0 = $1 in
           let mty1, mm1 = $3 in
-          Pmty_functor_type(Named (mknoloc None, mty0, mm0), mty1, mm1) }
+          Pmty_functor_type([Named (mknoloc None, mty0, mm0)], mty1, mm1) }
     | module_type WITH separated_nonempty_llist(AND, with_constraint)
         { Pmty_with($1, $3) }
     | extension
@@ -1565,12 +1546,17 @@ module_type:
 signature:
   optional_atat_modalities_expr extra_sig(flatten(signature_element*))
     { let start =
-        match $1 with
-        | x :: _ -> x.loc.loc_start
-        | [] ->
-          match $2 with
-          | [] -> $startpos
-          | item :: _ -> item.psig_loc.loc_start
+        (* The start position is important to retrieve all the tokens.
+           Usually $symbolstartpos is the right choice, however here
+           we might reduce an empty production (no modalities, no signature
+           element) while returning an non-empty signature (the extra_sig part).
+
+          extra_sig doesn't match any symbol, it synthesizes signature items
+          from a side table of docstrings. So $symbolstartpos doesn't know about
+          that and would reduce to $endpos. *)
+        match $1, $2 with
+        | [], item :: _ -> item.psig_loc.loc_start
+        | _ -> $symbolstartpos
       in
       let loc = start, $endpos in
       { psg_modalities = $1;
@@ -1662,10 +1648,9 @@ module_declaration_body(module_type_with_optional_modal_expr):
   | EQUAL error
       { expecting $loc($1) ":" }
   | mkmty(
-      arg_and_pos = functor_arg body = module_declaration_body(module_type_with_optional_modes)
-        { let (_, arg) = arg_and_pos in
-          let (ret, mret) = body in
-          Pmty_functor(arg, ret, mret) }
+      arg = functor_arg body = module_declaration_body(module_type_with_optional_modes)
+        { let (ret, mret) = body in
+        Pmty_functor([], [arg], ret, mret) }
     )
     { $1, [] }
 ;
@@ -2052,8 +2037,16 @@ class_signature:
       { mkcty ~loc:$sloc ~attrs:$2 (Pcty_signature $3) }
   | OBJECT attributes class_sig_body error
       { unclosed "object" $loc($1) "end" $loc($4) }
-  | class_signature attribute
-      { Cty.attr $1 $2 }
+  | cs=class_signature attribute
+      { (* We are "patching" the signature to add an attribute, we must also
+        patch the tokens attached to the sig to account for the new tokens
+        relative to the attribute. *)
+        let tokens = Tokens.at $sloc in
+        let cty_with_attr = Cty.attr cs $2 in
+        let pcty_tokens =
+          Tokens.replace_first_child tokens ~subst:cs.pcty_tokens
+        in
+        { cty_with_attr with pcty_tokens } }
   | LET OPEN override_flag attributes mkrhs(mod_longident) IN class_signature
       { let loc = ($startpos($2), $endpos($5)) in
         let od =
@@ -2374,13 +2367,11 @@ pattern_with_modes_or_poly:
 optional_atomic_constraint_:
   | COLON atomic_type {
     { ret_type_constraint = Some (Pconstraint $2)
-    ; mode_annotations = []
     ; ret_mode_annotations = []
     }
    }
   | at_mode_expr {
     { ret_type_constraint = None
-    ; mode_annotations = []
     ; ret_mode_annotations = $1
     }
   }
@@ -2521,7 +2512,7 @@ unboxed_access:
 
 simple_expr:
   | LPAREN seq_expr RPAREN
-      { mkexp ~loc:$sloc (Pexp_parens { begin_end = false; exp = $2 }) }
+      { mkexp ~loc:$sloc (Pexp_parens { begin_end = false; exp = Some $2 }) }
   | LPAREN seq_expr error
       { unclosed "(" $loc($1) ")" $loc($3) }
   | LPAREN seq_expr type_constraint_with_modes RPAREN
@@ -2555,12 +2546,9 @@ simple_expr:
 ;
 %inline simple_expr_attrs:
   | BEGIN ext_attributes e = seq_expr END
-    { Pexp_parens { begin_end = true; exp = e }, $2 }
+    { Pexp_parens { begin_end = true; exp = Some e }, $2 }
   | BEGIN ext_attributes END
-      { (* FIXME! *)
-        Pexp_construct (mkloc (mkunit $sloc) (make_loc $sloc), None),
-        $2
-      }
+      { Pexp_parens { begin_end = true; exp = None }, $2 }
   | BEGIN ext_attributes seq_expr error
       { unclosed "begin" $loc($1) "end" $loc($4) }
   | NEW ext_attributes mkrhs(class_longident)
@@ -2736,7 +2724,7 @@ block_access:
   | od=open_dot_declaration DOT LPAREN seq_expr RPAREN
       { let exp =
           let loc = $startpos($3), $endpos($5) in
-          mkexp ~loc (Pexp_parens { begin_end = false; exp = $4 })
+          mkexp ~loc (Pexp_parens { begin_end = false; exp = Some $4 })
         in
         Pexp_dot_open(od, exp) }
   | od=open_dot_declaration DOT LBRACELESS object_expr_content GREATERRBRACE
@@ -3694,8 +3682,17 @@ parenthesized_type_parameter:
 ;
 
 type_parameter:
-    type_variance type_variable attributes
-      { let typ = {$2 with ptyp_attributes = $3} in
+    type_variance ty=type_variable attributes
+      { let typ =
+          (* We are "patching" the type to add an attribute, we must also patch
+             the tokens attached to the type to account for the new tokens
+             relative to the attribute. *)
+           let typ_tokens = Tokens.at ($startpos(ty), $endpos) in
+           let ptyp_tokens =
+             Tokens.replace_first_child typ_tokens ~subst:ty.ptyp_tokens
+           in
+           { ty with ptyp_tokens; ptyp_attributes = $3 }
+        in
         let infos = $1 in
         let tokens = Tokens.at $sloc in
         { ptp_typ = typ; ptp_infos = infos; ptp_tokens = tokens } }
@@ -3782,9 +3779,11 @@ str_exception_declaration:
   attrs = post_item_attributes
   { let loc = make_loc $sloc in
     let info = symbol_info $endpos(attrs1) in
-    let rebind_toks = Tokens.at ($startpos(lid), $endpos(attrs1)) in
-    Te.mk_exception ~attrs
-      (Te.rebind id lid ~attrs:attrs1 ~loc ~info ~tokens:rebind_toks)
+    let rebind_loc =($startpos(lid), $endpos(attrs1)) in
+    let rebind_toks = Tokens.at rebind_loc in
+    Te.mk_exception ~attrs ~loc
+      (Te.rebind id lid ~attrs:attrs1 ~loc:(make_loc rebind_loc) ~info
+        ~tokens:rebind_toks)
       ~ext_attrs
       ~tokens:(Tokens.at $sloc)
   }
@@ -3797,12 +3796,13 @@ sig_exception_declaration:
   attrs1 = attributes
   attrs = post_item_attributes
     { let vars, args, res = vars_args_res in
-      let loc = make_loc ($startpos, $endpos(attrs1)) in
+      let decl_loc = ($startpos(id), $endpos(attrs1)) in
       let info = symbol_info $endpos(attrs1) in
-      let decl_toks = Tokens.at ($startpos, $endpos(attrs1)) in
-      Te.mk_exception ~attrs
-        (Te.decl id ~vars ~args ?res ~attrs:attrs1 ~loc ~info
-          ~tokens:decl_toks)
+      let decl_toks = Tokens.at decl_loc in
+      dprintf "exn attrs: %d@." (List.length ext_attrs.pea_attrs);
+      Te.mk_exception ~attrs ~loc:(make_loc $sloc)
+        (Te.decl id ~vars ~args ?res ~attrs:attrs1 ~loc:(make_loc decl_loc)
+          ~info ~tokens:decl_toks)
         ~ext_attrs
         ~tokens:(Tokens.at $sloc)
     }

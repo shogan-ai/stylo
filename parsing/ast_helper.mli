@@ -299,7 +299,7 @@ module Mty:
     val alias: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> module_type
     val signature: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> signature -> module_type
     val functor_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?ret_mode:modes ->
-      functor_parameter -> module_type -> module_type
+      attributes -> functor_parameter list -> module_type -> module_type
     val with_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_type ->
       with_constraint list -> module_type
     val typeof_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_expr -> module_type
@@ -318,7 +318,7 @@ module Mod:
     val structure: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> attrs ->
       structure -> module_expr
     val functor_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
-      functor_parameter -> module_expr -> module_expr
+      attrs -> functor_parameter list -> module_expr -> module_expr
     val apply: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_expr -> module_expr ->
       module_expr
     val apply_unit: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_expr -> module_expr
@@ -462,15 +462,15 @@ module Vb:
 (** Class type expressions *)
 module Cty:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> class_type_desc -> class_type
+    val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> class_type_desc -> class_type
     val attr: class_type -> attribute -> class_type
 
-    val constr: ?loc:loc -> ?attrs:attrs -> lid -> core_type list -> class_type
-    val signature: ?loc:loc -> ?attrs:attrs -> class_signature -> class_type
-    val arrow: ?loc:loc -> ?attrs:attrs -> arg_label -> core_type ->
+    val constr: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> core_type list -> class_type
+    val signature: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> class_signature -> class_type
+    val arrow: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> arg_label -> core_type ->
       class_type -> class_type
-    val extension: ?loc:loc -> ?attrs:attrs -> extension -> class_type
-    val open_: ?loc:loc -> ?attrs:attrs -> open_description -> class_type
+    val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> class_type
+    val open_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> open_description -> class_type
                -> class_type
   end
 

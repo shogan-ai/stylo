@@ -152,6 +152,11 @@ class to_tokens = object
     let node_toks = exn.ptyexn_tokens in
     combine_children ~loc:exn.ptyexn_loc node_toks sub_tokens
 
+  method! visit_class_type env cty =
+    let sub_tokens = super#visit_class_type env cty in
+    let node_toks = cty.pcty_tokens in
+    combine_children ~loc:cty.pcty_loc node_toks sub_tokens
+
   method! visit_class_type_field env ctf =
     let sub_tokens = super#visit_class_type_field env ctf in
     let node_toks = ctf.pctf_tokens in

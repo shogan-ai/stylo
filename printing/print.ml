@@ -161,7 +161,7 @@ let modalities = separate_loc_list (break 1) modality
 let with_modalities ~modalities:l t =
   match l with
   | [] -> t
-  | _ -> t ^/^ S.atat ^/^ modalities l
+  | _ -> t ^?^ S.atat ^/^ modalities l
 
 let mode (Mode s) = string s
 let modes = separate_loc_list (break 1) mode
@@ -174,12 +174,12 @@ let modes_legacy = separate_loc_list (break 1) mode_legacy
 let with_modes ~modes:l t =
   match l with
   | [] -> t
-  | _ -> t ^/^ S.at ^/^ modes l
+  | _ -> t ^?^ S.at ^/^ modes l
 
 let with_atat_modes ~modes:l t =
   match l with
   | [] -> t
-  | _ -> t ^/^ S.atat ^/^ modes l
+  | _ -> t ^?^ S.atat ^/^ modes l
 
 let include_kind = function
   | Structure -> empty
@@ -323,12 +323,7 @@ end = struct
     match ct.ptyp_desc with
     | Ptyp_any None -> S.underscore
     | Ptyp_any Some k -> S.underscore ^/^ S.colon ^/^ Jkind_annotation.pp k
-    | Ptyp_var (s, ko) ->
-      let var = char '\'' ^^ string s in
-      begin match ko with
-        | None -> var
-        | Some k -> var ^/^ S.colon ^/^ Jkind_annotation.pp k
-      end
+    | Ptyp_var (s, ko) -> pp_var s ko
     | Ptyp_arrow { lbl; dom_legacy_modes; dom_type; dom_modes;
                    codom_legacy_modes; codom_type; codom_modes } ->
       let pp_surrounded pre_m post_m ty =
@@ -366,18 +361,24 @@ end = struct
     | Ptyp_variant (fields, cf, lbls) ->
       pp_variant ~tokens:ct.ptyp_tokens fields cf lbls
     | Ptyp_poly (bound_vars, ct) ->
-      let binding = function
-        | var, None -> S.squote ^^ string var.Location.txt
-        | var, Some jkind ->
-          S.lparen ^^ break 0 ^^ S.squote ^^ string var.txt ^^
-          Jkind_annotation.pp jkind ^^ break 0 ^^ S.rparen
+      let pp_bound (var, jkind) =
+        let var_and_kind = pp_var var.Location.txt jkind in
+        match jkind with
+        | None -> var_and_kind
+        | Some _ -> parens var_and_kind
       in
-      separate_map (break 1) binding bound_vars ^^ break 0 ^^ S.dot ^/^ pp ct
+      separate_map (break 1) pp_bound bound_vars ^^ break 0 ^^ S.dot ^/^ pp ct
     | Ptyp_package pkg -> package_type pkg
     | Ptyp_open (lid, ct) -> longident lid.txt ^^ S.dot ^^ pp ct
     | Ptyp_of_kind jkind -> S.type_ ^/^ S.colon ^/^ Jkind_annotation.pp jkind
     | Ptyp_extension ext -> Extension.pp ext
     | Ptyp_parens ct -> parens (pp ct)
+
+  and pp_var var_name jkind =
+    let var = S.squote ^^ string var_name in
+    match jkind with
+    | None -> var
+    | Some k -> var ^/^ S.colon ^/^ Jkind_annotation.pp k
 
   and pp_variant ~tokens fields (cf : Asttypes.closed_flag) lbls =
     let fields =
@@ -719,9 +720,10 @@ end = struct
     | Pexp_index_op access ->
       pp_index_op (nb_semis exp.pexp_tokens)
         access.kind access.seq access.op access.indices access.assign
-    | Pexp_parens { begin_end = false; exp } -> parens (pp exp)
+    | Pexp_parens { begin_end = false; exp = Some exp } -> parens (pp exp)
+    | Pexp_parens { begin_end = false; exp = None } -> assert false
     | Pexp_parens { begin_end = true; exp } ->
-      prefix S.begin_ (pp exp) ^/^ S.end_
+      prefix_nonempty !!S.begin_ (optional pp exp) ^/^ S.end_
     | Pexp_list elts -> pp_list (nb_semis exp.pexp_tokens) elts
     | Pexp_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
     | Pexp_exclave exp -> S.exclave__ ^/^ pp exp
@@ -1020,30 +1022,8 @@ and Function_constraint : sig
   val pp : function_constraint -> document
 end = struct
   let pp fc =
-  (* FIXME:
-  { mode_annotations : modes;
-    (** The mode annotation placed on a function let-binding, e.g.
-       [let local_ f x : int -> int = ...].
-       The [local_] syntax is parsed into two nodes: the field here, and [pvb_modes].
-       This field only affects the interpretation of [ret_type_constraint], while the
-       latter is translated in [typecore] to [Pexp_constraint] to contrain the mode of the
-       function.
-       (* CR zqian: This field is not failthful representation of the user syntax, and
-       complicates [pprintast]. It should be removed and their functionality should be
-       moved to [pvb_modes]. *)
-    *)
-    ret_mode_annotations : modes;
-    (** The mode annotation placed on a function's body, e.g.
-       [let f x : int -> int @@ local = ...].
-       This field constrains the mode of function's body.
-    *)
-    ret_type_constraint : type_constraint option;
-    (** The type constraint placed on a function's body. *)
-  }
-     *)
-  match fc.ret_type_constraint with
-  | None -> empty
-  | Some tc -> Type_constraint.pp tc
+    optional Type_constraint.pp fc.ret_type_constraint
+    |> with_modes ~modes:fc.ret_mode_annotations
 end
 
 and Comprehension : sig
@@ -1378,12 +1358,12 @@ end
 and Class_type : sig
   val pp : class_type -> document
 end = struct
-  let rec pp_desc = function
+  let rec pp_desc tokens = function
     | Pcty_constr (lid, args) ->
       type_app ~parens:false (longident lid.txt) (List.map Core_type.pp args)
     | Pcty_signature cs -> pp_signature cs
     | Pcty_arrow (lbl, arg, rhs) ->
-      Core_type.pp_arrow [(* FIXME *)] lbl (Core_type.pp arg) (pp rhs)
+      Core_type.pp_arrow tokens lbl (Core_type.pp arg) (pp rhs)
     | Pcty_extension ext -> Extension.pp ext
     | Pcty_open (od, ct) ->
       S.let_ ^/^ Open_description.pp od ^/^ S.in_ ^/^ pp ct
@@ -1418,8 +1398,8 @@ end = struct
     | Pctf_attribute attr -> Attribute.pp_floating attr
     | Pctf_extension ext -> Extension.pp ~floating:true ext
 
-  and pp { pcty_desc; pcty_attributes; pcty_loc = _ } =
-    pp_desc pcty_desc
+  and pp { pcty_desc; pcty_attributes; pcty_loc = _; pcty_tokens } =
+    pp_desc pcty_tokens pcty_desc
     |> Attribute.attach ~item:true ~attrs:pcty_attributes
 end
 
@@ -1590,11 +1570,12 @@ end = struct
   let rec pp_desc = function
     | Pmty_ident lid -> longident lid.txt
     | Pmty_signature sg -> Signature.pp sg
-    | Pmty_functor (fp, mty, modes) ->
-      S.functor_ ^/^ Functor_parameter.pp fp ^/^ S.rarrow ^/^
+    | Pmty_functor (attrs, fps, mty, modes) ->
+      Attribute.attach ~attrs S.functor_ ^/^
+      separate_map (break 1) Functor_parameter.pp fps ^/^ S.rarrow ^/^
       with_modes ~modes (pp mty)
-    | Pmty_functor_type (fp, mty, modes) ->
-      Functor_parameter.pp_type fp ^/^ S.rarrow ^/^
+    | Pmty_functor_type (fps, mty, modes) ->
+      separate_map (break 1) Functor_parameter.pp_type fps ^/^ S.rarrow ^/^
       with_modes ~modes (pp mty)
     | Pmty_with (mty, cstrs) ->
       pp mty ^^
@@ -1634,8 +1615,10 @@ end = struct
   let pp_type = function
     | Unit -> parens empty
     | Named (lbl, mty, modes) ->
-      assert (lbl.txt = None);
-      with_modes (Module_type.pp mty) ~modes
+      let mty_modes = with_modes (Module_type.pp mty) ~modes in
+      match lbl.txt with
+      | None -> mty_modes
+      | Some s -> parens (string s ^/^ S.colon ^/^ mty_modes)
 
   let pp = function
     | Unit -> empty
@@ -1687,37 +1670,55 @@ end = struct
       before ^^ hardline ^^ hardline ^^ after
 
   (* We keep the list of items in sync with the list of "tokens" of the
-     structure (each [Child_node] is a structure item).
-     That tells us where to insert [;;]. *)
-  let rec pp_keeping_semi doc = function
-    | [], [] -> doc
-    | item :: items, Tokens.{ desc = Child_node; _ } :: tokens ->
-      pp_keeping_semi (doc ^//^ pp_item item) (items, tokens)
-    | _::_, [] -> assert false
-    | items, tok :: tokens ->
-      match tok.desc with
-      | Child_node -> assert false
-      | Token SEMISEMI ->
-        pp_keeping_semi (doc ^?^ S.semisemi) (items, tokens)
-      | Comment _
-      | Token EOF ->
-        pp_keeping_semi doc (items, tokens)
-      | Token _ -> assert false
+     signature (each [Child_node] is a signature item).
+     That tells us where to insert [;;].
 
-  let pp { psg_modalities ; psg_items ; psg_tokens; psg_loc = _ } =
-    group (
-      prefix (with_modalities S.sig_ ~modalities:psg_modalities)
-        (pp_keeping_semi empty (psg_items, psg_tokens)) ^/^
-      S.end_
-    )
+     N.B. as modalities are not marked as "child", we need to remove the prefix
+     of the tokens as they correspond to the modalities tokens
+  *)
+  let pp_keeping_semi doc
+        { psg_modalities = _; psg_items; psg_tokens; psg_loc = _ } =
+    let rec aux doc = function
+      | [], [] -> doc
+      | item :: items, Tokens.{ desc = Child_node; _ } :: tokens ->
+        aux (doc ^//^ pp_item item) (items, tokens)
+      | _::_, [] -> assert false
+      | items, tok :: tokens ->
+        match tok.desc with
+        | Child_node -> assert false
+        | Token SEMISEMI ->
+          aux (doc ^?^ S.semisemi) (items, tokens)
+        | Comment _
+        | Token EOF ->
+          aux doc (items, tokens)
+        | Token _ -> assert false
+    in
+    let items_tokens =
+      List.drop_while (fun tok ->
+        match tok.Tokens.desc with
+        | Token (ATAT | LIDENT _) -> (* modality tokens *) true
+        | Comment _ ->
+          (* comments might appear before / inside the modalities *)
+          true
+        | _ -> false
+      ) psg_tokens
+    in
+    aux doc (psg_items, items_tokens)
 
-  let pp_parts { psg_modalities ; psg_items ; psg_tokens; psg_loc = _ } =
-    with_modalities S.sig_ ~modalities:psg_modalities,
-    pp_keeping_semi empty (psg_items, psg_tokens),
+
+  let pp_parts sg =
+    with_modalities S.sig_ ~modalities:sg.psg_modalities,
+    pp_keeping_semi empty sg,
     S.end_
 
+  let pp sg =
+    let sig_with_mods, items, end_ = pp_parts sg in
+    group (prefix sig_with_mods items ^/^ end_)
+
+
   let pp_interface sg =
-    group (pp_keeping_semi empty (sg.psg_items, sg.psg_tokens))
+    with_modalities empty ~modalities:sg.psg_modalities ^?^
+    group (pp_keeping_semi empty sg)
 end
 
 and Module_declaration : sig
@@ -1901,8 +1902,9 @@ end = struct
   let rec pp_desc = function
     | Pmod_ident lid -> longident lid.txt
     | Pmod_structure (attrs, str) -> Structure.pp ~attrs str
-    | Pmod_functor (fp, me) ->
-      S.functor_ ^/^ Functor_parameter.pp fp ^/^ S.rarrow ^/^ pp me
+    | Pmod_functor (attrs, fps, me) ->
+      Attribute.attach ~attrs S.functor_ ^/^
+      separate_map (break 1) Functor_parameter.pp fps ^/^ S.rarrow ^/^ pp me
     | Pmod_apply (m1, m2) -> pp m1 ^^ pp m2
     | Pmod_apply_unit me -> pp me ^^ S.lparen ^^ S.rparen
     | Pmod_constraint (me, None, modes) ->

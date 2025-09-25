@@ -602,7 +602,7 @@ and expression_desc =
       indices: expression list;
       assign: expression option
     }
-  | Pexp_parens of { begin_end: bool; exp: expression }
+  | Pexp_parens of { begin_end: bool; exp: expression option }
   | Pexp_list of expression list
   | Pexp_cons of expression * expression
   | Pexp_exclave of expression
@@ -725,18 +725,7 @@ and type_constraint =
 (** See the comment on {{!expression_desc.Pexp_function}[Pexp_function]}. *)
 
 and function_constraint =
-  { mode_annotations : modes;
-    (** The mode annotation placed on a function let-binding, e.g.
-       [let local_ f x : int -> int = ...].
-       The [local_] syntax is parsed into two nodes: the field here, and [pvb_modes].
-       This field only affects the interpretation of [ret_type_constraint], while the
-       latter is translated in [typecore] to [Pexp_constraint] to contrain the mode of the
-       function.
-       (* CR zqian: This field is not failthful representation of the user syntax, and
-       complicates [pprintast]. It should be removed and their functionality should be
-       moved to [pvb_modes]. *)
-    *)
-    ret_mode_annotations : modes;
+  { ret_mode_annotations : modes;
     (** The mode annotation placed on a function's body, e.g.
        [let f x : int -> int @@ local = ...].
        This field constrains the mode of function's body.
@@ -1018,6 +1007,7 @@ and class_type =
      pcty_desc: class_type_desc;
      pcty_loc: location;
      pcty_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
+     pcty_tokens: tokens;
     }
 
 and class_type_desc =
@@ -1231,9 +1221,9 @@ and module_type =
 and module_type_desc =
   | Pmty_ident of longident loc  (** [Pmty_ident(S)] represents [S] *)
   | Pmty_signature of signature  (** [sig ... end] *)
-  | Pmty_functor of functor_parameter * module_type * modes
+  | Pmty_functor of attributes * functor_parameter list * module_type * modes
       (** [functor(X : MT1 @@ modes) -> MT2 @ modes] *)
-  | Pmty_functor_type of functor_parameter * module_type * modes
+  | Pmty_functor_type of functor_parameter list * module_type * modes
   | Pmty_with of module_type * with_constraint list  (** [MT with ...] *)
   | Pmty_typeof of module_expr  (** [module type of ME] *)
   | Pmty_extension of extension  (** [[%id]] *)
@@ -1418,8 +1408,8 @@ and module_expr =
 and module_expr_desc =
   | Pmod_ident of longident loc  (** [X] *)
   | Pmod_structure of attributes * structure  (** [struct[@attrs] ... end] *)
-  | Pmod_functor of functor_parameter * module_expr
-      (** [functor(X : MT1) -> ME] *)
+  | Pmod_functor of attributes * functor_parameter list * module_expr
+    (** [functor [@attr] (X : MT1) (X2 : MT2) -> ME] *)
   | Pmod_apply of module_expr * module_expr  (** [ME1(ME2)] *)
   | Pmod_apply_unit of module_expr (** [ME1()] *)
   | Pmod_constraint of module_expr * module_type option * modes
