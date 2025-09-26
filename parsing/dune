@@ -10,6 +10,14 @@
   (merge_into parser)
   (flags :standard --table --inspection --external-tokens Parser_tokens --cmly))
 
+(rule
+  (target raw_grammar)
+  (deps parser.mly parser_tokens.mly)
+  (action
+    (with-stdout-to %{target}
+     (run menhir --external-tokens Parser_tokens --only-preprocess-u
+          --base parser %{deps}))))
+
 (library
   (name ocaml_syntax)
   (modules_without_implementation asttypes)
