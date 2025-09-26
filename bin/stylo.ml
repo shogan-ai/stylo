@@ -99,7 +99,9 @@ let fuzzer_batch fn =
             |> fun () -> Buffer.contents styled
           in
           match Ast_checker.check_same_ast ~impl:(not intf) src styled with
-          | false -> has_errors := true
+          | false ->
+            Format.eprintf "%s, line %d: ast changed@." fn i;
+            has_errors := true
           | true
           | exception _ (* FIXME: shouldn't user compiler-libs parser.. *)
             ->
