@@ -361,7 +361,7 @@ let extra_def p1 p2 items =
 
 let extra_rhs_core_type ct ~pos =
   let docs = rhs_info pos in
-  { ct with ptyp_attributes = add_info_attrs docs ct.ptyp_attributes }
+  Typ.info ct docs
 
 let mklb first ~loc body ext_attrs attrs =
   { lb_ext_attrs = ext_attrs;
@@ -1245,8 +1245,11 @@ structure:
   { let str = $1 in
     let start =
       match str with
-      | [] -> $startpos
-      | x :: _ -> x.pstr_loc.loc_start
+      | [] -> $symbolstartpos
+      | x :: _ ->
+          (* We need the min because there might be ;; before the first element
+             loc... *)
+          min $symbolstartpos x.pstr_loc.loc_start
     in
     str, Tokens.at (start, $endpos) }
 ;
@@ -1625,7 +1628,7 @@ signature_item:
 %inline module_declaration:
   MODULE
   ext_attrs = ext_attributes
-  name_ = module_name_modal(atat_modalities_expr)
+  name = module_name_modal(atat_modalities_expr)
   body = module_declaration_body(
     module_type optional_atat_modalities_expr { ($1, $2) }
   )
@@ -1633,10 +1636,12 @@ signature_item:
   {
     let loc = make_loc $sloc in
     let docs = symbol_docs $sloc in
-    let name, modalities' = name_ in
-    let mty, modalities = body in
-    let modalities = modalities' @ modalities in
-    Md.mk name mty ~attrs ~loc ~docs ~modalities ~ext_attrs
+    let body =
+      match body with
+      | `Noparams (mty, modalities) -> Without_params (mty, modalities)
+      | `Params (args, mty, modes) -> With_params (args, mty, modes)
+    in
+    Md.mk name body ~attrs ~loc ~docs ~ext_attrs
       ~tokens:(Tokens.at $sloc)
   }
 ;
@@ -1644,32 +1649,29 @@ signature_item:
 (* The body (right-hand side) of a module declaration. *)
 module_declaration_body(module_type_with_optional_modal_expr):
     COLON mty_mm = module_type_with_optional_modal_expr
-      { mty_mm }
+      { `Noparams mty_mm }
   | EQUAL error
       { expecting $loc($1) ":" }
-  | mkmty(
-      arg = functor_arg body = module_declaration_body(module_type_with_optional_modes)
-        { let (ret, mret) = body in
-        Pmty_functor([], [arg], ret, mret) }
-    )
-    { $1, [] }
+  | arg = functor_arg body = module_declaration_body(module_type_with_optional_modes)
+      { match body with
+        | `Noparams (mty, modes) -> `Params ([arg], mty, modes)
+        | `Params (args, mty, modes) -> `Params (arg :: args, mty, modes) }
 ;
 
 (* A module alias declaration (in a signature). *)
 %inline module_alias:
   MODULE
   ext_attrs = ext_attributes
-  name_ = module_name_modal(atat_modalities_expr)
+  name = module_name_modal(atat_modalities_expr)
   EQUAL
-  body = module_expr_alias
+  alias = module_expr_alias
   modalities = optional_atat_modalities_expr
   attrs = post_item_attributes
   {
     let loc = make_loc $sloc in
     let docs = symbol_docs $sloc in
-    let name, modalities' = name_ in
-    let modalities = modalities' @ modalities in
-    Md.mk name body ~attrs ~modalities ~loc ~docs ~ext_attrs
+    let body = Without_params (alias, modalities) in
+    Md.mk name body ~attrs ~loc ~docs ~ext_attrs
       ~tokens:(Tokens.at $sloc)
   }
 ;
@@ -1712,7 +1714,8 @@ module_subst:
   {
     let loc = make_loc $sloc in
     let docs = symbol_docs $sloc in
-    Md.mk ~ext_attrs name mty ~attrs ~loc ~docs ~modalities
+    let body = Without_params (mty, modalities) in
+    Md.mk ~ext_attrs (name, []) body ~attrs ~loc ~docs
       ~tokens:(Tokens.at $sloc)
   }
 ;
@@ -1728,7 +1731,8 @@ module_subst:
     let docs = symbol_docs $sloc in
     let loc = make_loc $sloc in
     let text = symbol_text $symbolstartpos in
-    Md.mk ~ext_attrs name mty ~attrs ~loc ~text ~docs ~modalities
+    let body = Without_params (mty, modalities) in
+    Md.mk ~ext_attrs (name, []) body ~attrs ~loc ~text ~docs
       ~tokens:(Tokens.at $sloc)
   }
 ;
@@ -3830,9 +3834,8 @@ generalized_constructor_arguments:
 ;
 
 %inline constructor_argument:
-  gbl=global_flag cty=atomic_type m1=optional_atat_modalities_expr {
-    let modalities = gbl @ m1 in
-    Type.constructor_arg cty ~modalities ~loc:(make_loc $sloc)
+  gbl=global_flag cty=atomic_type modalities=optional_atat_modalities_expr {
+    Type.constructor_arg cty ~global:gbl ~modalities ~loc:(make_loc $sloc)
   }
 ;
 
@@ -4823,8 +4826,8 @@ mutable_or_global_flag:
     { Immutable, [ mkloc (Modality "global") (make_loc $sloc)] }
 ;
 %inline global_flag:
-           { [] }
-  | GLOBAL { [ mkloc (Modality "global") (make_loc $sloc)] }
+           { false }
+  | GLOBAL { true }
 ;
 virtual_flag:
     /* empty */                                 { Concrete }

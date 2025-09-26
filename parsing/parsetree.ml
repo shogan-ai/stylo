@@ -162,6 +162,7 @@ and core_type =
      ptyp_desc: core_type_desc;
      ptyp_loc: location;
      ptyp_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
+     ptyp_doc: attribute option; (* can only be set on lhs of an arrow *)
      ptyp_tokens: tokens;
     }
 
@@ -912,8 +913,9 @@ and constructor_declaration =
 
 and constructor_argument =
   {
-    pca_modalities: modalities;
+    pca_global: bool;
     pca_type: core_type;
+    pca_modalities: modalities;
     pca_loc: location;
   }
 
@@ -1284,14 +1286,17 @@ and signature_item_desc =
   | Psig_kind_abbrev of string loc * jkind_annotation
       (** [kind_abbrev_ name = k] *)
 
+and module_declaration_body =
+  | With_params of functor_parameter list * module_type * modes
+  | Without_params of module_type * modalities
+
 and module_declaration =
     {
      pmd_pre_text: attributes;
      pmd_pre_doc: attribute option;
      pmd_ext_attrs: ext_attribute;
-     pmd_name: string option loc;
-     pmd_type: module_type;
-     pmd_modalities: modalities;
+     pmd_name: string option loc * modalities;
+     pmd_body: module_declaration_body;
      pmd_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
      pmd_post_doc: attribute option;
      pmd_loc: location;

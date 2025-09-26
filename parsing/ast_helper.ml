@@ -100,6 +100,7 @@ module Typ = struct
     {ptyp_desc = d;
      ptyp_loc = loc;
      ptyp_attributes = attrs;
+     ptyp_doc = None;
      ptyp_tokens = tokens;}
 
   let attr d a = {d with ptyp_attributes = d.ptyp_attributes @ [a]}
@@ -121,6 +122,10 @@ module Typ = struct
     mk ?loc ?attrs ~tokens (Ptyp_package pkg)
   let extension ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ptyp_extension a)
   let open_ ?loc ?attrs ~tokens mod_ident t = mk ?loc ?attrs ~tokens (Ptyp_open (mod_ident, t))
+
+  let info ct info =
+    let doc, info_tokens = Tokens_and_doc.info info in
+    { ct with ptyp_doc = doc; ptyp_tokens = ct.ptyp_tokens @ info_tokens }
 
   let varify_constructors var_names t =
     let check_variable vl _loc v =
@@ -576,7 +581,7 @@ end
 
 module Md = struct
   let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
-        ~tokens ?(docs = empty_docs) ?(text = []) ?(modalities=[]) name typ =
+        ~tokens ?(docs = empty_docs) ?(text = []) name body =
     let pre_doc, post_doc, tokens =
       Tokens_and_doc.process ~text docs tokens
     in
@@ -585,8 +590,7 @@ module Md = struct
      pmd_pre_doc = pre_doc;
      pmd_ext_attrs = ext_attrs;
      pmd_name = name;
-     pmd_type = typ;
-     pmd_modalities = modalities;
+     pmd_body = body;
      pmd_attributes = attrs;
      pmd_post_doc = post_doc;
      pmd_loc = loc;
@@ -781,8 +785,9 @@ module Type = struct
      pcd_tokens = tokens @ info_tokens;
     }
 
-  let constructor_arg ?(loc = !default_loc) ?(modalities = []) typ =
+  let constructor_arg ?(loc = !default_loc) ~global ?(modalities = []) typ =
     {
+      pca_global = global;
       pca_modalities = modalities;
       pca_type = typ;
       pca_loc = loc;

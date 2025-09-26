@@ -97,6 +97,8 @@ module Typ :
     val open_ : ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> core_type -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> core_type
 
+    val info : core_type -> docstring option -> core_type
+
     val varify_constructors: str list -> core_type -> core_type
     (** [varify_constructors newtypes te] is type expression [te], of which
         any of nullary type constructor [tc] is replaced by type variable of
@@ -254,7 +256,7 @@ module Type:
       str_or_op ->
       constructor_declaration
 
-    val constructor_arg: ?loc:loc -> ?modalities:modality with_loc list -> core_type ->
+    val constructor_arg: ?loc:loc -> global:bool -> ?modalities:modality with_loc list -> core_type ->
       constructor_argument
 
     val field: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?info:info ->
@@ -401,8 +403,8 @@ module Str:
 module Md:
   sig
     val mk: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
-      tokens:Tokens.seq -> ?docs:docs -> ?text:text -> ?modalities:modalities ->
-      str_opt -> module_type -> module_declaration
+      tokens:Tokens.seq -> ?docs:docs -> ?text:text ->
+      str_opt * modalities -> module_declaration_body -> module_declaration
   end
 
 (** Module substitutions *)

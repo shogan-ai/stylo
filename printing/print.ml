@@ -22,22 +22,25 @@ let nb_semis =
     if tok.Tokens.desc = Token SEMI then nb + 1 else nb
   ) 0
 
-let rec starts_with_pipe = function
-  | Tokens.{ desc = Token BAR; _ } :: _ -> true
-  | Tokens.{ desc = Comment _; _ } :: rest -> starts_with_pipe rest
+let rec starts_with tok = function
+  | Tokens.{ desc = Token t; _ } :: _ -> t = tok
+  | Tokens.{ desc = Comment _; _ } :: rest -> starts_with tok rest
   | _ -> false
+
+let rec has_leading tok ~after:after_kw = function
+  | [] -> false
+  | Tokens.{ desc = Token t; _ } :: rest when t = after_kw ->
+    starts_with tok rest
+  | _ :: rest -> has_leading tok ~after:after_kw rest
+
+let starts_with_pipe = starts_with BAR
+let has_leading_pipe ~after = has_leading BAR ~after
 
 let rec pipe_before_child = function
   | []
   | Tokens.{ desc = Child_node; _ } :: _ -> false
   | Tokens.{ desc = Token BAR; _ } :: _ -> true
   | _ :: rest -> pipe_before_child rest
-
-let rec has_leading_pipe ~after:after_kw = function
-  | [] -> assert false
-  | Tokens.{ desc = Token tok; _ } :: rest when tok = after_kw ->
-    starts_with_pipe rest
-  | _ :: rest -> has_leading_pipe ~after:after_kw rest
 
 type 'a loc = 'a Location.loc = { txt: 'a; loc: Location.t }
 let stringf fmt = Printf.ksprintf string fmt
@@ -120,7 +123,7 @@ let array_delimiters = function
   | Asttypes.Immutable -> S.lbracket_colon, S.colon_rbracket
   | Mutable -> S.lbracket_pipe, S.pipe_rbracket
 
-let type_app ?(parens=true) ty args =
+let type_app ?(omit_delims_if_possible=false) ?(parens=true) ty args =
   let left, right =
     if parens then
       S.lparen, S.rparen
@@ -129,7 +132,7 @@ let type_app ?(parens=true) ty args =
   in
   begin match args with
     | [] -> empty
-    | [ x ] when parens -> x
+    | [ x ] when omit_delims_if_possible -> x
     | _ -> left ^^ separate (S.comma ^^ break 1) args ^^ right
   end ^?^ ty
 
@@ -190,6 +193,8 @@ module rec Attribute : sig
   val pp_floating : attribute -> document
   val pp_list : ?item:bool -> attributes -> document
 
+  val pp_attr_name : string list loc -> document
+
   val attach
     :  ?item:bool
     -> ?text:attributes
@@ -209,12 +214,19 @@ end = struct
       docstring s
     | _ -> assert false
 
+  let pp_attr_name ids =
+    let pp_one = function
+      | "let" -> S.let_
+      | s -> string s
+    in
+    separate_map S.dot pp_one ids.txt
+
   let pp ?(item=false)
       { attr_name; attr_payload; attr_loc = _; attr_tokens = _ } =
     match attr_name.txt with
     | ["ocaml"; ("doc"|"text")]  (* FIXME *) -> pp_doc attr_payload
-    | attr_names ->
-      let attr_name = separate_map S.dot string attr_names in
+    | _ ->
+      let attr_name = pp_attr_name attr_name in
       (if item then S.lbracket_atat else S.lbracket_at)
       ^^  attr_name ^^ Payload.pp attr_payload
       ^^ S.rbracket
@@ -222,8 +234,8 @@ end = struct
   let pp_floating { attr_name; attr_payload; attr_loc = _; attr_tokens = _ } =
     match attr_name.txt with
     | ["ocaml"; ("doc"|"text")]  (* FIXME *) -> pp_doc attr_payload
-    | attr_names ->
-      let attr_name = separate_map S.dot string attr_names in
+    | _ ->
+      let attr_name = pp_attr_name attr_name in
       S.lbracket_atatat
       ^^ attr_name ^^ Payload.pp attr_payload
       ^^ S.rbracket
@@ -260,7 +272,7 @@ and Extension : sig
   val pp : ?floating:bool -> extension -> document
 end = struct
   let pp_classic ~floating names payload =
-    let name = separate_map S.dot string names.txt in
+    let name = Attribute.pp_attr_name names in
     (if floating then S.lbracket_percentpercent else S.lbracket_percent)
     ^^ name ^^ Payload.pp payload ^^ S.rbracket
 
@@ -283,7 +295,7 @@ end = struct
   let pp = function
     | PString _ -> assert false (* handled in Extension *)
     | PStr s -> break 1 ^^ Structure.pp_implementation s
-    | PSig s -> break 0 ^^ S.colon ^/^ Signature.pp s
+    | PSig s -> break 0 ^^ S.colon ^/^ Signature.pp_interface s
     | PTyp c -> break 0 ^^ S.colon ^/^ Core_type.pp c
     | PPat (p, eo) ->
       break 0 ^^ S.qmark ^/^ Pattern.pp p
@@ -315,12 +327,11 @@ end = struct
     end ^^
     arg ^/^ S.rarrow ^/^ rhs
 
-  let rec pp ct =
-    group (pp_desc ct)
-    |> Attribute.attach ~attrs:ct.ptyp_attributes
+  let rec pp { ptyp_desc; ptyp_attributes; ptyp_doc; ptyp_tokens; ptyp_loc=_} =
+    group (pp_desc ptyp_tokens ptyp_desc)
+    |> Attribute.attach ~attrs:ptyp_attributes ?post_doc:ptyp_doc
 
-  and pp_desc ct =
-    match ct.ptyp_desc with
+  and pp_desc tokens = function
     | Ptyp_any None -> S.underscore
     | Ptyp_any Some k -> S.underscore ^/^ S.colon ^/^ Jkind_annotation.pp k
     | Ptyp_var (s, ko) -> pp_var s ko
@@ -330,13 +341,14 @@ end = struct
         modes_legacy pre_m ^?^ pp ty
         |> with_modes ~modes:post_m
       in
-      pp_arrow ct.ptyp_tokens lbl
+      pp_arrow tokens lbl
         (pp_surrounded dom_legacy_modes dom_modes dom_type)
         (pp_surrounded codom_legacy_modes codom_modes codom_type)
     | Ptyp_tuple elts -> pp_tuple elts
     | Ptyp_unboxed_tuple elts -> S.hash_lparen ^^ pp_tuple elts ^^ S.rparen
     | Ptyp_constr (args, lid) ->
-      type_app (longident lid.txt) (List.map pp args)
+      let omit_delims_if_possible = not (starts_with LPAREN tokens) in
+      type_app ~omit_delims_if_possible (longident lid.txt) (List.map pp args)
     | Ptyp_object (fields, closed) ->
       let field_doc = separate_map (S.semi ^^ break 1) object_field fields in
       S.lt ^/^
@@ -359,7 +371,7 @@ end = struct
         | Some s -> S.squote ^^ string s.txt
       ) ^^ S.colon ^^ Jkind_annotation.pp jkind ^^ break 0 ^^ S.rparen
     | Ptyp_variant (fields, cf, lbls) ->
-      pp_variant ~tokens:ct.ptyp_tokens fields cf lbls
+      pp_variant ~tokens fields cf lbls
     | Ptyp_poly (bound_vars, ct) ->
       let pp_bound (var, jkind) =
         let var_and_kind = pp_var var.Location.txt jkind in
@@ -391,9 +403,27 @@ end = struct
     | Closed, Some [] -> S.lbracket_lt ^/^ fields ^/^ S.rbracket
     | Closed, Some labels ->
       S.lbracket_lt ^/^ fields ^/^
-      S.gt ^/^ separate_map (break 1) string labels ^/^
+      S.gt ^/^ separate_map (break 1) pp_poly_tag labels ^/^
       S.rbracket
     | Open, Some _ -> assert false
+
+  and row_field rf =
+    group (
+      row_field_desc rf.prf_desc
+      |> Attribute.attach ~attrs:rf.prf_attributes
+    )
+
+  and row_field_desc = function
+    | Rinherit ct -> pp ct
+    | Rtag (label, _, []) -> pp_poly_tag label.txt
+    | Rtag (label, has_const, at_types) ->
+      prefix (group (pp_poly_tag label.txt ^/^ S.of_)) (
+        (if has_const then S.ampersand ^^ break 1 else empty) ^^
+        separate_map (break 1 ^^ S.ampersand ^^ break 1) pp at_types
+      )
+
+  and pp_poly_tag lbl = S.bquote ^^ string lbl
+
 
   and pp_tuple elts =
     let pp_elt (lbl_opt, ct) =
@@ -419,17 +449,6 @@ end = struct
       | Some ea -> Ext_attribute.decorate S.module_ ea
     in
     S.lparen ^^ module_ ^/^ longident lid.txt ^^ with_ ^^ break 0 ^^ S.rparen
-
-  and row_field rf =
-    Attribute.attach ~attrs:rf.prf_attributes (row_field_desc rf.prf_desc)
-
-  and row_field_desc = function
-    | Rinherit ct -> pp ct
-    | Rtag (label, _, []) -> S.bquote ^^ string label.txt
-    | Rtag (label, has_const, at_types) ->
-      S.bquote ^^ string label.txt ^/^ S.of_ ^/^
-      (if has_const then S.ampersand ^^ break 1 else empty) ^^
-      separate_map (break 1 ^^ S.ampersand ^^ break 1) pp at_types
 
   and object_field of_ =
     Attribute.attach ~attrs:of_.pof_attributes (object_field_desc of_.pof_desc)
@@ -460,7 +479,7 @@ end = struct
     | Ppat_tuple (elts, closed) -> pp_tuple closed elts
     | Ppat_unboxed_tuple (elts, cf) ->
       S.hash_lparen ^^ nest 1 (pp_tuple cf elts) ^^ S.rparen
-    | Ppat_construct (lid, arg) -> pp_construct lid arg
+    | Ppat_construct (lid, arg) -> pp_construct p.ppat_tokens lid arg
     | Ppat_variant (lbl, None) -> S.bquote ^^ string lbl
     | Ppat_variant (lbl, Some p) -> S.bquote ^^ string lbl ^/^ pp p
     | Ppat_record (fields, cf) -> pp_record (nb_semis p.ppat_tokens) cf fields
@@ -521,17 +540,30 @@ end = struct
       | Open -> break 0 ^^ S.comma ^^ break 1 ^^ S.dotdot
     end
 
-  and pp_construct name arg_opt =
+  and pp_construct tokens name arg_opt =
     let name = constr_longident name.txt in
+    let pp_annotated_newtype nt jkind =
+      string nt.txt ^/^ S.colon ^/^ Jkind_annotation.pp jkind
+    in
     match arg_opt with
     | None -> name
     | Some ([], arg_pat) -> prefix name (pp arg_pat)
+    | Some ([newtype, Some jkind], arg_pat)
+      when not (has_leading LPAREN ~after:TYPE tokens) ->
+      (* We could decide to "normalize" this case.
+         Here we are careful because we don't want to trigger if the user wrote
+         {[
+           Constr (type (a : jk)) arg
+         ]} *)
+      prefix name (
+        parens (S.type_ ^/^ pp_annotated_newtype newtype jkind) ^/^
+        pp arg_pat
+      )
     | Some (bindings, arg_pat) ->
       let binding (newtype, jkind) =
         match jkind with
         | None -> string newtype.txt
-        | Some jkind ->
-          parens (string newtype.txt ^/^ S.colon ^/^ Jkind_annotation.pp jkind)
+        | Some jkind -> parens (pp_annotated_newtype newtype jkind)
       in
       prefix name (
         parens (S.type_ ^/^ flow_map (break 1) binding bindings) ^/^
@@ -1125,12 +1157,10 @@ and Constructor_argument : sig
 
   val pp_args : constructor_arguments -> document
 end = struct
-  let pp { pca_modalities; pca_type; pca_loc = _ } =
-    Core_type.pp pca_type ^^
-    begin match pca_modalities with
-      | [] -> empty
-      | ms -> break 1 ^^ S.atat ^/^ modalities ms
-    end
+  let pp { pca_global; pca_modalities; pca_type; pca_loc = _ } =
+    (if pca_global then S.global__ else empty) ^?^
+    Core_type.pp pca_type
+    |> with_modalities ~modalities:pca_modalities
 
   let pp_args = function
     | Pcstr_tuple args ->
@@ -1249,10 +1279,10 @@ end = struct
     | Some ct, Ptype_abstract ->
       eq ^?^ private_ td.ptype_private ^?^ Core_type.pp ct
     | Some ct, kind ->
-      S.equals ^/^ Core_type.pp ct ^/^
+      eq ^/^ Core_type.pp ct ^/^
       S.equals ^?^ private_ td.ptype_private ^?^ type_kind kind
     | None, kind ->
-      S.equals ^?^ private_ td.ptype_private ^?^ type_kind kind
+      eq ^?^ private_ td.ptype_private ^?^ type_kind kind
     end ^?^ pp_constraints td.ptype_cstrs
 
   let pp ~start ?subst td =
@@ -1265,7 +1295,10 @@ end = struct
     in
     prefix_nonempty (
       prefix start (
-        type_app (string td.ptype_name.txt)
+        let omit_delims_if_possible =
+          not (has_leading LPAREN ~after:TYPE td.ptype_tokens)
+        in
+        type_app ~omit_delims_if_possible (string td.ptype_name.txt)
           (List.map Type_param.pp td.ptype_params)
         ^?^
         match td.ptype_jkind_annotation with
@@ -1292,10 +1325,13 @@ and Type_extension : sig
 end = struct
   let pp { ptyext_path; ptyext_params; ptyext_constructors; ptyext_private;
            ptyext_attributes; ptyext_ext_attrs; ptyext_pre_doc; ptyext_post_doc;
-           ptyext_loc = _ ; ptyext_tokens = _ }=
+           ptyext_loc = _ ; ptyext_tokens }=
+    let omit_delims_if_possible =
+      not (has_leading LPAREN ~after:TYPE ptyext_tokens)
+    in
     Ext_attribute.decorate S.type_ ptyext_ext_attrs ^/^
-    type_app (longident ptyext_path.txt) (List.map Type_param.pp ptyext_params)
-    ^/^
+    type_app ~omit_delims_if_possible
+      (longident ptyext_path.txt) (List.map Type_param.pp ptyext_params) ^/^
     S.plus_equals ^/^
     private_ ptyext_private ^?^
     separate_map (break 1)
@@ -1331,7 +1367,7 @@ end = struct
           break 1 ^^ S.colon ^/^ vars ^^
           Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct
       end
-    | Pext_rebind lid -> S.equals ^/^ longident lid.txt
+    | Pext_rebind lid -> S.equals ^/^ constr_longident lid.txt
 
   let pp { pext_name; pext_kind; pext_attributes; pext_doc;
            pext_loc = _; pext_tokens } =
@@ -1726,7 +1762,12 @@ and Module_declaration : sig
 
   val pp_recmods : module_declaration list -> document
 end = struct
-  let pp keywords { pmd_name; pmd_type; pmd_modalities; pmd_attributes;
+  let equal_sign mty =
+    match mty.pmty_desc with
+    | Pmty_alias _ -> S.equals
+    | _ -> S.colon
+
+  let pp keywords { pmd_name = (name, modalities); pmd_body; pmd_attributes;
                     pmd_ext_attrs; pmd_pre_text; pmd_pre_doc; pmd_post_doc;
                     pmd_loc = _; pmd_tokens = _ } =
     let keywords =
@@ -1734,21 +1775,39 @@ end = struct
         :: List.tl keywords
     in
     let binding =
-      begin match pmd_name.txt with
-      | None -> S.underscore
-      | Some s -> string s
-      end ^?^
-      (* FIXME: pass as ~constraint_ ? *)
-      match pmd_modalities with
-      | [] -> empty
-      | l -> S.at ^/^ modalities l
+      let name =
+        match name.txt with
+        | None -> S.underscore
+        | Some s -> string s
+      in
+      match modalities with
+      | [] -> name
+      | _ -> parens (with_modalities name ~modalities)
+    in
+    let params, equal_sign, rhs =
+      match pmd_body with
+      | With_params (params, mty, modes) ->
+        let rhs =
+          Module_type.as_rhs mty
+          |> Generic_binding.map_rhs_end (with_modes ~modes)
+        in
+        List.map Functor_parameter.pp params,
+        S.colon,
+        rhs
+      | Without_params (mty, modalities) ->
+        let rhs =
+          Module_type.as_rhs mty
+          |> Generic_binding.map_rhs_end (with_modalities ~modalities)
+        in
+        [], equal_sign mty, rhs
     in
     Generic_binding.pp ~item:true
       ~pre_text:pmd_pre_text ?pre_doc:pmd_pre_doc
       ~keyword:(separate (break 1) keywords)
       binding
-      ~equal_sign:S.colon
-      ~rhs:(Generic_binding.Single_part (Module_type.pp pmd_type))
+      ~params
+      ~equal_sign
+      ~rhs
       ~attrs:pmd_attributes
       ?post_doc:pmd_post_doc
 
@@ -1782,13 +1841,12 @@ end = struct
   let pp ?(subst=false)
       { pmtd_name; pmtd_type; pmtd_attributes; pmtd_ext_attrs; pmtd_pre_doc;
         pmtd_post_doc; pmtd_loc = _; pmtd_tokens = _ } =
-    let mk_rhs mty = Generic_binding.Single_part (Module_type.pp mty) in
     Generic_binding.pp ~item:true
       ?pre_doc:pmtd_pre_doc
       ~keyword:(Ext_attribute.decorate S.module_ pmtd_ext_attrs ^/^ S.type_)
       (string pmtd_name.txt)
       ~equal_sign:(if subst then S.colon_equals else S.equals)
-      ?rhs:(Option.map mk_rhs pmtd_type)
+      ?rhs:(Option.map Module_type.as_rhs pmtd_type)
       ~attrs:pmtd_attributes
       ?post_doc:pmtd_post_doc
 end
@@ -2027,10 +2085,10 @@ end = struct
         | [] -> empty
         | vars ->
           let pp_var (name, jkind) =
-            string name.txt ^^
             match jkind with
-            | None -> empty
-            | Some j -> break 1 ^^ Jkind_annotation.pp j
+            | None -> string name.txt
+            | Some j ->
+              parens (string name.txt ^/^ S.colon ^/^ Jkind_annotation.pp j)
           in
           S.type_ ^/^
           separate_map (break 1) pp_var vars ^^ S.dot ^^ break 1
@@ -2056,6 +2114,9 @@ and Generic_binding : sig
         N.B. also used for value bindings in cases such as
         [let f = function ...], there [start = function] and [stop] is empty. *)
 
+  val map_rhs_end : (document -> document) -> rhs -> rhs
+    (** either map the sole part, or the stop part *)
+
   val pp
     : ?item:bool
     -> ?equal_sign:document
@@ -2073,6 +2134,10 @@ end = struct
   type rhs =
     | Single_part of document
     | Three_parts of { start: document; main: document; stop: document }
+
+  let map_rhs_end f = function
+    | Single_part d -> Single_part (f d)
+    | Three_parts r -> Three_parts { r with stop = f r.stop }
 
   let pp ~equal_sign ~keyword ~params ?constraint_ ?rhs bound =
     let bindings = nest 2 (flow (break 1) (keyword :: bound :: params)) in
