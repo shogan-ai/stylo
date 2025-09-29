@@ -6,7 +6,7 @@ module S = Syntax
 
 let enclose l r d = group (l ^^ break 0 ^^ d ^^ break 0 ^^ r)
 
-let parens d =
+let parens d = (* fixme: nest 1?? *)
   group (S.lparen ^^ nest 1 d ^^ S.rparen)
 let brackets = enclose S.lbracket S.rbracket
 
@@ -598,6 +598,9 @@ end
 
 and Expression : sig
   val pp : expression -> document
+
+  val pp_function_parts :
+    expression -> document * document
 end = struct
   let pp_op op =
     match op.pexp_desc with
@@ -625,23 +628,12 @@ end = struct
           | Mutable, Recursive -> [S.mutable_; S.rec_]
         ) ^/^ S.in_
       ) ^/^ pp body
-    | Pexp_function ([], _, body) ->
-      (* pexp_ext_attr is empty in this case, we attach on the body. *)
-      Function_body.pp body
-    | Pexp_function (params, constr, body) ->
-      prefix (
-        prefix !!S.fun_ (
-          group (
-            flow_map (break 1) Function_param.pp params ^/^
-            group (Function_constraint.pp constr ^?^ S.rarrow)
-          )
-        )
-      ) (Function_body.pp body)
+    | Pexp_function _ -> pp_function exp
     | Pexp_prefix_apply (op, arg) -> pp_op op ^^ pp arg
     | Pexp_add_or_sub (op, arg) -> string op ^^ pp arg
     | Pexp_infix_apply {op; arg1; arg2} ->
       (* N.B. the associativity of [op] will impact the nesting... *)
-      pp arg1 ^/^ prefix (pp_op op) (pp arg2)
+      pp arg1 ^/^ pp_op_apply op arg2
     | Pexp_apply (e, args) -> pp_apply e args
     | Pexp_match (e, cases) ->
       group (!!S.match_ ^/^ pp e ^/^ S.with_) ^/^
@@ -764,6 +756,29 @@ end = struct
     | Pexp_exclave exp -> S.exclave__ ^/^ pp exp
     | Pexp_mode_legacy (m, exp) -> mode_legacy m.txt ^/^ pp exp
 
+  and pp_function_parts exp =
+    match exp.pexp_desc with
+    | Pexp_function ([], _, body) ->
+      (* exp.pexp_ext_attr is empty in this case, we attach on the body. *)
+      begin match Function_body.as_rhs body with
+      | Three_parts { start; main; stop = _ } ->
+        (* we know stop is empty *)
+        start, main
+      | _ -> assert false
+      end
+    | Pexp_function (params, constr, body) ->
+      let params = flow_map (break 1) Function_param.pp params in
+      let constr = Function_constraint.pp constr in
+      prefix
+        (Ext_attribute.decorate S.fun_ exp.pexp_ext_attr)
+        (group (params ^/^ group (constr ^?^ S.rarrow))),
+      Function_body.pp body
+    | _ -> assert false
+
+  and pp_function exp =
+    let (fun_and_params, body) = pp_function_parts exp in
+    prefix fun_and_params body
+
   and pp_index_op nb_semis kind seq op indices assign =
     let delims =
       match kind with
@@ -810,7 +825,20 @@ end = struct
   and pp_tuple elts =
     separate_map (S.comma ^^ break 1) (Argument.pp pp) elts
 
-  and pp_apply e args = prefix (pp e) (Application.pp_args args)
+  and pp_apply e args = Application.pp (pp e) args
+
+  and pp_op_apply op arg =
+    match arg.pexp_desc with
+    | Pexp_apply (f, args) ->
+      (* N.B. the app is not under parentheses, that's why this is valid! *)
+      let op = pp_op op in
+      (* Basically we align a sublock after the op... except when we finish on a
+         literal function in which case we only indent by 2 ??? *)
+      let indent = requirement op + 1 (* space *) + 2 (* indent *) in
+      let op_and_f = op ^^ nest indent (group (break 1 ^^ pp f)) in
+      Application.pp ~indent op_and_f args
+    | _ ->
+      prefix (pp_op op) (pp arg)
 
   and pp_record ?(unboxed = false) nb_semis expr_opt fields =
     let semi_as_term = List.compare_length_with fields nb_semis = 0 in
@@ -887,12 +915,63 @@ end = struct
 end
 
 and Application : sig
-  val pp_args : expression argument list -> document
+  val pp: ?indent:int -> document -> expression argument list -> document
 end = struct
+  let is_function p =
+    match p.pexp_desc with
+    | Pexp_parens
+        { begin_end = false
+        ; exp = Some { pexp_desc = Pexp_function _; _ }
+        } ->
+      true
+    | _ -> false
 
-  let pp_arg a = Argument.pp Expression.pp a
+  (* We want the following layouts (assuming no line overflows):
+     {[
+       some_fun arg1 arg2 ~f:(fun a b c d : whatever ->
+         foo bar
+       ) arg4 arg5
+     ]}
+     {[
+       some_fun arg1 arg2
+         ~f:(fun a b c d : whatever -> foo bar) arg4 arg5
+     ]}
+     {[
+       some_fun arg1 arg2
+         ~f:(fun a b c d : whatever ->
+               foo bar)
+         arg4 arg5
+     ]}
+  *)
+  let pp_function_parts ?lbl exp =
+    match exp.pexp_desc with
+    | Pexp_parens { begin_end = false; exp = Some fun_exp } ->
+      let (fun_and_params, body) = Expression.pp_function_parts fun_exp in
+      let first_part =
+        optional (stringf "~%s:") lbl ^^ S.lparen ^^ fun_and_params
+      in
+      group (break 1 ^^ first_part) ^^
+      group (relative_nest 2 (break 1 ^^ body) ^^ S.rparen)
+      |> Attribute.attach ~attrs:exp.pexp_attributes
+    | _ -> assert false
 
-  let pp_args = flow_map (break 1) pp_arg
+  let pp_arg arg =
+    match arg.parg_desc with
+    | Parg_unlabelled { legacy_modes=[]; arg; typ_constraint=None; modes=[] }
+      when is_function arg ->
+      pp_function_parts arg
+    | Parg_labelled { optional=false; legacy_modes=[]; name;
+                      maybe_punned=Some arg; typ_constraint=None;modes=[];
+                      default=None }
+      when is_function arg ->
+      pp_function_parts ~lbl:name arg
+    | _ ->
+      group (break 1 ^^ Argument.pp Expression.pp arg)
+
+  let pp ?(indent=2) f args =
+    List.fold_left (fun acc arg ->
+      acc ^^ nest indent @@ pp_arg arg
+    ) f args
 end
 
 and Case : sig
@@ -1050,6 +1129,7 @@ end = struct
     Ext_attribute.decorate S.function_ ext_attrs,
     Case.pp_cases cases
       ~has_leading_pipe:(has_leading_pipe ~after:FUNCTION tokens)
+
   let pp fb =
     match fb.pfb_desc with
     | Pfunction_body e -> Expression.pp e
@@ -1526,7 +1606,7 @@ end = struct
     | Pcl_structure cs -> pp_structure ext_attr cs
     | Pcl_fun (arg, rhs) ->
       !!S.fun_ ^/^ Argument.pp Pattern.pp arg ^/^ S.rarrow ^/^ pp rhs
-    | Pcl_apply (ce, args) -> pp ce ^/^ Application.pp_args args
+    | Pcl_apply (ce, args) -> Application.pp (pp ce) args
     | Pcl_let (rf, vbs, body) ->
       (* FIXME: factorize with Pexp_let *)
       Value_binding.pp_list vbs ~start:(

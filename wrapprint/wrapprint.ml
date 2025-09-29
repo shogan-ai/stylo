@@ -9,10 +9,24 @@ type t =
   | Whitespace of PPrint.document
   | Cat of t * t
   | Nest of int * t
+  | Relative_nest of int * t
   | Group of t
   | Align of t
 
 type document = t
+
+let rec requirement = function
+  | Empty -> 0
+  | Token_let -> 3
+  | Token d
+  | Comment d
+  | Whitespace d -> PPrint.requirement d
+  | Cat (t1, t2) -> requirement t1 + requirement t2
+  | Nest (_, t)
+  | Relative_nest (_, t)
+  | Group t
+  | Align t -> requirement t
+
 
 let empty = Empty
 let char c = Token (PPrint.char c)
@@ -28,6 +42,7 @@ let (^^) t1 t2 =
   | _ -> Cat (t1, t2)
 
 let nest i t = if t = Empty then t else Nest (i, t)
+let relative_nest i t = if t = Empty then t else Relative_nest (i, t)
 let group t = if t = Empty then t else Group t
 let align t = if t = Empty then t else Align t
 
@@ -98,11 +113,21 @@ let prefix_nonempty l r =
 
 open PPrint
 
+let relative_nest_custom i d = object
+  method requirement = requirement d
+
+  method pretty out state _indent flat =
+    pretty out state (state.last_indent + i) flat d
+
+  method compact out = compact out d
+end
+
 let rec to_document : t -> document = function
   | Empty -> PPrint.empty
   | Token_let -> PPrint.string "let"
   | Comment t | Token t | Whitespace t -> t
   | Cat (t1, t2) -> to_document t1 ^^ to_document t2
   | Nest (i, t) -> nest i (to_document t)
+  | Relative_nest (i, t) -> custom (relative_nest_custom i (to_document t))
   | Group t -> group (to_document t)
   | Align t -> align (to_document t)

@@ -55,7 +55,7 @@ let rec consume_only_leading_comments acc = function
 let rec first_is_comment = function
   | Doc.Comment _ -> `yes
   | Token _ | Token_let -> `no
-  | Group d | Align d | Nest (_, d) -> first_is_comment d
+  | Group d | Align d | Nest (_, d) | Relative_nest (_, d) -> first_is_comment d
   | Empty | Whitespace _ -> `maybe
   | Cat (d1, d2) ->
     match first_is_comment d1 with
@@ -130,6 +130,9 @@ let rec walk_both seq doc =
     | _, Doc.Nest (i, doc) ->
       let rest, doc = walk_both seq doc in
       rest, Nest (i, doc)
+    | _, Doc.Relative_nest (i, doc) ->
+      let rest, doc = walk_both seq doc in
+      rest, Relative_nest (i, doc)
     | _, Doc.Group doc ->
       let rest, doc = walk_both seq doc in
       rest, Group doc
