@@ -730,8 +730,9 @@ end = struct
     | Pexp_lazy e -> !!S.lazy_ ^/^ pp e
     | Pexp_object cs -> Class_expr.pp_structure exp.pexp_ext_attr cs
     | Pexp_pack (me, ty) ->
-      S.lparen ^^ !!S.module_ ^/^ Module_expr.pp me ^?^
-      optional (fun c -> S.colon ^/^ Module_expr.pp_package_type c) ty ^^
+      S.lparen ^^ !!S.module_ ^/^ Module_expr.pp me ^^
+      optional (fun c ->
+        break 1 ^^ S.colon ^/^ Module_expr.pp_package_type c) ty ^^
       S.rparen
     | Pexp_dot_open (lid, e) -> longident lid.txt ^^ S.dot ^^ pp e
     | Pexp_let_open (od, e) ->
