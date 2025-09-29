@@ -900,10 +900,29 @@ end = struct
     | None -> empty
     | Some e -> group (S.when_ ^/^ Expression.pp e)
 
+  (* we only nest the pattern, not the pipes (there might be several due to
+     or-patterns). *)
+  let pp_pattern pipe p =
+    let rec split_top_or p =
+      match p.ppat_desc with
+      | Ppat_or (p1, p2) ->
+        (* N.B. we're sure there's no attribute here, one needs parens to attach
+           an attribute to an or pattern in ocaml. So the attribute would be on
+           a Ppat_parens above the Ppat_or. *)
+        split_top_or p1 @ split_top_or p2
+      | _ -> [ p ]
+    in
+    split_top_or p
+    |> List.fold_left (fun (acc, pipe) pat ->
+      let pat = Pattern.pp pat in
+      let p = if pipe then group (prefix S.pipe pat) else pat in
+      acc ^?^ p, true
+    ) (empty, pipe)
+    |> fst
+
   let pp pipe { pc_lhs; pc_guard; pc_rhs } =
-    let pat = Pattern.pp pc_lhs in
     prefix (
-      prefix (if pipe then group (prefix S.pipe pat) else pat)
+      prefix (pp_pattern pipe pc_lhs)
         (group (pp_guard pc_guard ^?^ S.rarrow))
     ) (Expression.pp pc_rhs)
 
