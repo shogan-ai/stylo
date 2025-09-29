@@ -921,10 +921,15 @@ end = struct
     |> fst
 
   let pp pipe { pc_lhs; pc_guard; pc_rhs } =
-    prefix (
-      prefix (pp_pattern pipe pc_lhs)
-        (group (pp_guard pc_guard ^?^ S.rarrow))
-    ) (Expression.pp pc_rhs)
+    group (
+      prefix_nonempty (pp_pattern pipe pc_lhs)
+        (pp_guard pc_guard) ^^
+      nest 2 (
+        (* always try to put on the same line as what preceeds if it fits. *)
+        group (break 1 ^^ S.rarrow) ^/^
+        Expression.pp pc_rhs
+      )
+    )
 
   let pp_cases ~has_leading_pipe =
     foldli (fun i accu x ->
