@@ -171,12 +171,14 @@ let inputs = ref []
 let check = ref false
 let ast_check = ref false
 let fuzzing = ref false
+let inplace = ref false
 
 let () =
   Arg.parse
     ["-only-check", Arg.Set check, "Compare result with input, no printing"
     ;"-ast-check", Arg.Set ast_check, "Compare official AST after reparsing"
-    ;"-fuzzing", Arg.Set fuzzing, "-ast-check on each line separately"]
+    ;"-fuzzing", Arg.Set fuzzing, "-ast-check on each line separately"
+    ;"-i", Arg.Set inplace, "style file in place"]
     (fun fn -> inputs := fn :: !inputs)
     "stylo.exe [-only-check] FILENAME*"
 
@@ -213,9 +215,15 @@ let () =
             (* TODO: location, etc *)
             Format.eprintf "%s: ast changed@." fn
         ) else (
-          PPrint.ToChannel.pretty 1. 80 stdout doc;
-          print_newline ();
-          flush stdout
+          let pp oc =
+            PPrint.ToChannel.pretty 1. 90 oc doc;
+            output_char oc '\n';
+            flush oc
+          in
+          if not !inplace then
+            pp stdout
+          else
+            Out_channel.with_open_text fn pp
         )
   ) !inputs;
   if !has_error then
