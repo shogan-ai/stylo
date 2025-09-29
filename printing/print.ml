@@ -736,7 +736,6 @@ end = struct
       pp body
     | Pexp_assert e -> !!S.assert_ ^/^ pp e
     | Pexp_lazy e -> !!S.lazy_ ^/^ pp e
-    | Pexp_poly _ -> assert false (* FIXME: doesn't appear in concrete syntax *)
     | Pexp_object cs -> Class_expr.pp_structure exp.pexp_ext_attr cs
     | Pexp_pack (me, ty) ->
       S.lparen ^^ !!S.module_ ^/^ Module_expr.pp me ^?^

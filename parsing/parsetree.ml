@@ -258,9 +258,6 @@ and core_type_desc =
            - As the {!core_type} of a
            {{!class_type_field_desc.Pctf_method}[Pctf_method]} node.
 
-           - As the {!core_type} of a {{!expression_desc.Pexp_poly}[Pexp_poly]}
-           node.
-
            - As the {{!label_declaration.pld_type}[pld_type]} field of a
            {!label_declaration}.
 
@@ -565,12 +562,6 @@ and expression_desc =
            Note: [assert false] is treated in a special way by the
            type-checker. *)
   | Pexp_lazy of expression  (** [lazy E] *)
-  | Pexp_poly of expression * core_type option
-      (** Used for method bodies.
-
-           Can only be used as the expression under
-           {{!class_field_kind.Cfk_concrete}[Cfk_concrete]} for methods (not
-           values). *)
   | Pexp_object of class_structure  (** [object ... end] *)
   | Pexp_pack of module_expr * core_type option
       (** [(module ME)].
@@ -1194,9 +1185,8 @@ and class_field_desc =
   *)
   | Pcf_method of (string loc * private_flag * class_field_kind)
       (** - [method x = E]
-                        ([E] can be a {{!expression_desc.Pexp_poly}[Pexp_poly]})
-            - [method virtual x: T]
-                        ([T] can be a {{!core_type_desc.Ptyp_poly}[Ptyp_poly]})
+          - [method virtual x: T]
+                      ([T] can be a {{!core_type_desc.Ptyp_poly}[Ptyp_poly]})
   *)
   | Pcf_constraint of (core_type * core_type)  (** [constraint T1 = T2] *)
   | Pcf_initializer of expression  (** [initializer E] *)

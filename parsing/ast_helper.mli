@@ -207,8 +207,6 @@ module Exp:
       -> expression
     val assert_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> expression
     val lazy_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> expression
-    val poly: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> core_type option
-              -> expression
     val object_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> class_structure -> expression
     val pack: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?pkg_type:core_type -> module_expr ->
       expression

@@ -303,7 +303,6 @@ module Exp = struct
   let letexception ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_letexception (a, b))
   let assert_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_assert a)
   let lazy_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_lazy a)
-  let poly ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_poly (a, b))
   let object_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_object a)
   let pack ?loc ?attrs ~tokens ?pkg_type a = mk ?loc ?attrs ~tokens (Pexp_pack (a, pkg_type))
   let open_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_dot_open (a, b))
