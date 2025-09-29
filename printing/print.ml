@@ -310,6 +310,8 @@ and Core_type : sig
   val pp : core_type -> document
 
   val pp_arrow: Tokens.seq -> arg_label -> document -> document -> document
+
+  val pp_poly_bindings : (string loc * jkind_annotation option) list -> document
 end = struct
   let pp_arrow tokens arg_lbl arg rhs =
     begin match arg_lbl with
@@ -372,13 +374,7 @@ end = struct
     | Ptyp_variant (fields, cf, lbls) ->
       pp_variant ~tokens fields cf lbls
     | Ptyp_poly (bound_vars, ct) ->
-      let pp_bound (var, jkind) =
-        let var_and_kind = pp_var var.Location.txt jkind in
-        match jkind with
-        | None -> var_and_kind
-        | Some _ -> parens var_and_kind
-      in
-      separate_map (break 1) pp_bound bound_vars ^^ break 0 ^^ S.dot ^/^ pp ct
+      pp_poly_bindings bound_vars ^^ break 0 ^^ S.dot ^/^ pp ct
     | Ptyp_package pkg -> package_type pkg
     | Ptyp_open (lid, ct) -> longident lid.txt ^^ S.dot ^^ pp ct
     | Ptyp_of_kind jkind -> S.type_ ^/^ S.colon ^/^ Jkind_annotation.pp jkind
@@ -390,6 +386,15 @@ end = struct
     match jkind with
     | None -> var
     | Some k -> var ^/^ S.colon ^/^ Jkind_annotation.pp k
+
+  and pp_poly_bindings bound_vars =
+    let pp_bound (var, jkind) =
+      let var_and_kind = pp_var var.Location.txt jkind in
+      match jkind with
+      | None -> var_and_kind
+      | Some _ -> parens var_and_kind
+    in
+    separate_map (break 1) pp_bound bound_vars
 
   and pp_variant ~tokens fields (cf : Asttypes.closed_flag) lbls =
     let fields =
@@ -1239,31 +1244,22 @@ end = struct
         pcd_doc; pcd_loc = _; pcd_tokens = _ } =
     let pcd_vars =
       match pcd_vars with
-        | [] -> empty
-        | lst ->
-          separate_map (break 1) (function
-            | var, None -> S.squote ^^ string var.txt
-            | var, Some j ->
-              S.lparen ^^ S.squote ^^ string var.txt ^/^ S.colon ^/^
-              Jkind_annotation.pp j ^^ S.rparen
-          ) lst ^^ S.dot ^^ break 1
+      | [] -> empty
+      | vars -> Core_type.pp_poly_bindings vars ^^ S.dot
     in
-    Attribute.attach ~attrs:pcd_attributes (
-      prefix_nonempty
-        (group ((if pipe then S.pipe else empty) ^?^
-                constr_ident pcd_name.txt))
-        (begin match pcd_args, pcd_res with
-           | Pcstr_tuple [], None -> empty
-           | args, None ->
-             S.of_ ^/^ Constructor_argument.pp_args args
-           | Pcstr_tuple [], Some ct ->
-             S.colon ^/^ pcd_vars ^^ Core_type.pp ct
-           | args, Some ct ->
-             S.colon ^/^ pcd_vars ^^
-             Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct
-         end)
-    ) ^?^
-    optional Attribute.pp pcd_doc
+    prefix_nonempty
+      (group ((if pipe then S.pipe else empty) ^?^
+              constr_ident pcd_name.txt))
+      (match pcd_args, pcd_res with
+       | Pcstr_tuple [], None -> empty
+       | args, None ->
+         S.of_ ^/^ Constructor_argument.pp_args args
+       | Pcstr_tuple [], Some ct ->
+         S.colon ^?^ pcd_vars ^?^ Core_type.pp ct
+       | args, Some ct ->
+         S.colon ^?^ pcd_vars ^?^
+         Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct)
+    |> Attribute.attach ~attrs:pcd_attributes ?post_doc:pcd_doc
 
   let pp_constrs ~has_leading_pipe =
     foldli (fun i accu x ->
