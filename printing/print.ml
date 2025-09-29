@@ -641,7 +641,7 @@ end = struct
     | Pexp_add_or_sub (op, arg) -> string op ^^ pp arg
     | Pexp_infix_apply {op; arg1; arg2} ->
       (* N.B. the associativity of [op] will impact the nesting... *)
-      prefix (group (prefix (pp arg1) (pp_op op))) (pp arg2)
+      pp arg1 ^/^ prefix (pp_op op) (pp arg2)
     | Pexp_apply (e, args) -> pp_apply e args
     | Pexp_match (e, cases) ->
       group (!!S.match_ ^/^ pp e ^/^ S.with_) ^/^
