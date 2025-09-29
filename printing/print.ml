@@ -1292,7 +1292,7 @@ end = struct
     )
 
   let pp_rhs ?(subst=false) td =
-    let eq = if subst then S.colon_equals else S.equals in
+    let eq = group (break 1 ^^ if subst then S.colon_equals else S.equals) in
     begin match td.ptype_manifest, td.ptype_kind with
     | None, Ptype_abstract -> empty
     | Some ct, Ptype_abstract ->
@@ -1312,7 +1312,7 @@ end = struct
         Ext_attribute.decorate first_kw td.ptype_ext_attrs
           ^?^ separate (break 1) other_kws
     in
-    prefix_nonempty (
+    let lhs =
       prefix start (
         let omit_delims_if_possible =
           not (has_leading LPAREN ~after:TYPE td.ptype_tokens)
@@ -1324,7 +1324,8 @@ end = struct
         | None -> empty
         | Some j -> S.colon ^/^ Jkind_annotation.pp j
       )
-    ) (pp_rhs ?subst td)
+    in
+    lhs ^^ nest 2 (group (pp_rhs ?subst td))
     |> Attribute.attach ~item:true
       ~text:td.ptype_pre_text
       ?pre_doc:td.ptype_pre_doc
