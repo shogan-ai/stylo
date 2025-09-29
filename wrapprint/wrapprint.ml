@@ -52,6 +52,12 @@ let (^?^) d1 d2 =
   | d, Empty -> d
   | _ -> d1 ^/^ d2
 
+let (^?/^) d1 d2 =
+  match d1, d2 with
+  | Empty, d
+  | d, Empty -> d
+  | _ -> d1 ^^ hardline ^^ d2
+
 let separate_map sep f xs =
   foldli (fun i accu x ->
     if i = 0 then

@@ -221,24 +221,23 @@ end = struct
     in
     separate_map S.dot pp_one ids.txt
 
+  let pp lbat name payload =
+    group @@ nest 2 (
+      lbat ^^ pp_attr_name name ^^ Payload.pp payload ^^ S.rbracket
+    )
+
+  let pp_floating { attr_name; attr_payload; attr_loc = _; attr_tokens = _ } =
+    match attr_name.txt with
+    | ["ocaml"; ("doc"|"text")]  (* FIXME *) -> pp_doc attr_payload
+    | _ -> pp S.lbracket_atatat attr_name attr_payload
+
   let pp ?(item=false)
       { attr_name; attr_payload; attr_loc = _; attr_tokens = _ } =
     match attr_name.txt with
     | ["ocaml"; ("doc"|"text")]  (* FIXME *) -> pp_doc attr_payload
     | _ ->
-      let attr_name = pp_attr_name attr_name in
-      (if item then S.lbracket_atat else S.lbracket_at)
-      ^^  attr_name ^^ Payload.pp attr_payload
-      ^^ S.rbracket
-
-  let pp_floating { attr_name; attr_payload; attr_loc = _; attr_tokens = _ } =
-    match attr_name.txt with
-    | ["ocaml"; ("doc"|"text")]  (* FIXME *) -> pp_doc attr_payload
-    | _ ->
-      let attr_name = pp_attr_name attr_name in
-      S.lbracket_atatat
-      ^^ attr_name ^^ Payload.pp attr_payload
-      ^^ S.rbracket
+      pp (if item then S.lbracket_atat else S.lbracket_at) attr_name
+        attr_payload
 
   let pp_list ?item l = separate_map (break 0) (pp ?item) l
 
@@ -250,7 +249,7 @@ end = struct
       separate_map (break 1) pp text ^^
       hardline ^^ hardline
     end ^^
-    optional pp pre_doc ^?^
+    optional pp pre_doc ^?/^
     t ^?^ pp_list ?item attrs ^?^
     optional pp post_doc
 end
@@ -486,7 +485,7 @@ end = struct
     | Ppat_record_unboxed_product (fields, cf) ->
       pp_record ~unboxed:true (nb_semis p.ppat_tokens) cf fields
     | Ppat_array (mut, ps) -> pp_array (nb_semis p.ppat_tokens) mut ps
-    | Ppat_or (p1, p2) -> pp p1 ^/^ S.pipe ^/^ pp p2
+    | Ppat_or (p1, p2) -> pp p1 ^/^ group (S.pipe ^/^ pp p2)
     | Ppat_constraint (p, None, modes) ->
       parens (with_modes ~modes (pp p))
     | Ppat_constraint (p, Some ty, atat_modes) ->
@@ -1696,7 +1695,7 @@ end = struct
       S.kind_abbrev__ ^/^ string name.txt ^/^ S.equals ^/^
         Jkind_annotation.pp k
 
-  let pp_item it = pp_item_desc it.psig_desc
+  let pp_item it = group (pp_item_desc it.psig_desc)
 
   (* TODO: duplicated from Structure *)
   let (^//^) before after =
@@ -1963,7 +1962,7 @@ end = struct
     | Pmod_functor (attrs, fps, me) ->
       Attribute.attach ~attrs S.functor_ ^/^
       separate_map (break 1) Functor_parameter.pp fps ^/^ S.rarrow ^/^ pp me
-    | Pmod_apply (m1, m2) -> pp m1 ^^ pp m2
+    | Pmod_apply (m1, m2) -> pp m1 ^/^ pp m2
     | Pmod_apply_unit me -> pp me ^^ S.lparen ^^ S.rparen
     | Pmod_constraint (me, None, modes) ->
       (* FIXME: parens? shouldn't that be part of cst? *)
