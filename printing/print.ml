@@ -664,13 +664,7 @@ end = struct
       pp e1 ^^ S.dot ^^ longident lid.txt ^/^ S.larrow ^/^ pp e2
     | Pexp_array (mut, es) -> pp_array (nb_semis exp.pexp_tokens) mut es
     | Pexp_idx (ba, uas) -> pp_block_idx ba uas
-    | Pexp_ifthenelse (e1, e2, e3_o) ->
-      let if_cond_then = !!S.if_ ^^ nest 2 (break 1 ^^ pp e1) ^/^ S.then_ in
-      prefix (group if_cond_then) (pp e2) ^?^
-      begin match e3_o with
-        | None -> empty
-        | Some e3 -> prefix S.else_ (pp e3)
-      end
+    | Pexp_ifthenelse (e1, e2, e3_o) -> pp_ite exp.pexp_ext_attr e1 e2 e3_o
     | Pexp_sequence (e1, e2) ->
       (* FIXME: ext_attr not at the beginning, the token synchronisation is
          going to have issues. *)
@@ -798,6 +792,17 @@ end = struct
     | None -> empty
     | Some e -> break 1 ^^ S.larrow ^/^ pp e
     end
+
+  and pp_ite ext_attr e1 e2 e3_o =
+    let if_ = Ext_attribute.decorate S.if_ ext_attr in
+    let if_cond = if_ ^^ nest 2 (break 1 ^^ pp e1) in
+    let then_ = S.then_ ^^ nest 2 (group (break 1 ^^ pp e2)) in
+    let else_ =
+      match e3_o with
+      | None -> empty
+      | Some e3 -> prefix S.else_ (pp e3)
+    in
+    group if_cond ^/^ then_ ^?^ else_
 
   and pp_delimited_seq (opn, cls) nb_semis elts =
     let semi_as_term = List.compare_length_with elts nb_semis = 0 in
