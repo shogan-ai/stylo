@@ -22,6 +22,7 @@
 
 val init : unit -> unit
 val token: Lexing.lexbuf -> Parser_tokens.token
+val token_updating_indexed_list: Lexing.lexbuf -> Parser_tokens.token
 val skip_hash_bang: Lexing.lexbuf -> unit
 
 type error =

@@ -1047,6 +1047,7 @@ and skip_hash_bang = parse
         (* There have been no blank lines, and the previous
            token was a newline. *)
     | BlankLine (* There have been blank lines. *)
+    | BlankEquivalentLine
 
   type doc_state =
     | Initial  (* There have been no docstrings yet *)
@@ -1066,7 +1067,7 @@ and skip_hash_bang = parse
       | After a, (NoLine | NewLine) ->
           set_post_docstrings post_pos (List.rev a);
           set_pre_docstrings pre_pos a;
-      | After a, BlankLine ->
+      | After a, (BlankLine | BlankEquivalentLine) ->
           set_post_docstrings post_pos (List.rev a);
           set_pre_extra_docstrings pre_pos (List.rev a)
       | Before(a, f, b), (NoLine | NewLine) ->
@@ -1076,7 +1077,7 @@ and skip_hash_bang = parse
           set_floating_docstrings pre_pos (List.rev f);
           set_pre_extra_docstrings pre_pos (List.rev a);
           set_pre_docstrings pre_pos b
-      | Before(a, f, b), BlankLine ->
+      | Before(a, f, b), (BlankLine | BlankEquivalentLine) ->
           set_post_docstrings post_pos (List.rev a);
           set_post_extra_docstrings post_pos
             (List.rev_append f (List.rev b));
@@ -1093,11 +1094,12 @@ and skip_hash_bang = parse
     else
       match docs, lines with
       | Initial, (NoLine | NewLine) -> After [doc]
-      | Initial, BlankLine -> Before([], [], [doc])
+      | Initial, (BlankLine | BlankEquivalentLine) -> Before([], [], [doc])
       | After a, (NoLine | NewLine) -> After (doc :: a)
-      | After a, BlankLine -> Before (a, [], [doc])
+      | After a, (BlankLine | BlankEquivalentLine) -> Before (a, [], [doc])
       | Before(a, f, b), (NoLine | NewLine) -> Before(a, f, doc :: b)
-      | Before(a, f, b), BlankLine -> Before(a, b @ f, [doc])
+      | Before(a, f, b), (BlankLine | BlankEquivalentLine) ->
+        Before(a, b @ f, [doc])
 
   let token lexbuf =
     let post_pos = lexeme_end_p lexbuf in
@@ -1109,7 +1111,8 @@ and skip_hash_bang = parse
             match lines with
             | NoLine -> NoLine
             | NewLine -> NoLine
-            | BlankLine -> BlankLine
+            | BlankLine
+            | BlankEquivalentLine -> BlankEquivalentLine
           in
           loop lines' docs lexbuf
       | EOL ->
@@ -1117,7 +1120,8 @@ and skip_hash_bang = parse
             match lines with
             | NoLine -> NewLine
             | NewLine -> BlankLine
-            | BlankLine -> BlankLine
+            | BlankLine
+            | BlankEquivalentLine -> BlankLine
           in
           loop lines' docs lexbuf
       | DOCSTRING doc ->
@@ -1130,6 +1134,70 @@ and skip_hash_bang = parse
           tok
     in
       loop NoLine Initial lexbuf
+
+  type staged_comment = {
+    sc_loc: Location.t;
+    sc_str: string;
+    sc_before: newline_state;
+  }
+
+  let stage_comment sc_before sc_loc sc_str =
+    { sc_loc; sc_str; sc_before }
+
+  let unstage_comment newline_after sc =
+    ignore sc.sc_before;
+    ignore newline_after;
+    Tokens.Indexed_list.append
+      Tokens.Indexed_list.global
+      ~pos:sc.sc_loc.loc_start
+      (Comment sc.sc_str)
+
+  let token_updating_indexed_list lexbuf =
+    let post_pos = lexeme_end_p lexbuf in
+    let rec loop lines docs sc_opt lexbuf =
+      match token_with_comments lexbuf with
+      | COMMENT (s, loc) ->
+          add_comment (s, loc);
+          Option.iter (unstage_comment lines) sc_opt;
+          let sc = stage_comment lines loc s in
+          let lines' =
+            match lines with
+            | NoLine -> NoLine
+            | NewLine -> NoLine
+            | BlankLine
+            | BlankEquivalentLine -> BlankEquivalentLine
+          in
+          loop lines' docs (Some sc) lexbuf
+      | EOL ->
+          let lines' =
+            match lines with
+            | NoLine -> NewLine
+            | NewLine -> BlankLine
+            | BlankLine
+            | BlankEquivalentLine -> BlankLine
+          in
+          loop lines' docs sc_opt lexbuf
+      | DOCSTRING doc ->
+          Docstrings.register doc;
+          add_docstring_comment doc;
+          Option.iter (unstage_comment lines) sc_opt;
+          let sc =
+            stage_comment lines
+              (Docstrings.docstring_loc doc)
+              (Docstrings.docstring_body doc)
+          in
+          let docs' = acc_docstring lines docs doc in
+          loop NoLine docs' (Some sc) lexbuf
+      | tok ->
+          Option.iter (unstage_comment lines) sc_opt;
+          attach lines docs post_pos (lexeme_start_p lexbuf);
+          Tokens.Indexed_list.append
+            Tokens.Indexed_list.global
+            ~pos:lexbuf.lex_start_p
+            (Token tok);
+          tok
+    in
+      loop NoLine Initial None lexbuf
 
   let init () =
     is_in_string := false;
