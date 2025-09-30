@@ -116,8 +116,11 @@ open PPrint
 let relative_nest_custom i d = object
   method requirement = requirement d
 
-  method pretty out state _indent flat =
-    pretty out state (state.last_indent + i) flat d
+  method pretty out state indent flat =
+    (* we don't want to decrease the indent, we just don't want to increase it
+       too much. *)
+    let indent = max (state.last_indent + i) indent in
+    pretty out state indent flat d
 
   method compact out = compact out d
 end

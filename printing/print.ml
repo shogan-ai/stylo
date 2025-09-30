@@ -609,7 +609,7 @@ end = struct
     | _ -> assert false
 
   let rec pp e =
-    group (pp_desc e)
+    pp_desc e
     |> Attribute.attach ~attrs:e.pexp_attributes
 
   and pp_desc exp =
@@ -617,17 +617,7 @@ end = struct
     match exp.pexp_desc with
     | Pexp_ident lid -> longident lid.txt
     | Pexp_constant c -> constant c
-    | Pexp_let (mf, rf, vbs, body) ->
-      group (
-        Value_binding.pp_list vbs ~start:(
-          !!S.let_ ::
-          match mf, rf with
-          | Immutable, Nonrecursive -> []
-          | Immutable, Recursive -> [S.rec_]
-          | Mutable, Nonrecursive -> [S.mutable_]
-          | Mutable, Recursive -> [S.mutable_; S.rec_]
-        ) ^/^ S.in_
-      ) ^/^ pp body
+    | Pexp_let (mf, rf, vbs, body) -> pp_let mf rf vbs body
     | Pexp_function _ -> pp_function exp
     | Pexp_prefix_apply (op, arg) -> pp_op op ^^ pp arg
     | Pexp_add_or_sub (op, arg) -> string op ^^ pp arg
@@ -636,7 +626,7 @@ end = struct
       pp arg1 ^/^ pp_op_apply op arg2
     | Pexp_apply (e, args) -> pp_apply e args
     | Pexp_match (e, cases) ->
-      group (!!S.match_ ^/^ pp e ^/^ S.with_) ^/^
+      group (!!S.match_ ^^ nest 2 (group (break 1 ^^ pp e)) ^/^ S.with_) ^/^
       Case.pp_cases cases
         ~has_leading_pipe:(has_leading_pipe ~after:WITH exp.pexp_tokens)
     | Pexp_try (e, cases) ->
@@ -648,12 +638,7 @@ end = struct
       S.hash_lparen ^^ nest 1 (pp_tuple elts) ^^ S.rparen
     | Pexp_construct (lid, arg) ->
       prefix_nonempty (constr_longident lid.txt) (optional pp arg)
-    | Pexp_variant (lbl, eo) ->
-      S.bquote ^^ string lbl ^^
-      begin match eo with
-        | None -> empty
-        | Some e -> break 1 ^^ pp e
-      end
+    | Pexp_variant (lbl, eo) -> pp_variant lbl eo
     | Pexp_record (eo, fields) -> pp_record (nb_semis exp.pexp_tokens) eo fields
     | Pexp_record_unboxed_product (eo, fields) ->
       pp_record ~unboxed:true (nb_semis exp.pexp_tokens) eo fields
@@ -674,9 +659,14 @@ end = struct
       !!S.while_ ^/^ pp e1 ^/^ S.do_ ^/^ pp e2 ^/^
       S.done_
     | Pexp_for (p, e1, e2, dir, e3) ->
-      !!S.for_ ^/^
-      Pattern.pp p ^/^ S.equals ^/^ pp e1 ^/^ direction dir ^/^
-      pp e2 ^/^ S.do_ ^/^ pp e3 ^/^ S.done_
+      let fst_line =
+        prefix !!S.for_ (
+          group (
+            Pattern.pp p ^/^ S.equals ^/^ pp e1 ^/^ direction dir ^/^ pp e2
+          )
+        ) ^/^ S.do_
+      in
+      group (prefix fst_line (pp e3) ^/^ S.done_)
     | Pexp_constraint (e, None, modes) ->
       with_modes ~modes (pp e)
     | Pexp_constraint (e, Some ct, atat_modes) ->
@@ -751,6 +741,18 @@ end = struct
     | Pexp_exclave exp -> S.exclave__ ^/^ pp exp
     | Pexp_mode_legacy (m, exp) -> mode_legacy m.txt ^/^ pp exp
 
+  and pp_let mf rf vbs body =
+    group (
+      Value_binding.pp_list vbs ~start:(
+        S.let_ ::
+        match mf, rf with
+        | Immutable, Nonrecursive -> []
+        | Immutable, Recursive -> [S.rec_]
+        | Mutable, Nonrecursive -> [S.mutable_]
+        | Mutable, Recursive -> [S.mutable_; S.rec_]
+      ) ^/^ S.in_
+    ) ^/^ pp body
+
   and pp_function_parts exp =
     match exp.pexp_desc with
     | Pexp_function ([], _, body) ->
@@ -812,7 +814,7 @@ end = struct
       else
         separate_map (S.semi ^^ break 1) pp elts
     in
-    prefix_nonempty opn elts ^?^ cls
+    group (prefix_nonempty opn elts ^?^ cls)
 
   and pp_array nb_semis mut elts =
     pp_delimited_seq (array_delimiters mut) nb_semis elts
@@ -830,6 +832,7 @@ end = struct
 
   and pp_tuple elts =
     separate_map (S.comma ^^ break 1) (Argument.pp pp) elts
+    |> group
 
   and pp_apply e args = Application.pp (pp e) args
 
@@ -846,6 +849,11 @@ end = struct
     | _ ->
       prefix (pp_op op) (pp arg)
 
+  and pp_variant lbl eo =
+    let constr = S.bquote ^^ string lbl in
+    let arg = optional pp eo in
+    prefix_nonempty constr arg
+
   and pp_record ?(unboxed = false) nb_semis expr_opt fields =
     let semi_as_term = List.compare_length_with fields nb_semis = 0 in
     let eo =
@@ -853,9 +861,18 @@ end = struct
       | None -> empty
       | Some e -> pp e ^/^ S.with_
     in
-    prefix ((if unboxed then S.hash_lbrace else S.lbrace) ^?^ eo)
-      (Record_field.pp_list ~semi_as_term pp fields) ^/^
-    S.rbrace
+    group (
+      (* FIXME: that prefix implies a group, meaning in some cases we will end
+         up with
+         {[
+           { foo with bar; baz
+           }
+         ]}
+         thath is not what we want. *)
+      prefix ((if unboxed then S.hash_lbrace else S.lbrace) ^?^ eo)
+        (Record_field.pp_list ~semi_as_term pp fields) ^/^
+      S.rbrace
+    )
 end
 
 and Record_field : sig
