@@ -64,6 +64,17 @@ let rec first_is_comment = function
 
 let first_is_comment d = first_is_comment d = `yes
 
+let rec attach_before_comments tokens doc =
+  match tokens with
+  | [] -> tokens, doc
+  | first :: rest ->
+    match first.T.desc with
+    | T.Comment (c, Before) ->
+      (* FIXME: make sure the comment is not already inserted!! *)
+      let doc = Doc.(doc ^/^ comment c) in
+      attach_before_comments rest doc
+    | _ -> tokens, doc
+
 let rec walk_both seq doc =
   match seq with
   | [] ->
@@ -104,7 +115,7 @@ let rec walk_both seq doc =
         first.pos.pos_lnum
         (first.pos.pos_cnum - first.pos.pos_bol)
         PPrint.ToFormatter.compact p;
-      rest, doc
+      attach_before_comments rest doc
 
     (* Skip "whitespaces" *)
     (* FIXME: we might want to insert a comment before whitespaces. Currently
