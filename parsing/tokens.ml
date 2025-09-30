@@ -302,9 +302,11 @@ module Raw = struct
   | _ -> false
 end
 
+type attachment = Before | After | Floating
+
 type desc =
   | Token of token
-  | Comment of string
+  | Comment of string * attachment
   | Child_node
 
 type elt = {
@@ -320,7 +322,7 @@ let desc_as_string = function
       Raw.to_string t
     else
       "tok"
-  | Comment c -> Printf.sprintf "(* %s *)" c
+  | Comment (c, _) -> Printf.sprintf "(* %s *)" c
   | Child_node -> "child"
 
 let pp_elt ppf e = Format.pp_print_string ppf (desc_as_string e.desc)

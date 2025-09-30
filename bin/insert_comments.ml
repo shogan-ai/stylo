@@ -30,7 +30,7 @@ let append_trailing_comments (tokens, doc) =
     | [ T.{ desc = Token EOF; _ } ] -> doc
     | tok :: toks ->
       match tok.T.desc with
-      | Comment c -> aux Doc.(doc ^?^ comment c) toks
+      | Comment (c, _) -> aux Doc.(doc ^?^ comment c) toks
       | Token _ -> raise (Error (Missing_token tok.pos))
       | Child_node -> assert false
   in
@@ -40,7 +40,7 @@ let rec consume_leading_comments acc = function
   | [] -> acc, []
   | first :: rest ->
     match first.T.desc with
-    | Comment c -> consume_leading_comments Doc.(acc ^?^ comment c) rest
+    | Comment (c, _) -> consume_leading_comments Doc.(acc ^?^ comment c) rest
     | Token _ -> acc, rest
     | Child_node -> assert false
 
@@ -48,7 +48,7 @@ let rec consume_only_leading_comments acc = function
   | [] -> acc, []
   | first :: rest ->
     match first.T.desc with
-    | Comment c -> consume_only_leading_comments Doc.(acc ^?^ comment c) rest
+    | Comment (c, _) -> consume_only_leading_comments Doc.(acc ^?^ comment c) rest
     | Token _ -> acc, first :: rest
     | Child_node -> assert false
 
@@ -91,7 +91,7 @@ let rec walk_both seq doc =
          skipped or not.
 
          TODO: improve *)
-      T.Comment c, Doc.Comment _
+      T.Comment (c, _), Doc.Comment _
       when Doc.comment c <> doc && Doc.docstring c <> doc ->
       let rest, doc = walk_both rest doc in
       rest, Doc.(comment c ^/^ doc)

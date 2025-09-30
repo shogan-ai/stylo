@@ -1145,12 +1145,22 @@ and skip_hash_bang = parse
     { sc_loc; sc_str; sc_before }
 
   let unstage_comment newline_after sc =
-    ignore sc.sc_before;
-    ignore newline_after;
+    let attachement : Tokens.attachment =
+      match sc.sc_before, newline_after with
+      | (NoLine | BlankEquivalentLine),
+        (NoLine | BlankEquivalentLine) ->
+        (* FIXME: refine using indentation *)
+        Floating
+      | NoLine, _ -> Before
+      | _, NoLine -> After
+      | NewLine, _ -> Before
+      | _, NewLine -> After
+      | _ -> Floating
+    in
     Tokens.Indexed_list.append
       Tokens.Indexed_list.global
       ~pos:sc.sc_loc.loc_start
-      (Comment sc.sc_str)
+      (Comment (sc.sc_str, attachement))
 
   let token_updating_indexed_list lexbuf =
     let post_pos = lexeme_end_p lexbuf in

@@ -82,7 +82,7 @@ let docs_attr ds =
     { pstr_desc = Pstr_eval (exp, []); pstr_loc = loc;
       pstr_tokens = []; }
   in
-  let tok_elt = { Tokens.desc = Comment body; pos = loc.loc_start } in
+  let tok_elt = { Tokens.desc = Comment (body, After (* FIXME *)); pos = loc.loc_start } in
   remember_token tok_elt;
   { attr_name = doc_loc;
     attr_payload = PStr ([item], []);
@@ -140,7 +140,7 @@ let text_attr ds =
     { pstr_desc = Pstr_eval (exp, []); pstr_loc = loc;
       pstr_tokens = []; }
   in
-  let tok_elt = { Tokens.desc = Comment body; pos = loc.loc_start } in
+  let tok_elt = { Tokens.desc = Comment (body, Floating); pos = loc.loc_start } in
   remember_token tok_elt;
   { attr_name = text_loc;
     attr_payload = PStr ([item], []);
