@@ -1235,6 +1235,7 @@ end = struct
     )
     |> Attribute.attach ~item:true ?pre_doc:pval_pre_doc ?post_doc:pval_post_doc
       ~attrs:pval_attributes
+    |> group
 end
 
 (** {2 Type declarations} *)
@@ -1419,7 +1420,9 @@ end = struct
 
   let rec pp_list ?subst start = function
     | [] -> empty
-    | td :: tds -> pp ?subst ~start td ^?^ pp_list ?subst [S.and_] tds
+    | td :: tds ->
+      group (pp ?subst ~start td)
+      ^?^ pp_list ?subst [S.and_] tds
 
   let pp_list ?subst rf tds =
     pp_list ?subst [S.type_; nonrec_ rf] tds
@@ -1444,6 +1447,7 @@ end = struct
     |> Attribute.attach ~item:true ~attrs:ptyext_attributes
       ?pre_doc:ptyext_pre_doc
       ?post_doc:ptyext_post_doc
+    |> group
 end
 
 and Extension_constructor : sig
@@ -1491,6 +1495,7 @@ end = struct
     |> Attribute.attach ~item:true ~attrs:ptyexn_attributes
       ?pre_doc:ptyexn_pre_doc
       ?post_doc:ptyexn_post_doc
+    |> group
 end
 
 (** {1 Class language} *)
@@ -1792,6 +1797,7 @@ end = struct
     | Psig_open od -> Open_description.pp od
     | Psig_include (incl, modalities) ->
       with_modalities ~modalities (Include_description.pp incl)
+      |> group
     | Psig_class cds -> Class_description.pp_list cds
     | Psig_class_type ctds -> Class_type_declaration.pp_list ctds
     | Psig_attribute attr -> Attribute.pp_floating attr
@@ -1800,8 +1806,9 @@ end = struct
     | Psig_kind_abbrev (name, k) ->
       S.kind_abbrev__ ^/^ string name.txt ^/^ S.equals ^/^
         Jkind_annotation.pp k
+      |> group
 
-  let pp_item it = group (pp_item_desc it.psig_desc)
+  let pp_item it = pp_item_desc it.psig_desc
 
   (* TODO: duplicated from Structure *)
   let (^//^) before after =
@@ -1854,7 +1861,7 @@ end = struct
 
   let pp sg =
     let sig_with_mods, items, end_ = pp_parts sg in
-    group (prefix sig_with_mods items ^/^ end_)
+    prefix sig_with_mods items ^/^ end_
 
 
   let pp_interface sg =
@@ -1967,6 +1974,7 @@ end = struct
     pp_expr popen_expr
     |> Attribute.attach ~item ~attrs:popen_attributes
       ?pre_doc:popen_pre_doc ?post_doc:popen_post_doc
+    |> group
 end
 
 and Open_description : sig
@@ -1995,6 +2003,7 @@ end = struct
     pp_mod pincl_mod
     |> Attribute.attach ~item:true ~attrs:pincl_attributes
       ?pre_doc:pincl_pre_doc ?post_doc:pincl_post_doc
+    |> group
 end
 
 and Include_description : sig
@@ -2138,11 +2147,13 @@ end = struct
     | Pstr_attribute a -> Attribute.pp_floating a
     | Pstr_extension (ext, attrs) ->
       Attribute.attach ~item:true ~attrs (Extension.pp ~floating:true ext)
+      |> group
     | Pstr_kind_abbrev (name, k) ->
       S.kind_abbrev__ ^/^ string name.txt ^/^ S.equals ^/^
       Jkind_annotation.pp k
+      |> group
 
-  let pp_item it = group (pp_item_desc it)
+  let pp_item it = pp_item_desc it
 
   let (^//^) before after =
     if before = Empty then
@@ -2261,9 +2272,8 @@ end = struct
         (prefix bindings (group (typ ^/^ equal_sign)))
         exp
     | None, Some Three_parts { start; main; stop } ->
-      prefix
-        (prefix bindings (group (equal_sign ^/^ start)))
-        main ^/^
+      prefix bindings (group (equal_sign ^/^ start)) ^^
+        nest 2 (break 1 ^^ main) ^/^
       stop
     | Some Three_parts { start; main; stop }, None ->
       (* FIXME: here the "colon" is not included??? *)
@@ -2344,7 +2354,7 @@ end = struct
     | [ x ] -> pp ~item start x
     | x :: xs ->
       let sep = if item then hardline ^^ hardline else break 1 in
-      pp ~item start x ^^ sep ^^ pp_list ~item ~start:[S.and_] xs
+      group (pp ~item start x) ^^ sep ^^ pp_list ~item ~start:[S.and_] xs
 end
 
 and Module_binding : sig
