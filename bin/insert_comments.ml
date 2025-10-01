@@ -44,11 +44,15 @@ let rec consume_leading_comments acc = function
     | Token _ -> acc, rest
     | Child_node -> assert false
 
-let rec consume_only_leading_comments acc = function
+let rec consume_only_leading_comments ?(restrict_to_before=false) acc = function
   | [] -> acc, []
   | first :: rest ->
     match first.T.desc with
-    | Comment (c, _) -> consume_only_leading_comments Doc.(acc ^?^ comment c) rest
+    | Comment (c, attached) ->
+      if restrict_to_before && attached <> Before then
+        acc, first :: rest
+      else
+        consume_only_leading_comments Doc.(acc ^?^ comment c) rest
     | Token _ -> acc, first :: rest
     | Child_node -> assert false
 
@@ -64,21 +68,82 @@ let rec first_is_comment = function
 
 let first_is_comment d = first_is_comment d = `yes
 
-let rec attach_before_comments space_before_next tokens doc =
-  match tokens with
-  | [] -> tokens, doc, space_before_next
-  | first :: rest ->
-    match first.T.desc with
-    | T.Comment (c, Before) ->
-      (* FIXME: make sure the comment is not already inserted!! *)
-      (* FIXME: if we're attaching several comments, they'll be separated by two
-         spaces each.
-         Use [consume_leading_comments] instead. *)
-      let doc = Doc.(group (doc ^/^ comment c)) in
-      attach_before_comments true rest doc
-    | _ -> tokens, doc, space_before_next
+type state = {
+  space_needed_before_next: bool;
+  (** Whether a space should be inserted before the next leaf node (token or
+      comment).
 
-let rec walk_both ?(space_before_next=false) ?(at_end_of_group=false) seq doc =
+      This flag is set when a comment is inserted, and it is reset when a space
+      is inserted (either manually, or because we encountered a [Whitespace]
+      node). *)
+
+  at_end_of_a_group: bool;
+  (** This is [true] for the rightmost branch under a [Group] node.
+      In that situation we delay comment insertion: appending at the end of a
+      group might make it non flat. *)
+
+  nesting_difference_with_previous_token: int;
+  (** When we "attach" a comment to the token that preceeds it, we expect it to
+      be at the same nesting level as that token.
+      However, since we sometimes delay comment insertion (c.f.
+      {!at_end_of_group}) we might have gone out of the [Nest] subtree when we
+      finally insert the comment.
+      Keeping track of the nesting level of the previous token enables us to
+      recreate the correct [Nest] node to place the comment under. *)
+}
+
+let init_state =
+  { space_needed_before_next = false
+  ; at_end_of_a_group = false
+  ; nesting_difference_with_previous_token = 0 }
+
+let no_space st = { st with space_needed_before_next = false }
+
+let incr_nesting st n =
+  { st with
+    nesting_difference_with_previous_token =
+      st.nesting_difference_with_previous_token + n }
+
+let decr_nesting st n =
+  { st with
+    nesting_difference_with_previous_token =
+      max 0 (st.nesting_difference_with_previous_token - n) }
+
+let reset_nesting st = { st with nesting_difference_with_previous_token = 0 }
+
+let attach_before_comments state tokens doc =
+  if state.at_end_of_a_group then
+    tokens, doc, state
+  else
+    let () = dprintf "not at end of group, attaching!@." in
+    let to_append, tokens =
+      consume_only_leading_comments ~restrict_to_before:true
+        Doc.empty tokens
+    in
+    if to_append = Doc.empty then
+      (* no comment to attach *)
+      tokens, doc, reset_nesting state
+    else
+      let doc =
+        let open Doc in
+        dprintf "attaching to preceeding!@.";
+        let nested_comment =
+          nest state.nesting_difference_with_previous_token
+            (break 1 ^^ to_append)
+        in
+        group (doc ^^ nested_comment)
+      in
+      tokens, doc,
+      { state with
+        space_needed_before_next = true;
+        nesting_difference_with_previous_token = 0 }
+
+let insert_space_if_required state doc =
+  if state.space_needed_before_next
+  then Doc.(break 1 ^^ doc)
+  else doc
+
+let rec walk_both state seq doc =
   match seq with
   | [] ->
     (* Some extra tokens or comments were synthesized *)
@@ -91,11 +156,8 @@ let rec walk_both ?(space_before_next=false) ?(at_end_of_group=false) seq doc =
       dprintf "synced at %d:%d with LET@."
         first.pos.pos_lnum
         (first.pos.pos_cnum - first.pos.pos_bol);
-      let doc = if space_before_next then Doc.(break 1 ^^ doc) else doc in
-      if at_end_of_group then
-        rest, doc, false
-      else
-        attach_before_comments false rest doc
+      let doc = insert_space_if_required state doc in
+      attach_before_comments (no_space state) rest doc
 
     (*** Stricter sync check part 2 ***)
     | T.Token LET, Doc.Token _ ->
@@ -111,12 +173,10 @@ let rec walk_both ?(space_before_next=false) ?(at_end_of_group=false) seq doc =
          TODO: improve *)
       T.Comment (c, _), Doc.Comment _
       when Doc.comment c <> doc && Doc.docstring c <> doc ->
-      let space_before_doc =
-        if space_before_next then Doc.break 1 else Doc.empty
-      in
-      let rest, doc, add_space_before_next = walk_both rest doc in
-      let doc = Doc.(space_before_doc ^^ comment c ^/^ doc) in
-      rest, doc, add_space_before_next
+      let rest, doc, state' = walk_both (no_space state) rest doc in
+      (* FIXME: nesting?! *)
+      let doc = insert_space_if_required state Doc.(comment c ^/^ doc) in
+      rest, doc, state'
 
     (* Synchronized, advance *)
     | T.Token _, Doc.Token p
@@ -126,73 +186,68 @@ let rec walk_both ?(space_before_next=false) ?(at_end_of_group=false) seq doc =
         first.pos.pos_lnum
         (first.pos.pos_cnum - first.pos.pos_bol)
         PPrint.ToFormatter.compact p;
-      let doc = if space_before_next then Doc.(break 1 ^^ doc) else doc in
-      if at_end_of_group then
-        rest, doc, false
-      else
-        attach_before_comments false rest doc
+      let doc = insert_space_if_required state doc in
+      attach_before_comments (no_space state) rest doc
 
     (* Skip "whitespaces" *)
-    | _, Doc.Empty -> seq, doc, space_before_next
-    | _, Doc.Whitespace _ -> seq, doc, false
+    | _, Doc.Empty -> seq, doc, state
+    | _, Doc.Whitespace _ -> seq, doc, no_space state
 
     (* Comments missing in the doc, insert them *)
     | T.Comment _, Doc.(Token_let | Token _) ->
-      let space_before_doc =
-        if space_before_next then Doc.break 1 else Doc.empty
-      in
       let to_prepend, rest = consume_leading_comments Doc.empty seq in
-      let doc = Doc.(space_before_doc ^^ to_prepend ^/^ doc) in
-      rest, doc, false
+      dprintf "inserting before token!!@.";
+      let doc = insert_space_if_required state Doc.(to_prepend ^/^ doc) in
+      rest, doc, no_space state
 
     | T.Comment _, Doc.Group d when not (first_is_comment d) ->
-      let space_before_doc =
-        if space_before_next then Doc.break 1 else Doc.empty
-      in
       let to_prepend, rest = consume_only_leading_comments Doc.empty seq in
-      let rest, doc, space_before_next =
-        walk_both ~at_end_of_group:true rest doc
+      dprintf "inserting before group!!@.";
+      let rest, doc, state' =
+        walk_both
+          { state with
+            space_needed_before_next = false;
+            at_end_of_a_group = true }
+          rest doc
       in
-      let doc = Doc.(space_before_doc ^^ to_prepend ^/^ doc) in
-      if at_end_of_group then
-        rest, doc, space_before_next
-      else
-        attach_before_comments space_before_next rest doc
+      let doc = insert_space_if_required state Doc.(to_prepend ^/^ doc) in
+      attach_before_comments state' rest doc
 
     (* Traverse document structure *)
     | _, Doc.Cat (left, right) ->
-      let restl, left, space_before_next =
-        walk_both ~space_before_next seq left in
-      let restr, right, space_before_next =
-        walk_both ~space_before_next ~at_end_of_group restl right in
-      restr, Cat (left, right), space_before_next
+      let restl, left, mid_state =
+        walk_both { state with at_end_of_a_group = false } seq left
+      in
+      let restr, right, final_state =
+        walk_both { mid_state with at_end_of_a_group = state.at_end_of_a_group }
+          restl right
+      in
+      restr, Cat (left, right), final_state
 
-    (* We're resetting [at_end_of_group] here because, even though we generally
-       don't want to append to a group (as that risks breaking its flatness), we
-       still want to keep comments in the same nest group as the token they are
-       attached to. *)
     | _, Doc.Nest (i, doc) ->
-      let rest, doc, space_before_next = walk_both ~space_before_next seq doc in
-      rest, Nest (i, doc), space_before_next
+      let rest, doc, state = walk_both (decr_nesting state i) seq doc in
+      rest, Nest (i, doc), incr_nesting state i
     | _, Doc.Relative_nest (i, doc) ->
-      let rest, doc, space_before_next = walk_both ~space_before_next seq doc in
-      rest, Relative_nest (i, doc), space_before_next
+      let rest, doc, state = walk_both (decr_nesting state i) seq doc in
+      rest, Relative_nest (i, doc), incr_nesting state i
 
     | _, Doc.Group doc ->
-      let space_before_doc =
-        if space_before_next then Doc.break 1 else Doc.empty
+      let rest, doc, state' =
+        walk_both
+          { state with
+            space_needed_before_next = false;
+            at_end_of_a_group = true }
+          seq doc
       in
-      let rest, doc, space_before_next =
-        walk_both ~at_end_of_group:true seq doc in
-      let doc = Doc.(space_before_doc ^^ group doc) in
-      if at_end_of_group then
-        rest, doc, space_before_next
-      else
-        attach_before_comments space_before_next rest doc
+      let return_state =
+        { state' with at_end_of_a_group = state.at_end_of_a_group }
+      in
+      let doc = insert_space_if_required state (Doc.group doc) in
+      attach_before_comments return_state rest doc
+
     | _, Doc.Align doc ->
-      let rest, doc, space_before_next =
-        walk_both ~space_before_next ~at_end_of_group seq doc in
-      rest, Align doc, space_before_next
+      let rest, doc, state = walk_both state seq doc in
+      rest, Align doc, state
 
     (* Token missing from the document: this is a hard error. *)
     | T.Token _, Doc.Comment _ ->
@@ -206,5 +261,5 @@ let rec walk_both ?(space_before_next=false) ?(at_end_of_group=false) seq doc =
     | T.Child_node, _ -> assert false
 
 let from_tokens tokens doc =
-  walk_both tokens doc
+  walk_both init_state tokens doc
   |> append_trailing_comments
