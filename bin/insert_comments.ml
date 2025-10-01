@@ -166,14 +166,18 @@ let rec walk_both ?(space_before_next=false) ?(at_end_of_group=false) seq doc =
       let restr, right, space_before_next =
         walk_both ~space_before_next ~at_end_of_group restl right in
       restr, Cat (left, right), space_before_next
+
+    (* We're resetting [at_end_of_group] here because, even though we generally
+       don't want to append to a group (as that risks breaking its flatness), we
+       still want to keep comments in the same nest group as the token they are
+       attached to. *)
     | _, Doc.Nest (i, doc) ->
-      let rest, doc, space_before_next =
-        walk_both ~space_before_next ~at_end_of_group seq doc in
+      let rest, doc, space_before_next = walk_both ~space_before_next seq doc in
       rest, Nest (i, doc), space_before_next
     | _, Doc.Relative_nest (i, doc) ->
-      let rest, doc, space_before_next =
-        walk_both ~space_before_next ~at_end_of_group seq doc in
+      let rest, doc, space_before_next = walk_both ~space_before_next seq doc in
       rest, Relative_nest (i, doc), space_before_next
+
     | _, Doc.Group doc ->
       let space_before_doc =
         if space_before_next then Doc.break 1 else Doc.empty
