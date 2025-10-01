@@ -24,7 +24,7 @@ let pp_error ppf = function
 
 exception Error of error
 
-let append_trailing_comments (tokens, doc) =
+let append_trailing_comments (tokens, doc, _) =
   let rec aux doc = function
     | []
     | [ T.{ desc = Token EOF; _ } ] -> doc
@@ -64,18 +64,21 @@ let rec first_is_comment = function
 
 let first_is_comment d = first_is_comment d = `yes
 
-let rec attach_before_comments tokens doc =
+let rec attach_before_comments space_before_next tokens doc =
   match tokens with
-  | [] -> tokens, doc
+  | [] -> tokens, doc, space_before_next
   | first :: rest ->
     match first.T.desc with
     | T.Comment (c, Before) ->
       (* FIXME: make sure the comment is not already inserted!! *)
+      (* FIXME: if we're attaching several comments, they'll be separated by two
+         spaces each.
+         Use [consume_leading_comments] instead. *)
       let doc = Doc.(group (doc ^/^ comment c)) in
-      attach_before_comments rest doc
-    | _ -> tokens, doc
+      attach_before_comments true rest doc
+    | _ -> tokens, doc, space_before_next
 
-let rec walk_both ?(at_end_of_group=false) seq doc =
+let rec walk_both ?(space_before_next=false) ?(at_end_of_group=false) seq doc =
   match seq with
   | [] ->
     (* Some extra tokens or comments were synthesized *)
@@ -88,7 +91,11 @@ let rec walk_both ?(at_end_of_group=false) seq doc =
       dprintf "synced at %d:%d with LET@."
         first.pos.pos_lnum
         (first.pos.pos_cnum - first.pos.pos_bol);
-      rest, doc
+      let doc = if space_before_next then Doc.(break 1 ^^ doc) else doc in
+      if at_end_of_group then
+        rest, doc, false
+      else
+        attach_before_comments false rest doc
 
     (*** Stricter sync check part 2 ***)
     | T.Token LET, Doc.Token _ ->
@@ -104,8 +111,12 @@ let rec walk_both ?(at_end_of_group=false) seq doc =
          TODO: improve *)
       T.Comment (c, _), Doc.Comment _
       when Doc.comment c <> doc && Doc.docstring c <> doc ->
-      let rest, doc = walk_both rest doc in
-      rest, Doc.(comment c ^/^ doc)
+      let space_before_doc =
+        if space_before_next then Doc.break 1 else Doc.empty
+      in
+      let rest, doc, add_space_before_next = walk_both rest doc in
+      let doc = Doc.(space_before_doc ^^ comment c ^/^ doc) in
+      rest, doc, add_space_before_next
 
     (* Synchronized, advance *)
     | T.Token _, Doc.Token p
@@ -115,51 +126,69 @@ let rec walk_both ?(at_end_of_group=false) seq doc =
         first.pos.pos_lnum
         (first.pos.pos_cnum - first.pos.pos_bol)
         PPrint.ToFormatter.compact p;
+      let doc = if space_before_next then Doc.(break 1 ^^ doc) else doc in
       if at_end_of_group then
-        rest, doc
+        rest, doc, false
       else
-        attach_before_comments rest doc
+        attach_before_comments false rest doc
 
     (* Skip "whitespaces" *)
-    (* FIXME: we might want to insert a comment before whitespaces. Currently
-       we're always placing comments just before the next token/group, but we
-       might want to keep them close to the preceeding one. *)
-    | _, Doc.(Empty | Whitespace _) -> seq, doc
+    | _, Doc.Empty -> seq, doc, space_before_next
+    | _, Doc.Whitespace _ -> seq, doc, false
 
     (* Comments missing in the doc, insert them *)
     | T.Comment _, Doc.(Token_let | Token _) ->
+      let space_before_doc =
+        if space_before_next then Doc.break 1 else Doc.empty
+      in
       let to_prepend, rest = consume_leading_comments Doc.empty seq in
-      rest, Doc.(to_prepend ^/^ doc)
+      let doc = Doc.(space_before_doc ^^ to_prepend ^/^ doc) in
+      rest, doc, false
 
     | T.Comment _, Doc.Group d when not (first_is_comment d) ->
+      let space_before_doc =
+        if space_before_next then Doc.break 1 else Doc.empty
+      in
       let to_prepend, rest = consume_only_leading_comments Doc.empty seq in
-      let rest, doc = walk_both ~at_end_of_group:true rest doc in
-      let doc = Doc.(to_prepend ^/^ doc) in
+      let rest, doc, space_before_next =
+        walk_both ~at_end_of_group:true rest doc
+      in
+      let doc = Doc.(space_before_doc ^^ to_prepend ^/^ doc) in
       if at_end_of_group then
-        rest, doc
+        rest, doc, space_before_next
       else
-        attach_before_comments rest doc
+        attach_before_comments space_before_next rest doc
 
     (* Traverse document structure *)
     | _, Doc.Cat (left, right) ->
-      let restl, left = walk_both seq left in
-      let restr, right = walk_both ~at_end_of_group restl right in
-      restr, Cat (left, right)
+      let restl, left, space_before_next =
+        walk_both ~space_before_next seq left in
+      let restr, right, space_before_next =
+        walk_both ~space_before_next ~at_end_of_group restl right in
+      restr, Cat (left, right), space_before_next
     | _, Doc.Nest (i, doc) ->
-      let rest, doc = walk_both ~at_end_of_group seq doc in
-      rest, Nest (i, doc)
+      let rest, doc, space_before_next =
+        walk_both ~space_before_next ~at_end_of_group seq doc in
+      rest, Nest (i, doc), space_before_next
     | _, Doc.Relative_nest (i, doc) ->
-      let rest, doc = walk_both ~at_end_of_group seq doc in
-      rest, Relative_nest (i, doc)
+      let rest, doc, space_before_next =
+        walk_both ~space_before_next ~at_end_of_group seq doc in
+      rest, Relative_nest (i, doc), space_before_next
     | _, Doc.Group doc ->
-      let rest, doc = walk_both ~at_end_of_group:true seq doc in
+      let space_before_doc =
+        if space_before_next then Doc.break 1 else Doc.empty
+      in
+      let rest, doc, space_before_next =
+        walk_both ~at_end_of_group:true seq doc in
+      let doc = Doc.(space_before_doc ^^ group doc) in
       if at_end_of_group then
-        rest, Group doc
+        rest, doc, space_before_next
       else
-        attach_before_comments rest (Group doc)
+        attach_before_comments space_before_next rest doc
     | _, Doc.Align doc ->
-      let rest, doc = walk_both ~at_end_of_group seq doc in
-      rest, Align doc
+      let rest, doc, space_before_next =
+        walk_both ~space_before_next ~at_end_of_group seq doc in
+      rest, Align doc, space_before_next
 
     (* Token missing from the document: this is a hard error. *)
     | T.Token _, Doc.Comment _ ->
