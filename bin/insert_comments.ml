@@ -111,27 +111,33 @@ let decr_nesting st n =
 
 let reset_nesting st = { st with nesting_difference_with_previous_token = 0 }
 
+let is_comment_attaching_before elt =
+  match elt.T.desc with
+  | Comment (_, Before) -> true
+  | _ -> false
+
 let attach_before_comments state tokens doc =
   if state.at_end_of_a_group then
     tokens, doc, state
   else
     let () = dprintf "not at end of group, attaching!@." in
-    let to_append, tokens =
-      consume_only_leading_comments ~restrict_to_before:true
-        Doc.empty tokens
-    in
-    if to_append = Doc.empty then
+    match List.take_while is_comment_attaching_before tokens with
+    | [] ->
       (* no comment to attach *)
       tokens, doc, reset_nesting state
-    else
+    | to_append ->
+      let tokens = List.drop_while is_comment_attaching_before tokens in
       let doc =
         let open Doc in
         dprintf "attaching to preceeding!@.";
-        let nested_comment =
-          nest state.nesting_difference_with_previous_token
-            (break 1 ^^ to_append)
-        in
-        group (doc ^^ nested_comment)
+        group @@ List.fold_left (fun acc cmt ->
+          match cmt.T.desc with
+          | Comment (c, _) ->
+            acc ^^
+            nest state.nesting_difference_with_previous_token
+              (group (break 1 ^^ comment c))
+          | _ -> assert false
+        ) doc to_append
       in
       tokens, doc,
       { state with
