@@ -1180,17 +1180,12 @@ and skip_hash_bang = parse
       | BlankLine, NewLine -> After
       | BlankLine, BlankLine -> Floating
       | NewLine, NewLine ->
-        let prev_indent = sc.sc_indent.prev_tok in
         let cmt_indent = sc.sc_indent.curr_tok in
         let next_indent = Line_indent.current_line () in
-        if prev_indent = next_indent then
-          Floating
-        else if prev_indent = cmt_indent then
-          Before
-        else if cmt_indent = next_indent then
+        if cmt_indent = next_indent then
           After
         else
-          Floating
+          Before
     in
     Tokens.Indexed_list.append
       Tokens.Indexed_list.global
