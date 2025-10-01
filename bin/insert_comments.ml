@@ -75,7 +75,10 @@ type state = {
 
       This flag is set when a comment is inserted, and it is reset when a space
       is inserted (either manually, or because we encountered a [Whitespace]
-      node). *)
+      node).
+
+      FIXME: we also need the "reverse": we need to know when a space needs to
+      be added before a comment we're inserting... *)
 
   at_end_of_a_group: bool;
   (** This is [true] for the rightmost branch under a [Group] node.
@@ -89,7 +92,12 @@ type state = {
       {!at_end_of_group}) we might have gone out of the [Nest] subtree when we
       finally insert the comment.
       Keeping track of the nesting level of the previous token enables us to
-      recreate the correct [Nest] node to place the comment under. *)
+      recreate the correct [Nest] node to place the comment under.
+
+      FIXME: symmetrically, we sometimes eagerly insert a comment before going
+      under a group (and the subsequent nests).
+      But if the comment is "attached" to the next token, then we need to keep
+      track of the nesting difference with that token. *)
 }
 
 let init_state =
