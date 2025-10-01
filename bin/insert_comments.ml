@@ -71,11 +71,11 @@ let rec attach_before_comments tokens doc =
     match first.T.desc with
     | T.Comment (c, Before) ->
       (* FIXME: make sure the comment is not already inserted!! *)
-      let doc = Doc.(doc ^/^ comment c) in
+      let doc = Doc.(group (doc ^/^ comment c)) in
       attach_before_comments rest doc
     | _ -> tokens, doc
 
-let rec walk_both seq doc =
+let rec walk_both ?(at_end_of_group=false) seq doc =
   match seq with
   | [] ->
     (* Some extra tokens or comments were synthesized *)
@@ -115,7 +115,10 @@ let rec walk_both seq doc =
         first.pos.pos_lnum
         (first.pos.pos_cnum - first.pos.pos_bol)
         PPrint.ToFormatter.compact p;
-      attach_before_comments rest doc
+      if at_end_of_group then
+        rest, doc
+      else
+        attach_before_comments rest doc
 
     (* Skip "whitespaces" *)
     (* FIXME: we might want to insert a comment before whitespaces. Currently
@@ -130,25 +133,32 @@ let rec walk_both seq doc =
 
     | T.Comment _, Doc.Group d when not (first_is_comment d) ->
       let to_prepend, rest = consume_only_leading_comments Doc.empty seq in
-      let rest, doc = walk_both rest doc in
-      rest, Doc.(to_prepend ^/^ doc)
+      let rest, doc = walk_both ~at_end_of_group:true rest doc in
+      let doc = Doc.(to_prepend ^/^ doc) in
+      if at_end_of_group then
+        rest, doc
+      else
+        attach_before_comments rest doc
 
     (* Traverse document structure *)
     | _, Doc.Cat (left, right) ->
       let restl, left = walk_both seq left in
-      let restr, right = walk_both restl right in
+      let restr, right = walk_both ~at_end_of_group restl right in
       restr, Cat (left, right)
     | _, Doc.Nest (i, doc) ->
-      let rest, doc = walk_both seq doc in
+      let rest, doc = walk_both ~at_end_of_group seq doc in
       rest, Nest (i, doc)
     | _, Doc.Relative_nest (i, doc) ->
-      let rest, doc = walk_both seq doc in
+      let rest, doc = walk_both ~at_end_of_group seq doc in
       rest, Relative_nest (i, doc)
     | _, Doc.Group doc ->
-      let rest, doc = walk_both seq doc in
-      rest, Group doc
+      let rest, doc = walk_both ~at_end_of_group:true seq doc in
+      if at_end_of_group then
+        rest, Group doc
+      else
+        attach_before_comments rest (Group doc)
     | _, Doc.Align doc ->
-      let rest, doc = walk_both seq doc in
+      let rest, doc = walk_both ~at_end_of_group seq doc in
       rest, Align doc
 
     (* Token missing from the document: this is a hard error. *)
