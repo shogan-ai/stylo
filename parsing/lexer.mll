@@ -1135,27 +1135,62 @@ and skip_hash_bang = parse
     in
       loop NoLine Initial lexbuf
 
+  module Line_indent = struct
+    type t = {
+      mutable curr_tok: int;
+      mutable prev_tok: int;
+    }
+
+    let state = { curr_tok = -1; prev_tok = -1 }
+
+    let new_info newline_state token_start_pos =
+      let col = token_start_pos.Lexing.pos_cnum - token_start_pos.pos_bol in
+      state.prev_tok <- state.curr_tok;
+      match newline_state with
+      | NoLine when state.curr_tok <> -1 (* we already saw some tokens *) ->
+        () (* line didn't change, nothing to do. *)
+      | _ -> state.curr_tok <- col
+
+    let copy () =
+      let { curr_tok; prev_tok } = state in
+      { curr_tok; prev_tok }
+
+    let current_line () = state.curr_tok
+  end
+
   type staged_comment = {
     sc_loc: Location.t;
     sc_str: string;
     sc_before: newline_state;
+    sc_indent: Line_indent.t;
   }
 
   let stage_comment sc_before sc_loc sc_str =
-    { sc_loc; sc_str; sc_before }
+    { sc_loc; sc_str; sc_before; sc_indent = Line_indent.copy () }
 
   let unstage_comment newline_after sc =
     let attachement : Tokens.attachment =
       match sc.sc_before, newline_after with
       | (NoLine | BlankEquivalentLine),
         (NoLine | BlankEquivalentLine) ->
-        (* FIXME: refine using indentation *)
         Floating
-      | NoLine, _ -> Before
-      | _, NoLine -> After
-      | NewLine, _ -> Before
-      | _, NewLine -> After
-      | _ -> Floating
+      | (NoLine | BlankEquivalentLine), _ -> Before
+      | _, (NoLine | BlankEquivalentLine) -> After
+      | NewLine, BlankLine -> Before
+      | BlankLine, NewLine -> After
+      | BlankLine, BlankLine -> Floating
+      | NewLine, NewLine ->
+        let prev_indent = sc.sc_indent.prev_tok in
+        let cmt_indent = sc.sc_indent.curr_tok in
+        let next_indent = Line_indent.current_line () in
+        if prev_indent = next_indent then
+          Floating
+        else if prev_indent = cmt_indent then
+          Before
+        else if cmt_indent = next_indent then
+          After
+        else
+          Floating
     in
     Tokens.Indexed_list.append
       Tokens.Indexed_list.global
@@ -1167,6 +1202,7 @@ and skip_hash_bang = parse
     let rec loop lines docs sc_opt lexbuf =
       match token_with_comments lexbuf with
       | COMMENT (s, loc) ->
+          Line_indent.new_info lines loc.loc_start;
           add_comment (s, loc);
           Option.iter (unstage_comment lines) sc_opt;
           let sc = stage_comment lines loc s in
@@ -1188,22 +1224,24 @@ and skip_hash_bang = parse
           in
           loop lines' docs sc_opt lexbuf
       | DOCSTRING doc ->
+          let doc_loc = Docstrings.docstring_loc doc in
+          Line_indent.new_info lines doc_loc.loc_start;
           Docstrings.register doc;
           add_docstring_comment doc;
           Option.iter (unstage_comment lines) sc_opt;
           let sc =
-            stage_comment lines
-              (Docstrings.docstring_loc doc)
-              (Docstrings.docstring_body doc)
+            stage_comment lines doc_loc (Docstrings.docstring_body doc)
           in
           let docs' = acc_docstring lines docs doc in
           loop NoLine docs' (Some sc) lexbuf
       | tok ->
+          let start_pos = lexeme_start_p lexbuf in
+          Line_indent.new_info lines start_pos;
           Option.iter (unstage_comment lines) sc_opt;
-          attach lines docs post_pos (lexeme_start_p lexbuf);
+          attach lines docs post_pos start_pos;
           Tokens.Indexed_list.append
             Tokens.Indexed_list.global
-            ~pos:lexbuf.lex_start_p
+            ~pos:start_pos
             (Token tok);
           tok
     in
