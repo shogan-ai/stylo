@@ -1256,31 +1256,40 @@ end = struct
 end
 
 (** {2 Type declarations} *)
-and Label_declaration : sig
-  val pp : label_declaration -> document
+
+and Record : sig
+  val pp_decl: ?unboxed:bool -> label_declaration list -> document
 end = struct
-  let pp { pld_name; pld_mutable; pld_modalities; pld_type; pld_attributes;
-           pld_doc = _ (* explicitely handled in the wrapper below *);
-           pld_loc = _; pld_tokens = _ } =
-    prefix (group (mutable_ pld_mutable ^^ string pld_name.txt ^/^ S.colon))
-      (Core_type.pp pld_type ^^
-       begin match pld_modalities with
-       | [] -> empty
-       | ms -> break 1 ^^ S.atat ^/^ modalities ms
-       end)
-    |> Attribute.attach ~attrs:pld_attributes
+  let pp preceding_tok (* opening brace or previous semicolon *)
+        { pld_name; pld_mutable; pld_modalities; pld_type; pld_attributes;
+          pld_doc; pld_loc = _; pld_tokens = _ } =
+    let field =
+      prefix
+        (prefix_nonempty preceding_tok
+           (group (mutable_ pld_mutable ^^ string pld_name.txt ^/^ S.colon)))
+        (Core_type.pp pld_type ^^
+         begin match pld_modalities with
+         | [] -> empty
+         | ms -> break 1 ^^ S.atat ^/^ modalities ms
+         end)
+    in
+    (* We want the attributes (and doc) to line up with the field name, not the
+       semicolon. *)
+    prefix_nonempty field
+      (Attribute.pp_list pld_attributes ^?^ optional Attribute.pp pld_doc)
 
-  let pp pld =
-    (* N.B. we are "normalizing": docstring is always placed after the semicolon
-       if there is one.
-       Is that ok? *)
-    pp pld ^^
-    begin if List.exists (fun t -> t.Tokens.desc = Token SEMI) pld.pld_tokens
-      then S.semi
-      else empty
-    end ^?^
-    optional Attribute.pp pld.pld_doc
-
+  let pp_decl ?(unboxed=false) lbls =
+    let maybe_trailing_semi, lbls =
+      List.fold_left_map (fun preceding_tok lbl ->
+        let next_tok =
+          if List.exists (fun t -> t.Tokens.desc = Token SEMI) lbl.pld_tokens
+          then S.semi
+          else empty
+        in
+        next_tok, pp preceding_tok lbl
+      ) (if unboxed then S.hash_lbrace else S.lbrace) lbls
+    in
+    separate (break 0) lbls ^?^ maybe_trailing_semi ^?^ S.rbrace
 end
 
 and Constructor_argument : sig
@@ -1296,9 +1305,7 @@ end = struct
   let pp_args = function
     | Pcstr_tuple args ->
       separate_map (break 1 ^^ S.star ^^ break 1) pp args
-    | Pcstr_record lbls ->
-      let lbls = separate_map (break 1) Label_declaration.pp lbls in
-      prefix S.lbrace lbls ^/^ S.rbrace
+    | Pcstr_record lbls -> Record.pp_decl lbls
 end
 
 and Type_param : sig
@@ -1380,12 +1387,8 @@ end = struct
       | cd :: _ ->
         pp_constrs ~has_leading_pipe:(starts_with_pipe cd.pcd_tokens) cds
       end
-    | Ptype_record lbls ->
-      let lbls = separate_map (break 1) Label_declaration.pp lbls in
-      prefix S.lbrace lbls ^/^ S.rbrace
-    | Ptype_record_unboxed_product lbls ->
-      let lbls = separate_map (break 1) Label_declaration.pp lbls in
-      prefix S.hash_lbrace lbls ^/^ S.rbrace
+    | Ptype_record lbls -> Record.pp_decl lbls
+    | Ptype_record_unboxed_product lbls -> Record.pp_decl ~unboxed:true lbls
     | Ptype_open -> S.dotdot
 
   let pp_constraints =
