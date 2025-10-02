@@ -1591,7 +1591,7 @@ end = struct
     pp ?equal_sign
       ~pre_text:pci_pre_text
       ?pre_doc:pci_pre_doc
-      ~keyword:(group (separate (break 1) keywords ^?^ virtual_ pci_virt))
+      ~keyword:(separate (break 1) keywords ^?^ virtual_ pci_virt)
       bound_class_thingy
       ~params:value_params
       ?constraint_:(Option.map mk_constraint pci_constraint)
@@ -2273,7 +2273,10 @@ end = struct
     | Three_parts r -> Three_parts { r with stop = f r.stop }
 
   let pp ~equal_sign ~keyword ~params ?constraint_ ?rhs bound =
-    let bindings = nest 2 (flow (break 1) (keyword :: bound :: params)) in
+    let bindings =
+      List.fold_left (fun acc elt -> acc ^^ nest 2 (group (break 1 ^^ elt)))
+        (group keyword) (bound :: params)
+    in
     match constraint_, rhs with
     | None, None ->
       (* let-punning and abstract module types *)
@@ -2348,7 +2351,7 @@ end = struct
         Ext_attribute.decorate first_kw pvb_ext_attrs
           ^?^ separate (break 1) other_kws
     in
-    let kw_and_modes = group (start ^?^ modes pvb_modes) in
+    let kw_and_modes = start ^?^ modes pvb_modes in
     let pat = Pattern.pp pvb_pat in
     let params = List.map Function_param.pp pvb_params in
     let open Generic_binding in
@@ -2412,7 +2415,7 @@ end = struct
     let params = List.map Functor_parameter.pp pmb_params in
     let constraint_ = modal_constraint pmb_constraint pmb_modes in
     Generic_binding.pp ~pre_text:pmb_pre_text ?pre_doc:pmb_pre_doc
-      ~keyword:(group kw) bound ~params
+      ~keyword:kw bound ~params
       ?constraint_
       ~rhs:(Module_expr.as_rhs pmb_expr)
       ~attrs:pmb_attributes ?item
