@@ -328,22 +328,22 @@ end = struct
     end ^^
     arg ^/^ S.rarrow ^/^ rhs
 
-  let rec pp { ptyp_desc; ptyp_attributes; ptyp_doc; ptyp_tokens; ptyp_loc=_} =
+  let rec pp { ptyp_desc; ptyp_attributes; ptyp_tokens; ptyp_loc=_} =
     group (pp_desc ptyp_tokens ptyp_desc)
-    |> Attribute.attach ~attrs:ptyp_attributes ?post_doc:ptyp_doc
+    |> Attribute.attach ~attrs:ptyp_attributes
 
   and pp_desc tokens = function
     | Ptyp_any None -> S.underscore
     | Ptyp_any Some k -> S.underscore ^/^ S.colon ^/^ Jkind_annotation.pp k
     | Ptyp_var (s, ko) -> pp_var s ko
-    | Ptyp_arrow { lbl; dom_legacy_modes; dom_type; dom_modes;
-                   codom_legacy_modes; codom_type; codom_modes } ->
+    | Ptyp_arrow { domain=dom; codom_legacy_modes; codom_type; codom_modes } ->
       let pp_surrounded pre_m post_m ty =
         modes_legacy pre_m ^?^ pp ty
         |> with_modes ~modes:post_m
       in
-      pp_arrow tokens lbl
-        (pp_surrounded dom_legacy_modes dom_modes dom_type)
+      pp_arrow tokens dom.aa_lbl
+        (pp_surrounded dom.aa_legacy_modes dom.aa_modes dom.aa_type
+         |> Attribute.attach ?post_doc:dom.aa_doc ~attrs:[])
         (pp_surrounded codom_legacy_modes codom_modes codom_type)
     | Ptyp_tuple elts -> pp_tuple elts
     | Ptyp_unboxed_tuple elts -> S.hash_lparen ^^ pp_tuple elts ^^ S.rparen

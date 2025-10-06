@@ -162,19 +162,25 @@ and core_type =
      ptyp_desc: core_type_desc;
      ptyp_loc: location;
      ptyp_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
-     ptyp_doc: attribute option; (* can only be set on lhs of an arrow *)
      ptyp_tokens: tokens;
     }
+
+and arrow_arg = {
+  aa_lbl: arg_label;
+  aa_legacy_modes: modes;
+  aa_type: core_type;
+  aa_modes: modes;
+  aa_doc: attribute option;
+  aa_loc: location;
+  aa_tokens: tokens;
+}
 
 and core_type_desc =
   | Ptyp_any of jkind_annotation option (** [_] or [_ : k] *)
   | Ptyp_var of string * jkind_annotation option
     (** A type variable such as ['a] or ['a : k] *)
   | Ptyp_arrow of
-      { lbl: arg_label;
-        dom_legacy_modes: modes;
-        dom_type: core_type;
-        dom_modes: modes;
+      { domain: arrow_arg;
         codom_legacy_modes: modes;
         codom_type: core_type;
         codom_modes: modes

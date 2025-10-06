@@ -42,6 +42,10 @@ val with_default_loc: loc -> (unit -> 'a) -> 'a
     (** Set the [default_loc] within the scope of the execution
         of the provided function. *)
 
+module Tokens_and_doc : sig
+  val info : docstring option -> attribute option * Tokens.seq
+end
+
 (** {1 Constants} *)
 
 module Const : sig
@@ -96,8 +100,6 @@ module Typ :
                  -> core_type
     val open_ : ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> core_type -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> core_type
-
-    val info : core_type -> docstring option -> core_type
 
     val varify_constructors: str list -> core_type -> core_type
     (** [varify_constructors newtypes te] is type expression [te], of which

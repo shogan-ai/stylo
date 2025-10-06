@@ -100,7 +100,6 @@ module Typ = struct
     {ptyp_desc = d;
      ptyp_loc = loc;
      ptyp_attributes = attrs;
-     ptyp_doc = None;
      ptyp_tokens = tokens;}
 
   let attr d a = {d with ptyp_attributes = d.ptyp_attributes @ [a]}
@@ -123,10 +122,6 @@ module Typ = struct
   let extension ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ptyp_extension a)
   let open_ ?loc ?attrs ~tokens mod_ident t = mk ?loc ?attrs ~tokens (Ptyp_open (mod_ident, t))
 
-  let info ct info =
-    let doc, info_tokens = Tokens_and_doc.info info in
-    { ct with ptyp_doc = doc; ptyp_tokens = ct.ptyp_tokens @ info_tokens }
-
   let varify_constructors var_names t =
     let check_variable vl _loc v =
       if List.mem v vl then
@@ -145,13 +140,10 @@ module Typ = struct
             let jkind = Option.map loop_jkind jkind in
             check_variable var_names t.ptyp_loc x;
             Ptyp_var (x, jkind)
-        | Ptyp_arrow { lbl; dom_legacy_modes; dom_type; dom_modes;
+        | Ptyp_arrow { domain;
                        codom_legacy_modes; codom_type; codom_modes } ->
             Ptyp_arrow {
-              lbl;
-              dom_legacy_modes;
-              dom_type = loop dom_type;
-              dom_modes;
+              domain = loop_aa domain;
               codom_legacy_modes;
               codom_type = loop codom_type;
               codom_modes
@@ -197,6 +189,8 @@ module Typ = struct
         | Ptyp_parens ct -> Ptyp_parens (loop ct)
       in
       {t with ptyp_desc = desc}
+    and loop_aa arrow_arg =
+      { arrow_arg with aa_type = loop arrow_arg.aa_type }
     and loop_jkind jkind =
       let rec pjkind_desc = function
         | Default as x -> x

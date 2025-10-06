@@ -359,9 +359,21 @@ let extra_def p1 p2 items =
       Ptop_def ([def], [fake_tok])) (Str.text txt))
     items
 
-let extra_rhs_core_type ct ~pos =
-  let docs = rhs_info pos in
-  Typ.info ct docs
+let mk_arrow_arg ~loc lbl legacy_modes typ modes =
+  let doc, doc_toks =
+    rhs_info (snd loc)
+    |> Tokens_and_doc.info
+  in
+  let tokens = Tokens.at loc in
+  {
+    aa_lbl = lbl;
+    aa_legacy_modes = legacy_modes;
+    aa_type = typ;
+    aa_modes = modes;
+    aa_doc = doc;
+    aa_loc = make_loc loc;
+    aa_tokens = tokens @ doc_toks;
+  }
 
 let mklb first ~loc body ext_attrs attrs =
   { lb_ext_attrs = ext_attrs;
@@ -711,7 +723,6 @@ The precedences must be listed from low to high.
 %inline extra_csig(symb): symb { extra_csig $startpos $endpos $1 };
 %inline extra_def(symb): symb { extra_def $startpos $endpos $1 };
 %inline extra_text(symb): symb { extra_text $startpos $endpos $1 };
-%inline extra_rhs(symb): symb { extra_rhs_core_type $1 ~pos:$endpos($1) };
 %inline mkrhs(symb): symb
     { mkrhs $1 $sloc }
 ;
@@ -4087,15 +4098,16 @@ function_type:
 strict_function_or_labeled_tuple_type:
   | mktyp(
       label = arg_label
-      domain_with_modes = with_optional_mode_expr(extra_rhs(param_type))
+      domain_with_modes = with_optional_mode_expr(param_type)
       MINUSGREATER
       codomain = strict_function_or_labeled_tuple_type
-        { let arg_legacy_m, (domain, (_ : Lexing.position * Lexing.position)), arg_modes = domain_with_modes in
+        { let arg_legacy_m, (typ, _), arg_modes = domain_with_modes in
+          let domain =
+            mk_arrow_arg ~loc:($symbolstartpos, $endpos(domain_with_modes))
+              label arg_legacy_m typ arg_modes
+          in
            Ptyp_arrow
-             { lbl = label;
-              dom_legacy_modes = arg_legacy_m;
-              dom_type = domain ;
-              dom_modes = arg_modes;
+             { domain ;
               codom_legacy_modes = [];
               codom_type = codomain;
               codom_modes = [] }
@@ -4104,17 +4116,18 @@ strict_function_or_labeled_tuple_type:
     { $1 }
   | mktyp(
       label = arg_label
-      domain_with_modes = with_optional_mode_expr(extra_rhs(param_type))
+      domain_with_modes = with_optional_mode_expr(param_type)
       MINUSGREATER
       codomain_with_modes = with_optional_mode_expr(tuple_type)
       %prec MINUSGREATER
-        { let arg_legacy_m, (domain, (_ : Lexing.position * Lexing.position)), arg_modes = domain_with_modes in
+        { let arg_legacy_m, (typ, _), arg_modes = domain_with_modes in
+          let domain =
+            mk_arrow_arg ~loc:($symbolstartpos, $endpos(domain_with_modes))
+              label arg_legacy_m typ arg_modes
+          in
           let ret_legacy_modes, (codomain, codomain_loc), ret_modes = codomain_with_modes in
           Ptyp_arrow
-            { lbl = label;
-              dom_legacy_modes = arg_legacy_m;
-              dom_type = domain ;
-              dom_modes = arg_modes;
+            { domain ;
               codom_legacy_modes = ret_legacy_modes;
               codom_type = maybe_curry_typ codomain codomain_loc;
               codom_modes = ret_modes }
@@ -4142,13 +4155,13 @@ strict_function_or_labeled_tuple_type:
            let arg_legacy_m, (tuple, tuple_loc), arg_modes = tuple_with_modes in
            let ty, ltys = tuple in
            let label = Labelled label in
-           let domain = mktyp ~loc:tuple_loc (Ptyp_tuple ((None, ty) :: ltys)) in
-           let domain = extra_rhs_core_type domain ~pos:(snd tuple_loc) in
+           let typ = mktyp ~loc:tuple_loc (Ptyp_tuple ((None, ty) :: ltys)) in
+           let domain =
+             mk_arrow_arg ~loc:($symbolstartpos, $endpos(tuple_with_modes))
+               label arg_legacy_m typ arg_modes
+           in
            Ptyp_arrow
-             { lbl = label;
-              dom_legacy_modes = arg_legacy_m;
-              dom_type = domain ;
-              dom_modes = arg_modes;
+             { domain ;
               codom_legacy_modes = [];
               codom_type = codomain;
               codom_modes = [] }
@@ -4167,12 +4180,12 @@ strict_function_or_labeled_tuple_type:
            in
            let ty, ltys = tuple in
            let label = Labelled label in
-           let domain = mktyp ~loc:tuple_loc (Ptyp_tuple ((None, ty) :: ltys)) in
-           let domain = extra_rhs_core_type domain ~pos:(snd tuple_loc) in
-           Ptyp_arrow{ lbl = label;
-            dom_legacy_modes = arg_legacy_m;
-            dom_type = domain ;
-            dom_modes = arg_modes;
+           let typ = mktyp ~loc:tuple_loc (Ptyp_tuple ((None, ty) :: ltys)) in
+           let domain =
+             mk_arrow_arg ~loc:($symbolstartpos, $endpos(tuple_with_modes))
+               label arg_legacy_m typ arg_modes
+           in
+           Ptyp_arrow{ domain ;
             codom_legacy_modes = ret_legacy_modes;
             codom_type = maybe_curry_typ codomain codomain_loc;
             codom_modes = ret_modes }

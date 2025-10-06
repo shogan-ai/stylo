@@ -82,6 +82,11 @@ class to_tokens = object
     let (name,_,node_toks) = e in
     combine_children ~loc:name.loc node_toks sub_tokens
 
+  method! visit_arrow_arg env aa =
+    let sub_tokens = super#visit_arrow_arg env aa in
+    let node_toks = aa.aa_tokens in
+    combine_children ~loc:aa.aa_loc node_toks sub_tokens
+
   method! visit_core_type env ct =
     let sub_tokens = super#visit_core_type env ct in
     let node_toks = ct.ptyp_tokens in
