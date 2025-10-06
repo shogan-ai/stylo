@@ -309,9 +309,13 @@ end
 and Core_type : sig
   val pp : core_type -> document
 
-  val pp_arrow: Tokens.seq -> arg_label -> document -> document -> document
-
   val pp_poly_bindings : (string loc * jkind_annotation option) list -> document
+
+  val collect_arrow_args :
+    core_type -> (arrow_arg list * (modes * modes * core_type)) option
+
+  val pp_arrow_for_descr :
+    arrow_arg list -> document -> document
 end = struct
   let pp_arrow tokens arg_lbl arg rhs =
     begin match arg_lbl with
@@ -460,6 +464,57 @@ end = struct
   and object_field_desc = function
     | Oinherit ct -> pp ct
     | Otag (lbl, ct) -> string lbl.txt ^^ S.colon ^/^ pp ct
+
+  let collect_arrow_args ct =
+    let rec aux rev_args = function
+      | [], [], { ptyp_desc = Ptyp_arrow arrow; _ } ->
+        (* there can't be attributes on Ptyp_arrow, they'd be on Ptyp_parens *)
+        aux (arrow.domain :: rev_args)
+          (arrow.codom_legacy_modes, arrow.codom_modes, arrow.codom_type)
+      | codom -> List.rev rev_args, codom
+    in
+    match ct.ptyp_desc with
+    | Ptyp_arrow { domain=dom; codom_legacy_modes; codom_type; codom_modes } ->
+      Some (aux [dom] (codom_legacy_modes, codom_modes, codom_type))
+    | _ -> None
+
+
+  let pp_arrow_for_descr args codom =
+    let pp_arg preceeding_tok
+          { aa_lbl; aa_legacy_modes; aa_type; aa_modes; aa_doc; aa_tokens;
+            aa_loc = _ } =
+      let label =
+        match aa_lbl with
+        | Nolabel -> empty
+        | Labelled s -> string s ^^ S.colon
+        | Optional s ->
+          dprintf "arg tokens: %a@." Tokens.pp_seq aa_tokens;
+          if
+            List.exists (function
+              | Tokens.{ desc = Token OPTLABEL _; _ } -> true
+              | _ -> false
+            ) aa_tokens
+          then stringf "?%s:" s
+          else S.qmark ^^ string s ^^ S.colon
+      in
+      let typ_and_modes =
+        modes_legacy aa_legacy_modes ^?^ pp aa_type
+        |> with_modes ~modes:aa_modes
+      in
+      let arg =
+        label ^^ typ_and_modes
+        |> Attribute.attach ?post_doc:aa_doc ~attrs:[]
+      in
+      if preceeding_tok = empty
+      then nest 2 (group arg)
+      else preceeding_tok ^^ nest 2 (group (break 1 ^^ arg))
+    in
+    let (acc, last_arrow) =
+      List.fold_left (fun (acc, between) arg ->
+        acc ^?^ pp_arg between arg, S.rarrow
+      ) (empty, S.colon) args
+    in
+    acc ^/^ last_arrow ^^ nest 2 (group (break 1 ^^ codom))
 end
 
 (** {2 Patterns} *)
@@ -1231,6 +1286,19 @@ end
 and Value_description : sig
   val pp : value_description -> document
 end = struct
+  let pp_type ct =
+    match Core_type.collect_arrow_args ct with
+    | None -> S.colon ^/^ Core_type.pp ct
+    | Some (args, (legacy_modes, post_modes, ty)) ->
+      dprintf "ICI!@.";
+      let codom =
+        modes_legacy legacy_modes ^?^ Core_type.pp ty
+        |> with_modes ~modes:post_modes
+        |> group
+      in
+      Core_type.pp_arrow_for_descr args codom
+      |> Attribute.attach ~attrs:ct.ptyp_attributes
+
   let pp { pval_pre_doc; pval_ext_attrs; pval_name; pval_type; pval_modalities;
            pval_prim; pval_attributes; pval_post_doc; pval_loc = _ ;
            pval_tokens = _ ; } =
@@ -1242,7 +1310,7 @@ end = struct
     let kw = Ext_attribute.decorate kw pval_ext_attrs in
     prefix (group (kw ^/^ str_or_op pval_name.txt)) (
       with_modalities ~modalities:pval_modalities
-        (group (S.colon ^/^ Core_type.pp pval_type))
+        (group (pp_type pval_type))
       ^?^
       begin match pval_prim with
         | [] -> empty
@@ -1524,12 +1592,18 @@ end
 and Class_type : sig
   val pp : class_type -> document
 end = struct
-  let rec pp_desc tokens = function
+  let rec collect_arrow_args rev_args = function
+    | { pcty_desc = Pcty_arrow (arg, res); _ } ->
+      collect_arrow_args (arg :: rev_args) res
+    | otherwise -> List.rev rev_args, otherwise
+
+  let rec pp_desc = function
     | Pcty_constr (lid, args) ->
       type_app ~parens:false (longident lid.txt) (List.map Core_type.pp args)
     | Pcty_signature cs -> pp_signature cs
-    | Pcty_arrow (lbl, arg, rhs) ->
-      Core_type.pp_arrow tokens lbl (Core_type.pp arg) (pp rhs)
+    | Pcty_arrow (arrow_arg, rhs) ->
+      let args, rhs = collect_arrow_args [arrow_arg] rhs in
+      Core_type.pp_arrow_for_descr args (pp rhs)
     | Pcty_extension ext -> Extension.pp ext
     | Pcty_open (od, ct) ->
       S.let_ ^/^ Open_description.pp od ^/^ S.in_ ^/^ pp ct
@@ -1564,8 +1638,8 @@ end = struct
     | Pctf_attribute attr -> Attribute.pp_floating attr
     | Pctf_extension ext -> Extension.pp ~floating:true ext
 
-  and pp { pcty_desc; pcty_attributes; pcty_loc = _; pcty_tokens } =
-    pp_desc pcty_tokens pcty_desc
+  and pp { pcty_desc; pcty_attributes; pcty_loc = _; pcty_tokens = _ } =
+    pp_desc pcty_desc
     |> Attribute.attach ~item:true ~attrs:pcty_attributes
 end
 

@@ -2038,7 +2038,10 @@ class_type:
       domain = tuple_type
       MINUSGREATER
       codomain = class_type
-        { Pcty_arrow(label, domain, codomain) }
+        { let domain =
+            mk_arrow_arg ~loc:($symbolstartpos, $endpos(domain)) label [] domain []
+          in
+          Pcty_arrow(domain, codomain) }
     ) { $1 }
  ;
 class_signature:

@@ -1014,7 +1014,7 @@ and class_type_desc =
       (** - [c]
             - [['a1, ..., 'an] c] *)
   | Pcty_signature of class_signature  (** [object ... end] *)
-  | Pcty_arrow of arg_label * core_type * class_type
+  | Pcty_arrow of arrow_arg * class_type
       (** [Pcty_arrow(lbl, T, CT)] represents:
             - [T -> CT]
                      when [lbl] is {{!arg_label.Nolabel}[Nolabel]},

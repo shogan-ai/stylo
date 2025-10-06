@@ -469,7 +469,7 @@ module Cty:
 
     val constr: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> core_type list -> class_type
     val signature: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> class_signature -> class_type
-    val arrow: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> arg_label -> core_type ->
+    val arrow: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> arrow_arg ->
       class_type -> class_type
     val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> class_type
     val open_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> open_description -> class_type
