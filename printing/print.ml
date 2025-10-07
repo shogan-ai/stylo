@@ -1036,6 +1036,15 @@ end = struct
                foo bar)
          arg4 arg5
      ]}
+
+     But currently we have:
+     {[
+       some_fun arg1 arg2
+         ~f:(fun a b c d : whatever ->
+               foo bar) arg4 arg5
+     ]}
+     which is less readable.
+     TODO: improve.
   *)
   let pp_function_parts ?lbl exp =
     match exp.pexp_desc with
