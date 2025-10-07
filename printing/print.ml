@@ -911,37 +911,53 @@ end = struct
 
   and pp_record ?(unboxed = false) nb_semis expr_opt fields =
     let semi_as_term = List.compare_length_with fields nb_semis = 0 in
-    let eo =
+    let first_part, extra_indent, first_before =
       match expr_opt with
-      | None -> empty
-      | Some e -> pp e ^/^ S.with_
+      | None ->
+        empty,
+        2,
+        Record_field.Before (if unboxed then `Hash_brace else `Brace)
+      | Some e ->
+        group (
+          (if unboxed then S.hash_lbrace else S.lbrace) ^/^ pp e ^/^ S.with_
+        ),
+        0,
+        No
     in
     group (
-      (* FIXME: that prefix implies a group, meaning in some cases we will end
-         up with
-         {[
-           { foo with bar; baz
-           }
-         ]}
-         thath is not what we want. *)
-      prefix ((if unboxed then S.hash_lbrace else S.lbrace) ^?^ eo)
-        (Record_field.pp_list ~semi_as_term pp fields) ^/^
-      S.rbrace
+      foldli (fun i acc field ->
+        if i = 0 then
+          prefix_nonempty acc
+            (nest extra_indent @@ Record_field.pp first_before pp field)
+        else
+          acc ^^ break 0 ^^ nest 2 @@ Record_field.pp (Before `Semi) pp field
+      ) first_part fields
+      ^?^ (if semi_as_term then S.semi else empty) ^?^ S.rbrace
     )
 end
 
 and Record_field : sig
-(*   val pp : ('a -> document) -> 'a record_field -> document *)
+  type semi = Before of [ `Semi | `Brace | `Hash_brace ] | After | No
+
+  val pp : semi -> ('a -> document) -> 'a record_field -> document
 
   val pp_list : semi_as_term:bool -> ('a -> document) -> 'a record_field list ->
     document
 end = struct
+  type semi = Before of [ `Semi | `Brace | `Hash_brace ] | After | No
+
   let pp add_semi pp_value rf =
     let pre =
-      group (
-        longident rf.field_name.txt ^?^
-        optional (fun v -> group @@ Type_constraint.pp v) rf.typ
-      )
+      let prefix_tok =
+        match add_semi with
+        | Before `Semi -> S.semi
+        | Before `Brace -> S.lbrace
+        | Before `Hash_brace -> S.hash_lbrace
+        | _ -> empty
+      in
+      prefix_nonempty
+        (group (prefix_tok ^?^ longident rf.field_name.txt))
+        (optional (fun v -> group @@ Type_constraint.pp v) rf.typ)
     in
     let field =
       match rf.value with
@@ -949,14 +965,14 @@ end = struct
       | Some v ->
         prefix (group (pre ^/^ S.equals)) (pp_value v)
     in
-    if add_semi then group (field ^^ S.semi) else field
+    if add_semi = After then group (field ^^ S.semi) else field
 
   let pp_list ~semi_as_term pp_value fields =
     (* [separate_map] inlined so we can control ; insertion and grouping *)
     let len = List.length fields in
     let fields =
       List.mapi (fun i field ->
-        let add_semi = semi_as_term || i + 1 < len in
+        let add_semi = if semi_as_term || i + 1 < len then After else No in
         pp add_semi pp_value field
       ) fields
     in
