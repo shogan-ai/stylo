@@ -1569,7 +1569,10 @@ signature:
           from a side table of docstrings. So $symbolstartpos doesn't know about
           that and would reduce to $endpos. *)
         match $1, $2 with
-        | [], item :: _ -> item.psig_loc.loc_start
+        | [], item :: _ ->
+            (* We need the min because there might be ;; before the first element
+               loc... *)
+            min item.psig_loc.loc_start $symbolstartpos
         | _ -> $symbolstartpos
       in
       let loc = start, $endpos in
