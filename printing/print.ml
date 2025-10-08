@@ -712,7 +712,13 @@ end = struct
       (* FIXME: ext_attr not at the beginning, the token synchronisation is
          going to have issues. *)
       pp e1 ^^ !!S.semi ^/^ pp e2
-    | Pexp_seq_empty e -> pp e ^^ S.semi
+    | Pexp_seq_empty e ->
+      pp e ^^ S.semi
+      (* the following is needed if we're at the end of a record (or
+         override) field for instance.
+
+         TODO: improve. *)
+      ^^ break 1
     | Pexp_while (e1, e2) ->
       !!S.while_ ^/^ pp e1 ^/^ S.do_ ^/^ pp e2 ^/^
       S.done_
@@ -744,17 +750,7 @@ end = struct
     | Pexp_send (e, lbl) -> pp e ^/^ S.hash ^/^ string lbl.txt
     | Pexp_new lid -> !!S.new_ ^/^ longident lid.txt
     | Pexp_setvar (lbl, e) -> string lbl.txt ^/^ S.larrow ^/^ pp e
-    | Pexp_override fields ->
-      let field (lbl, eo) =
-        string lbl.txt ^^
-        begin match eo with
-          | None -> empty
-          | Some e -> break 1 ^^ S.equals ^/^ pp e
-        end
-      in
-      S.lbrace_lt ^/^
-      separate_map (S.semi ^^ break 1) field fields ^/^
-      S.gt_rbrace
+    | Pexp_override fields -> pp_override (nb_semis exp.pexp_tokens) fields
     | Pexp_letmodule (name, me, body) ->
       let name =
         match name.txt with
@@ -873,6 +869,23 @@ end = struct
         separate_map (S.semi ^^ break 1) pp elts
     in
     group (prefix_nonempty opn elts ^?^ cls)
+
+  and pp_override nb_semis fields =
+    let semi_as_term = List.compare_length_with fields nb_semis = 0 in
+    let field (lbl, eo) =
+      string lbl.txt ^^
+      begin match eo with
+      | None -> empty
+      | Some e -> break 1 ^^ S.equals ^/^ pp e
+      end
+      in
+    let fields =
+      if semi_as_term then
+        separate_map (break 1) (fun elt -> field elt ^^ S.semi) fields
+      else
+        separate_map (S.semi ^^ break 1) field fields
+    in
+    group (prefix_nonempty S.lbrace_lt fields ^?^ S.gt_rbrace)
 
   and pp_array nb_semis mut elts =
     pp_delimited_seq (array_delimiters mut) nb_semis elts
