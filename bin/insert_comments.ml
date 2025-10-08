@@ -129,7 +129,6 @@ let attach_before_comments state tokens doc =
   if state.at_end_of_a_group then
     tokens, doc, state
   else
-    let () = dprintf "not at end of group, attaching!@." in
     match List.take_while is_comment_attaching_before tokens with
     | [] ->
       (* no comment to attach *)
@@ -138,7 +137,6 @@ let attach_before_comments state tokens doc =
       let tokens = List.drop_while is_comment_attaching_before tokens in
       let doc =
         let open Doc in
-        dprintf "attaching to preceeding!@.";
         group @@ List.fold_left (fun acc cmt ->
           match cmt.T.desc with
           | Comment (c, _) -> acc ^^ (group (break 1 ^^ comment c))
@@ -208,7 +206,6 @@ let rec walk_both state seq doc =
     (* Comments missing in the doc, insert them *)
     | T.Comment _, Doc.(Token_let | Token _) ->
       let to_prepend, rest = consume_leading_comments Doc.empty seq in
-      dprintf "inserting before token!!@.";
       let doc =
         insert_space_if_required ~inserting_comment:true state
           Doc.(to_prepend ^/^ doc)
@@ -220,7 +217,6 @@ let rec walk_both state seq doc =
         not (nest_before_leaf d) (* traverse group to reach correct nesting *)
         && not (first_is_comment d) (* might be the same comment *) ->
       let to_prepend, rest = consume_only_leading_comments Doc.empty seq in
-      dprintf "inserting before group!!@.";
       let rest, doc, state' =
         walk_both { space_needed_before_next = No; at_end_of_a_group = true }
           rest doc
