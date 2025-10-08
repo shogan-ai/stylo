@@ -345,7 +345,7 @@ end = struct
         modes_legacy pre_m ^?^ pp ty
         |> with_modes ~modes:post_m
       in
-      pp_arrow tokens dom.aa_lbl
+      pp_arrow dom.aa_tokens dom.aa_lbl
         (pp_surrounded dom.aa_legacy_modes dom.aa_modes dom.aa_type
          |> Attribute.attach ?post_doc:dom.aa_doc ~attrs:[])
         (pp_surrounded codom_legacy_modes codom_modes codom_type)
