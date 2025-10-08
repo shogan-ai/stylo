@@ -453,7 +453,7 @@ module Vb:
   sig
     val mk: ?loc: loc -> ?ext_attr:ext_attribute -> ?attrs:attrs ->
       tokens:Tokens.seq -> ?docs:docs -> ?text:text ->
-      ?params:function_param list -> ?modes:modes ->
+      ?params:function_param list -> ?legacy_modes:modes -> ?modes:modes ->
       ?value_constraint:value_constraint -> ?ret_modes:modes -> pattern ->
       expression option -> value_binding
   end

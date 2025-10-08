@@ -409,6 +409,7 @@ let val_of_let_bindings ~loc lbs =
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
            ~ext_attr:lb.lb_ext_attrs
            ~tokens:lb.lb_toks
+           ~legacy_modes:lb.lb_body.lbb_legacy_modes
            ~modes:lb.lb_body.lbb_modes
            ~docs:(Lazy.force lb.lb_docs)
            ~text:(Lazy.force lb.lb_text)
@@ -434,6 +435,7 @@ let expr_of_let_bindings ~loc lbs body =
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
            ~ext_attr:lb.lb_ext_attrs
            ~tokens:lb.lb_toks
+           ~legacy_modes:lb.lb_body.lbb_legacy_modes
            ~modes:lb.lb_body.lbb_modes
            ~docs:(Lazy.force lb.lb_docs)
            ~text:(Lazy.force lb.lb_text)
@@ -457,6 +459,7 @@ let class_of_let_bindings ~loc lbs body =
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
            ~ext_attr:lb.lb_ext_attrs
            ~tokens:lb.lb_toks
+           ~legacy_modes:lb.lb_body.lbb_legacy_modes
            ~modes:lb.lb_body.lbb_modes
            ~docs:(Lazy.force lb.lb_docs)
            ~text:(Lazy.force lb.lb_text)
@@ -1932,7 +1935,7 @@ value:
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
             pvb_pat = pat;
-            pvb_modes = []; pvb_params = [];
+            pvb_legacy_modes = []; pvb_modes = []; pvb_params = [];
             pvb_constraint = None; pvb_ret_modes = [];
             pvb_expr = Some $6; pvb_loc = make_loc $sloc;
             pvb_attributes = [] (* FIXME? *);
@@ -1955,7 +1958,7 @@ value:
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
             pvb_pat = pat;
-            pvb_modes = []; pvb_params = [];
+            pvb_legacy_modes = []; pvb_modes = []; pvb_params = [];
             pvb_constraint = Some t; pvb_ret_modes = [];
             pvb_expr = Some $7; pvb_loc = make_loc $sloc;
             pvb_attributes = [] (* FIXME? *);
@@ -1979,7 +1982,7 @@ method_:
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
             pvb_pat = pat;
-            pvb_modes = []; pvb_params = params;
+            pvb_legacy_modes = []; pvb_modes = []; pvb_params = params;
             pvb_constraint = tc; pvb_ret_modes = ret_modes;
             pvb_expr = Some e;
             pvb_loc = make_loc $sloc;
@@ -2000,7 +2003,7 @@ method_:
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
             pvb_pat = pat;
-            pvb_modes = []; pvb_params = [];
+            pvb_legacy_modes = []; pvb_modes = []; pvb_params = [];
             pvb_constraint = Some constr; pvb_ret_modes = [];
             pvb_expr = Some $8;
             pvb_loc = make_loc $sloc;
@@ -2020,7 +2023,7 @@ method_:
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
             pvb_pat = pat;
-            pvb_modes = []; pvb_params = [];
+            pvb_legacy_modes = []; pvb_modes = []; pvb_params = [];
             pvb_constraint = Some constr; pvb_ret_modes = [];
             pvb_expr = Some $11;
             pvb_loc = make_loc $sloc;
@@ -2848,20 +2851,21 @@ labeled_simple_expr:
 
 %inline let_ident_with_modes:
     optional_mode_expr_legacy let_ident
-      { ($2, $1) }
+      { ($1, $2, []) }
   | LPAREN let_ident at_mode_expr RPAREN
-      { ($2, $3) }
+      { ([], $2, $3) }
 
 let_binding_body_no_punning:
     let_ident_with_modes strict_binding_modes
-      { let (v, modes) = $1 in
+      { let (legacy_modes, v, modes) = $1 in
         let params, tc, ret_modes, e = $2 in
-        { lbb_modes = modes; lbb_pat = v; lbb_params = params;
+        { lbb_legacy_modes = legacy_modes;
+          lbb_modes = modes; lbb_pat = v; lbb_params = params;
           lbb_constraint = tc; lbb_ret_modes = ret_modes; lbb_expr = Some e } }
   | let_ident_with_modes constraint_ EQUAL seq_expr
       (* CR zqian: modes are duplicated, and one of them needs to be made ghost
          to make internal tools happy. We should try to avoid that. *)
-      { let v, modes0 = $1 in (* PR#7344 *)
+      { let legacy_modes, v, modes0 = $1 in (* PR#7344 *)
         let typ, modes1 = $2 in
         let t =
           Option.map (function
@@ -2870,14 +2874,15 @@ let_binding_body_no_punning:
           | Pcoerce (ground, coercion) -> Pvc_coercion { ground; coercion}
           ) typ
         in
-        { lbb_modes = modes0;
+        { lbb_legacy_modes = legacy_modes; lbb_modes = modes0;
           lbb_pat = v; lbb_params = []; lbb_constraint = t;
           lbb_ret_modes = modes1; lbb_expr = Some $4 }
       }
   | let_ident_with_modes COLON strictly_poly_type_with_optional_modes EQUAL seq_expr
-      { let v, modes0 = $1 in
+      { let legacy_modes, v, modes0 = $1 in
         let typ, modes1 = $3 in
-        { lbb_modes = modes0;
+        { lbb_legacy_modes = legacy_modes;
+          lbb_modes = modes0;
           lbb_pat = v; lbb_params = [];
           lbb_constraint =
             Some (Pvc_constraint { locally_abstract_univars = []; typ });
@@ -2902,20 +2907,21 @@ let_binding_body_no_punning:
       *)
       (* FIXME: ! *)
       {
-        let v, modes0 = $1 in
-        { lbb_modes = modes0;
+        let legacy_modes, v, modes0 = $1 in
+        { lbb_legacy_modes = legacy_modes;
+          lbb_modes = modes0;
           lbb_pat = v; lbb_params = [];
           lbb_constraint =
             Some (Pvc_constraint { locally_abstract_univars = ntys; typ = cty });
           lbb_ret_modes = modes1; lbb_expr = Some e }
        }
   | pattern_no_exn EQUAL seq_expr
-      { { lbb_modes = []; lbb_pat = $1; lbb_params = [];
+      { { lbb_legacy_modes = []; lbb_modes = []; lbb_pat = $1; lbb_params = [];
           lbb_constraint = None; lbb_ret_modes = []; lbb_expr = Some $3 } }
   | simple_pattern_not_ident pvc_modes EQUAL seq_expr
       {
         let pvc, modes = $2 in
-        { lbb_modes = []; lbb_pat = $1; lbb_params = [];
+        { lbb_legacy_modes = []; lbb_modes = []; lbb_pat = $1; lbb_params = [];
           lbb_constraint = pvc; lbb_ret_modes = modes; lbb_expr = Some $4 }
       }
 ;
@@ -2924,7 +2930,7 @@ let_binding_body:
       { $1 }
 /* BEGIN AVOID */
   | val_ident %prec below_HASH
-      { { lbb_modes = [];
+      { { lbb_legacy_modes = []; lbb_modes = [];
           lbb_pat = mkpatvar ~loc:$loc $1;
           lbb_params = []; lbb_constraint = None; lbb_ret_modes = [];
           lbb_expr = None } }

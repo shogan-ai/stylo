@@ -3,8 +3,9 @@ open Parsetree
 open Docstrings
 
 type let_binding_body =
-  { lbb_modes: modes;
+  { lbb_legacy_modes: modes;
     lbb_pat: pattern;
+    lbb_modes: modes;
     lbb_params: function_param list;
     lbb_constraint: value_constraint option;
     lbb_ret_modes: modes;

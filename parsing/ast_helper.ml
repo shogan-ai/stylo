@@ -686,8 +686,8 @@ end
 module Vb = struct
   let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr)
         ?(attrs = []) ~tokens ?(docs = empty_docs)
-      ?(text = []) ?(params = []) ?(modes = []) ?value_constraint
-      ?(ret_modes = []) pat expr =
+        ?(text = []) ?(params = []) ?(legacy_modes = []) ?(modes = [])
+        ?value_constraint ?(ret_modes = []) pat expr =
     let pre_doc, post_doc, tokens =
       Tokens_and_doc.process ~text docs tokens
     in
@@ -695,6 +695,7 @@ module Vb = struct
      pvb_pre_text = add_text_attrs text [];
      pvb_pre_doc = pre_doc;
      pvb_ext_attrs = ext_attr;
+     pvb_legacy_modes = legacy_modes;
      pvb_pat = pat;
      pvb_params = params;
      pvb_expr = expr;

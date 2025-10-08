@@ -2462,9 +2462,9 @@ end = struct
     | _ -> Single_part (Expression.pp e)
 
   let pp ?item start
-        { pvb_modes; pvb_pat; pvb_params; pvb_constraint; pvb_ret_modes;
-          pvb_expr; pvb_attributes; pvb_pre_text; pvb_pre_doc; pvb_post_doc;
-          pvb_loc = _; pvb_tokens = _; pvb_ext_attrs } =
+        { pvb_legacy_modes; pvb_pat; pvb_modes; pvb_params; pvb_constraint;
+          pvb_ret_modes; pvb_expr; pvb_attributes; pvb_pre_text; pvb_pre_doc;
+          pvb_post_doc; pvb_loc = _; pvb_tokens = _; pvb_ext_attrs } =
     let start =
       match start with
       | [] -> assert false
@@ -2472,8 +2472,13 @@ end = struct
         Ext_attribute.decorate first_kw pvb_ext_attrs
           ^?^ separate (break 1) other_kws
     in
-    let kw_and_modes = start ^?^ modes pvb_modes in
+    let kw_and_modes = start ^?^ modes_legacy pvb_legacy_modes in
     let pat = Pattern.pp pvb_pat in
+    let pat =
+      match pvb_modes with
+      | [] -> pat
+      | modes -> parens (with_modes pat ~modes)
+    in
     let params = List.map Function_param.pp pvb_params in
     let open Generic_binding in
     let constraint_ =

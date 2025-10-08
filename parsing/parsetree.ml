@@ -1499,10 +1499,11 @@ and value_binding =
     pvb_pre_text: attributes;
     pvb_pre_doc: attribute option;
     pvb_ext_attrs: ext_attribute;
+    pvb_legacy_modes: modes;
     pvb_pat: pattern;
+    pvb_modes: modes;
     pvb_params: function_param list;
     pvb_constraint: value_constraint option;
-    pvb_modes: modes;
     pvb_expr: expression option;
     pvb_ret_modes: modes;
     pvb_attributes: attributes;
