@@ -363,7 +363,8 @@ end = struct
         | _, Closed -> field_doc
       end ^?^ S.gt
     | Ptyp_class (lid, args) ->
-      type_app (S.hash ^^ longident lid.txt)
+      let omit_delims_if_possible = not (starts_with LPAREN tokens) in
+      type_app ~omit_delims_if_possible (S.hash ^^ longident lid.txt)
         (List.map pp args)
     | Ptyp_alias (ct, name, None) ->
       pp ct ^/^ S.as_ ^/^
@@ -1624,6 +1625,7 @@ end = struct
 
   let rec pp_desc = function
     | Pcty_constr (lid, args) ->
+      (* FIXME: [~omit_delims_if_possible]? *)
       type_app ~parens:false (longident lid.txt) (List.map Core_type.pp args)
     | Pcty_signature cs -> pp_signature cs
     | Pcty_arrow (arrow_arg, rhs) ->
