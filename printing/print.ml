@@ -309,6 +309,8 @@ end
 and Core_type : sig
   val pp : core_type -> document
 
+  val pp_arrow : Tokens.seq -> arg_label -> document -> document -> document
+
   val pp_poly_bindings : (string loc * jkind_annotation option) list -> document
 
   val collect_arrow_args :
@@ -1630,8 +1632,9 @@ end = struct
       type_app ~parens:false (longident lid.txt) (List.map Core_type.pp args)
     | Pcty_signature cs -> pp_signature cs
     | Pcty_arrow (arrow_arg, rhs) ->
-      let args, rhs = collect_arrow_args [arrow_arg] rhs in
-      Core_type.pp_arrow_for_descr args (pp rhs)
+      ignore collect_arrow_args;
+      Core_type.pp_arrow arrow_arg.aa_tokens arrow_arg.aa_lbl
+        (Core_type.pp arrow_arg.aa_type) (pp rhs)
     | Pcty_extension ext -> Extension.pp ext
     | Pcty_open (od, ct) ->
       S.let_ ^/^ Open_description.pp od ^/^ S.in_ ^/^ pp ct
