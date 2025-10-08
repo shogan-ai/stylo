@@ -1437,8 +1437,6 @@ end
 and Type_declaration : sig
   val pp_constraints : ptype_constraint list -> document
 
-  val pp : start:document list -> ?subst:bool -> type_declaration -> document
-
   val pp_list :
     ?subst:bool -> Asttypes.rec_flag -> type_declaration list -> document
 end = struct
@@ -1504,7 +1502,7 @@ end = struct
       eq ^?^ private_ td.ptype_private ^?^ type_kind kind
     end ^?^ pp_constraints td.ptype_cstrs
 
-  let pp ~start ?subst td =
+  let pp ~kw_preceeding_params ~start ?subst td =
     let start =
       match start with
       | [] -> assert false
@@ -1515,7 +1513,7 @@ end = struct
     let lhs =
       prefix start (
         let omit_delims_if_possible =
-          not (has_leading LPAREN ~after:TYPE td.ptype_tokens)
+          not (has_leading LPAREN ~after:kw_preceeding_params td.ptype_tokens)
         in
         type_app ~omit_delims_if_possible (string td.ptype_name.txt)
           (List.map Type_param.pp td.ptype_params)
@@ -1532,14 +1530,17 @@ end = struct
       ~attrs:td.ptype_attributes
       ?post_doc:td.ptype_post_doc
 
-  let rec pp_list ?subst start = function
+  let rec pp_list ~kw_preceeding_params ?subst start = function
     | [] -> empty
     | td :: tds ->
-      group (pp ?subst ~start td)
-      ^?^ pp_list ?subst [S.and_] tds
+      group (pp ~kw_preceeding_params ?subst ~start td)
+      ^?^ pp_list ~kw_preceeding_params:AND ?subst [S.and_] tds
 
   let pp_list ?subst rf tds =
-    pp_list ?subst [S.type_; nonrec_ rf] tds
+    let kw_preceeding_params =
+      if rf = Asttypes.Nonrecursive then Parser_tokens.NONREC else TYPE
+    in
+    pp_list ~kw_preceeding_params ?subst [S.type_; nonrec_ rf] tds
 end
 
 and Type_extension : sig
