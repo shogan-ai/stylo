@@ -1102,7 +1102,7 @@ and class_expr_desc =
   | Pcl_constr of longident loc * core_type list
       (** [c] and [['a1, ..., 'an] c] *)
   | Pcl_structure of class_structure  (** [object ... end] *)
-  | Pcl_fun of pattern argument * class_expr
+  | Pcl_fun of pattern argument list * class_expr
       (** [Pcl_fun(lbl, exp0, P, CE)] represents:
             - [fun P -> CE]
                      when [lbl]  is {{!arg_label.Nolabel}[Nolabel]}

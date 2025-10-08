@@ -1753,8 +1753,11 @@ end = struct
     | Pcl_constr (lid, args) ->
       type_app ~parens:false (longident lid.txt) (List.map Core_type.pp args)
     | Pcl_structure cs -> pp_structure ext_attr cs
-    | Pcl_fun (arg, rhs) ->
-      !!S.fun_ ^/^ Argument.pp Pattern.pp arg ^/^ S.rarrow ^/^ pp rhs
+    | Pcl_fun (params, rhs) ->
+      let params = flow_map (break 1) (Argument.pp Pattern.pp) params in
+      prefix
+        (prefix !!S.fun_ (group (params ^/^ S.rarrow)))
+        (pp rhs)
     | Pcl_apply (ce, args) -> Application.pp (pp ce) args
     | Pcl_let (rf, vbs, body) ->
       (* FIXME: factorize with Pexp_let *)

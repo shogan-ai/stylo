@@ -319,9 +319,6 @@ let wrap_pat_attrs ~loc:_ pat ext_attr =
 let mkpat_attrs ~loc d attrs =
   wrap_pat_attrs ~loc (mkpat ~loc d) attrs
 
-let wrap_class_ext_attrs ~loc body ext_attrs =
-  {body with pcl_ext_attrs = ext_attrs; pcl_loc = make_loc loc }
-
 let mk_quotedext ~loc (id, idloc, str, _, delim) =
   let exp_id = mkloc [id] idloc in
   (exp_id, PString (str, delim), Tokens.at loc)
@@ -1835,7 +1832,8 @@ class_expr:
     class_simple_expr
       { $1 }
   | FUN noext_attributes class_fun_def
-      { wrap_class_ext_attrs ~loc:$sloc $3 $2 }
+      { let (args, body) = $3 in
+        Cl.fun_ ~loc:(make_loc $sloc) ~ext_attrs:$2 args body }
   | let_bindings(noext_attributes) IN class_expr
       { class_of_let_bindings ~loc:$sloc $1 $3 }
   | LET OPEN override_flag noext_attributes mkrhs(mod_longident) IN class_expr
@@ -1873,11 +1871,10 @@ class_simple_expr:
 ;
 
 class_fun_def:
-  mkclass(
-    labeled_simple_pattern MINUSGREATER e = class_expr
+    labeled_simple_pattern MINUSGREATER e = class_expr { [$1], e }
   | labeled_simple_pattern e = class_fun_def
-      { Pcl_fun($1, e) }
-  ) { $1 }
+      { let args, body = e in
+        $1 :: args, body }
 ;
 %inline class_structure:
   |  class_self_pattern extra_cstr(class_fields)
