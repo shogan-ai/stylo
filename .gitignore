@@ -1,1 +1,6 @@
 test/*
+
+# <fuzzer.exe> --cmly _build/defaut/parsing/parser.cmly \
+# --entrypoint implementation --entrypoint interface \
+# --print-entrypoint --exhaust
+exhaust
