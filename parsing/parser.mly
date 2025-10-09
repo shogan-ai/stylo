@@ -86,6 +86,9 @@ let mkcty ~loc ?attrs d =
   let tokens = Tokens.at loc in
   Cty.mk ~loc:(make_loc loc) ?attrs ~tokens d
 
+let mkwc loc wc_desc =
+  { wc_desc; wc_loc = make_loc loc; wc_tokens = Tokens.at loc }
+
 let pstr_typext te =
   Pstr_typext te
 let pstr_primitive vd =
@@ -487,7 +490,8 @@ let package_type_of_module_type pmty =
       pos.pos_lnum (pos.pos_cnum - pos.pos_bol) _s
     |> failwith
   in
-  let map_cstr = function
+  let map_cstr wc =
+    match wc.wc_desc with
     | Pwith_type (params, lid, priv, ty, cstrs) ->
         let loc = pmty.pmty_loc in
         if params <> [] then
@@ -3948,20 +3952,20 @@ extension_constructor_rebind(opening):
 with_constraint:
     TYPE type_parameters mkrhs(label_longident) with_type_binder
     core_type_no_attr constraints
-      { Pwith_type ($2, $3, $4, $5, $6) }
+      { mkwc $sloc @@ Pwith_type ($2, $3, $4, $5, $6) }
     /* used label_longident instead of type_longident to disallow
        functor applications in type path */
   | TYPE type_parameters mkrhs(label_longident)
     COLONEQUAL core_type_no_attr
-      { Pwith_typesubst ($2, $3, $5) }
+      { mkwc $sloc @@ Pwith_typesubst ($2, $3, $5) }
   | MODULE mkrhs(mod_longident) EQUAL mkrhs(mod_ext_longident)
-      { Pwith_module ($2, $4) }
+      { mkwc $sloc @@ Pwith_module ($2, $4) }
   | MODULE mkrhs(mod_longident) COLONEQUAL mkrhs(mod_ext_longident)
-      { Pwith_modsubst ($2, $4) }
+      { mkwc $sloc @@ Pwith_modsubst ($2, $4) }
   | MODULE TYPE l=mkrhs(mty_longident) EQUAL rhs=module_type
-      { Pwith_modtype (l, rhs) }
+      { mkwc $sloc @@ Pwith_modtype (l, rhs) }
   | MODULE TYPE l=mkrhs(mty_longident) COLONEQUAL rhs=module_type
-      { Pwith_modtypesubst (l, rhs) }
+      { mkwc $sloc @@ Pwith_modtypesubst (l, rhs) }
 ;
 with_type_binder:
     EQUAL          { Public }

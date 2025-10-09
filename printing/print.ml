@@ -2171,10 +2171,14 @@ end
 and With_constraint : sig
   val pp : with_constraint -> document
 end = struct
-  let pp = function
+  let pp wc =
+    match wc.wc_desc with
     | Pwith_type (params, lid, priv, ct, cstrs) ->
+      let omit_delims_if_possible =
+        not (has_leading LPAREN ~after:TYPE wc.wc_tokens)
+      in
       S.type_ ^/^
-      type_app (longident lid.txt)
+      type_app ~omit_delims_if_possible (longident lid.txt)
         (List.map Type_param.pp params) ^/^
       S.equals ^?^ private_ priv ^?^
       Core_type.pp ct ^?^ Type_declaration.pp_constraints cstrs
@@ -2187,8 +2191,11 @@ end = struct
       S.module_ ^/^ S.type_ ^/^ longident lid.txt ^/^ S.colon_equals ^/^
       Module_type.pp mty
     | Pwith_typesubst (params, lid, ct) ->
+      let omit_delims_if_possible =
+        not (has_leading LPAREN ~after:TYPE wc.wc_tokens)
+      in
       S.type_ ^/^
-      type_app (longident lid.txt)
+      type_app ~omit_delims_if_possible (longident lid.txt)
         (List.map Type_param.pp params) ^/^
       S.colon_equals ^/^ Core_type.pp ct
     | Pwith_modsubst (lid1, lid2) ->

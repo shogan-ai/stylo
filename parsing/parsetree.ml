@@ -1379,6 +1379,13 @@ and include_declaration = module_expr include_infos
 (** Values of type [include_declaration] represents [include ME] *)
 
 and with_constraint =
+  {
+    wc_desc: with_constraint_desc;
+    wc_loc: location;
+    wc_tokens: tokens;
+  }
+
+and with_constraint_desc =
   | Pwith_type of ptype_params * longident loc *
                   private_flag * core_type * ptype_constraint list
       (** [with type X.t = ...]

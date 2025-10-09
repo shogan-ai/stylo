@@ -217,6 +217,11 @@ class to_tokens = object
     let node_toks = incl.pincl_tokens in
     combine_children ~loc:incl.pincl_loc node_toks sub_tokens
 
+  method! visit_with_constraint env wc =
+    let sub_tokens = super#visit_with_constraint env wc in
+    let node_toks = wc.wc_tokens in
+    combine_children ~loc:wc.wc_loc node_toks sub_tokens
+
   method! visit_module_expr env me =
     let sub_tokens = super#visit_module_expr env me in
     let node_toks = me.pmod_tokens in
