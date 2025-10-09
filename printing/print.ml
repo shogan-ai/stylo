@@ -790,7 +790,7 @@ end = struct
     | Pexp_stack e -> S.stack__ ^/^ pp e
     | Pexp_comprehension ce -> Comprehension.pp_expr ce
     | Pexp_overwrite (e1, e2) ->
-      S.overwrite__ ^/^ pp e1 ^/^ S.with_ ^/^ pp e2
+      !!S.overwrite__ ^/^ pp e1 ^/^ S.with_ ^/^ pp e2
     | Pexp_hole -> S.underscore
     | Pexp_index_op access ->
       pp_index_op (nb_semis exp.pexp_tokens)
