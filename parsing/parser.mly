@@ -2072,12 +2072,13 @@ class_signature:
           Tokens.replace_first_child tokens ~subst:cs.pcty_tokens
         in
         { cty_with_attr with pcty_tokens } }
-  | LET OPEN override_flag attributes mkrhs(mod_longident) IN class_signature
+  | LET OPEN override_flag noext_attributes mkrhs(mod_longident) IN class_signature
       { let loc = ($startpos($2), $endpos($5)) in
         let od =
-          Opn.mk ~override:$3 ~loc:(make_loc loc) ~tokens:(Tokens.at loc) $5
+          Opn.mk ~override:$3 ~ext_attrs:$4 ~loc:(make_loc loc)
+            ~tokens:(Tokens.at loc) $5
         in
-        mkcty ~loc:$sloc ~attrs:$4 (Pcty_open(od, $7)) }
+        mkcty ~loc:$sloc (Pcty_open(od, $7)) }
 ;
 %inline class_parameters(parameter):
   | /* empty */
