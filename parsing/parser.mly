@@ -2095,9 +2095,8 @@ class_signature:
 ;
 class_self_type:
     LPAREN core_type RPAREN
-      { $2 }
-  | mktyp((* empty *) { Ptyp_any None })
-      { $1 }
+      { Some $2 }
+  | (* empty *) { None }
 ;
 %inline class_sig_fields:
   flatten(text_csig(class_sig_field)*)

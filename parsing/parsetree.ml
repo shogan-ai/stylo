@@ -1029,7 +1029,7 @@ and class_type_desc =
 
 and class_signature =
     {
-     pcsig_self: core_type;
+     pcsig_self: core_type option;
      pcsig_fields: class_type_field list;
     }
 (** Values of type [class_signature] represents:

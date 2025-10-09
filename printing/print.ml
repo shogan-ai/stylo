@@ -1672,9 +1672,9 @@ end = struct
   and pp_signature { pcsig_self; pcsig_fields } =
     let obj_with_self =
       S.object_ ^^
-      match pcsig_self.ptyp_desc with
-      | Ptyp_any None -> empty
-      | _otherwise -> parens (Core_type.pp pcsig_self)
+      match pcsig_self with
+      | None -> empty
+      | Some pcsig_self -> parens (Core_type.pp pcsig_self)
     in
     prefix obj_with_self
       (separate_map (break 1) pp_field pcsig_fields) ^/^
