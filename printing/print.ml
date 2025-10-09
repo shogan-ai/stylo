@@ -356,14 +356,7 @@ end = struct
     | Ptyp_constr (args, lid) ->
       let omit_delims_if_possible = not (starts_with LPAREN tokens) in
       type_app ~omit_delims_if_possible (longident lid.txt) (List.map pp args)
-    | Ptyp_object (fields, closed) ->
-      let field_doc = separate_map (S.semi ^^ break 1) object_field fields in
-      S.lt ^/^
-      begin match fields, closed with
-        | [], Open -> S.dotdot
-        | _, Open -> field_doc ^^ S.semi ^/^ S.dotdot
-        | _, Closed -> field_doc
-      end ^?^ S.gt
+    | Ptyp_object (fields, closed) -> pp_object (nb_semis tokens) fields closed
     | Ptyp_class (lid, args) ->
       let omit_delims_if_possible = not (starts_with LPAREN tokens) in
       type_app ~omit_delims_if_possible (S.hash ^^ longident lid.txt)
@@ -435,7 +428,6 @@ end = struct
 
   and pp_poly_tag lbl = S.bquote ^^ string lbl
 
-
   and pp_tuple elts =
     let pp_elt (lbl_opt, ct) =
       begin match lbl_opt with
@@ -460,6 +452,23 @@ end = struct
       | Some ea -> Ext_attribute.decorate S.module_ ea
     in
     S.lparen ^^ module_ ^/^ longident lid.txt ^^ with_ ^^ break 0 ^^ S.rparen
+
+  and pp_object nb_semis fields closed =
+    let semi_as_term = List.compare_length_with fields nb_semis = 0 in
+    let fields_doc =
+      if semi_as_term then
+        separate_map (break 1) (fun elt -> object_field elt ^^ S.semi) fields
+      else
+        separate_map (S.semi ^^ break 1) object_field fields
+    in
+    let fields_and_dotdot =
+      match fields, closed with
+      | _, Asttypes.Closed -> fields_doc
+      | [], Open -> S.dotdot
+      | _, Open ->
+        fields_doc ^^ (if semi_as_term then empty else S.semi) ^/^ S.dotdot
+    in
+    prefix_nonempty S.lt (group fields_and_dotdot) ^/^ S.gt
 
   and object_field of_ =
     Attribute.attach ~attrs:of_.pof_attributes (object_field_desc of_.pof_desc)
