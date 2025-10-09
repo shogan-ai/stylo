@@ -37,7 +37,7 @@ let fuzzer_batch fn =
       let intf = String.starts_with ~prefix:"interface:" entrypoint_and_src in
       let src =
         let prefix_len =
-          90 + String.length (if intf then "interface:" else "implementation:")
+          String.length (if intf then "interface: " else "implementation: ")
         in
         try
         String.sub entrypoint_and_src prefix_len
