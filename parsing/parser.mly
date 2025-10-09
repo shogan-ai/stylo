@@ -40,7 +40,6 @@ open Docstrings.WithMenhir
 open Parser_types
 
 let mkloc = Location.mkloc
-let mknoloc = Location.mknoloc
 
 let make_loc (startpos, endpos) = {
   Location.loc_start = startpos;
@@ -1544,7 +1543,7 @@ module_type:
         %prec below_WITH
         { let mty0, mm0 = $1 in
           let mty1, mm1 = $3 in
-          Pmty_functor_type([Named (mknoloc None, mty0, mm0)], mty1, mm1) }
+          Pmty_functor_type([Unnamed (mty0, mm0)], mty1, mm1) }
     | module_type WITH separated_nonempty_llist(AND, with_constraint)
         { Pmty_with($1, $3) }
     | extension

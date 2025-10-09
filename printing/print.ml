@@ -1916,14 +1916,6 @@ and Functor_parameter : sig
   val pp : functor_parameter -> document
   val pp_type : functor_parameter -> document
 end = struct
-  let pp_type = function
-    | Unit -> parens empty
-    | Named (lbl, mty, modes) ->
-      let mty_modes = with_modes (Module_type.pp mty) ~modes in
-      match lbl.txt with
-      | None -> mty_modes
-      | Some s -> parens (string s ^/^ S.colon ^/^ mty_modes)
-
   let pp = function
     | Unit -> empty
     | Named (lbl, mty, modes) ->
@@ -1931,8 +1923,14 @@ end = struct
         | None -> S.underscore
         | Some s -> string s
       end ^/^ S.colon ^/^ with_modes (Module_type.pp mty) ~modes
+    | Unnamed _ -> assert false
 
   let pp fp = parens (pp fp)
+
+  let pp_type = function
+    | Unnamed (mty, modes) -> with_modes (Module_type.pp mty) ~modes
+    | fp -> pp fp
+
 end
 
 and Signature : sig

@@ -1237,6 +1237,7 @@ and functor_parameter =
       (** [Named(name, MT)] represents:
             - [(X : MT @@ modes)] when [name] is [Some X],
             - [(_ : MT @@ modes)] when [name] is [None] *)
+  | Unnamed of module_type * modes (* only appears in module types *)
 
 and signature =
   {
