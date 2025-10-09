@@ -789,7 +789,7 @@ module Type = struct
     }
 
   let field ?(loc = !default_loc) ?(attrs = []) ~tokens ?(info = empty_info)
-        ?(mut = Immutable) ?(modalities = []) name typ =
+        ?(mut = Immutable) ?(global=false) ?(modalities = []) name typ =
     let info = simplify_ds info in
     let info_tokens =
       match info with
@@ -799,6 +799,7 @@ module Type = struct
     {
      pld_name = name;
      pld_mutable = mut;
+     pld_global = global;
      pld_modalities = modalities;
      pld_type = typ;
      pld_loc = loc;

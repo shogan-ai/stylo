@@ -260,8 +260,8 @@ module Type:
       constructor_argument
 
     val field: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?info:info ->
-      ?mut:mutable_flag -> ?modalities:modality with_loc list -> str -> core_type ->
-      label_declaration
+      ?mut:mutable_flag -> ?global:bool -> ?modalities:modality with_loc list ->
+      str -> core_type -> label_declaration
   end
 
 (** Type extensions *)

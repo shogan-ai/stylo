@@ -1379,12 +1379,20 @@ and Record : sig
   val pp_decl: ?unboxed:bool -> label_declaration list -> document
 end = struct
   let pp preceding_tok (* opening brace or previous semicolon *)
-        { pld_name; pld_mutable; pld_modalities; pld_type; pld_attributes;
+        { pld_name; pld_mutable; pld_global;
+          pld_modalities; pld_type; pld_attributes;
           pld_doc; pld_loc = _; pld_tokens = _ } =
+    let mut_or_glob =
+      match pld_mutable, pld_global with
+      | Immutable, false -> empty
+      | Mutable, false -> S.mutable_
+      | Immutable, true -> S.global__
+      | Mutable, true -> assert false
+    in
     let field =
       prefix
         (prefix_nonempty preceding_tok
-           (group (mutable_ pld_mutable ^^ string pld_name.txt ^/^ S.colon)))
+           (group (mut_or_glob ^?^ string pld_name.txt ^/^ S.colon)))
         (Core_type.pp pld_type ^^
          begin match pld_modalities with
          | [] -> empty

@@ -3878,9 +3878,8 @@ label_declarations:
 label_declaration:
     mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr m1=optional_atat_modalities_expr attrs=attributes
       { let info = symbol_info $endpos in
-        let mut, m0 = $1 in
-        let modalities = m0 @ m1 in
-        Type.field $2 $4 ~mut ~modalities ~attrs
+        let mut, global = $1 in
+        Type.field $2 $4 ~mut ~global ~modalities:m1 ~attrs
           ~tokens:(Tokens.at $sloc) ~loc:(make_loc $sloc) ~info}
 ;
 label_declaration_semi:
@@ -3891,9 +3890,8 @@ label_declaration_semi:
           | Some _ as info_before_semi -> info_before_semi
           | None -> symbol_info $endpos
        in
-       let mut, m0 = $1 in
-       let modalities = m0 @ m1 in
-       Type.field $2 $4 ~mut ~modalities ~attrs:(attrs0 @ attrs1)
+       let mut, global = $1 in
+       Type.field $2 $4 ~mut ~global ~modalities:m1 ~attrs:(attrs0 @ attrs1)
          ~tokens:(Tokens.at $sloc) ~loc:(make_loc $sloc) ~info}
 ;
 
@@ -4846,11 +4844,11 @@ mutable_flag:
 ;
 mutable_or_global_flag:
     /* empty */
-    { Immutable, [] }
+    { Immutable, false }
   | MUTABLE
-    { Mutable, [] }
+    { Mutable, false }
   | GLOBAL
-    { Immutable, [ mkloc (Modality "global") (make_loc $sloc)] }
+    { Immutable, true }
 ;
 %inline global_flag:
            { false }
