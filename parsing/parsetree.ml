@@ -1224,7 +1224,7 @@ and module_type_desc =
       (** [functor(X : MT1 @@ modes) -> MT2 @ modes] *)
   | Pmty_functor_type of functor_parameter list * module_type * modes
   | Pmty_with of module_type * with_constraint list  (** [MT with ...] *)
-  | Pmty_typeof of module_expr  (** [module type of ME] *)
+  | Pmty_typeof of attributes * module_expr  (** [module type of ME] *)
   | Pmty_extension of extension  (** [[%id]] *)
   | Pmty_alias of longident loc  (** [(module M)] *)
   (*_ [Pmty_strengthen] might be a better fit for [with_constraint] *)

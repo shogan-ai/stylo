@@ -336,7 +336,8 @@ module Mty = struct
   let functor_ ?loc ?attrs ~tokens ?(ret_mode=[]) a b c =
     mk ?loc ?attrs ~tokens (Pmty_functor (a, b, c,ret_mode))
   let with_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pmty_with (a, b))
-  let typeof_ ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_typeof a)
+  let typeof_ ?loc ?attrs ~tokens a b =
+    mk ?loc ?attrs ~tokens (Pmty_typeof (a, b))
   let extension ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_extension a)
   let strengthen ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pmty_strengthen (a, b))
 end

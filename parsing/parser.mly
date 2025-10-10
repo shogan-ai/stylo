@@ -1527,7 +1527,7 @@ module_type:
       { let mty, mm = mty_mm in
         mkmty ~loc:$sloc (Pmty_functor_type (args, mty, mm)) }
   | MODULE TYPE OF attributes module_expr %prec below_LBRACKETAT
-      { mkmty ~loc:$sloc ~attrs:$4 (Pmty_typeof $5) }
+      { mkmty ~loc:$sloc (Pmty_typeof ($4, $5)) }
   | mty = module_type attr = attribute
       { (* We are "patching" the module type to add an attribute, we must also
            patch the tokens attached to the mty to account for the new tokens

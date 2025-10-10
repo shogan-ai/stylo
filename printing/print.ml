@@ -1890,8 +1890,9 @@ end = struct
         separate_map (break 1 ^^ S.and_ ^^ break 1)
           With_constraint.pp cstrs
       end
-    | Pmty_typeof me ->
-      S.module_ ^/^ S.type_ ^/^ S.of_ ^/^ Module_expr.pp me
+    | Pmty_typeof (attrs, me) ->
+      let kws = S.module_ ^/^ S.type_ ^/^ S.of_ in
+      Attribute.attach kws ~attrs ^/^ Module_expr.pp me
     | Pmty_extension ext -> Extension.pp ext
     | Pmty_alias lid -> longident lid.txt
     | Pmty_strengthen (mty, lid) ->

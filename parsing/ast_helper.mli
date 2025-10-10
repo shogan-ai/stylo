@@ -304,7 +304,8 @@ module Mty:
       attributes -> functor_parameter list -> module_type -> module_type
     val with_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_type ->
       with_constraint list -> module_type
-    val typeof_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_expr -> module_type
+    val typeof_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
+      attributes -> module_expr -> module_type
     val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> module_type
     val strengthen: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_type -> lid ->
       module_type
