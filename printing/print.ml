@@ -843,14 +843,11 @@ end = struct
         ) ^/^ S.do_
       in
       group (prefix fst_line (pp e3) ^/^ S.done_)
-    | Pexp_constraint (e, None, modes) ->
-      with_modes ~modes (pp e)
-    | Pexp_constraint (e, Some ct, atat_modes) ->
+    | Pexp_constraint (e, ct_opt, modes) ->
       parens (
-        pp e ^/^ S.colon ^/^ Core_type.pp ct ^^
-        match atat_modes with
-        | [] -> empty
-        | lst -> break 1 ^^ S.atat ^/^ modes lst
+        pp e ^?^
+        optional (fun ct -> S.colon ^/^ Core_type.pp ct) ct_opt
+        |> with_modes ~modes
       )
     | Pexp_coerce (e, ct1, ct2) ->
       let ct1 =
