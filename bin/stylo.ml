@@ -103,7 +103,8 @@ let fuzzer_batch fn =
           | false ->
             Format.eprintf "%s, line %d: ast changed@." fn i;
             has_errors := true
-          | true ->
+          | true
+          | exception Failed_to_parse_source _ ->
             loop_lines (i + 1) ic
         end
   in
@@ -209,11 +210,10 @@ let () =
           let source = In_channel.(with_open_text fn input_all) in
           let reprinted = Buffer.contents b in
           if
+            not @@
             Ast_checker.check_same_ast fn 0
               ~impl:(Filename.check_suffix fn ".ml") source reprinted
           then
-            ()
-          else
             (* TODO: location, etc *)
             Format.eprintf "%s: ast changed@." fn
         ) else (

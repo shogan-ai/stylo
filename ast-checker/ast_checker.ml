@@ -1,9 +1,6 @@
 open Parsetree
 open Ast_helper
 
-module Location = Location
-module Syntaxerr = Syntaxerr
-
 let sort_attributes : attributes -> attributes = List.sort compare
 
 let normalize_cmt_spaces doc =
@@ -117,15 +114,25 @@ let report_error exn =
       Location.print_report report;
     exit 1
 
-let struct_or_error lex =
+exception Failed_to_parse_source of exn
+
+let struct_or_error ?(bail_out=false) lex =
   match Parse.implementation lex with
   | ast -> mapper.structure mapper ast
-  | exception exn -> report_error exn
+  | exception exn ->
+    if bail_out then
+      raise (Failed_to_parse_source exn)
+    else
+      report_error exn
 
-let sig_or_error lex =
+let sig_or_error ?(bail_out=false) lex =
   match Parse.interface lex with
   | ast -> mapper.signature mapper ast
-  | exception exn -> report_error exn
+  | exception exn ->
+    if bail_out then
+      raise (Failed_to_parse_source exn)
+    else
+      report_error exn
 
 let check_same_ast fn line ~impl s1 s2 =
   let pos =
@@ -141,12 +148,12 @@ let check_same_ast fn line ~impl s1 s2 =
   Lexing.set_filename lex2 (fn ^ ".out");
   Location.input_name := fn;
   if impl then
-    let ast1 = struct_or_error lex1 in
+    let ast1 = struct_or_error ~bail_out:true lex1 in
     Location.input_name := (fn ^ ".out");
     let ast2 = struct_or_error lex2 in
     ast1 = ast2
   else
-    let ast1 = sig_or_error lex1 in
+    let ast1 = sig_or_error ~bail_out:true lex1 in
     Location.input_name := (fn ^ ".out");
     let ast2 = sig_or_error lex2 in
     ast1 = ast2

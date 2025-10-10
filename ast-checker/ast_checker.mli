@@ -1,7 +1,6 @@
 (** Check that two strings parse to the same AST (modulo locations) *)
 
-module Location = Location
-module Syntaxerr = Syntaxerr
+exception Failed_to_parse_source of exn
 
 val ignore_docstrings : bool ref
 
