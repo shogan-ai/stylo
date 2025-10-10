@@ -1523,7 +1523,7 @@ end = struct
 
   let pp_rhs ?(subst=false) td =
     let eq = group (break 1 ^^ if subst then S.colon_equals else S.equals) in
-    begin match td.ptype_manifest, td.ptype_kind with
+    match td.ptype_manifest, td.ptype_kind with
     | None, Ptype_abstract -> empty
     | Some ct, Ptype_abstract ->
       eq ^?^ private_ td.ptype_private ^?^ Core_type.pp ct
@@ -1532,7 +1532,6 @@ end = struct
       S.equals ^?^ private_ td.ptype_private ^?^ type_kind kind
     | None, kind ->
       eq ^?^ private_ td.ptype_private ^?^ type_kind kind
-    end ^?^ pp_constraints td.ptype_cstrs
 
   let pp ~kw_preceeding_params ~start ?subst td =
     let start =
@@ -1555,7 +1554,9 @@ end = struct
         | Some j -> S.colon ^/^ Jkind_annotation.pp j
       )
     in
-    lhs ^^ nest 2 (group (pp_rhs ?subst td))
+    prefix_nonempty
+      (group (lhs ^^ nest 2 (group (pp_rhs ?subst td))))
+      (pp_constraints td.ptype_cstrs)
     |> Attribute.attach ~item:true
       ~text:td.ptype_pre_text
       ?pre_doc:td.ptype_pre_doc
