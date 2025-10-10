@@ -123,19 +123,6 @@ let array_delimiters = function
   | Asttypes.Immutable -> S.lbracket_colon, S.colon_rbracket
   | Mutable -> S.lbracket_pipe, S.pipe_rbracket
 
-let type_app ?(omit_delims_if_possible=false) ?(parens=true) ty args =
-  let left, right =
-    if parens then
-      S.lparen, S.rparen
-    else
-      S.lbracket, S.rbracket
-  in
-  begin match args with
-    | [] -> empty
-    | [ x ] when omit_delims_if_possible -> x
-    | _ -> left ^^ separate (S.comma ^^ break 1) args ^^ right
-  end ^?^ ty
-
 (* N.B. stringf is important here: suffixed number come out of the lexer as a
    single token. We can't use ^^ here. *)
 let constant = function
@@ -306,6 +293,95 @@ end
 (** {1 Core language} *)
 (** {2 Type expressions} *)
 
+
+and Type_constructor : sig
+  val pp_core_type
+    : ?class_:bool
+    -> Tokens.seq
+    -> core_type list
+    -> Longident.t
+    -> document
+
+  val pp_class_constr : core_type list -> Longident.t -> document
+
+  val pp_decl
+    : kw:Parser_tokens.token
+    -> Tokens.seq
+    -> ptype_params
+    -> document
+    -> document
+
+  val pp_class_info_decl : ptype_params -> string -> document
+end = struct
+  type params_delimiters =
+    | Brackets of { spaces_required: bool }
+    | Parens of { omit_when_single_param: bool }
+
+  let pp delims params_docs ty_doc =
+    let left, right, omit =
+      match delims with
+      | Brackets { spaces_required } ->
+        let sp = if spaces_required then break 1 else empty in
+        S.lbracket ^^ sp, sp ^^ S.rbracket, false
+      | Parens { omit_when_single_param } ->
+        S.lparen, S.rparen, omit_when_single_param
+    in
+    let params =
+      match params_docs with
+      | [] -> empty
+      | [ one ] when omit -> one
+      | params -> left ^^ separate (S.comma ^^ break 1) params ^^ right
+    in
+    params ^?^ ty_doc
+
+  let pp_core_type ?(class_=false) tokens args lid =
+    let delims =
+      Parens {
+        omit_when_single_param =
+          args <> [] && not (starts_with LPAREN tokens)
+      }
+    in
+    let args = List.map Core_type.pp args in
+    let lid = (if class_ then S.hash else empty) ^^ longident lid in
+    pp delims args lid
+
+  let pp_decl ~kw tokens params name =
+    let delims =
+      Parens {
+        omit_when_single_param =
+          params <> [] && not (has_leading LPAREN ~after:kw tokens)
+      }
+    in
+    let args = List.map Type_param.pp params in
+    pp delims args name
+
+  let starts_or_ends_with_obj = function
+    | [] -> false
+    | first :: rest ->
+      let is_obj ct =
+        match ct.ptyp_desc with
+        | Ptyp_object _ -> true
+        | _ -> false
+      in
+      let rec is_obj_last = function
+        | [] -> false
+        | [ x ] -> is_obj x
+        | _ :: xs -> is_obj_last xs
+      in
+      is_obj first || is_obj_last rest
+
+  let pp_class_constr args lid =
+    let delims = Brackets { spaces_required = starts_or_ends_with_obj args } in
+    let args = List.map Core_type.pp args in
+    let lid = longident lid in
+    pp delims args lid
+
+  let pp_class_info_decl params name =
+    let delims = Brackets { spaces_required = false } in
+    let args = List.map Type_param.pp params in
+    pp delims args (string name)
+end
+
 and Core_type : sig
   val pp : core_type -> document
 
@@ -353,14 +429,10 @@ end = struct
         (pp_surrounded codom_legacy_modes codom_modes codom_type)
     | Ptyp_tuple elts -> pp_tuple elts
     | Ptyp_unboxed_tuple elts -> S.hash_lparen ^^ pp_tuple elts ^^ S.rparen
-    | Ptyp_constr (args, lid) ->
-      let omit_delims_if_possible = not (starts_with LPAREN tokens) in
-      type_app ~omit_delims_if_possible (longident lid.txt) (List.map pp args)
+    | Ptyp_constr (args, lid) -> Type_constructor.pp_core_type tokens args lid.txt
     | Ptyp_object (fields, closed) -> pp_object (nb_semis tokens) fields closed
     | Ptyp_class (lid, args) ->
-      let omit_delims_if_possible = not (starts_with LPAREN tokens) in
-      type_app ~omit_delims_if_possible (S.hash ^^ longident lid.txt)
-        (List.map pp args)
+      Type_constructor.pp_core_type ~class_:true tokens args lid.txt
     | Ptyp_alias (ct, name, None) ->
       pp ct ^/^ S.as_ ^/^
       S.squote ^^ string (Option.get name).txt
@@ -1543,11 +1615,8 @@ end = struct
     in
     let lhs =
       prefix start (
-        let omit_delims_if_possible =
-          not (has_leading LPAREN ~after:kw_preceeding_params td.ptype_tokens)
-        in
-        type_app ~omit_delims_if_possible (string td.ptype_name.txt)
-          (List.map Type_param.pp td.ptype_params)
+        Type_constructor.pp_decl ~kw:kw_preceeding_params td.ptype_tokens
+          td.ptype_params (string td.ptype_name.txt)
         ^?^
         match td.ptype_jkind_annotation with
         | None -> empty
@@ -1582,12 +1651,9 @@ end = struct
   let pp { ptyext_path; ptyext_params; ptyext_constructors; ptyext_private;
            ptyext_attributes; ptyext_ext_attrs; ptyext_pre_doc; ptyext_post_doc;
            ptyext_loc = _ ; ptyext_tokens }=
-    let omit_delims_if_possible =
-      not (has_leading LPAREN ~after:TYPE ptyext_tokens)
-    in
     Ext_attribute.decorate S.type_ ptyext_ext_attrs ^/^
-    type_app ~omit_delims_if_possible
-      (longident ptyext_path.txt) (List.map Type_param.pp ptyext_params) ^/^
+    Type_constructor.pp_decl ~kw:TYPE ptyext_tokens
+      ptyext_params (longident ptyext_path.txt)  ^/^
     S.plus_equals ^/^
     private_ ptyext_private ^?^
     separate_map (break 1)
@@ -1658,9 +1724,7 @@ end = struct
     | otherwise -> List.rev rev_args, otherwise
 
   let rec pp_desc = function
-    | Pcty_constr (lid, args) ->
-      (* FIXME: [~omit_delims_if_possible]? *)
-      type_app ~parens:false (longident lid.txt) (List.map Core_type.pp args)
+    | Pcty_constr (lid, args) -> Type_constructor.pp_class_constr args lid.txt
     | Pcty_signature cs -> pp_signature cs
     | Pcty_arrow (arrow_arg, rhs) ->
       ignore collect_arrow_args;
@@ -1722,8 +1786,7 @@ end = struct
     in
     let value_params = List.map (Argument.pp Pattern.pp) pci_value_params in
     let bound_class_thingy =
-      type_app ~parens:false (string pci_name.txt)
-        (List.map Type_param.pp pci_params)
+      Type_constructor.pp_class_info_decl pci_params pci_name.txt
     in
     let open Generic_binding in
     let mk_constraint ct = Single_part (S.colon ^/^ Class_type.pp ct) in
@@ -1768,8 +1831,7 @@ end = struct
   let rec pp_desc ext_attr d =
     let (!!) kw = Ext_attribute.decorate kw ext_attr in
     match d with
-    | Pcl_constr (lid, args) ->
-      type_app ~parens:false (longident lid.txt) (List.map Core_type.pp args)
+    | Pcl_constr (lid, args) -> Type_constructor.pp_class_constr args lid.txt
     | Pcl_structure cs -> pp_structure ext_attr cs
     | Pcl_fun (params, rhs) ->
       let params = flow_map (break 1) (Argument.pp Pattern.pp) params in
@@ -2182,12 +2244,9 @@ end = struct
   let pp wc =
     match wc.wc_desc with
     | Pwith_type (params, lid, priv, ct, cstrs) ->
-      let omit_delims_if_possible =
-        not (has_leading LPAREN ~after:TYPE wc.wc_tokens)
-      in
       S.type_ ^/^
-      type_app ~omit_delims_if_possible (longident lid.txt)
-        (List.map Type_param.pp params) ^/^
+      Type_constructor.pp_decl ~kw:TYPE wc.wc_tokens params
+        (longident lid.txt) ^/^
       S.equals ^?^ private_ priv ^?^
       Core_type.pp ct ^?^ Type_declaration.pp_constraints cstrs
     | Pwith_module (lid1, lid2) ->
@@ -2199,12 +2258,9 @@ end = struct
       S.module_ ^/^ S.type_ ^/^ longident lid.txt ^/^ S.colon_equals ^/^
       Module_type.pp mty
     | Pwith_typesubst (params, lid, ct) ->
-      let omit_delims_if_possible =
-        not (has_leading LPAREN ~after:TYPE wc.wc_tokens)
-      in
       S.type_ ^/^
-      type_app ~omit_delims_if_possible (longident lid.txt)
-        (List.map Type_param.pp params) ^/^
+      Type_constructor.pp_decl ~kw:TYPE wc.wc_tokens params
+        (longident lid.txt) ^/^
       S.colon_equals ^/^ Core_type.pp ct
     | Pwith_modsubst (lid1, lid2) ->
       S.module_ ^/^ longident lid1.txt ^/^ S.colon_equals ^/^
