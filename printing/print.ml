@@ -1810,8 +1810,10 @@ end = struct
         pci_pre_text; pci_pre_doc; pci_post_doc } =
     let keywords =
       match keywords with
-      | [] -> assert false
-      | first :: rest -> Ext_attribute.decorate first pci_ext_attrs :: rest
+      | [ class_ ] -> Ext_attribute.decorate class_ pci_ext_attrs
+      | [ class_; type_ ] ->
+        class_  ^/^ Ext_attribute.decorate type_ pci_ext_attrs
+      | _ -> assert false
     in
     let value_params = List.map (Argument.pp Pattern.pp) pci_value_params in
     let bound_class_thingy =
@@ -1822,7 +1824,7 @@ end = struct
     pp ?equal_sign
       ~pre_text:pci_pre_text
       ?pre_doc:pci_pre_doc
-      ~keyword:(separate (break 1) keywords ^?^ virtual_ pci_virt)
+      ~keyword:(keywords ^?^ virtual_ pci_virt)
       bound_class_thingy
       ~params:value_params
       ?constraint_:(Option.map mk_constraint pci_constraint)
