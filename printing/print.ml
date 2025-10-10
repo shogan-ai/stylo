@@ -1683,7 +1683,7 @@ end = struct
   and pp_field { pctf_pre_doc; pctf_desc; pctf_attributes; pctf_post_doc;
                  pctf_loc = _; pctf_tokens = _ } =
     group (pp_field_desc pctf_desc)
-    |> Attribute.attach ~attrs:pctf_attributes
+    |> Attribute.attach ~item:true ~attrs:pctf_attributes
       ?pre_doc:pctf_pre_doc ?post_doc:pctf_post_doc
 
   and pp_field_desc = function
@@ -1701,7 +1701,7 @@ end = struct
 
   and pp { pcty_desc; pcty_attributes; pcty_loc = _; pcty_tokens = _ } =
     pp_desc pcty_desc
-    |> Attribute.attach ~item:true ~attrs:pcty_attributes
+    |> Attribute.attach ~attrs:pcty_attributes
 end
 
 
@@ -1853,7 +1853,7 @@ end = struct
 
   and pp { pcl_ext_attrs; pcl_desc; pcl_attributes; pcl_loc = _ } =
     pp_desc pcl_ext_attrs pcl_desc
-    |> Attribute.attach ~item:true ~attrs:pcl_attributes
+    |> Attribute.attach ~attrs:pcl_attributes
 end
 
 
