@@ -2621,11 +2621,11 @@ end = struct
     match Option.map Module_type.as_rhs constr, mode_l with
     | None, [] -> None
     | Some Three_parts { start; main; stop }, modes ->
-      Some (Three_parts { start; main; stop = with_atat_modes stop ~modes })
+      Some (Three_parts { start; main; stop = with_modes stop ~modes })
     | Some Single_part mty, modes ->
       Some (Single_part (
         S.colon ^/^ mty
-        |> with_atat_modes ~modes
+        |> with_modes ~modes
       ))
     | None, at_modes -> Some (Single_part (S.at ^/^ modes at_modes))
 
