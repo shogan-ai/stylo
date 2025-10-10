@@ -1872,7 +1872,7 @@ end = struct
     | Pcl_apply (ce, args) -> Application.pp (pp ce) args
     | Pcl_let (rf, vbs, body) ->
       (* FIXME: factorize with Pexp_let *)
-      Value_binding.pp_list vbs ~start:(
+      Value_binding.pp_list ~item:true vbs ~start:(
         S.let_ ::
         match rf with
         | Nonrecursive -> []
