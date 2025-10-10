@@ -98,13 +98,12 @@ let fuzzer_batch fn =
             |> PPrint.ToBuffer.compact styled
             |> fun () -> Buffer.contents styled
           in
-          match Ast_checker.check_same_ast ~impl:(not intf) src styled with
+          let open Ast_checker in
+          match check_same_ast fn i ~impl:(not intf) src styled with
           | false ->
             Format.eprintf "%s, line %d: ast changed@." fn i;
             has_errors := true
-          | true
-          | exception _ (* FIXME: shouldn't user compiler-libs parser.. *)
-            ->
+          | true ->
             loop_lines (i + 1) ic
         end
   in
@@ -209,7 +208,10 @@ let () =
           PPrint.ToBuffer.pretty 1. 80 b doc;
           let source = In_channel.(with_open_text fn input_all) in
           let reprinted = Buffer.contents b in
-          if Ast_checker.check_same_ast ~impl:true source reprinted then
+          if
+            Ast_checker.check_same_ast fn 0
+              ~impl:(Filename.check_suffix fn ".ml") source reprinted
+          then
             ()
           else
             (* TODO: location, etc *)

@@ -1,6 +1,9 @@
 open Parsetree
 open Ast_helper
 
+module Location = Location
+module Syntaxerr = Syntaxerr
+
 let sort_attributes : attributes -> attributes = List.sort compare
 
 let normalize_cmt_spaces doc =
@@ -103,28 +106,47 @@ let mapper =
   ; typ
   ; structure_item }
 
-let check_same_ast ~impl s1 s2 =
+let report_error exn =
+  match Location.error_of_exn exn with
+  | None ->
+    Format.eprintf "unexpected exn: %s@." (Printexc.to_string exn);
+    exit 1
+  | Some `Already_displayed -> assert false
+  | Some `Ok report ->
+    Format.eprintf "%a@."
+      Location.print_report report;
+    exit 1
+
+let struct_or_error lex =
+  match Parse.implementation lex with
+  | ast -> mapper.structure mapper ast
+  | exception exn -> report_error exn
+
+let sig_or_error lex =
+  match Parse.interface lex with
+  | ast -> mapper.signature mapper ast
+  | exception exn -> report_error exn
+
+let check_same_ast fn line ~impl s1 s2 =
+  let pos =
+    { Lexing.pos_fname = fn
+    ; pos_lnum = line
+    ; pos_bol = 0
+    ; pos_cnum = 0 }
+  in
   let lex1 = Lexing.from_string s1 in
+  Lexing.set_position lex1 pos;
   let lex2 = Lexing.from_string s2 in
+  Lexing.set_position lex2 pos;
+  Lexing.set_filename lex2 (fn ^ ".out");
+  Location.input_name := fn;
   if impl then
-    let ast1 =
-      Parse.implementation lex1
-      |> mapper.structure mapper
-    in
-    Location.input_name := "/tmp/out.txt";
-    let ast2 =
-      Parse.implementation lex2
-      |> mapper.structure mapper
-    in
+    let ast1 = struct_or_error lex1 in
+    Location.input_name := (fn ^ ".out");
+    let ast2 = struct_or_error lex2 in
     ast1 = ast2
   else
-    let ast1 =
-      Parse.interface lex1
-      |> mapper.signature mapper
-    in
-    Location.input_name := "/tmp/out.txt";
-    let ast2 =
-      Parse.interface lex2
-      |> mapper.signature mapper
-    in
+    let ast1 = sig_or_error lex1 in
+    Location.input_name := (fn ^ ".out");
+    let ast2 = sig_or_error lex2 in
     ast1 = ast2
