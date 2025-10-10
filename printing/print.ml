@@ -2243,16 +2243,11 @@ end = struct
       separate_map (break 1) Functor_parameter.pp fps ^/^ S.rarrow ^/^ pp me
     | Pmod_apply (m1, m2) -> pp m1 ^/^ pp m2
     | Pmod_apply_unit me -> pp me ^^ S.lparen ^^ S.rparen
-    | Pmod_constraint (me, None, modes) ->
-      (* FIXME: parens? shouldn't that be part of cst? *)
-      parens (with_modes ~modes (pp me))
-    | Pmod_constraint (me, Some mty, atat_modes) ->
+    | Pmod_constraint (me, mty_opt, modes) ->
       parens (
-        pp me ^/^ S.colon ^/^ Module_type.pp mty ^^
-        begin match atat_modes with
-          | [] -> empty
-          | l -> break 1 ^^ S.atat ^/^ modes l
-        end
+        pp me ^?^
+        optional (fun mty -> S.colon ^/^ Module_type.pp mty) mty_opt
+        |> with_modes ~modes
       )
     | Pmod_unpack (e, ty1, ty2) ->
       parens (
