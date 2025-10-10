@@ -668,7 +668,7 @@ let mklb first ~loc (p, e, typ, modes, is_pun) attrs =
   }
 
 let addlb lbs lb =
-  if lb.lb_is_pun && lbs.lbs_extension = None then syntax_error ();
+(*   if lb.lb_is_pun && lbs.lbs_extension = None then syntax_error (); *)
   { lbs with lbs_bindings = lb :: lbs.lbs_bindings }
 
 let mklbs ext mf rf lb =
