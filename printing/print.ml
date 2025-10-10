@@ -886,7 +886,8 @@ end = struct
       group (S.let_ ^/^ Open_declaration.pp ~item:false od ^/^ S.in_) ^/^ pp e
     | Pexp_letop lo -> Letop.pp lo
     | Pexp_extension ext -> Extension.pp ext
-    | Pexp_unreachable  -> S.dot
+    | Pexp_unreachable  ->
+      S.dot ^^ break 1 (* prevents unintentional conversion into DOTOP *)
     | Pexp_stack e -> S.stack__ ^/^ pp e
     | Pexp_comprehension ce -> Comprehension.pp_expr ce
     | Pexp_overwrite (e1, e2) ->
