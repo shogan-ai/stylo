@@ -243,15 +243,27 @@ end
 
 and Ext_attribute : sig
   val decorate : document -> ext_attribute -> document
+  val decorate_optional_override :
+    document -> Asttypes.override_flag -> ext_attribute -> document
 end = struct
-  let decorate kw { pea_ext; pea_attrs } =
+  let decorate ~between kw { pea_ext; pea_attrs } =
     Attribute.attach ~attrs:pea_attrs (
       match pea_ext with
       | None -> kw
       | Some lst_loc ->
-        kw ^^ string "%" ^^
+        kw ^^ between ^^ string "%" ^^
         separate_map (group (S.dot ^^ break 0)) string lst_loc.txt
     )
+
+  let decorate_optional_override kw ovr =
+    let kw, between =
+      match ovr with
+      | Asttypes.Fresh -> kw, empty
+      | Override -> kw ^^ S.bang, break 1
+    in
+    decorate kw ~between
+
+  let decorate = decorate ~between:empty
 end
 
 and Extension : sig
@@ -2189,7 +2201,7 @@ end = struct
   let pp ?(item=true) pp_expr
       { popen_expr; popen_override; popen_attributes; popen_ext_attrs;
         popen_pre_doc; popen_post_doc; popen_loc = _; popen_tokens = _ } =
-    Ext_attribute.decorate (S.open_ ^^ override_ popen_override)
+    Ext_attribute.decorate_optional_override S.open_ popen_override
       popen_ext_attrs ^/^
     pp_expr popen_expr
     |> Attribute.attach ~item ~attrs:popen_attributes
