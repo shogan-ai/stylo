@@ -769,6 +769,19 @@ end = struct
     pp_desc e
     |> Attribute.attach ~attrs:e.pexp_attributes
 
+  and opt_space_then_pp e =
+    (* we force a space before # *)
+    begin match e.pexp_desc with
+    | Pexp_unboxed_tuple _
+    | Pexp_record_unboxed_product _
+    | Pexp_constant
+        ( Pconst_unboxed_float _
+        | Pconst_unboxed_integer _
+        | Pconst_untagged_char _) ->
+      break 1
+    | _ -> empty
+    end ^^ pp e
+
   and pp_desc exp =
     let (!!) kw = Ext_attribute.decorate kw exp.pexp_ext_attr in
     match exp.pexp_desc with
@@ -776,8 +789,8 @@ end = struct
     | Pexp_constant c -> constant c
     | Pexp_let (mf, rf, vbs, body) -> pp_let mf rf vbs body
     | Pexp_function _ -> pp_function exp
-    | Pexp_prefix_apply (op, arg) -> pp_op op ^^ pp arg
-    | Pexp_add_or_sub (op, arg) -> string op ^^ pp arg
+    | Pexp_prefix_apply (op, arg) -> pp_op op ^^ opt_space_then_pp arg
+    | Pexp_add_or_sub (op, arg) -> string op ^^ opt_space_then_pp arg
     | Pexp_infix_apply {op; arg1; arg2} ->
       (* N.B. the associativity of [op] will impact the nesting... *)
       pp arg1 ^/^ pp_op_apply op arg2
