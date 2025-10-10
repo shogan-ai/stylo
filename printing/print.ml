@@ -2113,7 +2113,7 @@ end = struct
         pmtd_post_doc; pmtd_loc = _; pmtd_tokens = _ } =
     Generic_binding.pp ~item:true
       ?pre_doc:pmtd_pre_doc
-      ~keyword:(Ext_attribute.decorate S.module_ pmtd_ext_attrs ^/^ S.type_)
+      ~keyword:(S.module_ ^/^ Ext_attribute.decorate S.type_ pmtd_ext_attrs)
       (string pmtd_name.txt)
       ~equal_sign:(if subst then S.colon_equals else S.equals)
       ?rhs:(Option.map Module_type.as_rhs pmtd_type)
