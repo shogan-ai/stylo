@@ -460,7 +460,13 @@ end = struct
     | Ptyp_poly (bound_vars, ct) ->
       pp_poly_bindings bound_vars ^^ break 0 ^^ S.dot ^/^ pp ct
     | Ptyp_package pkg -> package_type pkg
-    | Ptyp_open (lid, ct) -> longident lid.txt ^^ S.dot ^^ pp ct
+    | Ptyp_open (lid, ct) ->
+      let space =
+        match ct.ptyp_desc with
+        | Ptyp_unboxed_tuple _ -> break 1
+        | _ -> empty
+      in
+      longident lid.txt ^^ S.dot ^^ space ^^ pp ct
     | Ptyp_of_kind jkind -> S.type_ ^/^ S.colon ^/^ Jkind_annotation.pp jkind
     | Ptyp_extension ext -> Extension.pp ext
     | Ptyp_parens ct -> parens (pp ct)
