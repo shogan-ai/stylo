@@ -104,16 +104,12 @@ let nonrec_ = function
   | Nonrecursive -> S.nonrec_
 
 let mutable_ = function
-  | Asttypes.Mutable -> S.mutable_ ^^ break 1
+  | Asttypes.Mutable -> S.mutable_
   | Immutable -> empty
 
 let virtual_ = function
   | Asttypes.Virtual -> S.virtual_
   | Concrete -> empty
-
-let virtual_field = function
-  | Cfk_virtual _ -> S.virtual_ ^^ break 1
-  | Cfk_concrete _ -> empty
 
 let override_= function
   | Asttypes.Fresh -> empty
@@ -1783,10 +1779,10 @@ end = struct
   and pp_field_desc = function
     | Pctf_inherit ct -> S.inherit_ ^/^ pp ct
     | Pctf_val (lbl, mut, virt, ct) ->
-      S.val_ ^/^ mutable_ mut ^^ virtual_ virt ^?^
+      S.val_ ^/^ mutable_ mut ^?^ virtual_ virt ^?^
       string lbl.txt ^/^ S.colon ^/^ Core_type.pp ct
     | Pctf_method (lbl, priv, virt, ct) ->
-      S.method_ ^/^ private_ priv ^^ virtual_ virt ^?^
+      S.method_ ^/^ private_ priv ^?^ virtual_ virt ^?^
       string lbl.txt ^/^ S.colon ^/^ Core_type.pp ct
     | Pctf_constraint (ct1, ct2) ->
       S.constraint_ ^/^ Core_type.pp ct1 ^/^ S.equals ^/^ Core_type.pp ct2
@@ -1925,7 +1921,7 @@ end = struct
 
   and pp_value lbl mut = function
     | Cfk_virtual ct ->
-      S.val_ ^/^ mutable_ mut ^^ S.virtual_ ^/^ string lbl.txt ^/^
+      S.val_ ^/^ mutable_ mut ^?^ S.virtual_ ^/^ string lbl.txt ^/^
       S.colon ^/^ Core_type.pp ct
     | Cfk_concrete (over, vb) ->
       let start = [
@@ -1936,7 +1932,7 @@ end = struct
 
   and pp_method lbl priv = function
     | Cfk_virtual ct ->
-      S.method_ ^/^ private_ priv ^^ S.virtual_ ^/^ string lbl.txt ^/^
+      S.method_ ^/^ private_ priv ^?^ S.virtual_ ^/^ string lbl.txt ^/^
       S.colon ^/^ Core_type.pp ct
     | Cfk_concrete (over, vb) ->
       let start = [
