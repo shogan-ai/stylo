@@ -103,10 +103,17 @@ let mapper =
   ; typ
   ; structure_item }
 
-let report_error exn =
+let report_error lex exn =
   match Location.error_of_exn exn with
   | None ->
-    Format.eprintf "unexpected exn: %s@." (Printexc.to_string exn);
+    let loc =
+      { Location.loc_start = lex.Lexing.lex_start_p
+      ; loc_end = lex.Lexing.lex_curr_p
+      ; loc_ghost = true }
+    in
+    Format.eprintf "%a@ Unexpected exn: %s@."
+      Location.print_loc loc
+      (Printexc.to_string exn);
     exit 1
   | Some `Already_displayed -> assert false
   | Some `Ok report ->
@@ -123,7 +130,7 @@ let struct_or_error ?(bail_out=false) lex =
     if bail_out then
       raise (Failed_to_parse_source exn)
     else
-      report_error exn
+      report_error lex exn
 
 let sig_or_error ?(bail_out=false) lex =
   match Parse.interface lex with
@@ -132,7 +139,7 @@ let sig_or_error ?(bail_out=false) lex =
     if bail_out then
       raise (Failed_to_parse_source exn)
     else
-      report_error exn
+      report_error lex exn
 
 let check_same_ast fn line ~impl s1 s2 =
   let pos =
