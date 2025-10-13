@@ -2557,7 +2557,7 @@ end = struct
     | Pstr_type (rf, tds) -> Type_declaration.pp_list rf tds
     | Pstr_typext te -> Type_extension.pp te
     | Pstr_exception exn -> Type_exception.pp exn
-    | Pstr_module mb -> Module_binding.pp ~keywords:[S.module_] mb
+    | Pstr_module mb -> Module_binding.pp ~item:true ~keywords:[S.module_] mb
     | Pstr_recmodule mbs -> Module_binding.pp_recmods mbs
     | Pstr_modtype mty -> Module_type_declaration.pp mty
     | Pstr_open od -> Open_declaration.pp od
