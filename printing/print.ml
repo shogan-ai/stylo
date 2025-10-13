@@ -817,10 +817,19 @@ end = struct
     | Ppat_unpack (path, ty) -> pp_unpack p.ppat_ext_attr path ty
     | Ppat_exception p -> !!S.exception_ ^/^ pp  p
     | Ppat_extension ext -> Extension.pp ext
-    | Ppat_open (lid, p) -> longident lid.txt ^^ S.dot ^^ pp p
+    | Ppat_open (lid, p) -> pp_open lid p
     | Ppat_parens p -> parens (pp p)
     | Ppat_list elts -> pp_list (nb_semis p.ppat_tokens) elts
     | Ppat_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
+
+  and pp_open lid p =
+    let space =
+      match p.ppat_desc with
+      | Ppat_unboxed_tuple _
+      | Ppat_record_unboxed_product _ -> break 1
+      | _ -> empty
+    in
+    longident lid.txt ^^ S.dot ^^ space ^^ pp p
 
   and pp_delimited_seq (opn, cls) nb_semis elts =
     let semi_as_term = List.compare_length_with elts nb_semis = 0 in
