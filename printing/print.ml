@@ -923,17 +923,30 @@ end = struct
     |> Attribute.attach ~attrs:e.pexp_attributes
 
   and opt_space_then_pp e =
-    (* we force a space before # *)
-    begin match e.pexp_desc with
-    | Pexp_unboxed_tuple _
-    | Pexp_record_unboxed_product _
-    | Pexp_constant
-        ( Pconst_unboxed_float _
-        | Pconst_unboxed_integer _
-        | Pconst_untagged_char _) ->
-      break 1
-    | _ -> empty
-    end ^^ pp e
+    let rec needs_space e =
+      match e.pexp_desc with
+      (* we force a space before # *)
+      | Pexp_unboxed_tuple _
+      | Pexp_record_unboxed_product _
+      | Pexp_constant
+          ( Pconst_unboxed_float _
+          | Pconst_unboxed_integer _
+          | Pconst_untagged_char _)
+      (* As well as before other operators *)
+      | Pexp_prefix_apply _
+      | Pexp_add_or_sub _
+      (* Or when the next token is a tilde *)
+      | Pexp_tuple ({ parg_desc = Parg_labelled _ ; _ } :: _) ->
+        true
+      (* Need to check rhs of "infix applications" *)
+      | Pexp_infix_apply { arg1 = lhs; _ }
+      | Pexp_send (lhs, _)
+      | Pexp_field (lhs, _)
+      | Pexp_index_op { seq = lhs; _ } ->
+        needs_space lhs
+      | _ -> false
+    in
+    (if needs_space e then break 1 else empty) ^^ pp e
 
   and pp_desc exp =
     let (!!) kw = Ext_attribute.decorate kw exp.pexp_ext_attr in
