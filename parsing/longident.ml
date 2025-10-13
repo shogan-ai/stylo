@@ -42,6 +42,21 @@ class virtual ['self] reduce = object(self : 'self)
     self#plus (self#visit_desc env t.desc) (self#visit_tokens env t.tokens)
 end
 
+class virtual ['self] map = object(self : 'self)
+  method virtual visit_tokens : 'env. 'env -> Tokens.seq -> Tokens.seq
+
+  method private visit_desc : 'env. 'env -> desc -> desc = fun env ->
+    function
+    | Lident _ as lid -> lid
+    | Ldot (t, s) -> Ldot (self#visit_longident env t, s)
+    | Lapply (t1, t2) ->
+      Lapply (self#visit_longident env t1, self#visit_longident env t2)
+
+  method visit_longident : 'env. 'env -> t -> 'a = fun env t ->
+    { desc = self#visit_desc env t.desc
+    ; tokens = self#visit_tokens env t.tokens }
+end
+
 let last t =
   match t.desc with
     Lident s -> s
