@@ -810,8 +810,6 @@ end = struct
         | [] -> empty
         | lst -> break 1 ^^ S.atat ^/^ modes lst
       )
-    (* FIXME: parser doesn't agree with what's written above I believe.
-       Recognized form seems to depend on context... *)
     | Ppat_type lid -> S.hash ^^ longident lid.txt
     | Ppat_lazy p -> !!S.lazy_ ^/^ pp p
     | Ppat_unpack (path, ty) -> pp_unpack p.ppat_ext_attr path ty
