@@ -1579,10 +1579,10 @@ end = struct
     separate_map (break 1) pp_clause c.pcomp_clauses
 
   let pp_expr = function
-    | Pcomp_list_comprehension c -> S.lbracket ^^ pp c ^^ S.rbracket
+    | Pcomp_list_comprehension c -> S.lbracket ^/^ pp c ^/^ S.rbracket
     | Pcomp_array_comprehension (mut, c) ->
       let left, right = array_delimiters mut in
-      left ^^ pp c ^^ right
+      left ^/^ pp c ^/^ right
 end
 
 (** {2 Value descriptions} *)
