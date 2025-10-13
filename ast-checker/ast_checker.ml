@@ -1,5 +1,5 @@
+open Ocaml_syntax
 open Parsetree
-open Ast_helper
 
 let sort_attributes : attributes -> attributes = List.sort compare
 
@@ -10,63 +10,69 @@ let normalize_cmt_spaces doc =
 
 let ignore_docstrings = ref true
 
-let mapper =
-  (* remove locations *)
-  let location _ _ = Location.none in
-  let attribute (m : Ast_mapper.mapper) (attr : attribute) =
-    let attr =
-      match attr.attr_name.txt with
-      | "ocaml.doc" | "ocaml.text" ->
-        let attr_payload =
-          match attr.attr_payload with
-          | PStr [ {
-              pstr_desc =
-                Pstr_eval
-                  ({ pexp_desc= Pexp_constant Pconst_string (doc, loc, None)
-                   ; _ } as inner_exp,[]);
-              _
-            } as str ] ->
-            let doc = normalize_cmt_spaces doc in
-            let inner' =
-              { inner_exp with
-                pexp_desc = Pexp_constant (Pconst_string (doc, loc, None))
-              }
-            in
-            PStr [ { str with pstr_desc = Pstr_eval (inner', []) }]
-          | _ -> assert false
-        in
-        { attr with attr_payload }
-      | _ -> attr
-    in
-    Ast_mapper.default_mapper.attribute m attr
-  in
-  let attributes (m : Ast_mapper.mapper) (attrs : attribute list) =
-    let attrs =
-      if not !ignore_docstrings then
-        attrs
+class cleanup =
+  let from_docstring attr =
+    match attr.attr_name.txt with
+    | "ocaml" :: ("doc" | "text") :: [] -> true
+    | _ -> false
+  in object(self)
+
+  inherit [_] Parsetree.map as super
+
+  (* We only care about the syntax tree, not details of the source. *)
+
+  method! visit_location _ _ = Location.none
+  method! visit_tokens _ _ = []
+
+  method! visit_attribute env attr =
+    let attr_payload =
+      if not (from_docstring attr) then
+        attr.attr_payload
       else
-        List.filter (function
-          | { attr_name = { txt = ("ocaml.doc" | "ocaml.text"); _ }; _ } ->
-            false
-          | _ -> true
-        ) attrs
+        match attr.attr_payload with
+        | PStr ([ {
+          pstr_desc =
+            Pstr_eval
+              ({ pexp_desc= Pexp_constant Pconst_string (doc, loc, None)
+               ; _ } as inner_exp,[]);
+          _
+        } as str ], tokens) ->
+          let doc = normalize_cmt_spaces doc in
+          let inner' =
+            { inner_exp with
+              pexp_desc = Pexp_constant (Pconst_string (doc, loc, None))
+            }
+          in
+          PStr (
+            [ { str with pstr_desc = Pstr_eval (inner', []) }],
+            self # visit_tokens env tokens
+          )
+        | _ -> assert false
+      in
+      super#visit_attribute env { attr with attr_payload }
+
+  method! visit_attributes env attrs =
+    let attrs =
+      if not !ignore_docstrings
+      then attrs
+      else List.filter (fun a -> not (from_docstring a)) attrs
     in
-    (* sort attributes *)
-    Ast_mapper.default_mapper.attributes m (sort_attributes attrs)
-  in
-  let expr (m : Ast_mapper.mapper) exp =
-    let exp = {exp with pexp_loc_stack= []} in
+    super#visit_attributes env ((* FIXME: why? *) sort_attributes attrs)
+
+  (*
+  method! visit_expression env exp =
     let {pexp_desc; pexp_attributes; _} = exp in
     match pexp_desc with
     (* convert [(c1; c2); c3] to [c1; (c2; c3)] *)
     | Pexp_sequence
         ({pexp_desc= Pexp_sequence (e1, e2); pexp_attributes= []; _}, e3) ->
-        m.expr m
-          (Exp.sequence e1 (Exp.sequence ~attrs:pexp_attributes e2 e3))
-    | _ -> Ast_mapper.default_mapper.expr m exp
-  in
-  let pat (m : Ast_mapper.mapper) pat =
-    let pat = {pat with ppat_loc_stack= []} in
+      (* FIXME: what about ext_attrs?! *)
+      self#visit_expression env
+        (Exp.sequence e1
+           (Exp.sequence ~attrs:pexp_attributes e2 e3))
+    | _ -> super#visit_expression env exp
+
+  method! visit_pattern env pat =
     let {ppat_desc; ppat_loc= loc1; ppat_attributes= attrs1; _} = pat in
     (* normalize nested or patterns *)
     match ppat_desc with
@@ -76,12 +82,16 @@ let mapper =
           ; ppat_loc= loc2
           ; ppat_attributes= attrs2
           ; _ } ) ->
-        m.pat m
+        self#visit_pattern env
           (Pat.or_ ~loc:loc1 ~attrs:attrs1
              (Pat.or_ ~loc:loc2 ~attrs:attrs2 pat1 pat2)
              pat3)
-    | _ -> Ast_mapper.default_mapper.pat m pat
-  in
+    | _ -> super#visit_pattern env pat
+     *)
+end
+
+(*
+let mapper =
   let typ (m : Ast_mapper.mapper) typ =
     let typ = {typ with ptyp_loc_stack= []} in
     Ast_mapper.default_mapper.typ m typ
@@ -102,7 +112,9 @@ let mapper =
   ; pat
   ; typ
   ; structure_item }
+   *)
 
+(*
 let report_error lex exn =
   match Location.error_of_exn exn with
   | None ->
@@ -122,24 +134,17 @@ let report_error lex exn =
     exit 1
 
 exception Failed_to_parse_source of exn
+   *)
 
-let struct_or_error ?(bail_out=false) lex =
-  match Parse.implementation lex with
-  | ast -> mapper.structure mapper ast
-  | exception exn ->
-    if bail_out then
-      raise (Failed_to_parse_source exn)
-    else
-      report_error lex exn
+let cleaner = new cleanup
 
-let sig_or_error ?(bail_out=false) lex =
-  match Parse.interface lex with
-  | ast -> mapper.signature mapper ast
-  | exception exn ->
-    if bail_out then
-      raise (Failed_to_parse_source exn)
-    else
-      report_error lex exn
+let struct_or_error lex =
+  Parse.implementation lex
+  |> cleaner#visit_structure ()
+
+let sig_or_error lex =
+  Parse.interface lex
+  |> cleaner#visit_signature ()
 
 let check_same_ast fn line ~impl s1 s2 =
   let pos =
@@ -155,12 +160,12 @@ let check_same_ast fn line ~impl s1 s2 =
   Lexing.set_filename lex2 (fn ^ ".out");
   Location.input_name := fn;
   if impl then
-    let ast1 = struct_or_error ~bail_out:true lex1 in
+    let ast1 = struct_or_error lex1 in
     Location.input_name := (fn ^ ".out");
     let ast2 = struct_or_error lex2 in
     ast1 = ast2
   else
-    let ast1 = sig_or_error ~bail_out:true lex1 in
+    let ast1 = sig_or_error lex1 in
     Location.input_name := (fn ^ ".out");
     let ast2 = sig_or_error lex2 in
     ast1 = ast2

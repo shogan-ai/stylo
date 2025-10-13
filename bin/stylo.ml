@@ -103,8 +103,7 @@ let fuzzer_batch fn =
           | false ->
             Format.eprintf "%s, line %d: ast changed@." fn i;
             has_errors := true
-          | true
-          | exception Failed_to_parse_source _ ->
+          | true ->
             loop_lines (i + 1) ic
         end
   in

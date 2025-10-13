@@ -70,12 +70,13 @@ class virtual ['self] reduce_predefs = object(_ : 'self)
   method visit_modalities : 'env 'modalities. 'env -> 'modalities -> _ = fun _ _ -> []
 end
 
-class virtual ['self] map_predefs = object(_ : 'self)
+class virtual ['self] map_predefs = object(self : 'self)
   method visit_location : 'env. 'env -> _ = fun _ _l -> _l
   method visit_loc :
     'env 'a. ('env -> 'a -> 'a) -> 'env -> 'a loc -> 'a loc =
     fun visit_arg env ll ->
-      { ll with txt = visit_arg env ll.txt }
+      { loc = self#visit_location env ll.loc
+      ; txt = visit_arg env ll.txt }
 
   method visit_str_or_op : 'env. 'env -> _ = fun _ s -> s
   inherit ['self] Longident.map
@@ -102,9 +103,9 @@ class virtual ['self] map_predefs = object(_ : 'self)
 
   method visit_include_kind :
     'env. 'env -> 'include_kind -> _ = fun _ i -> i
-  method visit_mode : 'env. 'env -> 'modes -> _ = fun _ m -> m
-  method visit_modes : 'env 'modes. 'env -> 'modes -> 'modes = fun _ m -> m
-  method visit_modalities : 'env. 'env -> 'modalities -> _ = fun _ m -> m
+  method visit_mode : 'env 'mode. 'env -> 'mode -> 'mode = fun _ m -> m
+  method visit_modality
+    : 'env 'moda. 'env -> 'moda -> 'moda = fun _ m -> m
 end
 
 (**************************************************************)
@@ -149,15 +150,21 @@ type constant =
                        polymorphic = true;
                        ancestors = ["map_predefs"]}]
 
+[@@@ocaml.warning "-7"]
+
 type modality = | Modality of string [@@unboxed]
 type modalities = modality loc list
+[@@deriving visitors { name = "map_modalities"; variety = "map";
+                       polymorphic = true;
+                       ancestors = ["map_const"]}]
 
 type mode = | Mode of string [@@unboxed]
 type modes = mode loc list
+[@@deriving visitors { name = "map_modes"; variety = "map";
+                       polymorphic = true;
+                       ancestors = ["map_modalities"]}]
 
 type include_kind = Structure | Functor
-
-[@@@ocaml.warning "-7"] (* support for visitors undeclared virtual methods *)
 
 (** {1 Extension points} *)
 
@@ -1601,7 +1608,7 @@ and jkind_annotation =
             visitors { variety = "map";
                        data=false;
                        polymorphic = true;
-                       ancestors = ["map_const"]
+                       ancestors = ["map_modes"]
                      } ]
 
 (** {1 Toplevel} *)

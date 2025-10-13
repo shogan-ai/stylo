@@ -1,8 +1,3 @@
-(ocamllex lexer)
-(menhir
-  (modules parser))
-
 (library
  (name ast_checker)
- (flags :standard -w -9)
- (modules_without_implementation asttypes parsetree))
+ (libraries ocaml_syntax))
