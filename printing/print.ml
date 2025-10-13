@@ -1562,7 +1562,7 @@ end = struct
     ; pcomp_cb_iterator = it
     ; pcomp_cb_attributes = attrs
     } =
-    optional (fun m -> mode m.txt ^^ break 1) m_opt ^^
+    optional (fun m -> mode_legacy m.txt ^^ break 1) m_opt ^^
     Pattern.pp p ^/^ pp_iterator it
     |> Attribute.attach ~attrs
 
