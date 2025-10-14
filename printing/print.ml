@@ -2552,7 +2552,7 @@ and Structure : sig
 
   val pp_implementation : structure -> document
 end = struct
-  let pp_item_desc item =
+  let pp_item item =
     match item.pstr_desc with
     | Pstr_eval (e, attrs) ->
       Attribute.attach ~item:true ~attrs (Expression.pp e)
@@ -2585,42 +2585,70 @@ end = struct
       Jkind_annotation.pp k
       |> group
 
-  let pp_item it = pp_item_desc it
-
-  let (^//^) before after =
-    if before = Empty then
-      after
+  let add_item doc item =
+    if doc = Empty then
+      group (item ^^ break 0)
     else
-      before ^^ hardline ^^ hardline ^^ after
+      (* flat items don't force blank lines, only non-flat ones do. *)
+      (* FIXME: non flat items are separated by two blank lines.
+         I don't think I can robustly hack the expected behavior on top of
+         PPrint.
+
+         Neocamlformat was looking at the width of each two consecutive items to
+         decide whether to insert one or two hardlines, which mostly works ...
+         but doesn't take into account the current indentation, which is needed
+         to accurately decide if something is flat or not.
+
+         That's probably good enough?
+
+         Another option would be make the engine track blank lines and be able
+         to query that to decide whether to add an hardline or not (this
+         wouldn't change decisions regarding flattening, as in both cases we'd
+         require "infinity" width). *)
+      doc ^^ hardline ^^ group (break 0 ^^ item ^^ break 0)
+
+  let rec advance_tokens = function
+    | [] -> false, []
+    | tok :: tokens ->
+      match tok.Tokens.desc with
+      | Child_node
+      | Token EOF -> false, tokens
+      | Token SEMISEMI -> true, tokens
+      | Token _ -> assert false
+      | Comment _ -> advance_tokens tokens
 
   (* We keep the list of items in sync with the list of "tokens" of the
      structure (each [Child_node] is a structure item).
      That tells us where to insert [;;]. *)
-  let rec pp_keeping_semi doc = function
-    | [], [] -> doc
-    | item :: items, Tokens.{ desc = Child_node; _ } :: tokens ->
-      pp_keeping_semi (doc ^//^ pp_item item) (items, tokens)
-    | _::_, [] -> assert false
-    | items, tok :: tokens ->
-      match tok.desc with
-      | Child_node -> assert false
-      | Token SEMISEMI ->
-        pp_keeping_semi (doc ^?^ S.semisemi) (items, tokens)
-      | Comment _
-      | Token EOF ->
-        pp_keeping_semi doc (items, tokens)
-      | Token _ -> assert false
+  let pp_keeping_semi (items, tokens) =
+    let rec perhaps_semi doc items tokens =
+      let semi_first, tokens = advance_tokens tokens in
+      if semi_first
+      then perhaps_semi (doc ^?^ S.semisemi) items tokens
+      else expect_item doc items tokens
+    and expect_item doc items tokens =
+      match items, tokens with
+      | [], [] -> doc
+      | item :: items, tokens ->
+        let item = pp_item item in
+        let semi, tokens = advance_tokens tokens in
+        if semi
+        then perhaps_semi (add_item doc @@ item ^/^ S.semisemi) items tokens
+        else expect_item (add_item doc item) items tokens
+      | _ -> assert false
+    in
+    perhaps_semi empty items tokens
 
   let pp ?(attrs=[]) str =
     let struct_ = Attribute.attach ~attrs S.struct_ in
-    group (prefix struct_ (pp_keeping_semi empty str) ^/^ S.end_)
+    group (prefix struct_ (pp_keeping_semi str) ^/^ S.end_)
 
   let pp_parts attrs str =
     Attribute.attach ~attrs S.struct_,
-    group (pp_keeping_semi empty str), S.end_
+    group (pp_keeping_semi str), S.end_
 
   let pp_implementation str =
-    group (pp_keeping_semi empty str)
+    group (pp_keeping_semi str)
 end
 
 and Value_constraint : sig
