@@ -1132,12 +1132,20 @@ end = struct
     | Some e -> break 1 ^^ S.larrow ^/^ pp e
     end
 
-  and pp_ite ext_attr e1 e2 e3_o =
-    let if_ = Ext_attribute.decorate S.if_ ext_attr in
+  and pp_ite ?(kw=S.if_) ext_attr e1 e2 e3_o =
+    let if_ = Ext_attribute.decorate kw ext_attr in
     let if_cond = if_ ^^ nest 2 (break 1 ^^ pp e1) in
     let then_ = pp_if_branch S.then_ e2 in
-    let else_ = optional (pp_if_branch S.else_) e3_o in
+    let else_ = optional pp_else_branch e3_o in
     group if_cond ^/^ then_ ^?^ else_
+
+  and pp_else_branch = function
+    | { pexp_ext_attr = ext_attrs
+      ; pexp_attributes = [] (* we'd need to be under parens to have attrs *)
+      ; pexp_desc = Pexp_ifthenelse (e1, e2, e3)
+      ; _ } ->
+      pp_ite ~kw:(group (S.else_ ^/^ S.if_)) ext_attrs e1 e2 e3
+    | exp -> pp_if_branch S.else_ exp
 
   and pp_if_branch kw = function
     | { pexp_ext_attr = { pea_attrs = []; pea_ext = None }
