@@ -1135,13 +1135,17 @@ end = struct
   and pp_ite ext_attr e1 e2 e3_o =
     let if_ = Ext_attribute.decorate S.if_ ext_attr in
     let if_cond = if_ ^^ nest 2 (break 1 ^^ pp e1) in
-    let then_ = S.then_ ^^ nest 2 (group (break 1 ^^ pp e2)) in
-    let else_ =
-      match e3_o with
-      | None -> empty
-      | Some e3 -> prefix S.else_ (pp e3)
-    in
+    let then_ = pp_if_branch S.then_ e2 in
+    let else_ = optional (pp_if_branch S.else_) e3_o in
     group if_cond ^/^ then_ ^?^ else_
+
+  and pp_if_branch kw = function
+    | { pexp_ext_attr = { pea_attrs = []; pea_ext = None }
+      ; pexp_attributes = []
+      ; pexp_desc = Pexp_parens { begin_end = false; exp = Some e }
+      ; _ } ->
+      group (kw ^/^ S.lparen) ^^ nest 2 (group (break 0 ^^ pp e ^^ S.rparen))
+    | exp -> kw ^^ nest 2 (group (break 1 ^^ pp exp))
 
   and pp_delimited_seq (opn, cls) nb_semis elts =
     let semi_as_term = List.compare_length_with elts nb_semis = 0 in
