@@ -3,6 +3,9 @@ open Document.Utils
 
 open Ocaml_syntax.Tokens
 
+(* FIXME: sometimes there are two blank lines between defs.
+   For no obvious reason (sometimes it's between a flat and a non flat,
+   sometimes between two non flats, but not always). *)
 
 let add_item doc item =
   match doc with
