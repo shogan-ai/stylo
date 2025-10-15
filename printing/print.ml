@@ -2247,52 +2247,25 @@ end = struct
 
   let pp_item it = pp_item_desc it.psig_desc
 
-  (* TODO: duplicated from Structure *)
-  let (^//^) before after =
-    match before with
-    | Empty -> after
-    | _ -> before ^^ hardline ^^ hardline ^^ after
-
-  (* We keep the list of items in sync with the list of "tokens" of the
-     signature (each [Child_node] is a signature item).
-     That tells us where to insert [;;].
-
-     N.B. as modalities are not marked as "child", we need to remove the prefix
-     of the tokens as they correspond to the modalities tokens
-  *)
-  let pp_keeping_semi doc
-        { psg_modalities = _; psg_items; psg_tokens; psg_loc = _ } =
-    let rec aux doc = function
-      | [], [] -> doc
-      | item :: items, Tokens.{ desc = Child_node; _ } :: tokens ->
-        aux (doc ^//^ pp_item item) (items, tokens)
-      | _::_, [] -> assert false
-      | items, tok :: tokens ->
-        match tok.desc with
-        | Child_node -> assert false
-        | Token SEMISEMI ->
-          aux (doc ^?^ S.semisemi) (items, tokens)
-        | Comment _
-        | Token EOF ->
-          aux doc (items, tokens)
-        | Token _ -> assert false
-    in
+  let pp_keeping_semi { psg_modalities=_; psg_items; psg_tokens; psg_loc=_ } =
+    (* Modalities are currently not marked as "children" of the signature, so we
+       need to remove the prefix of the tokens as they correspond to the
+       modalities tokens *)
     let items_tokens =
       List.drop_while (fun tok ->
         match tok.Tokens.desc with
-        | Token (ATAT | LIDENT _) -> (* modality tokens *) true
-        | Comment _ ->
-          (* comments might appear before / inside the modalities *)
+        | Token (ATAT | LIDENT _) (* modality tokens *)
+        | Comment _ (* comments might appear before/inside the modalities *) ->
           true
         | _ -> false
       ) psg_tokens
     in
-    aux doc (psg_items, items_tokens)
+    Toplevel_items.pp_keeping_semi pp_item (psg_items, items_tokens)
 
 
   let pp_parts sg =
     with_modalities S.sig_ ~modalities:sg.psg_modalities,
-    pp_keeping_semi empty sg,
+    pp_keeping_semi sg,
     S.end_
 
   let pp sg =
@@ -2302,7 +2275,7 @@ end = struct
 
   let pp_interface sg =
     with_modalities empty ~modalities:sg.psg_modalities ^?^
-    group (pp_keeping_semi empty sg)
+    group (pp_keeping_semi sg)
 end
 
 and Module_declaration : sig
@@ -2585,67 +2558,7 @@ end = struct
       Jkind_annotation.pp k
       |> group
 
-  let add_item doc item =
-    match doc with
-    | Empty -> group (item ^^ break 0)
-    | _ ->
-      (* flat items don't force blank lines, only non-flat ones do. *)
-      (* Notice the [nest] trick here: without it any comment "attached" to the
-         item would be inserted outside the group (because we don't want to
-         unflatten things).
-         As a result, in situations such as
-         {[
-           flat_item
-
-           (* cmt *)
-           non_flat_item
-         ]}
-         the following would happen:
-         1. [flat_item] is printed (and is flat)
-         2. the [break 0] that follows vanishes
-         3. [hardline] is printed
-         4. the comment is inserted (with no extra spacing as it is between two
-         spaces/breaks already)
-         5. a hardline is inserted because of [blank_line]
-         That is: we have no blank line, and the item the comment refers to
-         becomes unclear.
-
-         The nest allows the comment insertion code to traverse the group,
-         delaying the comment until after the [nest 0 blankline], and producing
-         the output we expect. *)
-      doc ^^ hardline ^^ group (nest 0 blank_line ^^ item ^^ break 0)
-
-  let rec advance_tokens = function
-    | [] -> false, []
-    | tok :: tokens ->
-      match tok.Tokens.desc with
-      | Child_node
-      | Token EOF -> false, tokens
-      | Token SEMISEMI -> true, tokens
-      | Token _ -> assert false
-      | Comment _ -> advance_tokens tokens
-
-  (* We keep the list of items in sync with the list of "tokens" of the
-     structure (each [Child_node] is a structure item).
-     That tells us where to insert [;;]. *)
-  let pp_keeping_semi (items, tokens) =
-    let rec perhaps_semi doc items tokens =
-      let semi_first, tokens = advance_tokens tokens in
-      if semi_first
-      then perhaps_semi (doc ^?^ S.semisemi) items tokens
-      else expect_item doc items tokens
-    and expect_item doc items tokens =
-      match items, tokens with
-      | [], [] -> doc
-      | item :: items, tokens ->
-        let item = pp_item item in
-        let semi, tokens = advance_tokens tokens in
-        if semi
-        then perhaps_semi (add_item doc @@ item ^/^ S.semisemi) items tokens
-        else expect_item (add_item doc item) items tokens
-      | _ -> assert false
-    in
-    perhaps_semi empty items tokens
+  let pp_keeping_semi = Toplevel_items.pp_keeping_semi pp_item
 
   let pp ?(attrs=[]) str =
     let struct_ = Attribute.attach ~attrs S.struct_ in
