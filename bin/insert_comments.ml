@@ -6,7 +6,6 @@ module Doc = Wrapprint
 
 type error =
   | Output_longer_than_input of Doc.document
-  | Desynchronized of Lexing.position
   | Missing_token of Lexing.position
 
 let pp_error ppf = function
@@ -14,9 +13,6 @@ let pp_error ppf = function
     Format.fprintf ppf "Output longer than the input.";
     dprintf "remaining doc: << %a >>@."
       PPrint.ToFormatter.compact (Wrapprint.to_document doc)
-  | Desynchronized pos ->
-    Format.fprintf ppf "desynchronized at position %d:%d."
-      pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
   | Missing_token pos ->
     Format.fprintf ppf
       "token at position %d:%d absent from the output."
@@ -58,7 +54,7 @@ let rec consume_only_leading_comments ?(restrict_to_before=false) acc = function
 
 let rec first_is_comment = function
   | Doc.Comment _ -> `yes
-  | Token _ | Token_let -> `no
+  | Token _  -> `no
   | Group d | Align d | Nest (_, d) | Relative_nest (_, d) -> first_is_comment d
   | Empty | Whitespace _ -> `maybe
   | Cat (d1, d2) ->
@@ -70,7 +66,7 @@ let first_is_comment d = first_is_comment d = `yes
 
 let rec first_is_space = function
   | Doc.Whitespace _ -> `yes
-  | Token _ | Token_let | Comment _ -> `no
+  | Token _ | Comment _ -> `no
   | Group d | Align d | Nest (_, d) | Relative_nest (_, d) -> first_is_space d
   | Empty -> `maybe
   | Cat (d1, d2) ->
@@ -82,7 +78,7 @@ let first_is_space d = first_is_space d = `yes
 
 let rec nest_before_leaf = function
   | Doc.Nest _ | Relative_nest _ -> `yes
-  | Token _ | Token_let | Comment _ | Whitespace _ -> `no
+  | Token _ | Comment _ | Whitespace _ -> `no
   | Group d | Align d -> nest_before_leaf d
   | Empty -> `maybe
   | Cat (d1, d2) ->
@@ -159,18 +155,6 @@ let rec walk_both state seq doc =
 
   | first :: rest ->
     match first.T.desc, doc with
-    (*** Stricter synchro, for debugging purposes ***)
-    | T.Token LET, Doc.Token_let ->
-      dprintf "synced at %d:%d with LET@."
-        first.pos.pos_lnum
-        (first.pos.pos_cnum - first.pos.pos_bol);
-      let doc = insert_space_if_required state doc in
-      attach_before_comments (saw_leaf state) rest doc
-
-    (*** Stricter sync check part 2 ***)
-    | T.Token LET, Doc.Token _ ->
-      raise (Error (Desynchronized first.pos))
-
     | (* FIXME: the comment that was explicitely inserted might be the nth one
          from a list of several comments.
          If we drop the first and advance, we will reinsert the token that is
@@ -204,7 +188,7 @@ let rec walk_both state seq doc =
     | _, Doc.Whitespace _ -> seq, doc, no_space state
 
     (* Comments missing in the doc, insert them *)
-    | T.Comment _, Doc.(Token_let | Token _) ->
+    | T.Comment _, Doc.Token _ ->
       let to_prepend, rest = consume_leading_comments Doc.empty seq in
       let doc =
         insert_space_if_required ~inserting_comment:true state
@@ -273,10 +257,6 @@ let rec walk_both state seq doc =
     (* Token missing from the document: this is a hard error. *)
     | T.Token _, Doc.Comment _ ->
       raise (Error (Missing_token first.pos))
-
-    (*** Stricter sync check part 3 ***)
-    | _, Doc.Token_let ->
-      raise (Error (Desynchronized first.pos))
 
     (* [Child_node] doesn't appear in linearized token stream *)
     | T.Child_node, _ -> assert false
