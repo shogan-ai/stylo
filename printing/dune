@@ -1,4 +1,4 @@
 (library
   (name print)
-  (libraries ocaml_syntax wrapprint dbg_print)
+  (libraries ocaml_syntax document dbg_print)
   (flags :standard -open Dbg_print))

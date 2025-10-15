@@ -21,7 +21,6 @@ let style_file fn =
   in
   Dbg_print.dprintf "%a@." Tokens.pp_seq tokens;
   Insert_comments.from_tokens tokens doc
-  |> Wrapprint.to_document
 
 let fuzzer_batch fn =
   let has_errors = ref false in
@@ -92,14 +91,8 @@ let fuzzer_batch fn =
           raise exn
 
         | with_comments ->
-          let styled =
-            with_comments
-            |> Wrapprint.to_document
-            |> PPrint.ToBuffer.compact styled
-            |> fun () -> Buffer.contents styled
-          in
-          let open Ast_checker in
-          match check_same_ast fn i ~impl:(not intf) src styled with
+          let styled = Document.Print.to_string ~width:80 with_comments in
+          match Ast_checker.check_same_ast fn i ~impl:(not intf) src styled with
           | false ->
             Format.eprintf "%s, line %d: ast changed@." fn i;
             has_errors := true
@@ -127,11 +120,8 @@ let get_tokens lexbuf =
 
 let lex_and_compare input_fn doc =
   let output_tokens =
-    let buf = Buffer.create 42 in
-    PPrint.ToBuffer.compact buf doc;
-    let s = Buffer.contents buf in
-    Dbg_print.dprintf "output %S@." s;
-    Lexing.from_string s
+    Document.Print.to_string ~width:80 doc
+    |> Lexing.from_string
     |> get_tokens
   in
   let input_lexbuf =
@@ -204,10 +194,8 @@ let () =
         if !check then
           lex_and_compare fn doc
         else if !ast_check then (
-          let b = Buffer.create 42 in
-          PPrint.ToBuffer.pretty 1. 80 b doc;
+          let reprinted = Document.Print.to_string ~width:80 doc in
           let source = In_channel.(with_open_text fn input_all) in
-          let reprinted = Buffer.contents b in
           if
             not @@
             Ast_checker.check_same_ast fn 0
@@ -217,7 +205,8 @@ let () =
             Format.eprintf "%s: ast changed@." fn
         ) else (
           let pp oc =
-            PPrint.ToChannel.pretty 1. 90 oc doc;
+            let reprinted = Document.Print.to_string ~width:90 doc in
+            output_string oc reprinted;
             output_char oc '\n';
             flush oc
           in

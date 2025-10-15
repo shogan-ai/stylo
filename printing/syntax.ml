@@ -1,4 +1,4 @@
-let str = Wrapprint.string
+let str = Document.string
 
 let underscore = str "_"
 let star = str "*"

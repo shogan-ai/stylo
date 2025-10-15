@@ -2,17 +2,17 @@ open Ocaml_syntax
 open Dbg_print
 
 module T = Tokens
-module Doc = Wrapprint
+module Doc = Document
 
 type error =
-  | Output_longer_than_input of Doc.document
+  | Output_longer_than_input of Doc.t
   | Missing_token of Lexing.position
 
 let pp_error ppf = function
   | Output_longer_than_input doc ->
     Format.fprintf ppf "Output longer than the input.";
-    dprintf "remaining doc: << %a >>@."
-      PPrint.ToFormatter.compact (Wrapprint.to_document doc)
+    dprintf "remaining doc: << %s >>@."
+      (Document.Print.to_string ~width:80 doc)
   | Missing_token pos ->
     Format.fprintf ppf
       "token at position %d:%d absent from the output."
@@ -26,7 +26,7 @@ let append_trailing_comments (tokens, doc, _) =
     | [ T.{ desc = Token EOF; _ } ] -> doc
     | tok :: toks ->
       match tok.T.desc with
-      | Comment (c, _) -> aux Doc.(doc ^?^ comment c) toks
+      | Comment (c, _) -> aux Doc.Utils.(doc ^?^ Doc.comment c) toks
       | Token _ -> raise (Error (Missing_token tok.pos))
       | Child_node -> assert false
   in
@@ -36,7 +36,8 @@ let rec consume_leading_comments acc = function
   | [] -> acc, []
   | first :: rest ->
     match first.T.desc with
-    | Comment (c, _) -> consume_leading_comments Doc.(acc ^?^ comment c) rest
+    | Comment (c, _) ->
+      consume_leading_comments Doc.Utils.(acc ^?^ Doc.comment c) rest
     | Token _ -> acc, rest
     | Child_node -> assert false
 
@@ -48,16 +49,17 @@ let rec consume_only_leading_comments ?(restrict_to_before=false) acc = function
       if restrict_to_before && attached <> Before then
         acc, first :: rest
       else
-        consume_only_leading_comments Doc.(acc ^?^ comment c) rest
+        consume_only_leading_comments Doc.Utils.(acc ^?^ Doc.comment c) rest
     | Token _ -> acc, first :: rest
     | Child_node -> assert false
 
 let rec first_is_comment = function
   | Doc.Comment _ -> `yes
   | Token _  -> `no
-  | Group d | Align d | Nest (_, d) | Relative_nest (_, d) -> first_is_comment d
+  | Group (_, d) | Nest (_, _, d) | Relative_nest (_, _, d) ->
+    first_is_comment d
   | Empty | Whitespace _ -> `maybe
-  | Cat (d1, d2) ->
+  | Cat (_, d1, d2) ->
     match first_is_comment d1 with
     | `maybe -> first_is_comment d2
     | res -> res
@@ -67,9 +69,10 @@ let first_is_comment d = first_is_comment d = `yes
 let rec first_is_space = function
   | Doc.Whitespace _ -> `yes
   | Token _ | Comment _ -> `no
-  | Group d | Align d | Nest (_, d) | Relative_nest (_, d) -> first_is_space d
+  | Group (_, d) | Nest (_, _, d) | Relative_nest (_, _, d) ->
+    first_is_space d
   | Empty -> `maybe
-  | Cat (d1, d2) ->
+  | Cat (_, d1, d2) ->
     match first_is_space d1 with
     | `maybe -> first_is_space d2
     | res -> res
@@ -79,9 +82,9 @@ let first_is_space d = first_is_space d = `yes
 let rec nest_before_leaf = function
   | Doc.Nest _ | Relative_nest _ -> `yes
   | Token _ | Comment _ | Whitespace _ -> `no
-  | Group d | Align d -> nest_before_leaf d
+  | Group (_, d) -> nest_before_leaf d
   | Empty -> `maybe
-  | Cat (d1, d2) ->
+  | Cat (_, d1, d2) ->
     match nest_before_leaf d1 with
     | `maybe -> nest_before_leaf d2
     | res -> res
@@ -168,18 +171,18 @@ let rec walk_both state seq doc =
       let rest, doc, state' = walk_both (no_space state) rest doc in
       let doc =
         insert_space_if_required ~inserting_comment:true state
-          Doc.(comment c ^/^ doc)
+          Doc.Utils.(Doc.comment c ^/^ doc)
       in
       rest, doc, state'
 
     (* Synchronized, advance *)
     | T.Token _, Doc.Token p
     | T.Comment _, Doc.Comment p ->
-      dprintf "assume %a synced at %d:%d with << %a >>@."
+      dprintf "assume %a synced at %d:%d with << %s >>@."
         Tokens.pp_elt first
         first.pos.pos_lnum
         (first.pos.pos_cnum - first.pos.pos_bol)
-        PPrint.ToFormatter.compact p;
+        p;
       let doc = insert_space_if_required state doc in
       attach_before_comments (saw_leaf state) rest doc
 
@@ -192,11 +195,11 @@ let rec walk_both state seq doc =
       let to_prepend, rest = consume_leading_comments Doc.empty seq in
       let doc =
         insert_space_if_required ~inserting_comment:true state
-          Doc.(to_prepend ^/^ doc)
+          Doc.Utils.(to_prepend ^/^ doc)
       in
       rest, doc, no_space state
 
-    | T.Comment _, Doc.Group d
+    | T.Comment _, Doc.Group (_, d)
       when
         not (nest_before_leaf d) (* traverse group to reach correct nesting *)
         && not (first_is_comment d) (* might be the same comment *) ->
@@ -209,14 +212,14 @@ let rec walk_both state seq doc =
         let doc =
           if first_is_space doc
           then Doc.(to_prepend ^^ doc)
-          else Doc.(to_prepend ^/^ doc)
+          else Doc.Utils.(to_prepend ^/^ doc)
         in
         insert_space_if_required ~inserting_comment:true state doc
       in
       attach_before_comments state' rest doc
 
     (* Traverse document structure *)
-    | _, Doc.Cat (left, right) ->
+    | _, Doc.Cat (_, left, right) ->
       let restl, left, mid_state =
         walk_both { state with at_end_of_a_group = false } seq left
       in
@@ -224,16 +227,16 @@ let rec walk_both state seq doc =
         walk_both { mid_state with at_end_of_a_group = state.at_end_of_a_group }
           restl right
       in
-      restr, Cat (left, right), final_state
+      restr, Doc.(left ^^ right), final_state
 
-    | _, Doc.Nest (i, doc) ->
+    | _, Doc.Nest (_, i, doc) ->
       let rest, doc, state' = walk_both (under_nest state) seq doc in
-      rest, Nest (i, doc), exit_nest state state'
-    | _, Doc.Relative_nest (i, doc) ->
+      rest, Doc.nest i doc, exit_nest state state'
+    | _, Doc.Relative_nest (_, i, doc) ->
       let rest, doc, state' = walk_both (under_nest state) seq doc in
-      rest, Relative_nest (i, doc), exit_nest state state'
+      rest, Doc.relative_nest i doc, exit_nest state state'
 
-    | _, Doc.Group doc ->
+    | _, Doc.Group (_, doc) ->
       let rest, doc, state' =
         walk_both { space_needed_before_next = No; at_end_of_a_group = true }
           seq doc
@@ -249,10 +252,6 @@ let rec walk_both state seq doc =
         else insert_space_if_required state (Doc.group doc)
       in
       attach_before_comments return_state rest doc
-
-    | _, Doc.Align doc ->
-      let rest, doc, state = walk_both state seq doc in
-      rest, Align doc, state
 
     (* Token missing from the document: this is a hard error. *)
     | T.Token _, Doc.Comment _ ->

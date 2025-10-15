@@ -1,4 +1,5 @@
-open Wrapprint
+open Document
+open Document.Utils
 open Ocaml_syntax
 open Parsetree
 
@@ -172,11 +173,11 @@ let include_kind = function
   | Functor -> S.functor_
 
 module rec Attribute : sig
-  val pp : ?item:bool -> attribute -> document
-  val pp_floating : attribute -> document
-  val pp_list : ?item:bool -> attributes -> document
+  val pp : ?item:bool -> attribute -> t
+  val pp_floating : attribute -> t
+  val pp_list : ?item:bool -> attributes -> t
 
-  val pp_attr_name : string list loc -> document
+  val pp_attr_name : string list loc -> t
 
   val attach
     :  ?item:bool
@@ -184,10 +185,10 @@ module rec Attribute : sig
     -> ?pre_doc:attribute
     -> ?post_doc:attribute
     -> attrs:attributes
-    -> document
-    -> document
+    -> t
+    -> t
 end = struct
-  let pp_doc : payload -> document = function
+  let pp_doc : payload -> t = function
     | PStr ([ {
       pstr_desc =
         Pstr_eval
@@ -238,9 +239,9 @@ end = struct
 end
 
 and Ext_attribute : sig
-  val decorate : document -> ext_attribute -> document
+  val decorate : t -> ext_attribute -> t
   val decorate_optional_override :
-    document -> Asttypes.override_flag -> ext_attribute -> document
+    t -> Asttypes.override_flag -> ext_attribute -> t
 end = struct
   let decorate ~between kw { pea_ext; pea_attrs } =
     Attribute.attach ~attrs:pea_attrs (
@@ -263,7 +264,7 @@ end = struct
 end
 
 and Extension : sig
-  val pp : ?floating:bool -> extension -> document
+  val pp : ?floating:bool -> extension -> t
 end = struct
   let pp_classic ~floating names payload =
     let name = Attribute.pp_attr_name names in
@@ -283,7 +284,7 @@ end = struct
 end
 
 and Payload : sig
-  val pp : payload -> document
+  val pp : payload -> t
 end = struct
   module Ends_in_obj_type = struct
     let rec core_type ct =
@@ -465,18 +466,18 @@ and Type_constructor : sig
     -> Tokens.seq
     -> core_type list
     -> Longident.t
-    -> document
+    -> t
 
-  val pp_class_constr : core_type list -> Longident.t -> document
+  val pp_class_constr : core_type list -> Longident.t -> t
 
   val pp_decl
     : kw:Parser_tokens.token
     -> Tokens.seq
     -> ptype_params
-    -> document
-    -> document
+    -> t
+    -> t
 
-  val pp_class_info_decl : ptype_params -> string -> document
+  val pp_class_info_decl : ptype_params -> string -> t
 end = struct
   type params_delimiters =
     | Brackets of { spaces_required: bool }
@@ -548,17 +549,17 @@ end = struct
 end
 
 and Core_type : sig
-  val pp : core_type -> document
+  val pp : core_type -> t
 
-  val pp_arrow : Tokens.seq -> arg_label -> document -> document -> document
+  val pp_arrow : Tokens.seq -> arg_label -> t -> t -> t
 
-  val pp_poly_bindings : (string loc * jkind_annotation option) list -> document
+  val pp_poly_bindings : (string loc * jkind_annotation option) list -> t
 
   val collect_arrow_args :
     core_type -> (arrow_arg list * (modes * modes * core_type)) option
 
   val pp_arrow_for_descr :
-    arrow_arg list -> document -> document
+    arrow_arg list -> t -> t
 end = struct
   let pp_arrow tokens arg_lbl arg rhs =
     begin match arg_lbl with
@@ -711,7 +712,7 @@ end = struct
       | _, Open ->
         fields_doc ^^ (if semi_as_term then empty else S.semi) ^/^ S.dotdot
     in
-    prefix_nonempty S.lt (group fields_and_dotdot) ^/^ S.gt
+    prefix S.lt (group fields_and_dotdot) ^/^ S.gt
 
   and object_field of_ =
     Attribute.attach ~attrs:of_.pof_attributes (object_field_desc of_.pof_desc)
@@ -775,7 +776,7 @@ end
 (** {2 Patterns} *)
 
 and Pattern : sig
-  val pp : pattern -> document
+  val pp : pattern -> t
 end = struct
   let rec pp p =
     group (pp_desc p)
@@ -837,7 +838,7 @@ end = struct
       else
         separate_map (S.semi ^^ break 1) pp elts
     in
-    prefix_nonempty opn elts ^?^ cls
+    prefix opn elts ^?^ cls
 
   and pp_array nb_semis mut = pp_delimited_seq (array_delimiters mut) nb_semis
 
@@ -914,10 +915,10 @@ end
 (** {2 Value expressions} *)
 
 and Expression : sig
-  val pp : expression -> document
+  val pp : expression -> t
 
   val pp_function_parts :
-    expression -> document * document
+    expression -> t * t
 end = struct
   let pp_op op =
     match op.pexp_desc with
@@ -980,7 +981,7 @@ end = struct
     | Pexp_unboxed_tuple elts ->
       S.hash_lparen ^^ nest 1 (pp_tuple elts) ^^ S.rparen
     | Pexp_construct (lid, arg) ->
-      prefix_nonempty (constr_longident lid.txt) (optional pp arg)
+      prefix (constr_longident lid.txt) (optional pp arg)
     | Pexp_variant (lbl, eo) -> pp_variant lbl eo
     | Pexp_record (eo, fields) -> pp_record (nb_semis exp.pexp_tokens) eo fields
     | Pexp_record_unboxed_product (eo, fields) ->
@@ -1072,7 +1073,7 @@ end = struct
     | Pexp_parens { begin_end = false; exp = Some exp } -> parens (pp exp)
     | Pexp_parens { begin_end = false; exp = None } -> assert false
     | Pexp_parens { begin_end = true; exp } ->
-      prefix_nonempty !!S.begin_ (optional pp exp) ^/^ S.end_
+      prefix !!S.begin_ (optional pp exp) ^/^ S.end_
     | Pexp_list elts -> pp_list (nb_semis exp.pexp_tokens) elts
     | Pexp_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
     | Pexp_exclave exp -> S.exclave__ ^/^ pp exp
@@ -1163,7 +1164,7 @@ end = struct
       else
         separate_map (S.semi ^^ break 1) pp elts
     in
-    group (prefix_nonempty opn elts ^?^ cls)
+    group (prefix opn elts ^?^ cls)
 
   and pp_override nb_semis fields =
     let semi_as_term = List.compare_length_with fields nb_semis = 0 in
@@ -1180,7 +1181,7 @@ end = struct
       else
         separate_map (S.semi ^^ break 1) field fields
     in
-    group (prefix_nonempty S.lbrace_lt fields ^?^ S.gt_rbrace)
+    group (prefix S.lbrace_lt fields ^?^ S.gt_rbrace)
 
   and pp_array nb_semis mut elts =
     pp_delimited_seq (array_delimiters mut) nb_semis elts
@@ -1209,7 +1210,7 @@ end = struct
       let op = pp_op op in
       (* Basically we align a sublock after the op... except when we finish on a
          literal function in which case we only indent by 2 ??? *)
-      let indent = requirement op + 1 (* space *) + 2 (* indent *) in
+      let indent = 2 in
       let op_and_f = op ^^ nest indent (group (break 1 ^^ pp f)) in
       Application.pp ~indent op_and_f args
     | _ ->
@@ -1218,7 +1219,7 @@ end = struct
   and pp_variant lbl eo =
     let constr = S.bquote ^^ string lbl in
     let arg = optional pp eo in
-    prefix_nonempty constr arg
+    prefix constr arg
 
   and pp_record ?(unboxed = false) nb_semis expr_opt fields =
     let semi_as_term = List.compare_length_with fields nb_semis = 0 in
@@ -1238,7 +1239,7 @@ end = struct
     group (
       foldli (fun i acc field ->
         if i = 0 then
-          prefix_nonempty acc
+          prefix acc
             (nest extra_indent @@ Record_field.pp first_before pp field)
         else
           acc ^^ break 0 ^^ nest 2 @@ Record_field.pp (Before `Semi) pp field
@@ -1250,10 +1251,10 @@ end
 and Record_field : sig
   type semi = Before of [ `Semi | `Brace | `Hash_brace ] | After | No
 
-  val pp : semi -> ('a -> document) -> 'a record_field -> document
+  val pp : semi -> ('a -> t) -> 'a record_field -> t
 
-  val pp_list : semi_as_term:bool -> ('a -> document) -> 'a record_field list ->
-    document
+  val pp_list : semi_as_term:bool -> ('a -> t) -> 'a record_field list ->
+    t
 end = struct
   type semi = Before of [ `Semi | `Brace | `Hash_brace ] | After | No
 
@@ -1266,7 +1267,7 @@ end = struct
         | Before `Hash_brace -> S.hash_lbrace
         | _ -> empty
       in
-      prefix_nonempty
+      prefix
         (group (prefix_tok ^?^ longident rf.field_name.txt))
         (optional (fun v -> group @@ Type_constraint.pp v) rf.typ)
     in
@@ -1291,7 +1292,7 @@ end = struct
 end
 
 and Block_access : sig
-  val pp : block_access -> document
+  val pp : block_access -> t
 end = struct
   let pp = function
   | Baccess_field lid -> S.dot ^^ longident lid.txt
@@ -1304,11 +1305,11 @@ end = struct
     let idx_kind =
       match idx_kind with
       | Index_int -> empty
-      | Index_unboxed_int8 -> char 's'
-      | Index_unboxed_int16 -> char 'S'
-      | Index_unboxed_int32 -> char 'l'
-      | Index_unboxed_int64 -> char 'L'
-      | Index_unboxed_nativeint -> char 'n'
+      | Index_unboxed_int8 -> string "s"
+      | Index_unboxed_int16 -> string "S"
+      | Index_unboxed_int32 -> string "l"
+      | Index_unboxed_int64 -> string "L"
+      | Index_unboxed_nativeint -> string "n"
     in
     dot_or_dotop ^^ idx_kind ^^ parens (Expression.pp e)
   | Baccess_block (mut, e) ->
@@ -1320,7 +1321,7 @@ end = struct
 end
 
 and Application : sig
-  val pp: ?indent:int -> document -> expression argument list -> document
+  val pp: ?indent:int -> t -> expression argument list -> t
 end = struct
   let is_function p =
     match p.pexp_desc with
@@ -1389,9 +1390,9 @@ end = struct
 end
 
 and Case : sig
-  val pp : case -> document
+  val pp : case -> t
 
-  val pp_cases : has_leading_pipe:bool -> case list -> document
+  val pp_cases : has_leading_pipe:bool -> case list -> t
 end = struct
   let pp_guard = function
     | None -> empty
@@ -1419,7 +1420,7 @@ end = struct
 
   let pp pipe { pc_lhs; pc_guard; pc_rhs } =
     group (
-      prefix_nonempty (pp_pattern pipe pc_lhs)
+      prefix (pp_pattern pipe pc_lhs)
         (pp_guard pc_guard) ^^
       nest 2 (
         (* always try to put on the same line as what preceeds if it fits. *)
@@ -1440,7 +1441,7 @@ end = struct
 end
 
 and Letop : sig
-  val pp : letop -> document
+  val pp : letop -> t
 end = struct
   let pp { let_; ands; body } =
     let ands =
@@ -1453,14 +1454,14 @@ end = struct
 end
 
 and Binding_op : sig
-  val pp : binding_op -> document
+  val pp : binding_op -> t
 end = struct
   let pp { pbop_op; pbop_binding; pbop_loc = _ }=
     Value_binding.pp_list ~start:[string pbop_op.txt] [pbop_binding]
 end
 
 and Argument : sig
-  val pp : ('a -> document) -> 'a argument -> document
+  val pp : ('a -> t) -> 'a argument -> t
 end = struct
   let had_parens arg =
     List.exists (fun elt -> elt.Tokens.desc = Token LPAREN) arg.parg_tokens
@@ -1516,8 +1517,8 @@ end = struct
 end
 
 and Function_param : sig
-  val pp : function_param -> document
-  val pp_desc : function_param_desc -> document
+  val pp : function_param -> t
+  val pp_desc : function_param_desc -> t
 end = struct
   let pp_newtype ?(needs_parens=true) = function
     | name, None -> string name.txt
@@ -1536,7 +1537,7 @@ end = struct
 end
 
 and Function_body : sig
-  val pp : function_body -> document
+  val pp : function_body -> t
   val as_rhs : function_body -> Generic_binding.rhs
 end = struct
   let pp_cases ~tokens cases ext_attrs =
@@ -1560,7 +1561,7 @@ end = struct
 end
 
 and Type_constraint : sig
-  val pp : type_constraint -> document
+  val pp : type_constraint -> t
 end = struct
   let pp = function
   | Pconstraint ct ->
@@ -1572,7 +1573,7 @@ end
 
 
 and Function_constraint : sig
-  val pp : function_constraint -> document
+  val pp : function_constraint -> t
 end = struct
   let pp fc =
     optional Type_constraint.pp fc.ret_type_constraint
@@ -1580,8 +1581,8 @@ end = struct
 end
 
 and Comprehension : sig
-  val pp : comprehension -> document
-  val pp_expr : comprehension_expression -> document
+  val pp : comprehension -> t
+  val pp_expr : comprehension_expression -> t
 end = struct
   let pp_iterator = function
     | Pcomp_range { start; stop; direction = dir } ->
@@ -1620,7 +1621,7 @@ end
 (** {2 Value descriptions} *)
 
 and Value_description : sig
-  val pp : value_description -> document
+  val pp : value_description -> t
 end = struct
   let pp_type ct =
     match Core_type.collect_arrow_args ct with
@@ -1662,7 +1663,7 @@ end
 (** {2 Type declarations} *)
 
 and Record : sig
-  val pp_decl: ?unboxed:bool -> label_declaration list -> document
+  val pp_decl: ?unboxed:bool -> label_declaration list -> t
 end = struct
   let pp preceding_tok (* opening brace or previous semicolon *)
         { pld_name; pld_mutable; pld_global;
@@ -1677,7 +1678,7 @@ end = struct
     in
     let field =
       prefix
-        (prefix_nonempty preceding_tok
+        (prefix preceding_tok
            (group (mut_or_glob ^?^ string pld_name.txt ^/^ S.colon)))
         (Core_type.pp pld_type ^^
          begin match pld_modalities with
@@ -1687,7 +1688,7 @@ end = struct
     in
     (* We want the attributes (and doc) to line up with the field name, not the
        semicolon. *)
-    prefix_nonempty field
+    prefix field
       (Attribute.pp_list pld_attributes ^?^ optional Attribute.pp pld_doc)
 
   let pp_decl ?(unboxed=false) lbls =
@@ -1705,9 +1706,9 @@ end = struct
 end
 
 and Constructor_argument : sig
-  val pp : constructor_argument -> document
+  val pp : constructor_argument -> t
 
-  val pp_args : constructor_arguments -> document
+  val pp_args : constructor_arguments -> t
 end = struct
   let pp { pca_global; pca_modalities; pca_type; pca_loc = _ } =
     (if pca_global then S.global__ else empty) ^?^
@@ -1721,7 +1722,7 @@ end = struct
 end
 
 and Type_param : sig
-  val pp : ptype_param -> document
+  val pp : ptype_param -> t
 end = struct
   let var_inj_as_single_token =
     (* C.f. rule [type_variance] in the grammar. *)
@@ -1753,10 +1754,10 @@ end = struct
 end
 
 and Type_declaration : sig
-  val pp_constraints : ptype_constraint list -> document
+  val pp_constraints : ptype_constraint list -> t
 
   val pp_list :
-    ?subst:bool -> Asttypes.rec_flag -> type_declaration list -> document
+    ?subst:bool -> Asttypes.rec_flag -> type_declaration list -> t
 end = struct
 
   let constructor_declaration pipe
@@ -1767,7 +1768,7 @@ end = struct
       | [] -> empty
       | vars -> Core_type.pp_poly_bindings vars ^^ S.dot
     in
-    prefix_nonempty
+    prefix
       (group ((if pipe then S.pipe else empty) ^?^
               constr_ident pcd_name.txt))
       (match pcd_args, pcd_res with
@@ -1837,7 +1838,7 @@ end = struct
         | Some j -> S.colon ^/^ Jkind_annotation.pp j
       )
     in
-    prefix_nonempty
+    prefix
       (group (lhs ^^ nest 2 (group (pp_rhs ?subst td))))
       (pp_constraints td.ptype_cstrs)
     |> Attribute.attach ~item:true
@@ -1860,7 +1861,7 @@ end = struct
 end
 
 and Type_extension : sig
-  val pp : type_extension -> document
+  val pp : type_extension -> t
 end = struct
   let pp { ptyext_path; ptyext_params; ptyext_constructors; ptyext_private;
            ptyext_attributes; ptyext_ext_attrs; ptyext_pre_doc; ptyext_post_doc;
@@ -1879,7 +1880,7 @@ end = struct
 end
 
 and Extension_constructor : sig
-  val pp : extension_constructor -> document
+  val pp : extension_constructor -> t
 end = struct
   let pp_kind = function
     | Pext_decl (vars, args, res) ->
@@ -1914,7 +1915,7 @@ end = struct
 end
 
 and Type_exception : sig
-  val pp : type_exception -> document
+  val pp : type_exception -> t
 end = struct
   let pp { ptyexn_constructor ; ptyexn_attributes ; ptyexn_ext_attrs;
            ptyexn_pre_doc; ptyexn_post_doc; ptyexn_loc = _; ptyexn_tokens = _} =
@@ -1930,7 +1931,7 @@ end
 (** {2 Type expressions for the class language} *)
 
 and Class_type : sig
-  val pp : class_type -> document
+  val pp : class_type -> t
 end = struct
   let rec collect_arrow_args rev_args = function
     | { pcty_desc = Pcty_arrow (arg, res); _ } ->
@@ -1986,8 +1987,8 @@ end
 
 and Class_infos : sig
   val pp_list :
-    'a. ?equal_sign:document -> ('a -> document) -> keywords:document list ->
-    'a class_infos list -> document
+    'a. ?equal_sign:t -> ('a -> t) -> keywords:t list ->
+    'a class_infos list -> t
 end = struct
   let pp ?equal_sign pp_expr ~keywords
       { pci_ext_attrs; pci_virt; pci_params; pci_name; pci_expr; pci_attributes;
@@ -2026,14 +2027,14 @@ end = struct
 end
 
 and Class_description : sig
-  val pp_list : class_description list -> document
+  val pp_list : class_description list -> t
 end = struct
   let pp_list =
     Class_infos.pp_list ~equal_sign:S.colon Class_type.pp ~keywords:[S.class_]
 end
 
 and Class_type_declaration : sig
-  val pp_list : class_type_declaration list -> document
+  val pp_list : class_type_declaration list -> t
 end = struct
   let pp_list = Class_infos.pp_list Class_type.pp ~keywords:[S.class_; S.type_]
 end
@@ -2041,8 +2042,8 @@ end
 (** {2 Value expressions for the class language} *)
 
 and Class_expr : sig
-  val pp : class_expr -> document
-  val pp_structure : ext_attribute -> class_structure -> document
+  val pp : class_expr -> t
+  val pp_structure : ext_attribute -> class_structure -> t
 end = struct
   let rec pp_desc ext_attr d =
     let (!!) kw = Ext_attribute.decorate kw ext_attr in
@@ -2137,7 +2138,7 @@ end
 
 
 and Class_declaration : sig
-  val pp_list : class_declaration list -> document
+  val pp_list : class_declaration list -> t
 end = struct
   let pp_list = Class_infos.pp_list Class_expr.pp ~keywords:[S.class_]
 end
@@ -2146,7 +2147,7 @@ end
 (** {2 Type expressions for the module language} *)
 
 and Module_type : sig
-  val pp : module_type -> document
+  val pp : module_type -> t
 
   val as_rhs : module_type -> Generic_binding.rhs
 end = struct
@@ -2193,8 +2194,8 @@ end = struct
 end
 
 and Functor_parameter : sig
-  val pp : functor_parameter -> document
-  val pp_type : functor_parameter -> document
+  val pp : functor_parameter -> t
+  val pp_type : functor_parameter -> t
 end = struct
   let pp = function
     | Unit -> empty
@@ -2214,10 +2215,10 @@ end = struct
 end
 
 and Signature : sig
-  val pp : signature -> document
-  val pp_parts : signature -> document * document * document
+  val pp : signature -> t
+  val pp_parts : signature -> t * t * t
 
-  val pp_interface : signature -> document
+  val pp_interface : signature -> t
 end = struct
   let pp_item_desc = function
     | Psig_value vd -> Value_description.pp vd
@@ -2306,9 +2307,9 @@ end = struct
 end
 
 and Module_declaration : sig
-  val pp : module_declaration -> document
+  val pp : module_declaration -> t
 
-  val pp_recmods : module_declaration list -> document
+  val pp_recmods : module_declaration list -> t
 end = struct
   let equal_sign mty =
     match mty.pmty_desc with
@@ -2370,7 +2371,7 @@ end = struct
 end
 
 and Module_substitution : sig
-  val pp : module_substitution -> document
+  val pp : module_substitution -> t
 end = struct
   let pp { pms_name; pms_manifest; pms_attributes; pms_ext_attrs;
            pms_pre_doc; pms_post_doc; pms_loc = _; pms_tokens = _ } =
@@ -2384,7 +2385,7 @@ end = struct
 end
 
 and Module_type_declaration : sig
-  val pp : ?subst:bool -> module_type_declaration -> document
+  val pp : ?subst:bool -> module_type_declaration -> t
 end = struct
   let pp ?(subst=false)
       { pmtd_name; pmtd_type; pmtd_attributes; pmtd_ext_attrs; pmtd_pre_doc;
@@ -2400,7 +2401,7 @@ end = struct
 end
 
 and Open_infos : sig
-  val pp : 'a. ?item:bool -> ('a -> document) -> 'a open_infos -> document
+  val pp : 'a. ?item:bool -> ('a -> t) -> 'a open_infos -> t
 end = struct
   let pp ?(item=true) pp_expr
       { popen_expr; popen_override; popen_attributes; popen_ext_attrs;
@@ -2414,19 +2415,19 @@ end = struct
 end
 
 and Open_description : sig
-  val pp : open_description -> document
+  val pp : open_description -> t
 end = struct
   let pp = Open_infos.pp (fun lid -> longident lid.txt)
 end
 
 and Open_declaration : sig
-  val pp : ?item:bool -> open_declaration -> document
+  val pp : ?item:bool -> open_declaration -> t
 end = struct
   let pp ?item = Open_infos.pp ?item Module_expr.pp
 end
 
 and Include_infos : sig
-  val pp : 'a. ('a -> document) -> 'a include_infos -> document
+  val pp : 'a. ('a -> t) -> 'a include_infos -> t
 end = struct
   let pp pp_mod { pincl_kind ; pincl_mod; pincl_attributes; pincl_ext_attrs;
                   pincl_pre_doc; pincl_post_doc; pincl_loc = _;
@@ -2443,19 +2444,19 @@ end = struct
 end
 
 and Include_description : sig
-  val pp : include_description -> document
+  val pp : include_description -> t
 end = struct
   let pp = Include_infos.pp Module_type.pp
 end
 
 and Include_declaration : sig
-  val pp : include_declaration -> document
+  val pp : include_declaration -> t
 end = struct
   let pp = Include_infos.pp Module_expr.pp
 end
 
 and With_constraint : sig
-  val pp : with_constraint -> document
+  val pp : with_constraint -> t
 end = struct
   let pp wc =
     match wc.wc_desc with
@@ -2486,11 +2487,11 @@ end
 (** {2 Value expressions for the module language} *)
 
 and Module_expr : sig
-  val pp : module_expr -> document
+  val pp : module_expr -> t
   val as_rhs : module_expr -> Generic_binding.rhs
 
   (* TODO: not the most natural place for this. *)
-  val pp_package_type : core_type -> document
+  val pp_package_type : core_type -> t
 end = struct
   let pp_package_type ct =
     match ct.ptyp_desc with
@@ -2547,10 +2548,10 @@ end = struct
 end
 
 and Structure : sig
-  val pp : ?attrs:attributes -> structure -> document
-  val pp_parts : attributes -> structure -> document * document * document
+  val pp : ?attrs:attributes -> structure -> t
+  val pp_parts : attributes -> structure -> t * t * t
 
-  val pp_implementation : structure -> document
+  val pp_implementation : structure -> t
 end = struct
   let pp_item item =
     match item.pstr_desc with
@@ -2652,7 +2653,7 @@ end = struct
 end
 
 and Value_constraint : sig
-  val pp : value_constraint -> document
+  val pp : value_constraint -> t
 end = struct
   let pp = function
     | Pvc_constraint { locally_abstract_univars; typ } ->
@@ -2682,34 +2683,34 @@ end
 
 and Generic_binding : sig
   type rhs =
-    | Single_part of document
-    | Three_parts of { start: document; main: document; stop: document }
+    | Single_part of t
+    | Three_parts of { start: t; main: t; stop: t }
     (** Meant for [struct/sig .. end]: we try to keep [start] on the same line
         as what preceeds it, [main] is indented, [stop] is not.
 
         N.B. also used for value bindings in cases such as
         [let f = function ...], there [start = function] and [stop] is empty. *)
 
-  val map_rhs_end : (document -> document) -> rhs -> rhs
+  val map_rhs_end : (t -> t) -> rhs -> rhs
     (** either map the sole part, or the stop part *)
 
   val pp
     : ?item:bool
-    -> ?equal_sign:document
+    -> ?equal_sign:t
     -> ?pre_text:attributes
     -> ?pre_doc:attribute
-    -> keyword:document
-    -> ?params:document list
+    -> keyword:t
+    -> ?params:t list
     -> ?constraint_:rhs
     -> ?rhs:rhs
     -> ?attrs:attributes
     -> ?post_doc:attribute
-    -> document
-    -> document
+    -> t
+    -> t
 end = struct
   type rhs =
-    | Single_part of document
-    | Three_parts of { start: document; main: document; stop: document }
+    | Single_part of t
+    | Three_parts of { start: t; main: t; stop: t }
 
   let map_rhs_end f = function
     | Single_part d -> Single_part (f d)
@@ -2774,7 +2775,7 @@ end = struct
 end
 
 and Value_binding : sig
-  val pp_list : ?item:bool -> start:document list -> value_binding list -> document
+  val pp_list : ?item:bool -> start:t list -> value_binding list -> t
 end = struct
   let rhs e =
     (* FIXME: attributes ! *)
@@ -2826,9 +2827,9 @@ end = struct
 end
 
 and Module_binding : sig
-  val pp : ?item:bool -> keywords:document list -> module_binding -> document
+  val pp : ?item:bool -> keywords:t list -> module_binding -> t
 
-  val pp_recmods : module_binding list -> document
+  val pp_recmods : module_binding list -> t
 end = struct
   let modal_constraint constr mode_l : Generic_binding.rhs option =
     match Option.map Module_type.as_rhs constr, mode_l with
@@ -2881,7 +2882,7 @@ end = struct
 end
 
 and Jkind_annotation : sig
-  val pp : jkind_annotation -> document
+  val pp : jkind_annotation -> t
 end = struct
   let rec jkind_annotation_desc = function
     | Default -> S.underscore
