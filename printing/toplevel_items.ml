@@ -34,34 +34,127 @@ let add_item doc item =
        the output we expect. *)
     doc ^^ hardline ^^ group (nest 0 blank_line ^^ item ^^ break 0)
 
+type cont =
+  | Semi_followed_by of seq
+  | Child_followed_by of seq
+  | Done
+
 let rec advance_tokens = function
-  | [] -> false, []
+  | [] -> Done
   | tok :: tokens ->
     match tok.desc with
-    | Child_node
-    | Token EOF -> false, tokens
-    | Token SEMISEMI -> true, tokens
+    | Child_node -> Child_followed_by tokens
+    | Token EOF -> assert (tokens = []); Done
+    | Token SEMISEMI -> Semi_followed_by tokens
     | Token _ -> assert false
     | Comment _ -> advance_tokens tokens
 
 (* We keep the list of items in sync with the list of "tokens" of the
-   structure (each [Child_node] is a structure item).
+   structure (each [Child_node] is an item).
    That tells us where to insert [;;]. *)
-let pp_keeping_semi pp_item (items, tokens) =
+let pp_keeping_semi pp_item =
   let rec perhaps_semi doc items tokens =
-    let semi_first, tokens = advance_tokens tokens in
-    if semi_first
-    then perhaps_semi (doc ^?^ Syntax.semisemi) items tokens
-    else expect_item doc items tokens
-  and expect_item doc items tokens =
-    match items, tokens with
-    | [], [] -> doc
-    | item :: items, tokens ->
+    match advance_tokens tokens with
+    | Semi_followed_by tokens ->
+      perhaps_semi (doc ^?^ Syntax.semisemi) items tokens
+    | Child_followed_by _ as cont ->
+      expect_item doc items cont
+    | Done -> doc, Done
+  and expect_item doc items cont =
+    match items, cont with
+    | [], _ -> doc, cont
+    | item :: items, Child_followed_by tokens ->
       let item = pp_item item in
-      let semi, tokens = advance_tokens tokens in
-      if semi
-      then perhaps_semi (add_item doc @@ item ^/^ Syntax.semisemi) items tokens
-      else expect_item (add_item doc item) items tokens
+      begin match advance_tokens tokens with
+      | Semi_followed_by tokens ->
+        perhaps_semi (add_item doc @@ item ^/^ Syntax.semisemi) items tokens
+      | cont ->
+        expect_item (add_item doc item) items cont
+      end
     | _ -> assert false
   in
-  perhaps_semi empty items tokens
+  perhaps_semi
+
+let pp_grouped_keeping_semi pp_item groups tokens =
+  let tokens_of_cont =
+    (* Meh. *)
+    function
+    | Done -> []
+    | Semi_followed_by tokens ->
+      { desc = Token SEMISEMI; pos = Lexing.dummy_pos } :: tokens
+    | Child_followed_by tokens ->
+      { desc = Child_node; pos = Lexing.dummy_pos } :: tokens
+  in
+  match
+    List.fold_left_map (fun tokens group ->
+      let doc, cont = pp_keeping_semi pp_item empty group tokens in
+      tokens_of_cont cont, doc
+    ) tokens groups
+  with
+  | [], groups -> separate (hardline ^^ blank_line) groups
+  | _ -> assert false
+
+let rec group_by_desc same_group acc = function
+  | [] -> [ List.rev acc ]
+  | i :: is ->
+    if same_group i (List.hd acc) then
+      group_by_desc same_group (i :: acc) is
+    else
+      List.rev acc :: group_by_desc same_group [ i ] is
+
+module Struct = struct
+  open Ocaml_syntax.Parsetree
+
+  let same_group d1 d2 =
+    match d1.pstr_desc, d2.pstr_desc with
+    | Pstr_value _, Pstr_value _
+    | Pstr_primitive _, Pstr_primitive _
+    | Pstr_type _, Pstr_type _
+    | Pstr_typext _, Pstr_typext _
+    | Pstr_exception _, Pstr_exception _
+    | Pstr_module _, Pstr_module _
+    | Pstr_recmodule _, Pstr_recmodule _
+    | Pstr_modtype _, Pstr_modtype _
+    | Pstr_open _, Pstr_open _
+    | Pstr_class _, Pstr_class _
+    | Pstr_class_type _, Pstr_class_type _
+    | Pstr_include _, Pstr_include _
+    | Pstr_extension _, Pstr_extension _
+    | Pstr_kind_abbrev _, Pstr_kind_abbrev _
+      ->
+      true
+    | Pstr_attribute _, Pstr_attribute _ ->
+      (* FIXME: don't group docstrings with regular attributes *)
+      true
+    | (* Keeping this match non-fragile to better track language updates. *)
+      ( Pstr_eval _ (* never grouping those *)
+      | Pstr_value _
+      | Pstr_primitive _
+      | Pstr_type _
+      | Pstr_typext _
+      | Pstr_exception _
+      | Pstr_module _
+      | Pstr_recmodule _
+      | Pstr_modtype _
+      | Pstr_open _
+      | Pstr_class _
+      | Pstr_class_type _
+      | Pstr_include _
+      | Pstr_attribute _
+      | Pstr_extension _
+      | Pstr_kind_abbrev _), _ ->
+      false
+
+  let group_by_desc = function
+    | [] -> []
+    | item :: items -> group_by_desc same_group [ item ] items
+
+  let pp_grouped_keeping_semi pp_item (items, tokens) =
+    let groups = group_by_desc items in
+    pp_grouped_keeping_semi pp_item groups tokens
+end
+
+let pp_keeping_semi pp (items, tokens) =
+  match pp_keeping_semi pp empty items tokens with
+  | t, Done -> t
+  | _ -> assert false

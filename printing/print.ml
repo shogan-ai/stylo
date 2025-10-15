@@ -2538,7 +2538,6 @@ end = struct
         | Recursive -> [S.rec_]
       )
     | Pstr_primitive vd -> Value_description.pp vd
-    (* FIXME: factorize with Psig_* *)
     | Pstr_type (rf, tds) -> Type_declaration.pp_list rf tds
     | Pstr_typext te -> Type_extension.pp te
     | Pstr_exception exn -> Type_exception.pp exn
@@ -2558,7 +2557,7 @@ end = struct
       Jkind_annotation.pp k
       |> group
 
-  let pp_keeping_semi = Toplevel_items.pp_keeping_semi pp_item
+  let pp_keeping_semi = Toplevel_items.Struct.pp_grouped_keeping_semi pp_item
 
   let pp ?(attrs=[]) str =
     let struct_ = Attribute.attach ~attrs S.struct_ in
