@@ -2591,22 +2591,30 @@ end = struct
       group (item ^^ break 0)
     else
       (* flat items don't force blank lines, only non-flat ones do. *)
-      (* FIXME: non flat items are separated by two blank lines.
-         I don't think I can robustly hack the expected behavior on top of
-         PPrint.
+      (* Notice the [nest] trick here: without it any comment "attached" to the
+         item would be inserted outside the group (because we don't want to
+         unflatten things).
+         As a result, in situations such as
+         {[
+           flat_item
 
-         Neocamlformat was looking at the width of each two consecutive items to
-         decide whether to insert one or two hardlines, which mostly works ...
-         but doesn't take into account the current indentation, which is needed
-         to accurately decide if something is flat or not.
+           (* cmt *)
+           non_flat_item
+         ]}
+         the following would happen:
+         1. [flat_item] is printed (and is flat)
+         2. the [break 0] that follows vanishes
+         3. [hardline] is printed
+         4. the comment is inserted (with no extra spacing as it is between two
+         spaces/breaks already)
+         5. a hardline is inserted because of [blank_line]
+         That is: we have no blank line, and the item the comment refers to
+         becomes unclear.
 
-         That's probably good enough?
-
-         Another option would be make the engine track blank lines and be able
-         to query that to decide whether to add an hardline or not (this
-         wouldn't change decisions regarding flattening, as in both cases we'd
-         require "infinity" width). *)
-      doc ^^ hardline ^^ group (break 0 ^^ item ^^ break 0)
+         The nest allows the comment insertion code to traverse the group,
+         delaying the comment until after the [nest 0 blankline], and producing
+         the output we expect. *)
+      doc ^^ hardline ^^ group (nest 0 blank_line ^^ item ^^ break 0)
 
   let rec advance_tokens = function
     | [] -> false, []

@@ -23,7 +23,8 @@ module Req = Requirement
 type whitespace =
   | Break of int
   (** [Break n] prints as n spaces in flat mode, as a line break otherwise *)
-  | HardLine
+  | Hard_line
+  | Blank_line
 
 (* FIXME: comments and strings can contain newlines, they should be represented
    by something other than "string". *)
@@ -42,7 +43,8 @@ let requirement = function
   | Token s
   | Comment s -> Req.of_int (String.length s)
   | Whitespace Break n -> Req.of_int n
-  | Whitespace HardLine -> Req.infinity
+  | Whitespace Hard_line -> Req.infinity
+  | Whitespace Blank_line -> Req.of_int 0
   | Cat (r, _, _)
   | Nest (r, _, _)
   | Relative_nest (r, _, _)
@@ -51,7 +53,8 @@ let requirement = function
 let empty = Empty
 let string s = Token s
 let break n = Whitespace (Break n)
-let hardline = Whitespace HardLine
+let hardline = Whitespace Hard_line
+let blank_line = Whitespace Blank_line
 
 (* FIXME *)
 let comment s = Comment ("(*" ^ s ^ "*)")
