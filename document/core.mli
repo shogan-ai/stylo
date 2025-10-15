@@ -13,7 +13,10 @@ type whitespace =
   | Break of int
   (** [Break n] prints as n spaces in flat mode, as a line break otherwise *)
   | Hard_line
-  | Blank_line
+  (** Always a line break *)
+  | Blank_line (* FIXME: find a better name, [Max_one_blank_line]? *)
+  (** Vanishes in flat mode and after a blank line, same as hardline in other
+      cases. *)
 
 type t = private
   | Empty
