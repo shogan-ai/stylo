@@ -2249,10 +2249,9 @@ end = struct
 
   (* TODO: duplicated from Structure *)
   let (^//^) before after =
-    if before = Empty then
-      after
-    else
-      before ^^ hardline ^^ hardline ^^ after
+    match before with
+    | Empty -> after
+    | _ -> before ^^ hardline ^^ hardline ^^ after
 
   (* We keep the list of items in sync with the list of "tokens" of the
      signature (each [Child_node] is a signature item).
@@ -2587,9 +2586,9 @@ end = struct
       |> group
 
   let add_item doc item =
-    if doc = Empty then
-      group (item ^^ break 0)
-    else
+    match doc with
+    | Empty -> group (item ^^ break 0)
+    | _ ->
       (* flat items don't force blank lines, only non-flat ones do. *)
       (* Notice the [nest] trick here: without it any comment "attached" to the
          item would be inserted outside the group (because we don't want to

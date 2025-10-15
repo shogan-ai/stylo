@@ -69,12 +69,12 @@ let rec pretty buf state indent flat = function
   | Group (req, t) ->
     let flat =
       flat
-      || Req.(to_int @@ req + of_int state.column) <= state.max_width
+      || Requirement.(to_int @@ req + of_int state.column) <= state.max_width
     in
     pretty buf state indent flat t
 
 let to_string ~width d =
-  let sz = min (1024 * 1024) (Req.to_int @@ requirement d) in
+  let sz = min (1024 * 1024) (Requirement.to_int @@ requirement d) in
   let buf = Buffer.create sz in
   let init =
     { max_width = width
