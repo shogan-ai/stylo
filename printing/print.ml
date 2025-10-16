@@ -553,6 +553,7 @@ end
 
 and Core_type : sig
   val pp : core_type -> t
+  val pp_for_decl : core_type -> t
 
   val pp_arrow : Tokens.seq -> arg_label -> t -> t -> t
 
@@ -643,35 +644,46 @@ end = struct
     in
     separate_map (break 1) pp_bound bound_vars
 
-  and pp_variant ~tokens fields (cf : Asttypes.closed_flag) lbls =
-    let fields =
-      (if pipe_before_child tokens then S.pipe else empty) ^?^
-      separate_map (break 1 ^^ S.pipe ^^ break 1) row_field fields
+  and pp_variant ?(compact=true) ~tokens fields (cf : Asttypes.closed_flag)
+        lbls =
+    let pp_fields bracket =
+      let init =
+        bracket ^?^ if pipe_before_child tokens then S.pipe else empty
+      in
+      match fields with
+      | [] -> init
+      | rf :: rfs ->
+        let rf = row_field init rf in
+        let rfs = List.map (row_field S.pipe) rfs in
+        separate (if compact then break 1 else hardline) (rf :: rfs)
     in
     match cf, lbls with
-    | Closed, None -> S.lbracket ^/^ fields  ^/^ S.rbracket
-    | Open, None -> S.lbracket_gt ^/^ fields ^?^ S.rbracket
-    | Closed, Some [] -> S.lbracket_lt ^/^ fields ^/^ S.rbracket
+    | Closed, None -> pp_fields S.lbracket ^/^ S.rbracket
+    | Open, None -> pp_fields S.lbracket_gt ^/^ S.rbracket
+    | Closed, Some [] -> pp_fields S.lbracket_lt ^/^ S.rbracket
     | Closed, Some labels ->
-      S.lbracket_lt ^/^ fields ^/^
+      pp_fields S.lbracket_lt ^/^
       S.gt ^/^ separate_map (break 1) pp_poly_tag labels ^/^
       S.rbracket
     | Open, Some _ -> assert false
 
-  and row_field rf =
-    group (
-      row_field_desc rf.prf_desc
-      |> Attribute.attach ~attrs:rf.prf_attributes
-    )
+  and row_field preceeding_tok { prf_desc; prf_attributes; prf_loc = _;
+                                 prf_tokens = _ } =
+    prefix (row_field_desc preceeding_tok prf_desc)
+      (Attribute.pp_list prf_attributes)
 
-  and row_field_desc = function
-    | Rinherit ct -> pp ct
-    | Rtag (label, _, []) -> pp_poly_tag label.txt
+  and row_field_desc preceeding_tok = function
+    | Rinherit ct -> group (preceeding_tok ^/^ pp ct)
+    | Rtag (label, _, []) -> group (preceeding_tok ^/^ pp_poly_tag label.txt)
     | Rtag (label, has_const, at_types) ->
-      prefix (group (pp_poly_tag label.txt ^/^ S.of_)) (
+      let args =
         (if has_const then S.ampersand ^^ break 1 else empty) ^^
         separate_map (break 1 ^^ S.ampersand ^^ break 1) pp at_types
-      )
+      in
+      prefix
+        (prefix preceeding_tok
+           (group (pp_poly_tag label.txt ^/^ S.of_)))
+        args
 
   and pp_poly_tag lbl = S.bquote ^^ string lbl
 
@@ -774,6 +786,16 @@ end = struct
       ) (empty, S.colon) args
     in
     acc ^/^ last_arrow ^^ nest 2 (group (break 1 ^^ codom))
+
+  let pp_for_decl { ptyp_desc; ptyp_attributes; ptyp_tokens; ptyp_loc=_} =
+    let desc =
+      match ptyp_desc with
+      | Ptyp_variant (rf, cf, lbls) ->
+        pp_variant ~compact:false ~tokens:ptyp_tokens rf cf lbls
+      | _ -> pp_desc ptyp_tokens ptyp_desc
+    in
+    Attribute.attach desc ~attrs:ptyp_attributes
+
 end
 
 (** {2 Patterns} *)
@@ -1814,9 +1836,9 @@ end = struct
     match td.ptype_manifest, td.ptype_kind with
     | None, Ptype_abstract -> empty
     | Some ct, Ptype_abstract ->
-      eq ^?^ private_ td.ptype_private ^?^ Core_type.pp ct
+      eq ^?^ private_ td.ptype_private ^?^ Core_type.pp_for_decl ct
     | Some ct, kind ->
-      eq ^/^ Core_type.pp ct ^/^
+      eq ^/^ Core_type.pp_for_decl ct ^/^
       S.equals ^?^ private_ td.ptype_private ^?^ type_kind kind
     | None, kind ->
       eq ^?^ private_ td.ptype_private ^?^ type_kind kind
