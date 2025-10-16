@@ -1018,7 +1018,8 @@ end = struct
       pp e1 ^^ S.dot ^^ longident lid.txt ^/^ S.larrow ^/^ pp e2
     | Pexp_array (mut, es) -> pp_array (nb_semis exp.pexp_tokens) mut es
     | Pexp_idx (ba, uas) -> pp_block_idx ba uas
-    | Pexp_ifthenelse (e1, e2, e3_o) -> pp_ite exp.pexp_ext_attr e1 e2 e3_o
+    | Pexp_ifthenelse (e1, e2, e3_o) ->
+      pp_ifthenelse exp.pexp_ext_attr e1 e2 e3_o
     | Pexp_sequence (e1, e2) ->
       (* FIXME: ext_attr not at the beginning, the token synchronisation is
          going to have issues. *)
@@ -1157,6 +1158,10 @@ end = struct
     | None -> empty
     | Some e -> break 1 ^^ S.larrow ^/^ pp e
     end
+
+  and pp_ifthenelse ?kw ext_attr e1 e2 e3_o =
+    (* group the whole [if .. then .. (else if ..)* else? ..] *)
+    group (pp_ite ?kw ext_attr e1 e2 e3_o)
 
   and pp_ite ?(kw=S.if_) ext_attr e1 e2 e3_o =
     let if_ = Ext_attribute.decorate kw ext_attr in
