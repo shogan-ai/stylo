@@ -1114,7 +1114,7 @@ end = struct
         | Mutable, Nonrecursive -> [S.mutable_]
         | Mutable, Recursive -> [S.mutable_; S.rec_]
       ) ^/^ S.in_
-    ) ^/^ pp body
+    ) ^^ hardline ^^ pp body
 
   and pp_function_parts exp =
     match exp.pexp_desc with
