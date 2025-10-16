@@ -792,10 +792,23 @@ module Type = struct
   let field ?(loc = !default_loc) ?(attrs = []) ~tokens ?(info = empty_info)
         ?(mut = Immutable) ?(global=false) ?(modalities = []) name typ =
     let info = simplify_ds info in
-    let info_tokens =
+    (* The docstring can be either before or after the semi colon, so we are
+       already normalizing here (whatever choice we make).
+       Perhaps we should have gone for the easier one (ds at the end of tokens)
+       and left the smarter code for an explicit normalization pass? *)
+    let tokens_with_info =
       match info with
-      | None -> []
-      | Some ds -> [{ Tokens.desc = Child_node; pos = ds.ds_loc.loc_start }]
+      | None -> tokens
+      | Some ds ->
+        let ds_tok = { Tokens.desc = Child_node; pos = ds.ds_loc.loc_start } in
+        let rec insert_before_semi = function
+          | [] -> (* no semicolon *) [ds_tok]
+          | tok :: tokens ->
+            match tok.Tokens.desc with
+            | Token SEMI -> ds_tok :: tok :: tokens
+            | _ -> tok :: insert_before_semi tokens
+        in
+        insert_before_semi tokens
     in
     {
      pld_name = name;
@@ -806,7 +819,7 @@ module Type = struct
      pld_loc = loc;
      pld_attributes = attrs;
      pld_doc = Option.map Docstrings.info_attr info;
-     pld_tokens = tokens @ info_tokens;
+     pld_tokens = tokens_with_info;
     }
 
 end
