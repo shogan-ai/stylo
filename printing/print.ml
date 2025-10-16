@@ -1705,7 +1705,7 @@ end = struct
         next_tok, pp preceding_tok lbl
       ) (if unboxed then S.hash_lbrace else S.lbrace) lbls
     in
-    separate (break 0) lbls ^?^ maybe_trailing_semi ^?^ S.rbrace
+    separate hardline lbls ^?^ maybe_trailing_semi ^?^ S.rbrace
 end
 
 and Constructor_argument : sig
@@ -1785,22 +1785,20 @@ end = struct
          Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct)
     |> Attribute.attach ~attrs:pcd_attributes ?post_doc:pcd_doc
 
-  let pp_constrs ~has_leading_pipe =
-    foldli (fun i accu x ->
-      if i = 0 then
-        constructor_declaration has_leading_pipe x
-      else
-        accu ^/^ constructor_declaration true x
-    ) empty
+  let pp_variant = function
+    | [] -> S.pipe
+    | cd :: cds ->
+      let cd = constructor_declaration (starts_with_pipe cd.pcd_tokens) cd in
+      match cds with
+      | [] -> cd
+      | _ ->
+        List.fold_left (fun doc cd ->
+          doc ^^ hardline ^^ constructor_declaration true cd
+        ) cd cds
 
   let type_kind = function
     | Ptype_abstract -> empty
-    | Ptype_variant cds ->
-      begin match cds with
-      | [] -> S.pipe
-      | cd :: _ ->
-        pp_constrs ~has_leading_pipe:(starts_with_pipe cd.pcd_tokens) cds
-      end
+    | Ptype_variant cds -> pp_variant cds
     | Ptype_record lbls -> Record.pp_decl lbls
     | Ptype_record_unboxed_product lbls -> Record.pp_decl ~unboxed:true lbls
     | Ptype_open -> S.dotdot
