@@ -1,7 +1,5 @@
 open Core
 
-let spaces = String.make 80 ' '
-
 type line_info =
   | Has_text
   | Is_empty
@@ -19,9 +17,54 @@ let incr_col st i =
 
 let has_text st = { st with line = Has_text }
 
-let newline st indent buf =
-  Buffer.add_char buf '\n';
-  Buffer.add_substring buf spaces 0 indent;
+(* Wrapper with whitespace buffering *)
+module Buffer : sig
+  type t
+
+  val create : int -> t
+  val newline : indent:int -> t -> unit
+  val add_spaces : t -> int -> unit
+  val add_string : t -> string -> unit
+  val contents : t -> string
+end = struct
+
+  type t = {
+    buf: Buffer.t;
+    mutable delayed_ws: int;
+  }
+
+  let flush_ws =
+    let spaces = String.make 80 ' ' in
+    let rec aux t n =
+      if n <= 0 then
+        t.delayed_ws <- 0
+      else
+        let nb = min t.delayed_ws 80 in
+        Buffer.add_substring t.buf spaces 0 nb;
+        aux t (n - nb)
+    in
+    fun t ->
+      aux t t.delayed_ws
+
+
+  let create n = { buf = Buffer.create n; delayed_ws = 0 }
+
+  let newline ~indent t =
+    Buffer.add_char t.buf '\n';
+    t.delayed_ws <- indent
+
+  let add_spaces t n =
+    t.delayed_ws <- t.delayed_ws + n
+
+  let add_string t s =
+    flush_ws t;
+    Buffer.add_string t.buf s
+
+  let contents t = Buffer.contents t.buf
+end
+
+let newline st indent t =
+  Buffer.newline t ~indent;
   let line =
     match st.line with
     | Has_text -> Is_empty
@@ -42,7 +85,7 @@ let rec pretty buf state indent flat = function
     |> has_text
   | Whitespace Break n ->
     if flat then (
-      Buffer.add_substring buf spaces 0 n;
+      Buffer.add_spaces buf  n;
       incr_col state n
     ) else
       newline state indent buf
