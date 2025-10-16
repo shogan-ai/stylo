@@ -2656,13 +2656,13 @@ end = struct
         exp
     | None, Some Three_parts { start; main; stop } ->
       prefix bindings (group (equal_sign ^/^ start)) ^^
-        nest 2 (break 1 ^^ main) ^/^
+        nest 2 (break 1 ^^ main) ^?^
       stop
     | Some Three_parts { start; main; stop }, None ->
       (* FIXME: here the "colon" is not included??? *)
       prefix
         (prefix bindings (group (S.colon ^/^ start)))
-        main ^/^
+        main ^?^
       stop
     | Some Three_parts { start; main; stop }, Some Single_part doc ->
       (* FIXME: here the "colon" is not included??? *)
@@ -2675,7 +2675,7 @@ end = struct
     | Some Single_part doc, Some Three_parts { start; main; stop } ->
       prefix
         (prefix bindings (group (doc ^/^ equal_sign ^/^ start)))
-        main ^/^
+        main ^?^
       stop
     | Some Three_parts typ, Some Three_parts exp ->
       prefix
@@ -2683,7 +2683,7 @@ end = struct
         typ.main ^/^
       prefix
         (group (typ.stop ^/^ equal_sign ^/^ exp.start))
-        exp.main ^/^
+        exp.main ^?^
       exp.stop
 
 
