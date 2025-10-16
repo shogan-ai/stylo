@@ -22,12 +22,8 @@ module Req = Requirement
 
 type whitespace =
   | Line_break of { soft: bool }
-  (** Vanishes after a blank line when [soft = true].
-      Introduces a line break in the output otherwise. *)
   | Break of { spaces: int; soft: bool }
-  (** [Break { spaces = n; soft }] prints as n spaces in flat mode, and behaves
-      as a [Line_break { soft }] otherwise. *)
-
+  | Vanishing_space
 
 (* FIXME: comments and strings can contain newlines, they should be represented
    by something other than "string". *)
@@ -47,6 +43,7 @@ let requirement = function
   | Comment s -> Req.of_int (String.length s)
   | Whitespace Break { spaces; soft = _ } -> Req.of_int spaces
   | Whitespace Line_break _ -> Req.infinity
+  | Whitespace Vanishing_space -> Req.of_int 0
   | Cat (r, _, _)
   | Nest (r, _, _)
   | Relative_nest (r, _, _)
@@ -58,6 +55,8 @@ let break spaces = Whitespace (Break { spaces; soft = false })
 let soft_break spaces = Whitespace (Break { spaces; soft = true })
 let hardline = Whitespace (Line_break { soft = false })
 let softline = Whitespace (Line_break { soft = true })
+
+let vanishing_space = Whitespace Vanishing_space
 
 (* FIXME *)
 let comment s = Comment ("(*" ^ s ^ "*)")

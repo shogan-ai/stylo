@@ -88,14 +88,21 @@ let rec pretty buf state indent flat = function
     incr_col state (String.length s)
     |> has_text
   | Whitespace Break { spaces; soft } ->
-    if flat then (
+    if flat > 0 then (
       Buffer.add_spaces buf spaces;
       incr_col state spaces
     ) else
       newline state indent soft buf
   | Whitespace Line_break { soft } ->
-    assert (not flat);
+    assert (flat = 0);
     newline state indent soft buf
+  | Whitespace Vanishing_space ->
+    if flat <> 1 then
+      state
+    else (
+      Buffer.add_spaces buf 1;
+      incr_col state 1
+    )
   | Cat (_, t1, t2) ->
     let state' = pretty buf state indent flat t1 in
     pretty buf state' indent flat t2
@@ -110,8 +117,9 @@ let rec pretty buf state indent flat = function
     pretty buf state indent flat t
   | Group (req, t) ->
     let flat =
-      flat
-      || Requirement.(to_int @@ req + of_int state.column) <= state.max_width
+      if Requirement.(to_int @@ req + of_int state.column) <= state.max_width
+      then flat + 1
+      else flat
     in
     pretty buf state indent flat t
 
@@ -125,5 +133,5 @@ let to_string ~width d =
     ; line = Is_empty
     }
   in
-  let _final_state = pretty buf init 0 false d in
+  let _final_state = pretty buf init 0 0 d in
   Buffer.contents buf

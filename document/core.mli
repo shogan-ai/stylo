@@ -16,6 +16,9 @@ type whitespace =
   | Break of { spaces: int; soft: bool }
   (** [Break { spaces = n; soft }] prints as n spaces in flat mode, and behaves
       as a [Line_break { soft }] otherwise. *)
+  | Vanishing_space
+  (** Prints as a space in flat mode when the parent is not flat, and vanished
+      otherwise. *)
 
 type t = private
   | Empty
@@ -36,6 +39,8 @@ val break : int -> t
 val soft_break : int -> t
 val hardline : t
 val softline : t
+
+val vanishing_space : t
 
 val comment : string -> t
 val docstring : string -> t

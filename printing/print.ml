@@ -783,7 +783,7 @@ end = struct
     let (acc, last_arrow) =
       List.fold_left (fun (acc, between) arg ->
         acc ^?^ pp_arg between arg, S.rarrow
-      ) (empty, S.colon) args
+      ) (empty, group (S.colon ^^ vanishing_space)) args
     in
     acc ^/^ last_arrow ^^ nest 2 (group (break 1 ^^ codom))
 
