@@ -1362,61 +1362,50 @@ end = struct
       true
     | _ -> false
 
-  (* We want the following layouts (assuming no line overflows):
-     {[
-       some_fun arg1 arg2 ~f:(fun a b c d : whatever ->
-         foo bar
-       ) arg4 arg5
-     ]}
-     {[
-       some_fun arg1 arg2
-         ~f:(fun a b c d : whatever -> foo bar) arg4 arg5
-     ]}
-     {[
-       some_fun arg1 arg2
-         ~f:(fun a b c d : whatever ->
-               foo bar)
-         arg4 arg5
-     ]}
-
-     But currently we have:
-     {[
-       some_fun arg1 arg2
-         ~f:(fun a b c d : whatever ->
-               foo bar) arg4 arg5
-     ]}
-     which is less readable.
-     TODO: improve.
-  *)
-  let pp_function_parts ?lbl exp =
+  let pp_function_parts ~indent ?lbl exp =
     match exp.pexp_desc with
     | Pexp_parens { begin_end = false; exp = Some fun_exp } ->
       let (fun_and_params, body) = Expression.pp_function_parts fun_exp in
       let first_part =
         optional (stringf "~%s:") lbl ^^ S.lparen ^^ fun_and_params
       in
-      group (break 1 ^^ first_part) ^^
-      group (relative_nest 2 (break 1 ^^ body) ^^ S.rparen)
+      first_part,
+      group (relative_nest indent (break 1 ^^ body) ^^ S.rparen)
       |> Attribute.attach ~attrs:exp.pexp_attributes
     | _ -> assert false
 
-  let pp_arg arg =
+  let pp_arg_parts indent arg =
     match arg.parg_desc with
     | Parg_unlabelled { legacy_modes=[]; arg; typ_constraint=None; modes=[] }
       when is_function arg ->
-      pp_function_parts arg
+      pp_function_parts ~indent arg
     | Parg_labelled { optional=false; legacy_modes=[]; name;
                       maybe_punned=Some arg; typ_constraint=None;modes=[];
                       default=None }
       when is_function arg ->
-      pp_function_parts ~lbl:name arg
+      pp_function_parts ~indent ~lbl:name arg
     | _ ->
-      group (break 1 ^^ Argument.pp Expression.pp arg)
+      Argument.pp Expression.pp arg, empty
+
+  let pp_last_arg indent arg =
+    let p1, p2 = pp_arg_parts indent arg in
+    [ p1 ], p2
+
+  let pp_arg indent arg =
+    let p1, p2 = pp_arg_parts indent arg in
+    p1 ^^ p2
+
+  let rec pp_args indent = function
+    | [] -> assert false
+    | [ arg ] -> pp_last_arg indent arg
+    | arg :: args ->
+      let args, trailing = pp_args indent args in
+      pp_arg indent arg :: args, trailing
 
   let pp ?(indent=2) f args =
-    List.fold_left (fun acc arg ->
-      acc ^^ nest indent @@ pp_arg arg
-    ) f args
+    let args, trailing = pp_args indent args in
+    let f_and_args = separate (break 1) (f :: args) in
+    nest indent (group f_and_args) ^^ trailing
 end
 
 and Case : sig
