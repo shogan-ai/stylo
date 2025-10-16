@@ -95,6 +95,13 @@ let pp_grouped_keeping_semi pp_item groups tokens =
     ) tokens groups
   with
   | [], groups -> separate (softline ^^ softline) groups
+  | tokens, [] ->
+    (* Here we have an empty struct/sig with potential semis.
+       This code could be simplified for the special case, but meh. *)
+    begin match pp_keeping_semi Fun.id empty [] tokens with
+    | doc, Done -> doc
+    | _ -> assert false
+    end
   | _ -> assert false
 
 let rec group_by_desc same_group acc = function
