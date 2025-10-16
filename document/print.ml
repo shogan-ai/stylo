@@ -63,18 +63,22 @@ end = struct
   let contents t = Buffer.contents t.buf
 end
 
-let newline st indent t =
-  Buffer.newline t ~indent;
-  let line =
-    match st.line with
-    | Has_text -> Is_empty
-    | _ -> Follows_blank_line
-  in
-  { st with
-    column = indent;
-    line_indent = indent;
-    line;
-  }
+let newline st indent soft t =
+  if soft && st.line = Follows_blank_line then
+    st
+  else (
+    Buffer.newline t ~indent;
+    let line =
+      match st.line with
+      | Has_text -> Is_empty
+      | _ -> Follows_blank_line
+    in
+    { st with
+      column = indent;
+      line_indent = indent;
+      line;
+    }
+  )
 
 let rec pretty buf state indent flat = function
   | Empty -> state
@@ -83,20 +87,15 @@ let rec pretty buf state indent flat = function
     Buffer.add_string buf s;
     incr_col state (String.length s)
     |> has_text
-  | Whitespace Break n ->
+  | Whitespace Break { spaces; soft } ->
     if flat then (
-      Buffer.add_spaces buf  n;
-      incr_col state n
+      Buffer.add_spaces buf spaces;
+      incr_col state spaces
     ) else
-      newline state indent buf
-  | Whitespace Blank_line ->
-    if flat || state.line = Follows_blank_line then (
-      state
-    ) else
-      newline state indent buf
-  | Whitespace Hard_line ->
+      newline state indent soft buf
+  | Whitespace Line_break { soft } ->
     assert (not flat);
-    newline state indent buf
+    newline state indent soft buf
   | Cat (_, t1, t2) ->
     let state' = pretty buf state indent flat t1 in
     pretty buf state' indent flat t2

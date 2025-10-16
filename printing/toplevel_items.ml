@@ -35,7 +35,7 @@ let add_item doc item =
        The nest allows the comment insertion code to traverse the group,
        delaying the comment until after the [nest 0 blankline], and producing
        the output we expect. *)
-    doc ^^ hardline ^^ group (nest 0 blank_line ^^ item ^^ break 0)
+    doc ^^ softline ^^ group (nest 0 (soft_break 0) ^^ item ^^ break 0)
 
 type cont =
   | Semi_followed_by of seq
@@ -94,7 +94,7 @@ let pp_grouped_keeping_semi pp_item groups tokens =
       tokens_of_cont cont, doc
     ) tokens groups
   with
-  | [], groups -> separate (hardline ^^ blank_line) groups
+  | [], groups -> separate (softline ^^ softline) groups
   | _ -> assert false
 
 let rec group_by_desc same_group acc = function

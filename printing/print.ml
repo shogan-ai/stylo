@@ -2275,7 +2275,7 @@ end = struct
 
   let pp_interface sg =
     with_modalities empty ~modalities:sg.psg_modalities ^?^
-    group (pp_keeping_semi sg)
+    pp_keeping_semi sg
 end
 
 and Module_declaration : sig

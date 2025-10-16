@@ -10,13 +10,12 @@ module Requirement : sig
 end
 
 type whitespace =
-  | Break of int
-  (** [Break n] prints as n spaces in flat mode, as a line break otherwise *)
-  | Hard_line
-  (** Always a line break *)
-  | Blank_line (* FIXME: find a better name, [Max_one_blank_line]? *)
-  (** Vanishes in flat mode and after a blank line, same as hardline in other
-      cases. *)
+  | Line_break of { soft: bool }
+  (** Vanishes after a blank line when [soft = true].
+      Introduces a line break in the output otherwise. *)
+  | Break of { spaces: int; soft: bool }
+  (** [Break { spaces = n; soft }] prints as n spaces in flat mode, and behaves
+      as a [Line_break { soft }] otherwise. *)
 
 type t = private
   | Empty
@@ -32,9 +31,11 @@ val requirement : t -> Requirement.t
 
 val empty : t
 val string : string -> t
+
 val break : int -> t
+val soft_break : int -> t
 val hardline : t
-val blank_line : t
+val softline : t
 
 val comment : string -> t
 val docstring : string -> t
