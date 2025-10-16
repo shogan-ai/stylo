@@ -212,7 +212,8 @@ end = struct
 
   let pp_floating { attr_name; attr_payload; attr_loc = _; attr_tokens = _ } =
     match attr_name.txt with
-    | ["ocaml"; ("doc"|"text")]  (* FIXME *) -> pp_doc attr_payload
+    | ["ocaml"; ("doc"|"text")]  (* FIXME *) ->
+      softline ^^ pp_doc attr_payload ^^ softline
     | _ -> pp S.lbracket_atatat attr_name attr_payload
 
   let pp ?(item=false)
@@ -226,16 +227,18 @@ end = struct
   let pp_list ?item l = separate_map (break 0) (pp ?item) l
 
   let attach ?item ?(text = []) ?pre_doc ?post_doc ~attrs t =
+    let with_attrs = t ^?^ pp_list ?item attrs in
     begin match text with
     | [] -> empty
     | text ->
-      hardline ^^ hardline ^^
+      softline ^^ softline ^^
       separate_map (break 1) pp text ^^
-      hardline ^^ hardline
+      softline ^^ softline
     end ^^
-    optional pp pre_doc ^?/^
-    t ^?^ pp_list ?item attrs ^?^
-    optional pp post_doc
+    optional (fun a -> softline ^^ pp_doc a.attr_payload) pre_doc ^?/^
+    match post_doc with
+    | None -> with_attrs
+    | Some a -> group (t ^/^ pp_doc a.attr_payload) ^^ softline
 end
 
 and Ext_attribute : sig
@@ -591,7 +594,7 @@ end = struct
       in
       pp_arrow dom.aa_tokens dom.aa_lbl
         (pp_surrounded dom.aa_legacy_modes dom.aa_modes dom.aa_type
-         |> Attribute.attach ?post_doc:dom.aa_doc ~attrs:[])
+           ^?^ optional Attribute.pp dom.aa_doc)
         (pp_surrounded codom_legacy_modes codom_modes codom_type)
     | Ptyp_tuple elts -> pp_tuple elts
     | Ptyp_unboxed_tuple elts -> S.hash_lparen ^^ pp_tuple elts ^^ S.rparen
@@ -759,7 +762,7 @@ end = struct
       in
       let arg =
         label ^^ typ_and_modes
-        |> Attribute.attach ?post_doc:aa_doc ~attrs:[]
+        ^?^ optional Attribute.pp aa_doc
       in
       if preceeding_tok = empty
       then nest 2 (group arg)
