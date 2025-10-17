@@ -1141,23 +1141,32 @@ end = struct
     prefix fun_and_params body
 
   and pp_index_op nb_semis kind seq op indices assign =
-    let delims =
+    let open_, close =
       match kind with
       | Paren -> S.lparen, S.rparen
       | Brace -> S.lbrace, S.rbrace
       | Bracket -> S.lbracket, S.rbracket
     in
-    pp seq ^/^
-    begin match op with
-    | None -> S.dot
-    | Some (None, op) -> stringf ".%s" op
-    | Some (Some lid, op) -> S.dot ^^ longident lid ^^ stringf ".%s" op
-    end ^^
-    pp_delimited_seq delims nb_semis indices ^^
-    begin match assign with
-    | None -> empty
-    | Some e -> break 1 ^^ S.larrow ^/^ pp e
-    end
+    let indices =
+      let semi_as_term = List.compare_length_with indices nb_semis = 0 in
+      if semi_as_term
+      then separate_map (break 1) (fun i -> pp i ^^ S.semi) indices
+      else separate_map (S.semi ^^ break 1) pp indices
+    in
+    let dotop =
+      match op with
+      | None -> S.dot
+      | Some (None, op) -> stringf ".%s" op
+      | Some (Some lid, op) -> S.dot ^^ longident lid ^^ stringf ".%s" op
+    in
+    let access =
+      pp seq ^^ dotop ^^ open_ ^^ nest 2 (
+        break 0 ^^ indices ^^ break 0
+      ) ^^ close
+    in
+    match assign with
+    | None -> access
+    | Some e -> prefix (group (access ^/^ S.larrow)) (pp e)
 
   and pp_ifthenelse ?kw ext_attr e1 e2 e3_o =
     (* group the whole [if .. then .. (else if ..)* else? ..] *)
