@@ -1448,7 +1448,7 @@ end = struct
 
   let pp pipe { pc_lhs; pc_guard; pc_rhs } =
     group (
-      prefix (pp_pattern pipe pc_lhs)
+      prefix (group (pp_pattern pipe pc_lhs))
         (pp_guard pc_guard) ^^
       nest 2 (
         (* always try to put on the same line as what preceeds if it fits. *)
