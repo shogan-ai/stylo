@@ -1259,15 +1259,24 @@ structure:
   { let str = $1 in
     (* See the comments on [signature] for an explanation of the positions
        fiddleing. *)
-    let startp =
+    let startp, endp =
       match str with
-      | [] -> $symbolstartpos
-      | x :: _ -> min $symbolstartpos x.pstr_loc.loc_start
-    in
-    let endp =
-      match List.rev str with
-      | [] -> $endpos
-      | x :: _ -> max x.pstr_loc.loc_end $endpos
+      | [] -> $symbolstartpos, $endpos
+      | { pstr_loc = { loc_start = startp; _ }; _ } :: _ ->
+        let endp = (List.hd (List.rev str)).pstr_loc.loc_end in
+        if $symbolstartpos = $endpos (* empty reduction *)
+        then
+          (* Just use the synthesized items pos.
+             Especially since both $*pos are going to be equal to the $endpos of
+             the most recently parsed token. *)
+          startp, endp
+        else
+          (* Here we need to be careful: there might be synthesized str items
+             that extend the location past ($symbolstartpos, $endpos).
+             But symmetrically there might be symbols (namely SEMISEMI) that
+             appeared before the first or after the last of the collected items.
+             *)
+          min $symbolstartpos startp, max $endpos endp
     in
     str, Tokens.at (startp, endp) }
 ;
@@ -1566,7 +1575,8 @@ module_type:
    is a list of signature elements. *)
 signature:
   optional_atat_modalities_expr extra_sig(flatten(signature_element*))
-    { let startp =
+    { let empty_red = $symbolstartpos = $endpos in
+      let startp =
         (* The start position is important to retrieve all the tokens.
            Usually $symbolstartpos is the right choice, however here
            we might reduce an empty production (no modalities, no signature
@@ -1577,16 +1587,21 @@ signature:
           that and would reduce to $endpos. *)
         match $1, $2 with
         | [], item :: _ ->
-            (* We need the min because there might be ;; before the first element
-               loc... *)
-            min item.psig_loc.loc_start $symbolstartpos
+            if empty_red
+            then item.psig_loc.loc_start
+            else
+              (* There might be ;; before the first element *)
+              min item.psig_loc.loc_start $symbolstartpos
         | _ -> $symbolstartpos
       in
       let endp =
         (* Likewise for the end position: some elements might have been
            synthesized that extend the location past $endpos. *)
         match List.rev $2 with
-        | item :: _ -> max item.psig_loc.loc_end $endpos
+        | item :: _ ->
+            if empty_red
+            then item.psig_loc.loc_end
+            else max item.psig_loc.loc_end $endpos
         | _ -> $endpos
       in
       let loc = startp, endp in
