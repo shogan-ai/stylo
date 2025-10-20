@@ -1257,15 +1257,19 @@ structure:
     flatten(structure_element*)
   ))
   { let str = $1 in
-    let start =
+    (* See the comments on [signature] for an explanation of the positions
+       fiddleing. *)
+    let startp =
       match str with
       | [] -> $symbolstartpos
-      | x :: _ ->
-          (* We need the min because there might be ;; before the first element
-             loc... *)
-          min $symbolstartpos x.pstr_loc.loc_start
+      | x :: _ -> min $symbolstartpos x.pstr_loc.loc_start
     in
-    str, Tokens.at (start, $endpos) }
+    let endp =
+      match List.rev str with
+      | [] -> $endpos
+      | x :: _ -> max x.pstr_loc.loc_end $endpos
+    in
+    str, Tokens.at (startp, endp) }
 ;
 
 (* An optional standalone expression is just an expression with attributes
@@ -1562,7 +1566,7 @@ module_type:
    is a list of signature elements. *)
 signature:
   optional_atat_modalities_expr extra_sig(flatten(signature_element*))
-    { let start =
+    { let startp =
         (* The start position is important to retrieve all the tokens.
            Usually $symbolstartpos is the right choice, however here
            we might reduce an empty production (no modalities, no signature
@@ -1578,7 +1582,14 @@ signature:
             min item.psig_loc.loc_start $symbolstartpos
         | _ -> $symbolstartpos
       in
-      let loc = start, $endpos in
+      let endp =
+        (* Likewise for the end position: some elements might have been
+           synthesized that extend the location past $endpos. *)
+        match List.rev $2 with
+        | item :: _ -> max item.psig_loc.loc_end $endpos
+        | _ -> $endpos
+      in
+      let loc = startp, endp in
       { psg_modalities = $1;
         psg_items = $2;
         psg_loc = make_loc loc;
