@@ -345,6 +345,7 @@ and row_field = {
   prf_desc : row_field_desc;
   prf_loc : location;
   prf_attributes : attributes;
+  prf_doc: attribute option;
   prf_tokens: tokens;
 }
 
@@ -367,6 +368,8 @@ and object_field = {
   pof_desc : object_field_desc;
   pof_loc : location;
   pof_attributes : attributes;
+  pof_doc: attribute option;
+  pof_tokens: tokens;
 }
 
 and object_field_desc =

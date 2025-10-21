@@ -97,6 +97,11 @@ class to_tokens = object
     let node_toks = p.prf_tokens in
     combine_children ~loc:p.prf_loc node_toks sub_tokens
 
+  method! visit_object_field env p =
+    let sub_tokens = super#visit_object_field env p in
+    let node_toks = p.pof_tokens in
+    combine_children ~loc:p.pof_loc node_toks sub_tokens
+
   method! visit_pattern env p =
     let sub_tokens = super#visit_pattern env p in
     let node_toks = p.ppat_tokens in

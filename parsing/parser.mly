@@ -4567,12 +4567,11 @@ row_field:
 tag_field:
     mkrhs(name_tag) OF opt_ampersand amper_type_list attributes
       { let info = symbol_info $endpos in
-        let attrs = add_info_attrs info $5 in
-        Rf.tag ~loc:(make_loc $sloc) ~attrs ~tokens:(Tokens.at $sloc) $1 $3 $4 }
+        Rf.tag ~loc:(make_loc $sloc) ~attrs:$5 ~info ~tokens:(Tokens.at $sloc)
+          $1 $3 $4 }
   | mkrhs(name_tag) attributes
       { let info = symbol_info $endpos in
-        let attrs = add_info_attrs info $2 in
-        Rf.tag ~loc:(make_loc $sloc) ~attrs ~tokens:(Tokens.at $sloc)
+        Rf.tag ~loc:(make_loc $sloc) ~attrs:$2 ~info ~tokens:(Tokens.at $sloc)
           $1 true [] }
 ;
 opt_ampersand:
@@ -4604,8 +4603,8 @@ meth_list:
 %inline field:
   mkrhs(label) COLON poly_type_no_attr attributes
     { let info = symbol_info $endpos in
-      let attrs = add_info_attrs info $4 in
-      Of.tag ~loc:(make_loc $sloc) ~attrs $1 $3 }
+      Of.tag ~loc:(make_loc $sloc) ~attrs:$4 ~info $1 $3
+        ~tokens:(Tokens.at $sloc) }
 ;
 
 %inline field_semi:
@@ -4615,13 +4614,13 @@ meth_list:
         | Some _ as info_before_semi -> info_before_semi
         | None -> symbol_info $endpos
       in
-      let attrs = add_info_attrs info ($4 @ $6) in
-      Of.tag ~loc:(make_loc $sloc) ~attrs $1 $3 }
+      let attrs = ($4 @ $6) in
+      Of.tag ~loc:(make_loc $sloc) ~attrs ~info ~tokens:(Tokens.at $sloc) $1 $3 }
 ;
 
 %inline inherit_field:
   ty = atomic_type
-    { Of.inherit_ ~loc:(make_loc $sloc) ty }
+    { Of.inherit_ ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) ty }
 ;
 
 %inline label:

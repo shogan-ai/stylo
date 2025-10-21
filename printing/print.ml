@@ -600,7 +600,7 @@ end = struct
     | Ptyp_tuple elts -> pp_tuple elts
     | Ptyp_unboxed_tuple elts -> S.hash_lparen ^^ pp_tuple elts ^^ S.rparen
     | Ptyp_constr (args, lid) -> Type_constructor.pp_core_type tokens args lid.txt
-    | Ptyp_object (fields, closed) -> pp_object (nb_semis tokens) fields closed
+    | Ptyp_object (fields, closed) -> pp_object fields closed
     | Ptyp_class (lid, args) ->
       Type_constructor.pp_core_type ~class_:true tokens args lid.txt
     | Ptyp_alias (ct, name, None) ->
@@ -667,10 +667,10 @@ end = struct
       S.rbracket
     | Open, Some _ -> assert false
 
-  and row_field preceeding_tok { prf_desc; prf_attributes; prf_loc = _;
-                                 prf_tokens = _ } =
+  and row_field preceeding_tok { prf_desc; prf_attributes; prf_doc;
+                                 prf_loc = _; prf_tokens = _ } =
     prefix (row_field_desc preceeding_tok prf_desc)
-      (Attribute.pp_list prf_attributes)
+      (Attribute.pp_list prf_attributes ^?^ optional Attribute.pp prf_doc)
 
   and row_field_desc preceeding_tok = function
     | Rinherit ct -> group (preceeding_tok ^/^ pp ct)
@@ -712,25 +712,23 @@ end = struct
     in
     S.lparen ^^ module_ ^/^ longident lid.txt ^^ with_ ^^ break 0 ^^ S.rparen
 
-  and pp_object nb_semis fields closed =
-    let semi_as_term = List.compare_length_with fields nb_semis = 0 in
-    let fields_doc =
-      if semi_as_term then
-        separate_map (break 1) (fun elt -> object_field elt ^^ S.semi) fields
-      else
-        separate_map (S.semi ^^ break 1) object_field fields
-    in
+  and pp_object fields closed =
+    let fields_doc = separate_map (break 1) object_field fields in
     let fields_and_dotdot =
       match fields, closed with
       | _, Asttypes.Closed -> fields_doc
       | [], Open -> S.dotdot
-      | _, Open ->
-        fields_doc ^^ (if semi_as_term then empty else S.semi) ^/^ S.dotdot
+      | _, Open -> fields_doc ^/^ S.dotdot
     in
-    prefix S.lt (group fields_and_dotdot) ^/^ S.gt
+    group (prefix S.lt fields_and_dotdot ^/^ S.gt)
 
-  and object_field of_ =
-    Attribute.attach ~attrs:of_.pof_attributes (object_field_desc of_.pof_desc)
+  and object_field { pof_desc; pof_attributes; pof_doc; pof_tokens;
+                     pof_loc = _ } =
+    let semi = List.exists (fun t -> t.Tokens.desc = Token SEMI) pof_tokens in
+    prefix (group (object_field_desc pof_desc)) (
+      Attribute.pp_list pof_attributes
+      ^?^ optional Attribute.pp pof_doc
+    ) ^^ if semi then S.semi else empty
 
   and object_field_desc = function
     | Oinherit ct -> pp ct

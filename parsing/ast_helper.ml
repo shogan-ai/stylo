@@ -912,29 +912,52 @@ end
 
 (** Row fields *)
 module Rf = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens desc = {
-    prf_desc = desc;
-    prf_loc = loc;
-    prf_attributes = attrs;
-    prf_tokens = tokens;
-  }
-  let tag ?loc ?attrs ~tokens label const tys =
-    mk ?loc ?attrs ~tokens (Rtag (label, const, tys))
+  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens ?(info = empty_info)desc =
+    let doc, info_tokens = Tokens_and_doc.info info in
+    {
+      prf_desc = desc;
+      prf_loc = loc;
+      prf_attributes = attrs;
+      prf_doc = doc;
+      prf_tokens = tokens @ info_tokens;
+    }
+
+  let tag ?loc ?attrs ~tokens ?info label const tys =
+    mk ?loc ?attrs ?info ~tokens (Rtag (label, const, tys))
   let inherit_?loc ~tokens ty =
     mk ?loc ~tokens (Rinherit ty)
 end
 
 (** Object fields *)
 module Of = struct
-  let mk ?(loc = !default_loc) ?(attrs=[]) desc = {
-    pof_desc = desc;
-    pof_loc = loc;
-    pof_attributes = attrs;
-  }
-  let tag ?loc ?attrs label ty =
-    mk ?loc ?attrs (Otag (label, ty))
-  let inherit_ ?loc ty =
-    mk ?loc (Oinherit ty)
+  let mk ?(loc = !default_loc) ?(attrs=[]) ~tokens ?(info = empty_info) desc =
+    (* Same normalization as in [Type.field] *)
+    let tokens_with_info =
+      match info with
+      | None -> tokens
+      | Some ds ->
+        let ds_tok = { Tokens.desc = Child_node; pos = ds.ds_loc.loc_start } in
+        let rec insert_before_semi = function
+          | [] -> (* no semicolon *) [ds_tok]
+          | tok :: tokens ->
+            match tok.Tokens.desc with
+            | Token SEMI -> ds_tok :: tok :: tokens
+            | _ -> tok :: insert_before_semi tokens
+        in
+        insert_before_semi tokens
+    in
+    {
+      pof_desc = desc;
+      pof_loc = loc;
+      pof_attributes = attrs;
+      pof_doc = Option.map Docstrings.info_attr info;
+      pof_tokens = tokens_with_info;
+    }
+
+  let tag ?loc ?attrs ~tokens ?info label ty =
+    mk ?loc ?attrs ~tokens ?info (Otag (label, ty))
+  let inherit_ ?loc ~tokens ty =
+    mk ?loc ~tokens (Oinherit ty)
 end
 
 module Arg = struct
