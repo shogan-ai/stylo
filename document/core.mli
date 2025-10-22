@@ -9,13 +9,16 @@ module Requirement : sig
   val ( + ) : t -> t -> t
 end
 
+type softness =
+  | Hard (** always introduce a line break *)
+  | Soft (** Vanishes after blank lines, adds a break otherwise *)
+  | Softest (** Vanishes after a line break *)
+
 type whitespace =
-  | Line_break of { soft: bool }
-  (** Vanishes after a blank line when [soft = true].
-      Introduces a line break in the output otherwise. *)
-  | Break of { spaces: int; soft: bool }
-  (** [Break { spaces = n; soft }] prints as n spaces in flat mode, and behaves
-      as a [Line_break { soft }] otherwise. *)
+  | Line_break of softness (** Cf {!softness} *)
+  | Break of int * softness
+  (** [Break (n, softness)] prints as [n] spaces in flat mode, and behaves
+      as a [Line_break softness] otherwise. *)
   | Vanishing_space
   (** Prints as a space in flat mode when the parent is not flat, and vanished
       otherwise. *)
@@ -39,6 +42,9 @@ val break : int -> t
 val soft_break : int -> t
 val hardline : t
 val softline : t
+
+val softest_break : t
+(** [Break (1, Softest)], used between docstrings. *)
 
 val vanishing_space : t
 

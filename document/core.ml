@@ -20,9 +20,14 @@ end
 
 module Req = Requirement
 
+type softness =
+  | Hard (** always introduce a line break *)
+  | Soft (** Vanishes after blank lines, adds a break otherwise *)
+  | Softest (** Vanishes after a line break *)
+
 type whitespace =
-  | Line_break of { soft: bool }
-  | Break of { spaces: int; soft: bool }
+  | Line_break of softness
+  | Break of int * softness
   | Vanishing_space
 
 (* FIXME: comments and strings can contain newlines, they should be represented
@@ -41,7 +46,7 @@ let requirement = function
   | Empty -> Req.of_int 0
   | Token s
   | Comment s -> Req.of_int (String.length s)
-  | Whitespace Break { spaces; soft = _ } -> Req.of_int spaces
+  | Whitespace Break (spaces, _) -> Req.of_int spaces
   | Whitespace Line_break _ -> Req.infinity
   | Whitespace Vanishing_space -> Req.of_int 0
   | Cat (r, _, _)
@@ -51,10 +56,11 @@ let requirement = function
 
 let empty = Empty
 let string s = Token s
-let break spaces = Whitespace (Break { spaces; soft = false })
-let soft_break spaces = Whitespace (Break { spaces; soft = true })
-let hardline = Whitespace (Line_break { soft = false })
-let softline = Whitespace (Line_break { soft = true })
+let break spaces = Whitespace (Break (spaces, Hard))
+let soft_break spaces = Whitespace (Break (spaces, Soft))
+let hardline = Whitespace (Line_break Hard)
+let softline = Whitespace (Line_break Soft)
+let softest_break = Whitespace (Break (1, Softest))
 
 let vanishing_space = Whitespace Vanishing_space
 

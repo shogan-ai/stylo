@@ -64,9 +64,10 @@ end = struct
 end
 
 let newline st indent soft t =
-  if soft && st.line = Follows_blank_line then
-    st
-  else (
+  match soft, st.line with
+  | Soft, Follows_blank_line
+  | Softest, (Is_empty | Follows_blank_line) -> st
+  | _ ->
     Buffer.newline t ~indent;
     let line =
       match st.line with
@@ -78,7 +79,6 @@ let newline st indent soft t =
       line_indent = indent;
       line;
     }
-  )
 
 let rec pretty buf state indent flat = function
   | Empty -> state
@@ -87,13 +87,13 @@ let rec pretty buf state indent flat = function
     Buffer.add_string buf s;
     incr_col state (String.length s)
     |> has_text
-  | Whitespace Break { spaces; soft } ->
+  | Whitespace Break (spaces, soft) ->
     if flat > 0 then (
       Buffer.add_spaces buf spaces;
       incr_col state spaces
     ) else
       newline state indent soft buf
-  | Whitespace Line_break { soft } ->
+  | Whitespace Line_break soft ->
     assert (flat = 0);
     newline state indent soft buf
   | Whitespace Vanishing_space ->

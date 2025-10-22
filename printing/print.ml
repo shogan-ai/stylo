@@ -238,7 +238,8 @@ end = struct
     optional (fun a -> softline ^^ pp_doc a.attr_payload) pre_doc ^?/^
     match post_doc with
     | None -> with_attrs
-    | Some a -> group (t ^/^ pp_doc a.attr_payload) ^^ softline
+    | Some a ->
+      group (with_attrs ^^ softest_break ^^ pp_doc a.attr_payload) ^^ softline
 end
 
 and Ext_attribute : sig
