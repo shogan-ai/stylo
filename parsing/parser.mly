@@ -4594,10 +4594,10 @@ opt_ampersand:
 (* A method list (in an object type). *)
 meth_list:
     head = field_semi         tail = meth_list
-  | head = inherit_field SEMI tail = meth_list
+  | head = inherit_field_semi tail = meth_list
       { let (f, c) = tail in (head :: f, c) }
   | head = field_semi
-  | head = inherit_field SEMI
+  | head = inherit_field_semi
       { [head], Closed }
   | head = field
   | head = inherit_field
@@ -4625,6 +4625,11 @@ meth_list:
 
 %inline inherit_field:
   ty = atomic_type
+    { Of.inherit_ ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) ty }
+;
+
+%inline inherit_field_semi:
+  ty = atomic_type SEMI
     { Of.inherit_ ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) ty }
 ;
 
