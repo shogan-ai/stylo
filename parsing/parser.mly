@@ -3834,14 +3834,14 @@ str_exception_declaration:
   attrs1 = attributes
   attrs = post_item_attributes
   { let loc = make_loc $sloc in
-    let info = symbol_info $endpos(attrs1) in
+    let docs, sloc = symbol_docs $sloc in
     let rebind_loc =($startpos(lid), $endpos(attrs1)) in
     let rebind_toks = Tokens.at rebind_loc in
-    Te.mk_exception ~attrs ~loc
-      (Te.rebind id lid ~attrs:attrs1 ~loc:(make_loc rebind_loc) ~info
+    Te.mk_exception ~attrs ~loc ~docs
+      (Te.rebind id lid ~attrs:attrs1 ~loc:(make_loc rebind_loc)
         ~tokens:rebind_toks)
       ~ext_attrs
-      ~tokens:(Tokens.at $sloc)
+      ~tokens:(Tokens.at sloc)
   }
 ;
 sig_exception_declaration:
@@ -3853,14 +3853,16 @@ sig_exception_declaration:
   attrs = post_item_attributes
     { let vars, args, res = vars_args_res in
       let decl_loc = ($startpos(id), $endpos(attrs1)) in
-      let info = symbol_info $endpos(attrs1) in
+      (* If a docstring is present before attrs1, it will be in the [decl_toks]
+         but it also will remain unattached, so there will be no conflict with
+         [docs] and the parent tokens. *)
       let decl_toks = Tokens.at decl_loc in
-      dprintf "exn attrs: %d@." (List.length ext_attrs.pea_attrs);
-      Te.mk_exception ~attrs ~loc:(make_loc $sloc)
+      let docs, sloc = symbol_docs $sloc in
+      Te.mk_exception ~attrs ~loc:(make_loc $sloc) ~docs
         (Te.decl id ~vars ~args ?res ~attrs:attrs1 ~loc:(make_loc decl_loc)
-          ~info ~tokens:decl_toks)
+          ~tokens:decl_toks)
         ~ext_attrs
-        ~tokens:(Tokens.at $sloc)
+        ~tokens:(Tokens.at sloc)
     }
 ;
 %inline let_exception_declaration:
