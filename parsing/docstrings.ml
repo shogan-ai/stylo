@@ -345,9 +345,28 @@ end
 include WithParsing
 
 module WithMenhir = struct
-let symbol_docs (startpos, endpos) =
-  { docs_pre = get_pre_docs startpos;
-    docs_post = get_post_docs endpos; }
+  let attached_once_loc ds =
+    match ds.ds_attached, ds.ds_associated with
+    | (Info | Docs), One -> Some ds.ds_loc
+    | _ -> None
+
+  let extend_loc pre post (startpos, endpos) =
+    let startp =
+      match Option.bind pre attached_once_loc with
+      | None -> startpos
+      | Some l -> min l.loc_start startpos
+    in
+    let endp =
+      match Option.bind post attached_once_loc with
+      | None -> endpos
+      | Some l -> max l.loc_end endpos
+    in
+    (startp, endp)
+
+let symbol_docs (startpos, endpos as sloc) =
+  let pre = get_pre_docs startpos in
+  let post = get_post_docs endpos in
+  { docs_pre = pre; docs_post = post }, extend_loc pre post sloc
 
 let symbol_docs_lazy (p1, p2) =
   lazy { docs_pre = get_pre_docs p1;

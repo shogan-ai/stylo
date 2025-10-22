@@ -1310,7 +1310,8 @@ structure_item:
       { val_of_let_bindings ~loc:$sloc $1 }
   | mkstr(
       item_extension post_item_attributes
-        { let docs = symbol_docs $sloc in
+        { let docs, _sloc = symbol_docs $sloc in
+          (* FIXME: sloc not used for item tokens! *)
           Pstr_extension ($1, add_docs_attrs docs $2) }
     | floating_attribute
         { Pstr_attribute $1 }
@@ -1353,12 +1354,12 @@ structure_item:
   name = module_name_modal(at_mode_expr)
   body = module_binding_body
   attrs = post_item_attributes
-    { let docs = symbol_docs $sloc in
+    { let docs, sloc = symbol_docs $sloc in
       let loc = make_loc $sloc in
       let params, mty_opt, modes, me = body in
       let mb =
         Mb.mk name params mty_opt modes me ~ext_attr ~attrs ~loc ~docs
-          ~tokens:(Tokens.at $sloc)
+          ~tokens:(Tokens.at sloc)
       in
       Pstr_module mb }
 ;
@@ -1402,10 +1403,10 @@ module_binding_body:
   attrs = post_item_attributes
   {
     let loc = make_loc $sloc in
-    let docs = symbol_docs $sloc in
+    let docs, sloc = symbol_docs $sloc in
     let params, mty_opt, modes, me = body in
     Mb.mk name params mty_opt modes me ~ext_attr ~attrs ~loc ~docs
-      ~tokens:(Tokens.at $sloc)
+      ~tokens:(Tokens.at sloc)
   }
 ;
 
@@ -1418,11 +1419,12 @@ module_binding_body:
   attrs = post_item_attributes
   {
     let loc = make_loc $sloc in
-    let docs = symbol_docs $sloc in
+    let docs, sloc = symbol_docs $sloc in
+    (* FIXME: extend sloc with symbol_text! *)
     let text = symbol_text $symbolstartpos in
     let params, mty_opt, modes, me = body in
     Mb.mk name params mty_opt modes me ~ext_attr ~attrs ~loc ~text ~docs
-      ~tokens:(Tokens.at $sloc)
+      ~tokens:(Tokens.at sloc)
   }
 ;
 
@@ -1446,9 +1448,9 @@ include_kind:
   attrs = post_item_attributes
   {
     let loc = make_loc $sloc in
-    let docs = symbol_docs $sloc in
+    let docs, sloc = symbol_docs $sloc in
     Incl.mk ~kind ~ext_attrs thing ~attrs ~loc ~docs
-      ~tokens:(Tokens.at $sloc)
+      ~tokens:(Tokens.at sloc)
   }
 ;
 
@@ -1461,9 +1463,9 @@ module_type_declaration:
   attrs = post_item_attributes
   {
     let loc = make_loc $sloc in
-    let docs = symbol_docs $sloc in
+    let docs, sloc = symbol_docs $sloc in
     Mtd.mk id ?typ ~attrs ~loc ~docs ~ext_attrs
-      ~tokens:(Tokens.at $sloc)
+      ~tokens:(Tokens.at sloc)
   }
 ;
 
@@ -1479,9 +1481,9 @@ open_declaration:
   attrs = post_item_attributes
   {
     let loc = make_loc $sloc in
-    let docs = symbol_docs $sloc in
+    let docs, sloc = symbol_docs $sloc in
     Opn.mk me ~override ~attrs ~loc ~docs ~ext_attrs
-      ~tokens:(Tokens.at $sloc)
+      ~tokens:(Tokens.at sloc)
   }
 ;
 
@@ -1493,9 +1495,9 @@ open_description:
   attrs = post_item_attributes
   {
     let loc = make_loc $sloc in
-    let docs = symbol_docs $sloc in
+    let docs, sloc = symbol_docs $sloc in
     Opn.mk id ~override ~attrs ~loc ~docs ~ext_attrs
-      ~tokens:(Tokens.at $sloc)
+      ~tokens:(Tokens.at sloc)
   }
 ;
 
@@ -1623,8 +1625,8 @@ signature:
 (* A signature item. *)
 signature_item:
   | item_extension post_item_attributes
-      { let docs = symbol_docs $sloc in
-        mksig ~loc:$sloc (Psig_extension ($1, (add_docs_attrs docs $2))) }
+      { let docs, sloc = symbol_docs $sloc in
+        mksig ~loc:sloc (Psig_extension ($1, (add_docs_attrs docs $2))) }
   | mksig(
       floating_attribute
         { Psig_attribute $1 }
@@ -1678,14 +1680,14 @@ signature_item:
   attrs = post_item_attributes
   {
     let loc = make_loc $sloc in
-    let docs = symbol_docs $sloc in
+    let docs, sloc = symbol_docs $sloc in
     let body =
       match body with
       | `Noparams (mty, modalities) -> Without_params (mty, modalities)
       | `Params (args, mty, modes) -> With_params (args, mty, modes)
     in
     Md.mk name body ~attrs ~loc ~docs ~ext_attrs
-      ~tokens:(Tokens.at $sloc)
+      ~tokens:(Tokens.at sloc)
   }
 ;
 
@@ -1712,10 +1714,10 @@ module_declaration_body(module_type_with_optional_modal_expr):
   attrs = post_item_attributes
   {
     let loc = make_loc $sloc in
-    let docs = symbol_docs $sloc in
+    let docs, sloc = symbol_docs $sloc in
     let body = Without_params (alias, modalities) in
     Md.mk name body ~attrs ~loc ~docs ~ext_attrs
-      ~tokens:(Tokens.at $sloc)
+      ~tokens:(Tokens.at sloc)
   }
 ;
 %inline module_expr_alias:
@@ -1732,9 +1734,9 @@ module_subst:
   attrs = post_item_attributes
   {
     let loc = make_loc $sloc in
-    let docs = symbol_docs $sloc in
+    let docs, sloc = symbol_docs $sloc in
     Ms.mk uid body ~attrs ~loc ~docs ~ext_attrs
-      ~tokens:(Tokens.at $sloc)
+      ~tokens:(Tokens.at sloc)
   }
 | MODULE ext attributes mkrhs(UIDENT) COLONEQUAL error
     { expecting $loc($6) "module path" }
@@ -1756,10 +1758,10 @@ module_subst:
   attrs = post_item_attributes
   {
     let loc = make_loc $sloc in
-    let docs = symbol_docs $sloc in
+    let docs, sloc = symbol_docs $sloc in
     let body = Without_params (mty, modalities) in
     Md.mk ~ext_attrs (name, []) body ~attrs ~loc ~docs
-      ~tokens:(Tokens.at $sloc)
+      ~tokens:(Tokens.at sloc)
   }
 ;
 %inline and_module_declaration:
@@ -1771,12 +1773,13 @@ module_subst:
   modalities = optional_atat_modalities_expr
   attrs = post_item_attributes
   {
-    let docs = symbol_docs $sloc in
+    let docs, sloc = symbol_docs $sloc in
     let loc = make_loc $sloc in
+    (* FIXME: extend sloc with text! *)
     let text = symbol_text $symbolstartpos in
     let body = Without_params (mty, modalities) in
     Md.mk ~ext_attrs (name, []) body ~attrs ~loc ~text ~docs
-      ~tokens:(Tokens.at $sloc)
+      ~tokens:(Tokens.at sloc)
   }
 ;
 
@@ -1790,9 +1793,9 @@ module_type_subst:
   attrs = post_item_attributes
   {
     let loc = make_loc $sloc in
-    let docs = symbol_docs $sloc in
+    let docs, sloc = symbol_docs $sloc in
     Mtd.mk id ~typ ~attrs ~loc ~docs ~ext_attrs
-      ~tokens:(Tokens.at $sloc)
+      ~tokens:(Tokens.at sloc)
   }
 
 
@@ -1815,9 +1818,9 @@ module_type_subst:
   {
     let (value_params, constraint_, body) = body in
     let loc = make_loc $sloc in
-    let docs = symbol_docs $sloc in
+    let docs, sloc = symbol_docs $sloc in
     Ci.mk id body ~ext_attr ~virt ~params ~value_params ?constraint_ ~attrs ~loc
-      ~docs ~tokens:(Tokens.at $sloc)
+      ~docs ~tokens:(Tokens.at sloc)
   }
 ;
 %inline and_class_declaration:
@@ -1831,10 +1834,10 @@ module_type_subst:
   {
     let (value_params, constraint_, body) = body in
     let loc = make_loc $sloc in
-    let docs = symbol_docs $sloc in
+    let docs, sloc = symbol_docs $sloc in
     let text = symbol_text $symbolstartpos in
     Ci.mk id body ~virt ~params ~value_params ?constraint_ ~ext_attr ~attrs ~loc
-      ~text ~docs ~tokens:(Tokens.at $sloc)
+      ~text ~docs ~tokens:(Tokens.at sloc)
   }
 ;
 
@@ -1925,25 +1928,25 @@ class_field:
   | INHERIT override_flag attributes class_expr
     self = preceded(AS, mkrhs(LIDENT))?
     post_item_attributes
-      { let docs = symbol_docs $sloc in
-        mkcf ~loc:$sloc (Pcf_inherit ($2, $4, self)) ~attrs:($3@$6) ~docs }
+      { let docs, sloc = symbol_docs $sloc in
+        mkcf ~loc:sloc (Pcf_inherit ($2, $4, self)) ~attrs:($3@$6) ~docs }
   | VAL value post_item_attributes
       { let v, attrs = $2 in
-        let docs = symbol_docs $sloc in
-        mkcf ~loc:$sloc (Pcf_val v) ~attrs:(attrs@$3) ~docs }
+        let docs, sloc = symbol_docs $sloc in
+        mkcf ~loc:sloc (Pcf_val v) ~attrs:(attrs@$3) ~docs }
   | METHOD method_ post_item_attributes
       { let meth, attrs = $2 in
-        let docs = symbol_docs $sloc in
-        mkcf ~loc:$sloc (Pcf_method meth) ~attrs:(attrs@$3) ~docs }
+        let docs, sloc = symbol_docs $sloc in
+        mkcf ~loc:sloc (Pcf_method meth) ~attrs:(attrs@$3) ~docs }
   | CONSTRAINT attributes constrain_field post_item_attributes
-      { let docs = symbol_docs $sloc in
-        mkcf ~loc:$sloc (Pcf_constraint $3) ~attrs:($2@$4) ~docs }
+      { let docs, sloc = symbol_docs $sloc in
+        mkcf ~loc:sloc (Pcf_constraint $3) ~attrs:($2@$4) ~docs }
   | INITIALIZER attributes seq_expr post_item_attributes
-      { let docs = symbol_docs $sloc in
-        mkcf ~loc:$sloc (Pcf_initializer $3) ~attrs:($2@$4) ~docs }
+      { let docs, sloc = symbol_docs $sloc in
+        mkcf ~loc:sloc (Pcf_initializer $3) ~attrs:($2@$4) ~docs }
   | item_extension post_item_attributes
-      { let docs = symbol_docs $sloc in
-        mkcf ~loc:$sloc (Pcf_extension $1) ~attrs:$2 ~docs }
+      { let docs, sloc = symbol_docs $sloc in
+        mkcf ~loc:sloc (Pcf_extension $1) ~attrs:$2 ~docs }
   | mkcf(floating_attribute
       { Pcf_attribute $1 })
       { $1 }
@@ -2130,22 +2133,22 @@ class_self_type:
 ;
 class_sig_field:
     INHERIT attributes class_signature post_item_attributes
-      { let docs = symbol_docs $sloc in
-        mkctf ~loc:$sloc (Pctf_inherit $3) ~attrs:($2@$4) ~docs }
+      { let docs, sloc = symbol_docs $sloc in
+        mkctf ~loc:sloc (Pctf_inherit $3) ~attrs:($2@$4) ~docs }
   | VAL attributes value_type post_item_attributes
-      { let docs = symbol_docs $sloc in
-        mkctf ~loc:$sloc (Pctf_val $3) ~attrs:($2@$4) ~docs }
+      { let docs, sloc = symbol_docs $sloc in
+        mkctf ~loc:sloc (Pctf_val $3) ~attrs:($2@$4) ~docs }
   | METHOD attributes private_virtual_flags mkrhs(label) COLON poly_type
     post_item_attributes
       { let (p, v) = $3 in
-        let docs = symbol_docs $sloc in
-        mkctf ~loc:$sloc (Pctf_method ($4, p, v, $6)) ~attrs:($2@$7) ~docs }
+        let docs, sloc = symbol_docs $sloc in
+        mkctf ~loc:sloc (Pctf_method ($4, p, v, $6)) ~attrs:($2@$7) ~docs }
   | CONSTRAINT attributes constrain_field post_item_attributes
-      { let docs = symbol_docs $sloc in
-        mkctf ~loc:$sloc (Pctf_constraint $3) ~attrs:($2@$4) ~docs }
+      { let docs, sloc = symbol_docs $sloc in
+        mkctf ~loc:sloc (Pctf_constraint $3) ~attrs:($2@$4) ~docs }
   | item_extension post_item_attributes
-      { let docs = symbol_docs $sloc in
-        mkctf ~loc:$sloc (Pctf_extension $1) ~attrs:$2 ~docs }
+      { let docs, sloc = symbol_docs $sloc in
+        mkctf ~loc:sloc (Pctf_extension $1) ~attrs:$2 ~docs }
   | mkctf(floating_attribute
       { Pctf_attribute $1 })
       { $1 }
@@ -2184,9 +2187,9 @@ constrain_field:
   attrs = post_item_attributes
     {
       let loc = make_loc $sloc in
-      let docs = symbol_docs $sloc in
+      let docs, sloc = symbol_docs $sloc in
       Ci.mk id cty ~virt ~params ~ext_attr ~attrs ~loc ~docs
-        ~tokens:(Tokens.at $sloc)
+        ~tokens:(Tokens.at sloc)
     }
 ;
 %inline and_class_description:
@@ -2200,10 +2203,10 @@ constrain_field:
   attrs = post_item_attributes
     {
       let loc = make_loc $sloc in
-      let docs = symbol_docs $sloc in
+      let docs, sloc = symbol_docs $sloc in
       let text = symbol_text $symbolstartpos in
       Ci.mk id cty ~virt ~params ~ext_attr ~attrs ~loc ~text ~docs
-        ~tokens:(Tokens.at $sloc)
+        ~tokens:(Tokens.at sloc)
     }
 ;
 class_type_declarations:
@@ -2221,9 +2224,9 @@ class_type_declarations:
   attrs = post_item_attributes
     {
       let loc = make_loc $sloc in
-      let docs = symbol_docs $sloc in
+      let docs, sloc = symbol_docs $sloc in
       Ci.mk id csig ~ext_attr ~virt ~params ~attrs ~loc ~docs
-        ~tokens:(Tokens.at $sloc)
+        ~tokens:(Tokens.at sloc)
     }
 ;
 %inline and_class_type_declaration:
@@ -2237,10 +2240,10 @@ class_type_declarations:
   attrs = post_item_attributes
     {
       let loc = make_loc $sloc in
-      let docs = symbol_docs $sloc in
+      let docs, sloc = symbol_docs $sloc in
       let text = symbol_text $symbolstartpos in
       Ci.mk id csig ~virt ~params ~ext_attr ~attrs ~loc ~text ~docs
-        ~tokens:(Tokens.at $sloc)
+        ~tokens:(Tokens.at sloc)
     }
 ;
 
@@ -3511,9 +3514,9 @@ value_description:
   modalities = optional_atat_modalities_expr
   attrs = post_item_attributes
     { let loc = make_loc $sloc in
-      let docs = symbol_docs $sloc in
+      let docs, sloc = symbol_docs $sloc in
       Val.mk id ty ~attrs ~modalities ~loc ~docs ~ext_attrs
-        ~tokens:(Tokens.at $sloc)
+        ~tokens:(Tokens.at sloc)
     }
 ;
 
@@ -3530,9 +3533,9 @@ primitive_declaration:
   prim = raw_string+
   attrs = post_item_attributes
     { let loc = make_loc $sloc in
-      let docs = symbol_docs $sloc in
+      let docs, sloc = symbol_docs $sloc in
       Val.mk id ty ~prim ~attrs ~modalities ~loc ~docs ~ext_attrs
-        ~tokens:(Tokens.at $sloc)
+        ~tokens:(Tokens.at sloc)
     }
 ;
 
@@ -3584,12 +3587,12 @@ generic_type_declaration(flag, kind):
   attrs = post_item_attributes
     {
       let (kind, priv, manifest) = kind_priv_manifest in
-      let docs = symbol_docs $sloc in
+      let docs, sloc = symbol_docs $sloc in
       let loc = make_loc $sloc in
       flag,
       Type.mk id ~ext_attr
         ~params ~cstrs ~kind ~priv ?manifest ~attrs ~loc ~docs
-        ?jkind_annotation ~tokens:(Tokens.at $sloc)
+        ?jkind_annotation ~tokens:(Tokens.at sloc)
     }
 ;
 %inline generic_and_type_declaration(kind):
@@ -3603,11 +3606,11 @@ generic_type_declaration(flag, kind):
   attrs = post_item_attributes
     {
       let (kind, priv, manifest) = kind_priv_manifest in
-      let docs = symbol_docs $sloc in
       let loc = make_loc $sloc in
+      let docs, sloc = symbol_docs $sloc in
       let text = symbol_text $symbolstartpos in
       Type.mk ~ext_attr id ~params ~cstrs ~kind ~priv ?manifest ~attrs ~loc
-        ~docs ~text ?jkind_annotation ~tokens:(Tokens.at $sloc)
+        ~docs ~text ?jkind_annotation ~tokens:(Tokens.at sloc)
     }
 ;
 %inline constraints:
@@ -3939,9 +3942,9 @@ label_declaration_semi:
   priv = private_flag
   cs = bar_llist(declaration)
   attrs = post_item_attributes
-    { let docs = symbol_docs $sloc in
+    { let docs, sloc = symbol_docs $sloc in
       Te.mk tid cs ~params ~priv ~attrs ~docs ~ext_attrs
-        ~tokens:(Tokens.at $sloc)
+        ~tokens:(Tokens.at sloc)
     }
 ;
 %inline extension_constructor(opening):

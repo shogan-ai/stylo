@@ -419,15 +419,15 @@ end = struct
     dprintf "consume %d:%d -> %d:%d@."
       start.pos_lnum (start.pos_cnum - start.pos_bol)
       stop.pos_lnum (stop.pos_cnum - stop.pos_bol);
-    let rec aux = function
+    let rec aux ~replaced_by = function
       | Empty -> invalid_arg "Tokens.consume"
       | Node n as curr ->
         if n.pos >= stop then (
           (* Stop is an endpos, and we index by startpos *)
           [], curr
         ) else (
-          Tbl.remove t.tbl n.pos;
-          let seq, after = aux n.next in
+          Tbl.replace t.tbl n.pos replaced_by;
+          let seq, after = aux ~replaced_by n.next in
           n.value :: seq, after
         )
     in
@@ -442,14 +442,13 @@ end = struct
       match Tbl.find t.tbl start with
       | Empty -> invalid_arg "Tokens.consume"
       | Node start_node as cell ->
-        let seq, after = aux cell in
+        let seq, after = aux ~replaced_by:cell cell in
         start_node.value <- { start_node.value with desc = Child_node };
         start_node.next <- after;
         begin match after with
         | Empty -> ()
         | Node n -> n.prev <- cell
         end;
-        Tbl.replace t.tbl start cell; (* has been removed by aux... *)
         seq
 
   let consume t start stop =
