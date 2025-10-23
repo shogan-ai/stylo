@@ -96,6 +96,9 @@ let rec pretty buf state indent flat = function
   | Whitespace Line_break soft ->
     assert (flat = 0);
     newline state indent soft buf
+  | Whitespace Non_breakable ->
+    Buffer.add_spaces buf 1;
+    incr_col state 1
   | Whitespace Vanishing_space ->
     if flat <> 1 then
       state

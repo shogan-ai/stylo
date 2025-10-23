@@ -800,11 +800,18 @@ end
 (** {2 Patterns} *)
 
 and Pattern : sig
-  val pp : pattern -> t
+  val pp : ?pipe:bool -> pattern -> t
 end = struct
-  let rec pp p =
-    group (pp_desc p)
-    |> Attribute.attach ~attrs:p.ppat_attributes
+  let rec pp ?(pipe=false) p =
+    let without_pipe =
+      group (pp_desc p)
+      |> Attribute.attach ~attrs:p.ppat_attributes
+    in
+    if pipe then
+      (* we never want to break after the pipe. *)
+      S.pipe ^^ nbsp ^^ nest 2 without_pipe
+    else
+      without_pipe
 
   and pp_desc p =
     let (!!) kw = Ext_attribute.decorate kw p.ppat_ext_attr in
@@ -1453,8 +1460,7 @@ end = struct
     in
     split_top_or p
     |> List.fold_left (fun (acc, pipe) pat ->
-      let pat = Pattern.pp pat in
-      let p = if pipe then group (prefix S.pipe pat) else pat in
+      let p = Pattern.pp ~pipe pat in
       acc ^?^ p, true
     ) (empty, pipe)
     |> fst

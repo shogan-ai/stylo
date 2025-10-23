@@ -19,6 +19,7 @@ type whitespace =
   | Break of int * softness
   (** [Break (n, softness)] prints as [n] spaces in flat mode, and behaves
       as a [Line_break softness] otherwise. *)
+  | Non_breakable (** a simple space. *)
   | Vanishing_space
   (** Prints as a space in flat mode when the parent is not flat, and vanished
       otherwise. *)
@@ -46,6 +47,7 @@ val softest_line : t
 val softest_break : t
 (** [Break (1, Softest)], used between docstrings. *)
 
+val nbsp : t
 val vanishing_space : t
 
 val comment : string -> t

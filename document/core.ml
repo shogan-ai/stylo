@@ -28,6 +28,7 @@ type softness =
 type whitespace =
   | Line_break of softness
   | Break of int * softness
+  | Non_breakable
   | Vanishing_space
 
 (* FIXME: comments and strings can contain newlines, they should be represented
@@ -48,7 +49,8 @@ let requirement = function
   | Comment s -> Req.of_int (String.length s)
   | Whitespace Break (spaces, _) -> Req.of_int spaces
   | Whitespace Line_break _ -> Req.infinity
-  | Whitespace Vanishing_space -> Req.of_int 0
+  | Whitespace Non_breakable -> Req.of_int 1
+  | Whitespace Vanishing_space -> Req.of_int 0 (* FIXME: really? *)
   | Cat (r, _, _)
   | Nest (r, _, _)
   | Relative_nest (r, _, _)
@@ -63,6 +65,7 @@ let softline = Whitespace (Line_break Soft)
 let softest_line = Whitespace (Line_break Softest)
 let softest_break = Whitespace (Break (1, Softest))
 
+let nbsp = Whitespace Non_breakable
 let vanishing_space = Whitespace Vanishing_space
 
 (* FIXME *)
