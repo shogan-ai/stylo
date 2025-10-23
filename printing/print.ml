@@ -1078,11 +1078,11 @@ end = struct
         | Some s -> string s
       in
       S.let_ ^/^ !!S.module_ ^/^ name ^/^ S.equals ^/^
-      Module_expr.pp me ^/^ S.in_ ^/^
+      Module_expr.pp me ^/^ S.in_ ^^ hardline ^^
       pp body
     | Pexp_letexception (ec, body) ->
       S.let_ ^/^ !!S.exception_ ^/^
-      Extension_constructor.pp ec ^/^ S.in_ ^/^
+      Extension_constructor.pp ec ^/^ S.in_ ^^ hardline ^^
       pp body
     | Pexp_assert e -> !!S.assert_ ^/^ pp e
     | Pexp_lazy e -> !!S.lazy_ ^/^ pp e
@@ -1094,7 +1094,8 @@ end = struct
       S.rparen
     | Pexp_dot_open (lid, e) -> longident lid.txt ^^ S.dot ^^ pp e
     | Pexp_let_open (od, e) ->
-      group (S.let_ ^/^ Open_declaration.pp ~item:false od ^/^ S.in_) ^/^ pp e
+      group (S.let_ ^/^ Open_declaration.pp ~item:false od ^/^ S.in_) ^^
+      hardline ^^ pp e
     | Pexp_letop lo -> Letop.pp lo
     | Pexp_extension ext -> Extension.pp ext
     | Pexp_unreachable  ->
@@ -1496,7 +1497,7 @@ end = struct
       | [] -> empty
       | _ -> break 1 ^^ separate_map (break 1) Binding_op.pp ands
     in
-    Binding_op.pp let_ ^^ ands ^/^ S.in_ ^/^
+    Binding_op.pp let_ ^^ ands ^/^ S.in_ ^^ hardline ^^
     Expression.pp body
 end
 
