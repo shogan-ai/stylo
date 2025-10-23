@@ -993,9 +993,7 @@ end = struct
       group (pp arg1 ^/^ pp_op_apply op arg2)
     | Pexp_apply (e, args) -> pp_apply e args
     | Pexp_match (e, cases) ->
-      group (!!S.match_ ^^ nest 2 (group (break 1 ^^ pp e)) ^/^ S.with_) ^/^
-      Case.pp_cases cases
-        ~has_leading_pipe:(has_leading_pipe ~after:WITH exp.pexp_tokens)
+      pp_match ~ext_attrs:exp.pexp_ext_attr ~tokens:exp.pexp_tokens e cases
     | Pexp_try (e, cases) ->
       prefix !!S.try_ (pp e) ^/^ S.with_ ^/^
       Case.pp_cases cases
@@ -1137,6 +1135,12 @@ end = struct
   and pp_function exp =
     let (fun_and_params, body) = pp_function_parts exp in
     prefix fun_and_params body
+
+  and pp_match ~ext_attrs ~tokens e cases =
+    let match_ = Ext_attribute.decorate S.match_ ext_attrs in
+    group (match_ ^^ nest 2 (group (break 1 ^^ pp e)) ^/^ S.with_)
+    ^^ hardline ^^
+    Case.pp_cases cases ~has_leading_pipe:(has_leading_pipe ~after:WITH tokens)
 
   and pp_index_op nb_semis kind seq op indices assign =
     let open_, close =
