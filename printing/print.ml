@@ -925,14 +925,22 @@ end = struct
       (* [;] is used as a terminator if there are as many as there are fields *)
       nb_fields = nb_semis
     in
-    prefix (if unboxed then S.hash_lbrace else S.lbrace) (
-      Record_field.pp_list ~semi_as_term pp fields ^^
-      match closed_flag with
-      | Asttypes.Closed -> empty
-      | Open when semi_as_term -> S.underscore ^/^ S.semi
-      | Open -> S.semi ^/^ S.underscore
-    ) ^/^
-    S.rbrace
+    let first_before = if unboxed then `Hash_brace else `Brace in
+    group (
+      foldli (fun i acc field ->
+        if i = 0 then
+          (* acc = empty *)
+          nest 2 @@ Record_field.pp (Before first_before) pp field
+        else
+          acc ^^ break 0 ^^ nest 2 @@ Record_field.pp (Before `Semi) pp field
+      ) empty fields ^^
+      begin match closed_flag with
+      | Asttypes.Open -> break 0 ^^ nest 2 (group (S.semi ^/^ S.underscore))
+      | Closed -> empty
+      end ^^
+      (if semi_as_term then break 0 ^^ S.semi else empty) ^/^
+      S.rbrace
+    )
 
 end
 
