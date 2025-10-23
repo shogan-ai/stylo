@@ -990,7 +990,6 @@ end = struct
     | Pexp_prefix_apply (op, arg) -> pp_op op ^^ opt_space_then_pp arg
     | Pexp_add_or_sub (op, arg) -> string op ^^ opt_space_then_pp arg
     | Pexp_infix_apply {op; arg1; arg2} ->
-      (* N.B. the associativity of [op] will impact the nesting... *)
       group (pp arg1 ^/^ pp_op_apply op arg2)
     | Pexp_apply (e, args) -> pp_apply e args
     | Pexp_match (e, cases) ->
@@ -1241,7 +1240,7 @@ end = struct
 
   and pp_apply e args = Application.pp (pp e) args
 
-  and pp_op_apply op arg =
+  and pp_op_apply ?(on_left=false) op arg =
     match arg.pexp_desc with
     | Pexp_apply (f, args) ->
       (* N.B. the app is not under parentheses, that's why this is valid! *)
@@ -1251,8 +1250,12 @@ end = struct
       let indent = 2 in
       let op_and_f = op ^^ nest indent (group (break 1 ^^ pp f)) in
       Application.pp ~indent op_and_f args
+    | Pexp_infix_apply { op = next_op; arg1; arg2 } when not on_left ->
+      pp_op_apply ~on_left:true op arg1
+      ^/^ pp_op_apply next_op arg2
+      |> Attribute.attach ~attrs:arg.pexp_attributes
     | _ ->
-      prefix (pp_op op) (pp arg)
+      group (pp_op op ^/^ pp arg)
 
   and pp_variant lbl eo =
     let constr = S.bquote ^^ string lbl in
