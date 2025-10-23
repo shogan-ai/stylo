@@ -60,6 +60,7 @@ let break spaces = Whitespace (Break (spaces, Hard))
 let soft_break spaces = Whitespace (Break (spaces, Soft))
 let hardline = Whitespace (Line_break Hard)
 let softline = Whitespace (Line_break Soft)
+let softest_line = Whitespace (Line_break Softest)
 let softest_break = Whitespace (Break (1, Softest))
 
 let vanishing_space = Whitespace Vanishing_space

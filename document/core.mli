@@ -42,7 +42,7 @@ val break : int -> t
 val soft_break : int -> t
 val hardline : t
 val softline : t
-
+val softest_line : t
 val softest_break : t
 (** [Break (1, Softest)], used between docstrings. *)
 

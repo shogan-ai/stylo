@@ -1117,24 +1117,23 @@ end = struct
     match exp.pexp_desc with
     | Pexp_function ([], _, body) ->
       (* exp.pexp_ext_attr is empty in this case, we attach on the body. *)
-      begin match Function_body.as_rhs body with
-      | Three_parts { start; main; stop = _ } ->
-        (* we know stop is empty *)
-        start, main
-      | _ -> assert false
-      end
+      Function_body.pp_parts body
     | Pexp_function (params, constr, body) ->
-      let params = flow_map (break 1) Function_param.pp params in
-      let constr = Function_constraint.pp constr in
-      prefix
-        (Ext_attribute.decorate S.fun_ exp.pexp_ext_attr)
-        (group (params ^/^ group (constr ^?^ S.rarrow))),
-      Function_body.pp body
+      let fun_and_params =
+        let fun_ = Ext_attribute.decorate S.fun_ exp.pexp_ext_attr in
+        let params = flow_map (break 1) Function_param.pp params in
+        let constr = Function_constraint.pp constr in
+        prefix fun_
+          (group (params ^/^ group (constr ^?^ S.rarrow)))
+      in
+      let function_or_empty, cases_or_body = Function_body.pp_parts body in
+      prefix (group fun_and_params) function_or_empty,
+      cases_or_body
     | _ -> assert false
 
   and pp_function exp =
     let (fun_and_params, body) = pp_function_parts exp in
-    prefix fun_and_params body
+    fun_and_params ^/^ body
 
   and pp_match ~ext_attrs ~tokens e cases =
     let match_ = Ext_attribute.decorate S.match_ ext_attrs in
@@ -1571,20 +1570,22 @@ end = struct
 end
 
 and Function_body : sig
-  val pp : function_body -> t
+  val pp_parts : function_body -> t * t
+  (** [pp_parts (Pfunction_cases _)] is ["function", cases]
+      [pp_parts (Pfunction_body e)] is [<empty>, e] *)
+
   val as_rhs : function_body -> Generic_binding.rhs
 end = struct
   let pp_cases ~tokens cases ext_attrs =
     Ext_attribute.decorate S.function_ ext_attrs,
-    Case.pp_cases cases
-      ~has_leading_pipe:(has_leading_pipe ~after:FUNCTION tokens)
+    softest_line
+    ^^ Case.pp_cases cases ~has_leading_pipe:(has_leading_pipe ~after:FUNCTION tokens)
 
-  let pp fb =
+  let pp_parts fb =
     match fb.pfb_desc with
-    | Pfunction_body e -> Expression.pp e
+    | Pfunction_body e -> empty, Expression.pp e
     | Pfunction_cases (cases, ext_attrs) ->
-      let kw, cases = pp_cases ~tokens:fb.pfb_tokens cases ext_attrs in
-      kw ^/^ cases
+      pp_cases ~tokens:fb.pfb_tokens cases ext_attrs
 
   let as_rhs fb =
     match fb.pfb_desc with
