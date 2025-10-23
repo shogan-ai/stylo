@@ -1,0 +1,15 @@
+;; generated here and used in subdir because the computation of the directory
+;; contents is otherwise cyclic (according to dune).
+(rule
+  (target exhaust)
+  (enabled_if %{bin-available:formatpinata})
+  (mode fallback)
+  (action
+    (with-stdout-to %{target}
+      (run
+        formatpinata --cmly %{dep:../parsing/parser.cmly} --exhaust
+          --entrypoint implementation --entrypoint interface --print-entrypoint
+          ; HASH_CHAR is present in our grammar but not in the one the fuzzer is
+          ; built against.
+          --terminal "HASH_CHAR=#'a'"
+          ))))

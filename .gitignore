@@ -1,5 +1,1 @@
-# <fuzzer.exe> --cmly _build/defaut/parsing/parser.cmly \
-# --entrypoint implementation --entrypoint interface \
-# --avoid 'single_attr_id: LET' \
-# --print-entrypoint --exhaust
-exhaust
+test/exhaust
