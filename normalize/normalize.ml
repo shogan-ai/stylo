@@ -53,24 +53,12 @@ class normalize = object
     let tokens_no_semi =
       List.filter (fun tok -> tok.Tokens.desc <> Token SEMISEMI) tokens
     in
-    let pos =
-      match items with
-       | { pstr_loc = l; _ } :: _ -> l.loc_start
-       | _ -> Lexing.dummy_pos
-    in
-    dprintf
-      "---@\npos: %d:%d@\n\
-       items: %d@\ntokens: %d@\ntokens without semis: @[%a@]@."
-      pos.pos_lnum (pos.pos_cnum - pos.pos_bol)
-      (List.length items)
-      (List.length tokens)
-      Tokens.pp_seq tokens_no_semi;
     let rec walk_both items tokens =
       match tokens with
       | [] -> assert (items = []); []
       | t :: tokens ->
         match t.Tokens.desc with
-        | Token EOF
+        | Token EOF (* TODO: filter this out earlier in the pipeline... *)
         | Comment _ ->
           t :: walk_both items tokens
         | Token _ | Opt_token _ ->
