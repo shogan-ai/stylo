@@ -6,6 +6,19 @@ let from_docstring attr =
   | "ocaml" :: ("doc" | "text") :: [] -> true
   | _ -> false
 
+let lparen_child_lparen pos =
+  let mk desc = { Tokens.desc ; pos } in
+  [ mk (Token LPAREN)
+  ; mk Child_node
+  ; mk (Token RPAREN) ]
+
+let parens_pat pat =
+  { ppat_desc = Ppat_parens pat
+  ; ppat_tokens = lparen_child_lparen pat.ppat_loc.loc_start
+  ; ppat_loc = pat.ppat_loc
+  ; ppat_attributes = []
+  ; ppat_ext_attr = { pea_ext = None; pea_attrs = [] } }
+
 class normalize = object
 
   inherit [_] Parsetree.map as super
@@ -15,6 +28,17 @@ class normalize = object
       attr
     else
       super#visit_attribute env attr
+
+  method! visit_pattern_desc env desc =
+    let desc =
+      match desc with
+      | Ppat_construct
+          (lid, Some (vars, ({ ppat_desc = Ppat_construct (_, Some _)
+                             ; _ } as sub_pat))) ->
+        Ppat_construct (lid, Some (vars, parens_pat sub_pat))
+      | _ -> desc
+    in
+    super#visit_pattern_desc env desc
 
   method! visit_structure env (items, tokens) =
     let semisemi ~optional pos =
