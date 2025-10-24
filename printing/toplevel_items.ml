@@ -78,6 +78,8 @@ let pp_keeping_semi pp_item =
       begin match advance_tokens tokens with
       | Semi_followed_by tokens ->
         perhaps_semi (add_item doc @@ item ^/^ Syntax.semisemi) items tokens
+      | Opt_semi_followed_by tokens ->
+        perhaps_semi (add_item doc @@ item ^^ opt_semisemi_doc) items tokens
       | cont ->
         expect_item (add_item doc item) items cont
       end

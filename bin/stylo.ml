@@ -12,6 +12,7 @@ let style_file fn =
       Print.Signature.pp_interface sg, tokenizer # visit_signature () sg
     ) else (
       let str = Parse.implementation lexbuf in
+      let str = (new Normalize.normalize)#visit_structure () str in
       Print.Structure.pp_implementation str, tokenizer # visit_structure () str
     )
   in
