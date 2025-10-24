@@ -39,8 +39,12 @@ let add_item doc item =
 
 type cont =
   | Semi_followed_by of seq
+  | Opt_semi_followed_by of seq
   | Child_followed_by of seq
   | Done
+
+let opt_semisemi_doc =
+  Document.opt_token ~ws_before:(Line_break Softest) ";;"
 
 let rec advance_tokens = function
   | [] -> Done
@@ -49,7 +53,8 @@ let rec advance_tokens = function
     | Child_node -> Child_followed_by tokens
     | Token EOF -> assert (tokens = []); Done
     | Token SEMISEMI -> Semi_followed_by tokens
-    | Token _ -> assert false
+    | Opt_token SEMISEMI -> Opt_semi_followed_by tokens
+    | Opt_token _ | Token _ -> assert false
     | Comment _ -> advance_tokens tokens
 
 (* We keep the list of items in sync with the list of "tokens" of the
@@ -60,6 +65,8 @@ let pp_keeping_semi pp_item =
     match advance_tokens tokens with
     | Semi_followed_by tokens ->
       perhaps_semi (doc ^?^ Syntax.semisemi) items tokens
+    | Opt_semi_followed_by tokens ->
+      perhaps_semi (doc ^^ opt_semisemi_doc) items tokens
     | Child_followed_by _ as cont ->
       expect_item doc items cont
     | Done -> doc, Done
@@ -85,6 +92,8 @@ let pp_grouped_keeping_semi pp_item groups tokens =
     | Done -> []
     | Semi_followed_by tokens ->
       { desc = Token SEMISEMI; pos = Lexing.dummy_pos } :: tokens
+    | Opt_semi_followed_by tokens ->
+      { desc = Opt_token SEMISEMI; pos = Lexing.dummy_pos } :: tokens
     | Child_followed_by tokens ->
       { desc = Child_node; pos = Lexing.dummy_pos } :: tokens
   in

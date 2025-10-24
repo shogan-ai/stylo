@@ -306,6 +306,7 @@ type attachment = Before | After | Floating
 
 type desc =
   | Token of token
+  | Opt_token of token
   | Comment of string * attachment
   | Child_node
 
@@ -322,6 +323,11 @@ let desc_as_string = function
       Raw.to_string t
     else
       "tok"
+  | Opt_token t ->
+    if Dbg_print.dbg then
+      "optional(" ^ Raw.to_string t ^ ")"
+    else
+      "opttok"
   | Comment (c, _) -> Printf.sprintf "(* %s *)" c
   | Child_node -> "child"
 

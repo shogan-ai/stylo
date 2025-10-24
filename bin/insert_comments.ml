@@ -7,6 +7,7 @@ module Doc = Document
 type error =
   | Output_longer_than_input of Doc.t
   | Missing_token of Lexing.position
+  | Optional_mismatch of Lexing.position
 
 let pp_error ppf = function
   | Output_longer_than_input doc ->
@@ -16,6 +17,10 @@ let pp_error ppf = function
   | Missing_token pos ->
     Format.fprintf ppf
       "token at position %d:%d absent from the output."
+      pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
+  | Optional_mismatch pos ->
+    Format.fprintf ppf
+      "printer changed optional status of token at position %d:%d."
       pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
 
 exception Error of error
@@ -27,7 +32,8 @@ let append_trailing_comments (tokens, doc, _) =
     | tok :: toks ->
       match tok.T.desc with
       | Comment (c, _) -> aux Doc.Utils.(doc ^?^ Doc.comment c) toks
-      | Token _ -> raise (Error (Missing_token tok.pos))
+      | Token _
+      | Opt_token _ -> raise (Error (Missing_token tok.pos))
       | Child_node -> assert false
   in
   aux doc tokens
@@ -38,7 +44,8 @@ let rec consume_leading_comments acc = function
     match first.T.desc with
     | Comment (c, _) ->
       consume_leading_comments Doc.Utils.(acc ^?^ Doc.comment c) rest
-    | Token _ -> acc, rest
+    | Token _
+    | Opt_token _ -> acc, rest
     | Child_node -> assert false
 
 let rec consume_only_leading_comments ?(restrict_to_before=false) acc = function
@@ -50,7 +57,8 @@ let rec consume_only_leading_comments ?(restrict_to_before=false) acc = function
         acc, first :: rest
       else
         consume_only_leading_comments Doc.Utils.(acc ^?^ Doc.comment c) rest
-    | Token _ -> acc, first :: rest
+    | Token _
+    | Opt_token _ -> acc, first :: rest
     | Child_node -> assert false
 
 let rec first_is_comment = function
@@ -176,10 +184,9 @@ let rec walk_both state seq doc =
       in
       rest, doc, state'
 
-    | _, Doc.Optional _ -> failwith "TODO"
-
     (* Synchronized, advance *)
     | T.Token _, Doc.Token p
+    | T.Opt_token _, Doc.Optional { token = p; _ }
     | T.Comment _, Doc.Comment p ->
       dprintf "assume %a synced at %d:%d with << %s >>@."
         Tokens.pp_elt first
@@ -194,7 +201,7 @@ let rec walk_both state seq doc =
     | _, Doc.Whitespace _ -> seq, doc, no_space state
 
     (* Comments missing in the doc, insert them *)
-    | T.Comment _, Doc.Token _ ->
+    | T.Comment _, Doc.(Token _ | Optional _) ->
       let to_prepend, rest = consume_leading_comments Doc.empty seq in
       let doc =
         insert_space_if_required ~inserting_comment:true state
@@ -257,8 +264,12 @@ let rec walk_both state seq doc =
       attach_before_comments return_state rest doc
 
     (* Token missing from the document: this is a hard error. *)
-    | T.Token _, Doc.Comment _ ->
+    | T.(Token _ | Opt_token _), Doc.Comment _ ->
       raise (Error (Missing_token first.pos))
+
+    | T.Token _, Doc.Optional _
+    | T.Opt_token _, Doc.Token _ ->
+      raise (Error (Optional_mismatch first.pos))
 
     (* [Child_node] doesn't appear in linearized token stream *)
     | T.Child_node, _ -> assert false
