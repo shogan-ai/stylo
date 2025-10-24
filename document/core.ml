@@ -36,6 +36,11 @@ type whitespace =
 type t =
   | Empty
   | Token of string
+  | Optional of {
+      before: whitespace option;
+      token: string;
+      after: whitespace option;
+    }
   | Comment of string
   | Whitespace of whitespace
   | Cat of Req.t * t * t
@@ -47,6 +52,7 @@ let requirement = function
   | Empty -> Req.of_int 0
   | Token s
   | Comment s -> Req.of_int (String.length s)
+  | Optional _ -> Req.of_int 0 (* vanishes if flat so ... *)
   | Whitespace Break (spaces, _) -> Req.of_int spaces
   | Whitespace Line_break _ -> Req.infinity
   | Whitespace Non_breakable -> Req.of_int 1
@@ -67,6 +73,11 @@ let softest_break = Whitespace (Break (1, Softest))
 
 let nbsp = Whitespace Non_breakable
 let vanishing_space = Whitespace Vanishing_space
+
+let opt_token ?ws_before ?ws_after tok =
+  match ws_before, ws_after with
+  | Some _, Some _ -> invalid_arg "Document.opt_token"
+  | _ -> Optional { before = ws_before; after = ws_after; token = tok }
 
 (* FIXME *)
 let comment s = Comment ("(*" ^ s ^ "*)")

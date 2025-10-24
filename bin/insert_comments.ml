@@ -55,7 +55,7 @@ let rec consume_only_leading_comments ?(restrict_to_before=false) acc = function
 
 let rec first_is_comment = function
   | Doc.Comment _ -> `yes
-  | Token _  -> `no
+  | Token _ | Optional _ -> `no
   | Group (_, d) | Nest (_, _, d) | Relative_nest (_, _, d) ->
     first_is_comment d
   | Empty | Whitespace _ -> `maybe
@@ -69,6 +69,7 @@ let first_is_comment d = first_is_comment d = `yes
 let rec first_is_space = function
   | Doc.Whitespace _ -> `yes
   | Token _ | Comment _ -> `no
+  | Optional o -> if Option.is_some o.before then `yes else `no
   | Group (_, d) | Nest (_, _, d) | Relative_nest (_, _, d) ->
     first_is_space d
   | Empty -> `maybe
@@ -81,7 +82,7 @@ let first_is_space d = first_is_space d = `yes
 
 let rec nest_before_leaf = function
   | Doc.Nest _ | Relative_nest _ -> `yes
-  | Token _ | Comment _ | Whitespace _ -> `no
+  | Token _ | Optional _ | Comment _ | Whitespace _ -> `no
   | Group (_, d) -> nest_before_leaf d
   | Empty -> `maybe
   | Cat (_, d1, d2) ->
@@ -174,6 +175,8 @@ let rec walk_both state seq doc =
           Doc.Utils.(Doc.comment c ^/^ doc)
       in
       rest, doc, state'
+
+    | _, Doc.Optional _ -> failwith "TODO"
 
     (* Synchronized, advance *)
     | T.Token _, Doc.Token p

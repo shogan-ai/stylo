@@ -80,32 +80,48 @@ let newline st indent soft t =
       line;
     }
 
-let rec pretty buf state indent flat = function
-  | Empty -> state
-  | Token s
-  | Comment s ->
-    Buffer.add_string buf s;
-    incr_col state (String.length s)
-    |> has_text
-  | Whitespace Break (spaces, soft) ->
+let text buf state s =
+  Buffer.add_string buf s;
+  incr_col state (String.length s)
+  |> has_text
+
+let whitespace buf state indent flat = function
+  | Break (spaces, soft) ->
     if flat > 0 then (
       Buffer.add_spaces buf spaces;
       incr_col state spaces
     ) else
       newline state indent soft buf
-  | Whitespace Line_break soft ->
+  | Line_break soft ->
     assert (flat = 0);
     newline state indent soft buf
-  | Whitespace Non_breakable ->
+  | Non_breakable ->
     Buffer.add_spaces buf 1;
     incr_col state 1
-  | Whitespace Vanishing_space ->
+  | Vanishing_space ->
     if flat <> 1 then
       state
     else (
       Buffer.add_spaces buf 1;
       incr_col state 1
     )
+
+let rec pretty buf state indent flat = function
+  | Empty -> state
+  | Token s
+  | Comment s -> text buf state s
+  | Optional { before; after; token } ->
+    if flat > 0 then
+      state
+    else
+      let ws state = function
+        | None -> state
+        | Some ws -> whitespace buf state indent flat ws
+      in
+      let state' = ws state before in
+      let state'' = text buf state' token in
+      ws state'' after
+  | Whitespace ws -> whitespace buf state indent flat ws
   | Cat (_, t1, t2) ->
     let state' = pretty buf state indent flat t1 in
     pretty buf state' indent flat t2

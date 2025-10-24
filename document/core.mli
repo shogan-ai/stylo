@@ -27,6 +27,11 @@ type whitespace =
 type t = private
   | Empty
   | Token of string
+  | Optional of {
+      before: whitespace option;
+      token: string;
+      after: whitespace option;
+    }
   | Comment of string
   | Whitespace of whitespace
   | Cat of Requirement.t * t * t
@@ -38,6 +43,8 @@ val requirement : t -> Requirement.t
 
 val empty : t
 val string : string -> t
+
+val opt_token : ?ws_before:whitespace -> ?ws_after:whitespace -> string -> t
 
 val break : int -> t
 val soft_break : int -> t
