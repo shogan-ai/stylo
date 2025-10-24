@@ -1,5 +1,6 @@
 (rule
   (alias runtest)
   (action
-    (run ../../bin/stylo.exe -ast-check %{dep:docstrings.ml})))
+    (with-stdout-to null
+      (run ../../bin/stylo.exe -ast-check %{dep:docstrings.ml}))))
 

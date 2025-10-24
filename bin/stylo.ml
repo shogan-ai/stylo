@@ -22,6 +22,8 @@ let style_file fn =
   Dbg_print.dprintf "%a@." Tokens.pp_seq tokens;
   Insert_comments.from_tokens tokens doc
 
+let width = ref 90
+
 let fuzzer_batch fn =
   let has_errors = ref false in
   let has_parse_errors = ref false in
@@ -36,12 +38,10 @@ let fuzzer_batch fn =
       let intf = String.starts_with ~prefix:"interface:" entrypoint_and_src in
       let src =
         let prefix_len =
-          String.length (if intf then "interface: " else "implementation: ")
+          String.length (if intf then "interface:" else "implementation:")
         in
-        try
         String.sub entrypoint_and_src prefix_len
           (String.length entrypoint_and_src - prefix_len)
-        with Invalid_argument _ -> "" (* woooooooh *)
       in
       let lexbuf = Lexing.from_string src in
       lexbuf.lex_curr_p <-
@@ -91,7 +91,7 @@ let fuzzer_batch fn =
           raise exn
 
         | with_comments ->
-          let styled = Document.Print.to_string ~width:80 with_comments in
+          let styled = Document.Print.to_string ~width:!width with_comments in
           match Ast_checker.check_same_ast fn i ~impl:(not intf) src styled with
           | false ->
             Format.eprintf "%s, line %d: ast changed@." fn i;
@@ -107,77 +107,28 @@ let fuzzer_batch fn =
   );
   !has_errors
 
-let get_tokens lexbuf =
-  Lexer.init ();
-  let rec aux acc =
-    match Lexer.token_with_comments lexbuf with
-    | exception _ | EOF -> acc
-    | EOL -> aux acc
-    | tok -> aux (tok :: acc)
-  in
-  List.rev (aux [])
-
-
-let lex_and_compare input_fn doc =
-  let output_tokens =
-    Document.Print.to_string ~width:80 doc
-    |> Lexing.from_string
-    |> get_tokens
-  in
-  let input_lexbuf =
-    let input = In_channel.(with_open_text input_fn input_all) in
-    Dbg_print.dprintf "input %S@." input;
-    Lexing.from_string input
-  in
-  Lexer.init ();
-  let rec iterate_tokens out_toks =
-    let pos = input_lexbuf.lex_curr_p in
-    match Lexer.token_with_comments input_lexbuf with
-    | exception _ | EOF ->
-      begin match out_toks with
-      | [] -> (* tokens match, we're done. *) ()
-      | _ -> Format.eprintf "%s extra tokens at the end of output@." input_fn
-      end
-    | EOL -> iterate_tokens out_toks
-    | next_tok ->
-      match out_toks with
-      | [] ->
-        Format.eprintf "%s: output ended unexpectedly at position %d:%d@."
-            input_fn pos.pos_lnum (pos.pos_cnum - pos.pos_bol)
-      | ot :: ots ->
-        if Tokens.Raw.equals next_tok ot then
-          iterate_tokens ots
-        else
-          Format.eprintf
-            "%s: output differs from input at position %d:%d:@\n\
-             input is token %s,@ output is token %s@."
-            input_fn pos.pos_lnum (pos.pos_cnum - pos.pos_bol)
-            (Tokens.Raw.to_string next_tok) (Tokens.Raw.to_string ot)
-  in
-  iterate_tokens output_tokens
-
 let inputs = ref []
-let check = ref false
 let ast_check = ref false
 let fuzzing = ref false
 let inplace = ref false
 
 let () =
   Arg.parse
-    ["-only-check", Arg.Set check, "Compare result with input, no printing"
-    ;"-ast-check", Arg.Set ast_check, "Compare official AST after reparsing"
+    ["-ast-check", Arg.Set ast_check,
+     "Check the formatted code parses back to the same AST"
     ;"-fuzzing", Arg.Set fuzzing, "-ast-check on each line separately"
-    ;"-i", Arg.Set inplace, "style file in place"]
+    ;"-i", Arg.Set inplace, "style file in place"
+    ;"-width", Arg.Set_int width, ""]
     (fun fn -> inputs := fn :: !inputs)
-    "stylo.exe [-only-check] FILENAME*"
+    "stylo.exe [-ast-check] [-i] FILENAME*"
 
 let () =
   let has_error = ref false in
-  List.iter (fun fn ->
-    if !fuzzing then (
-      assert (List.length !inputs = 1);
-      has_error := fuzzer_batch fn
-    ) else
+  if !fuzzing then (
+    assert (List.length !inputs = 1);
+    has_error := fuzzer_batch (List.hd !inputs)
+  ) else
+    List.iter (fun fn ->
       match style_file fn with
       | exception Insert_comments.Error e ->
         Format.eprintf "%s: ERROR: %a@." fn Insert_comments.pp_error e;
@@ -191,21 +142,19 @@ let () =
           Format.eprintf "@.";
         has_error := true
       | doc ->
-        if !check then
-          lex_and_compare fn doc
-        else if !ast_check then (
-          let reprinted = Document.Print.to_string ~width:80 doc in
+        let width = !width in
+        if !ast_check &&
+          let reprinted = Document.Print.to_string ~width doc in
           let source = In_channel.(with_open_text fn input_all) in
-          if
-            not @@
-            Ast_checker.check_same_ast fn 0
-              ~impl:(Filename.check_suffix fn ".ml") source reprinted
-          then
-            (* TODO: location, etc *)
-            Format.eprintf "%s: ast changed@." fn
-        ) else (
+          not @@
+          Ast_checker.check_same_ast fn 0
+            ~impl:(Filename.check_suffix fn ".ml") source reprinted
+        then
+          (* TODO: location, etc *)
+          Format.eprintf "%s: ast changed@." fn
+        else (
           let pp oc =
-            let reprinted = Document.Print.to_string ~width:90 doc in
+            let reprinted = Document.Print.to_string ~width doc in
             output_string oc reprinted;
             output_char oc '\n';
             flush oc
@@ -215,6 +164,6 @@ let () =
           else
             Out_channel.with_open_text fn pp
         )
-  ) !inputs;
+    ) !inputs;
   if !has_error then
     exit 1

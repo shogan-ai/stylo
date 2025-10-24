@@ -6,7 +6,7 @@
   (alias fuzz)
   (enabled_if %{file-available:../exhaust})
   (action
-    (run ../../bin/fuzzer_driver.exe --cmd ../../bin/stylo.exe -j 8 %{dep:../exhaust})))
+    (run ../../bin/fuzzer_driver.exe --cmd %{dep:../../bin/stylo.exe} -j 8 %{dep:../exhaust})))
 
 (rule
   (aliases fuzz runtest)
