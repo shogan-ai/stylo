@@ -23,18 +23,20 @@
 
 *)
 
+type dotop_delims = Paren | Brace | Bracket
+
 type str_or_op =
   | Str of string
   | Str_trailing_hash of string (* FIXME? *)
   | Op of string
-  | DotOp of string * [ `Paren | `Brace | `Bracket ] * string * bool
+  | DotOp of string * dotop_delims * string * bool
 
-type desc =
+type lid_desc =
     Lident of str_or_op
   | Ldot of t * str_or_op
   | Lapply of t * t
 
-and t = { desc: desc; tokens: Tokens.seq }
+and t = { desc: lid_desc; tokens: Tokens.seq }
 
 val last: t -> str_or_op
 

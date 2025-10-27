@@ -13,25 +13,27 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type dotop_delims = Paren | Brace | Bracket
+
 type str_or_op =
   | Str of string
   | Str_trailing_hash of string (* FIXME? *)
   | Op of string
-  | DotOp of string * [ `Paren | `Brace | `Bracket ] * string * bool
+  | DotOp of string * dotop_delims * string * bool
 
-type desc =
+type lid_desc =
     Lident of str_or_op
   | Ldot of t * str_or_op
   | Lapply of t * t
 
-and t = { desc: desc; tokens: Tokens.seq }
+and t = { desc: lid_desc; tokens: Tokens.seq }
 
 class virtual ['self] reduce = object(self : 'self)
   method virtual visit_tokens : 'env. 'env -> Tokens.seq -> 'a
   method virtual zero : 'a
   method virtual plus : 'a -> 'a -> 'a
 
-  method private visit_desc : 'env. 'env -> desc -> 'a = fun env ->
+  method private visit_desc : 'env. 'env -> lid_desc -> 'a = fun env ->
     function
     | Lident _ -> self#zero
     | Ldot (t, _) -> self#visit_longident env t
@@ -45,7 +47,7 @@ end
 class virtual ['self] map = object(self : 'self)
   method virtual visit_tokens : 'env. 'env -> Tokens.seq -> Tokens.seq
 
-  method private visit_desc : 'env. 'env -> desc -> desc = fun env ->
+  method private visit_desc : 'env. 'env -> lid_desc -> lid_desc = fun env ->
     function
     | Lident _ as lid -> lid
     | Ldot (t, s) -> Ldot (self#visit_longident env t, s)

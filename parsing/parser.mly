@@ -4693,12 +4693,12 @@ operator:
     PREFIXOP                                    { Op $1 }
   | LETOP                                       { Op $1 }
   | ANDOP                                       { Op $1 }
-  | DOTOP LPAREN index_mod RPAREN               { DotOp ($1,`Paren,$3,false) }
-  | DOTOP LPAREN index_mod RPAREN LESSMINUS     { DotOp ($1,`Paren, $3, true) }
-  | DOTOP LBRACKET index_mod RBRACKET           { DotOp ($1,`Bracket,$3,false) }
-  | DOTOP LBRACKET index_mod RBRACKET LESSMINUS { DotOp ($1,`Bracket,$3,true) }
-  | DOTOP LBRACE index_mod RBRACE               { DotOp ($1,`Brace,$3,false) }
-  | DOTOP LBRACE index_mod RBRACE LESSMINUS     { DotOp ($1,`Brace,$3,true) }
+  | DOTOP LPAREN index_mod RPAREN               { DotOp ($1,Paren,$3,false) }
+  | DOTOP LPAREN index_mod RPAREN LESSMINUS     { DotOp ($1,Paren, $3, true) }
+  | DOTOP LBRACKET index_mod RBRACKET           { DotOp ($1,Bracket,$3,false) }
+  | DOTOP LBRACKET index_mod RBRACKET LESSMINUS { DotOp ($1,Bracket,$3,true) }
+  | DOTOP LBRACE index_mod RBRACE               { DotOp ($1,Brace,$3,false) }
+  | DOTOP LBRACE index_mod RBRACE LESSMINUS     { DotOp ($1,Brace,$3,true) }
   | HASHOP                                      { Op $1 }
   | BANG                                        { Op "!" }
   | infix_operator                              { $1 }

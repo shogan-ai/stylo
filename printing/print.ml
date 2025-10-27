@@ -63,9 +63,9 @@ let str_or_op (so : Longident.str_or_op) =
     let index_mod = if index_mod = "" then empty else S.semi ^^ S.dotdot in
     let left, right =
       match paren_kind with
-      | `Brace -> S.lbrace, S.rbrace
-      | `Bracket -> S.lbracket, S.rbracket
-      | `Paren -> S.lparen, S.rparen
+      | Brace -> S.lbrace, S.rbrace
+      | Bracket -> S.lbracket, S.rbracket
+      | Paren -> S.lparen, S.rparen
     in
     let assign = if assign then S.larrow else empty in
     parens (stringf ".%s" op ^^ left ^^ index_mod ^^ right ^^ assign)
