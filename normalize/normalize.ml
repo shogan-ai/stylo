@@ -19,28 +19,33 @@ let parens_pat pat =
   ; ppat_attributes = []
   ; ppat_ext_attr = { pea_ext = None; pea_attrs = [] } }
 
-class normalize = object
+open Ast_mapper
 
-  inherit [_] Parsetree.map as super
+let super = default_mapper
 
-  method! visit_attribute env attr =
+let normalizer =
+  let map_attribute mapper env attr =
     if from_docstring attr then
       attr
     else
-      super#visit_attribute env attr
-
-  method! visit_pattern_desc env desc =
-    let desc =
+      super.attribute mapper env attr
+  in
+  let map_pattern mapper parent_is_constr pat =
+    let pat = super.pattern mapper parent_is_constr pat in
+    match pat.ppat_desc with
+    | Ppat_construct (_, Some _) when parent_is_constr ->
+      parens_pat pat
+    | _ -> pat
+  in
+  let map_pattern_desc mapper _ desc =
+    let is_constr =
       match desc with
-      | Ppat_construct
-          (lid, Some (vars, ({ ppat_desc = Ppat_construct (_, Some _)
-                             ; _ } as sub_pat))) ->
-        Ppat_construct (lid, Some (vars, parens_pat sub_pat))
-      | _ -> desc
+      | Ppat_construct _ -> true
+      | _ -> false
     in
-    super#visit_pattern_desc env desc
-
-  method! visit_structure env (items, tokens) =
+    super.pattern_desc mapper is_constr desc
+  in
+  let map_structure mapper env (items, tokens) =
     let semisemi ~optional pos =
       let open Tokens in
       let desc =
@@ -79,5 +84,13 @@ class normalize = object
             | _ -> t :: walk_both items tokens
     in
     let tokens_with_minimal_semi = walk_both items tokens_no_semi in
-    super#visit_structure env (items, tokens_with_minimal_semi)
-end
+    super.structure mapper env (items, tokens_with_minimal_semi)
+  in
+  { super with
+    attribute = map_attribute
+  ; pattern = map_pattern
+  ; pattern_desc = map_pattern_desc
+  ; structure = map_structure
+  }
+
+let structure = normalizer.structure normalizer false
