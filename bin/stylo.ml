@@ -1,7 +1,5 @@
 open Ocaml_syntax
 
-let tokenizer = new Tokens_of_tree.to_tokens
-
 let style_file fn =
   In_channel.with_open_text fn @@ fun ic ->
   let lexbuf = Lexing.from_channel ic in
@@ -9,16 +7,12 @@ let style_file fn =
   let doc, tokens =
     if Filename.check_suffix fn ".mli" then (
       let sg = Parse.interface lexbuf in
-      Print.Signature.pp_interface sg, tokenizer # visit_signature () sg
+      Print.Signature.pp_interface sg, Tokens_of_tree.signature sg
     ) else (
       let str = Parse.implementation lexbuf in
       let str = Normalize.structure str in
-      Print.Structure.pp_implementation str, tokenizer # visit_structure () str
+      Print.Structure.pp_implementation str, Tokens_of_tree.structure str
     )
-  in
-  let tokens =
-    (* FIXME: shouldn't be needed when tokenizer is completed *)
-    List.flatten tokens
   in
   Dbg_print.dprintf "%a@." Tokens.pp_seq tokens;
   Insert_comments.from_tokens tokens doc
@@ -50,10 +44,10 @@ let fuzzer_batch fn =
       match
         if intf then (
           let sg = Parse.interface lexbuf in
-          Print.Signature.pp_interface sg, tokenizer # visit_signature () sg
+          Print.Signature.pp_interface sg, Tokens_of_tree.signature sg
         ) else (
           let str = Parse.implementation lexbuf in
-          Print.Structure.pp_implementation str, tokenizer # visit_structure () str
+          Print.Structure.pp_implementation str, Tokens_of_tree.structure str
         )
       with
       | exception Parser.Error ->
@@ -81,7 +75,7 @@ let fuzzer_batch fn =
         (* we stop at the first error in the batch
            Eventually we might want to go further, but while we try to fix the
            errors, there's not much point. *)
-        begin match Insert_comments.from_tokens (List.flatten tokens) doc with
+        begin match Insert_comments.from_tokens tokens doc with
         | exception Insert_comments.Error e ->
           Format.eprintf "%s, line %d: ERROR: %a@."
             fn i Insert_comments.pp_error e;
