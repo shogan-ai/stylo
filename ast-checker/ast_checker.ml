@@ -10,21 +10,16 @@ let normalize_cmt_spaces doc =
 
 let ignore_docstrings = ref true
 
-class cleanup =
+let cleaner =
   let from_docstring attr =
     match attr.attr_name.txt with
     | "ocaml" :: ("doc" | "text") :: [] -> true
     | _ -> false
-  in object(self)
-
-  inherit [_] Parsetree.map as super
-
-  (* We only care about the syntax tree, not details of the source. *)
-
-  method! visit_location _ _ = Location.none
-  method! visit_tokens _ _ = []
-
-  method! visit_attribute env attr =
+  in
+  let super = Ast_mapper.default_mapper in
+  let map_location _ _ _ = Location.none in
+  let map_tokens _ _ _ = [] in
+  let map_attribute (mapper : 'env Ast_mapper.mapper) (env : 'env) attr =
     let attr_payload =
       if not (from_docstring attr) then
         attr.attr_payload
@@ -45,19 +40,26 @@ class cleanup =
           in
           PStr (
             [ { str with pstr_desc = Pstr_eval (inner', []) }],
-            self # visit_tokens env tokens
+            mapper.tokens_seq mapper env tokens
           )
         | _ -> assert false
-      in
-      super#visit_attribute env { attr with attr_payload }
-
-  method! visit_attributes env attrs =
+    in
+    super.attribute mapper env { attr with attr_payload }
+  in
+  let map_attributes mapper env attrs =
     let attrs =
       if not !ignore_docstrings
       then attrs
       else List.filter (fun a -> not (from_docstring a)) attrs
     in
-    super#visit_attributes env ((* FIXME: why? *) sort_attributes attrs)
+    super.attributes mapper env ((* FIXME: why? *) sort_attributes attrs)
+  in
+  { super with
+    attribute = map_attribute
+  ; attributes = map_attributes
+  ; location = map_location
+  ; tokens_seq = map_tokens
+  }
 
   (*
   method! visit_expression env exp =
@@ -88,31 +90,7 @@ class cleanup =
              pat3)
     | _ -> super#visit_pattern env pat
      *)
-end
 
-(*
-let mapper =
-  let typ (m : Ast_mapper.mapper) typ =
-    let typ = {typ with ptyp_loc_stack= []} in
-    Ast_mapper.default_mapper.typ m typ
-  in
-  let structure_item (m : Ast_mapper.mapper) (si : structure_item) =
-    match si.pstr_desc with
-    | Pstr_eval ({pexp_desc= Pexp_extension e; _}, []) ->
-        let e = m.extension m e in
-        let pstr_loc = m.location m si.pstr_loc in
-        {pstr_desc= Pstr_extension (e, []); pstr_loc}
-    | _ -> Ast_mapper.default_mapper.structure_item m si
-  in
-  { Ast_mapper.default_mapper with
-    location
-  ; attribute
-  ; attributes
-  ; expr
-  ; pat
-  ; typ
-  ; structure_item }
-   *)
 
 (*
 let report_error lex exn =
@@ -136,15 +114,13 @@ let report_error lex exn =
 exception Failed_to_parse_source of exn
    *)
 
-let cleaner = new cleanup
-
 let struct_or_error lex =
   Parse.implementation lex
-  |> cleaner#visit_structure ()
+  |> cleaner.structure cleaner ()
 
 let sig_or_error lex =
   Parse.interface lex
-  |> cleaner#visit_signature ()
+  |> cleaner.signature cleaner ()
 
 let check_same_ast fn line ~impl s1 s2 =
   let pos =
