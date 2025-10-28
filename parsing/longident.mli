@@ -39,11 +39,3 @@ type lid_desc =
 and t = { desc: lid_desc; tokens: Tokens.seq }
 
 val last: t -> str_or_op
-
-class virtual ['self] reduce : object('self)
-  method virtual visit_tokens : 'env. 'env -> Tokens.seq -> 'a
-  method virtual zero : 'a
-  method virtual plus : 'a -> 'a -> 'a
-
-  method visit_longident : 'env. 'env -> t -> 'a
-end

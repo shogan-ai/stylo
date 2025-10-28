@@ -25,53 +25,6 @@ open Asttypes
 
 (**************************************************************)
 
-(* Those are aliased because visitors is dumb with its naming *)
-type location = Location.t
-type longident = Longident.t
-type tokens = Tokens.seq
-
-class virtual ['self] reduce_predefs = object(_ : 'self)
-  method visit_location : 'env. 'env -> _ = fun _ _l -> []
-  method visit_loc :
-    'env 'a. ('env -> 'a -> 'b) -> 'env -> 'a loc -> 'b =
-    fun visit_arg acc ll -> visit_arg acc ll.txt
-
-  method visit_str_or_op : 'env. 'env -> _ = fun _ _ -> []
-  inherit ['self] Longident.reduce
-
-  (* Must return the empty list: we need to explicitely access tokens from nodes
-     embedding them.
-     We don't want them to be retrieved and concatenated by the visitors infra,
-     concatenation is *not* correct. *)
-  method visit_tokens : 'env. 'env -> tokens -> _ = fun _ _ -> []
-
-  (* From Asttypes *)
-
-  method visit_label : 'env. 'env -> label -> _ = fun _ _ -> []
-  method visit_injectivity : 'env. 'env -> injectivity -> _ = fun _ _ -> []
-  method visit_index_kind : 'env. 'env -> index_kind -> _ = fun _ _ -> []
-  method visit_variance : 'env. 'env -> variance -> _ = fun _ _ -> []
-  method visit_closed_flag : 'env. 'env -> closed_flag -> _ = fun _ _ -> []
-  method visit_mutable_flag : 'env. 'env -> mutable_flag -> _ = fun _ _ -> []
-  method visit_virtual_flag : 'env. 'env -> virtual_flag -> _ = fun _ _ -> []
-  method visit_override_flag : 'env. 'env -> override_flag -> _ = fun _ _ -> []
-  method visit_private_flag : 'env. 'env -> private_flag -> _ = fun _ _ -> []
-  method visit_direction_flag : 'env. 'env -> direction_flag -> _ = fun _ _ -> []
-  method visit_rec_flag : 'env. 'env -> rec_flag -> _ = fun _ _ -> []
-
-  method visit_paren_kind : 'env. 'env -> paren_kind -> _ = fun _ _ -> []
-
-  (* Defined later in the file *)
-
-  method visit_include_kind :
-    'env 'include_kind. 'env -> 'include_kind -> _ = fun _ _ -> []
-  method visit_mode : 'env 'modes. 'env -> 'modes -> _ = fun _ _ -> []
-  method visit_modes : 'env 'modes. 'env -> 'modes -> _ = fun _ _ -> []
-  method visit_modalities : 'env 'modalities. 'env -> 'modalities -> _ = fun _ _ -> []
-end
-
-(**************************************************************)
-
 type constant =
   | Pconst_integer of string option * string * char option
       (** Integer constants such as [3] [-3] [-3l] [3L] [3n].
@@ -87,7 +40,7 @@ type constant =
       *)
   | Pconst_char of char  (** Character such as ['c']. *)
   | Pconst_untagged_char of char  (** Character such as [#'c']. *)
-  | Pconst_string of string * location * string option
+  | Pconst_string of string * Location.t * string option
       (** Constant string such as ["constant"] or
           [{delim|other constant|delim}].
 
@@ -105,11 +58,6 @@ type constant =
       Suffixes [g-z][G-Z] are accepted by the parser.
       Suffixes except ['s'] are rejected by the typechecker.
   *)
-[@@deriving visitors { name = "reduce_const"; variety = "reduce";
-                       polymorphic = true;
-                       ancestors = ["reduce_predefs"]}]
-
-[@@@ocaml.warning "-7"]
 
 type modality = | Modality of string [@@unboxed]
 type modalities = modality loc list
@@ -124,8 +72,8 @@ type include_kind = Structure | Functor
 type attribute = {
     attr_name : string list loc;
     attr_payload : payload;
-    attr_loc : location;
-    attr_tokens : tokens;
+    attr_loc : Location.t;
+    attr_tokens : Tokens.seq;
   }
 (** Attributes such as [[\@id ARG]] and [[\@\@id ARG]].
 
@@ -133,7 +81,7 @@ type attribute = {
           The compiler ignores unknown attributes.
        *)
 
-and extension = string list loc * payload * tokens
+and extension = string list loc * payload * Tokens.seq
 (** Extension points such as [[%id ARG] and [%%id ARG]].
 
          Sub-language placeholder -- rejected by the typechecker.
@@ -160,9 +108,9 @@ and ext_attribute = {
 and core_type =
     {
      ptyp_desc: core_type_desc;
-     ptyp_loc: location;
+     ptyp_loc: Location.t;
      ptyp_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
-     ptyp_tokens: tokens;
+     ptyp_tokens: Tokens.seq;
     }
 
 and arrow_arg = {
@@ -171,8 +119,8 @@ and arrow_arg = {
   aa_type: core_type;
   aa_modes: modes;
   aa_doc: attribute option;
-  aa_loc: location;
-  aa_tokens: tokens;
+  aa_loc: Location.t;
+  aa_tokens: Tokens.seq;
 }
 
 and core_type_desc =
@@ -208,7 +156,7 @@ and core_type_desc =
 
            Invariant: [n >= 2].
         *)
-  | Ptyp_constr of core_type list * longident loc
+  | Ptyp_constr of core_type list * Longident.t loc
       (** [Ptyp_constr(lident, l)] represents:
             - [tconstr]               when [l=[]],
             - [T tconstr]             when [l=[T]],
@@ -221,7 +169,7 @@ and core_type_desc =
             - [< l1:T1; ...; ln:Tn; .. >] when [flag] is
                                            {{!Asttypes.closed_flag.Open}[Open]}.
          *)
-  | Ptyp_class of longident loc * core_type list
+  | Ptyp_class of Longident.t loc * core_type list
       (** [Ptyp_class(tconstr, l)] represents:
             - [#tconstr]               when [l=[]],
             - [T #tconstr]             when [l=[T]],
@@ -274,7 +222,7 @@ and core_type_desc =
            {!value_description}.
          *)
   | Ptyp_package of package_type  (** [(module S)]. *)
-  | Ptyp_open of longident loc * core_type (** [M.(T)] *)
+  | Ptyp_open of Longident.t loc * core_type (** [M.(T)] *)
   | Ptyp_of_kind of jkind_annotation (** [(type : k)] *)
   | Ptyp_extension of extension  (** [[%id]]. *)
   | Ptyp_parens of core_type
@@ -286,8 +234,8 @@ and arg_label = Asttypes.arg_label =
 
 and package_type =
   { ppt_ext_attr: ext_attribute option;
-    ppt_name: longident loc;
-    ppt_eqs: (longident loc * core_type) list; }
+    ppt_name: Longident.t loc;
+    ppt_eqs: (Longident.t loc * core_type) list; }
 (** As {!package_type} typed values:
          - [(S, [])] represents [(module S)],
          - [(S, [(t1, T1) ; ... ; (tn, Tn)])]
@@ -296,10 +244,10 @@ and package_type =
 
 and row_field = {
   prf_desc : row_field_desc;
-  prf_loc : location;
+  prf_loc : Location.t;
   prf_attributes : attributes;
   prf_doc: attribute option;
-  prf_tokens: tokens;
+  prf_tokens: Tokens.seq;
 }
 
 and row_field_desc =
@@ -319,10 +267,10 @@ and row_field_desc =
 
 and object_field = {
   pof_desc : object_field_desc;
-  pof_loc : location;
+  pof_loc : Location.t;
   pof_attributes : attributes;
   pof_doc: attribute option;
-  pof_tokens: tokens;
+  pof_tokens: Tokens.seq;
 }
 
 and object_field_desc =
@@ -335,9 +283,9 @@ and pattern =
     {
      ppat_ext_attr: ext_attribute;
      ppat_desc: pattern_desc;
-     ppat_loc: location;
+     ppat_loc: Location.t;
      ppat_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
-     ppat_tokens: tokens;
+     ppat_tokens: Tokens.seq;
     }
 
 and pattern_desc =
@@ -374,7 +322,7 @@ and pattern_desc =
           - If Open, [n >= 1]
         *)
   | Ppat_construct of
-      longident loc
+      Longident.t loc
       * ((string loc * jkind_annotation option) list * pattern) option
       (** [Ppat_construct(C, args)] represents:
             - [C]               when [args] is [None],
@@ -416,7 +364,7 @@ and pattern_desc =
           - [(P : ty @@ modes)] when [tyopt] is [Some ty]
           - [(P @ modes)] when [tyopt] is [None]
          *)
-  | Ppat_type of longident loc  (** Pattern [#tconst] *)
+  | Ppat_type of Longident.t loc  (** Pattern [#tconst] *)
   | Ppat_lazy of pattern  (** Pattern [lazy P] *)
   | Ppat_unpack of string option loc * core_type option
       (** [Ppat_unpack(s)] represents:
@@ -424,7 +372,7 @@ and pattern_desc =
             - [(module _)] when [s] is [None] *)
   | Ppat_exception of pattern  (** Pattern [exception P] *)
   | Ppat_extension of extension  (** Pattern [[%id]] *)
-  | Ppat_open of longident loc * pattern  (** Pattern [M.(P)] *)
+  | Ppat_open of Longident.t loc * pattern  (** Pattern [M.(P)] *)
   | Ppat_parens of pattern
   | Ppat_list of pattern list
   | Ppat_cons of pattern * pattern
@@ -435,13 +383,13 @@ and expression =
     {
      pexp_ext_attr: ext_attribute;
      pexp_desc: expression_desc;
-     pexp_loc: location;
+     pexp_loc: Location.t;
      pexp_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
-     pexp_tokens: tokens;
+     pexp_tokens: Tokens.seq;
     }
 
 and expression_desc =
-  | Pexp_ident of longident loc
+  | Pexp_ident of Longident.t loc
       (** Identifiers such as [x] and [M.x]
          *)
   | Pexp_constant of constant
@@ -504,7 +452,7 @@ and expression_desc =
 
           Invariant: [n >= 2]
         *)
-  | Pexp_construct of longident loc * expression option
+  | Pexp_construct of Longident.t loc * expression option
       (** [Pexp_construct(C, exp)] represents:
            - [C]               when [exp] is [None],
            - [C E]             when [exp] is [Some E],
@@ -529,9 +477,9 @@ and expression_desc =
 
            Invariant: [n > 0]
          *)
-  | Pexp_field of expression * longident loc  (** [E.l] *)
-  | Pexp_unboxed_field of expression * longident loc  (** [E.#l] *)
-  | Pexp_setfield of expression * longident loc * expression
+  | Pexp_field of expression * Longident.t loc  (** [E.l] *)
+  | Pexp_unboxed_field of expression * Longident.t loc  (** [E.#l] *)
+  | Pexp_setfield of expression * Longident.t loc * expression
       (** [E1.l <- E2] *)
   | Pexp_array of mutable_flag * expression list
       (** [[| E1; ...; En |]] or [[: E1; ...; En :]] *)
@@ -557,7 +505,7 @@ and expression_desc =
             - [(E : T0 :> T)] when [from] is [Some T0].
          *)
   | Pexp_send of expression * string loc  (** [E # m] *)
-  | Pexp_new of longident loc  (** [new M.c] *)
+  | Pexp_new of Longident.t loc  (** [new M.c] *)
   | Pexp_setvar of string loc * expression  (** [x <- 2] *)
   | Pexp_override of (string loc * expression option) list
       (** [{< x1 = E1; ...; xn = En >}] *)
@@ -577,7 +525,7 @@ and expression_desc =
 
            [(module ME : S)] is represented as
            [Pexp_constraint(Pexp_pack ME, Ptyp_package S)] *)
-  | Pexp_dot_open of longident loc * expression
+  | Pexp_dot_open of Longident.t loc * expression
       (** - [M.(E)] *)
   | Pexp_let_open of open_declaration * expression
       (**   - [let open M in E]
@@ -598,7 +546,7 @@ and expression_desc =
   | Pexp_hole (** _ *)
   | Pexp_index_op of {
       kind: paren_kind;
-      op: (longident option * string) option;
+      op: (Longident.t option * string) option;
       seq: expression;
       indices: expression list;
       assign: expression option
@@ -610,7 +558,7 @@ and expression_desc =
   | Pexp_mode_legacy of mode loc * expression
 
 and 'a record_field =
-  { field_name: longident loc;
+  { field_name: Longident.t loc;
     typ: type_constraint option;
     value: 'a option;
   }
@@ -634,7 +582,7 @@ and binding_op =
   {
     pbop_op : string loc;
     pbop_binding : value_binding;
-    pbop_loc : location;
+    pbop_loc : Location.t;
   }
 
 and 'a argument_desc =
@@ -656,7 +604,7 @@ and 'a argument_desc =
 
 and 'a argument =
   { parg_desc: 'a argument_desc;
-    parg_tokens: tokens; }
+    parg_tokens: Tokens.seq; }
 
 and function_param_desc =
   | Pparam_val of pattern argument
@@ -700,14 +648,14 @@ and function_param_desc =
   *)
 
 and function_param =
-  { pparam_loc : location;
+  { pparam_loc : Location.t;
     pparam_desc : function_param_desc;
   }
 
 and function_body =
   { pfb_desc : function_body_desc;
-    pfb_loc: location;
-    pfb_tokens: tokens;
+    pfb_loc: Location.t;
+    pfb_tokens: Tokens.seq;
   }
 
 and function_body_desc =
@@ -737,7 +685,7 @@ and function_constraint =
 (** See the comment on {{!expression_desc.Pexp_function}[Pexp_function]}. *)
 
 and block_access =
-  | Baccess_field of longident loc
+  | Baccess_field of Longident.t loc
       (** [.foo] *)
   | Baccess_array of mutable_flag * index_kind * expression
       (** Mutable array accesses: [.(E)], [.L(E)], [.l(E)], [.n(E)]
@@ -751,7 +699,7 @@ and block_access =
       *)
 
 and unboxed_access =
-  | Uaccess_unboxed_field of longident loc
+  | Uaccess_unboxed_field of Longident.t loc
       (** [.#foo] *)
 
 and comprehension_iterator =
@@ -804,8 +752,8 @@ and value_description =
      pval_prim: string list;
      pval_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
      pval_post_doc: attribute option;
-     pval_loc: location;
-     pval_tokens: tokens;
+     pval_loc: Location.t;
+     pval_tokens: Tokens.seq;
     }
 (** Values of type {!value_description} represents:
     - [val x: T],
@@ -819,11 +767,11 @@ and value_description =
 and ptype_param = {
   ptp_typ: core_type;
   ptp_infos: variance * injectivity;
-  ptp_tokens: tokens;
+  ptp_tokens: Tokens.seq;
 }
 
 and ptype_params = ptype_param list
-and ptype_constraint = core_type * core_type * location
+and ptype_constraint = core_type * core_type * Location.t
 and type_declaration =
     {
      ptype_pre_text: attributes;
@@ -840,8 +788,8 @@ and type_declaration =
       (** [... constraint T1=T1'  ... constraint Tn=Tn'] *)
      ptype_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
      ptype_post_doc: attribute option;
-     ptype_loc: location;
-     ptype_tokens: tokens;
+     ptype_loc: Location.t;
+     ptype_tokens: Tokens.seq;
     }
 (**
    Here are type declarations and their representation,
@@ -883,10 +831,10 @@ and label_declaration =
      pld_global: bool;
      pld_modalities: modalities;
      pld_type: core_type;
-     pld_loc: location;
+     pld_loc: Location.t;
      pld_attributes: attributes;  (** [l : T [\@id1] [\@id2]] *)
      pld_doc: attribute option;
-     pld_tokens: tokens;
+     pld_tokens: Tokens.seq;
     }
 (**
    - [{ ...; l: T; ... }]
@@ -906,10 +854,10 @@ and constructor_declaration =
       (** jkind annotations are [C : ('a : kind1) ('a2 : kind2). ...] *)
      pcd_args: constructor_arguments;
      pcd_res: core_type option;
-     pcd_loc: location;
+     pcd_loc: Location.t;
      pcd_attributes: attributes;  (** [C of ... [\@id1] [\@id2]] *)
      pcd_doc: attribute option;
-     pcd_tokens: tokens;
+     pcd_tokens: Tokens.seq;
     }
 
 and constructor_argument =
@@ -917,7 +865,7 @@ and constructor_argument =
     pca_global: bool;
     pca_type: core_type;
     pca_modalities: modalities;
-    pca_loc: location;
+    pca_loc: Location.t;
   }
 
 and constructor_arguments =
@@ -941,14 +889,14 @@ and type_extension =
     {
      ptyext_pre_doc: attribute option;
      ptyext_ext_attrs: ext_attribute;
-     ptyext_path: longident loc;
+     ptyext_path: Longident.t loc;
      ptyext_params: ptype_param list;
      ptyext_constructors: extension_constructor list;
      ptyext_private: private_flag;
-     ptyext_loc: location;
+     ptyext_loc: Location.t;
      ptyext_attributes: attributes;  (** ... [\@\@id1] [\@\@id2] *)
      ptyext_post_doc: attribute option;
-     ptyext_tokens: tokens;
+     ptyext_tokens: Tokens.seq;
     }
 (**
    Definition of new extensions constructors for the extensive sum type [t]
@@ -959,10 +907,10 @@ and extension_constructor =
     {
      pext_name: Longident.str_or_op loc;
      pext_kind: extension_constructor_kind;
-     pext_loc: location;
+     pext_loc: Location.t;
      pext_attributes: attributes;  (** [C of ... [\@id1] [\@id2]] *)
      pext_doc: attribute option;
-     pext_tokens: tokens;
+     pext_tokens: Tokens.seq;
    }
 
 and type_exception =
@@ -970,10 +918,10 @@ and type_exception =
     ptyexn_pre_doc: attribute option;
     ptyexn_ext_attrs: ext_attribute;
     ptyexn_constructor : extension_constructor;
-    ptyexn_loc : location;
+    ptyexn_loc : Location.t;
     ptyexn_attributes : attributes;  (** [... [\@\@id1] [\@\@id2]] *)
     ptyexn_post_doc: attribute option;
-    ptyexn_tokens: tokens;
+    ptyexn_tokens: Tokens.seq;
   }
 (** Definition of a new exception ([exception E]). *)
 
@@ -999,7 +947,7 @@ and extension_constructor_kind =
                    {- [c_args] is [[T1; ... ; Tn]],}
                    {- [t_opt] is [Some T0].}}
        *)
-  | Pext_rebind of longident loc
+  | Pext_rebind of Longident.t loc
   (** [Pext_rebind(D)] re-export the constructor [D] with the new name [C] *)
 
 (** {1 Class language} *)
@@ -1008,13 +956,13 @@ and extension_constructor_kind =
 and class_type =
     {
      pcty_desc: class_type_desc;
-     pcty_loc: location;
+     pcty_loc: Location.t;
      pcty_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
-     pcty_tokens: tokens;
+     pcty_tokens: Tokens.seq;
     }
 
 and class_type_desc =
-  | Pcty_constr of longident loc * core_type list
+  | Pcty_constr of Longident.t loc * core_type list
       (** - [c]
             - [['a1, ..., 'an] c] *)
   | Pcty_signature of class_signature  (** [object ... end] *)
@@ -1045,10 +993,10 @@ and class_type_field =
     {
      pctf_pre_doc: attribute option;
      pctf_desc: class_type_field_desc;
-     pctf_loc: location;
+     pctf_loc: Location.t;
      pctf_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
      pctf_post_doc: attribute option;
-     pctf_tokens: tokens;
+     pctf_tokens: Tokens.seq;
     }
 
 and class_type_field_desc =
@@ -1075,10 +1023,10 @@ and 'a class_infos =
      pci_value_params: pattern argument list;
      pci_constraint: class_type option;
      pci_expr: 'a;
-     pci_loc: location;
+     pci_loc: Location.t;
      pci_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
      pci_post_doc: attribute option;
-     pci_tokens: tokens;
+     pci_tokens: Tokens.seq;
     }
 (** Values of type [class_expr class_infos] represents:
     - [class c = ...]
@@ -1098,12 +1046,12 @@ and class_expr =
     {
      pcl_ext_attrs: ext_attribute;
      pcl_desc: class_expr_desc;
-     pcl_loc: location;
+     pcl_loc: Location.t;
      pcl_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
     }
 
 and class_expr_desc =
-  | Pcl_constr of longident loc * core_type list
+  | Pcl_constr of Longident.t loc * core_type list
       (** [c] and [['a1, ..., 'an] c] *)
   | Pcl_structure of class_structure  (** [object ... end] *)
   | Pcl_fun of pattern argument list * class_expr
@@ -1156,10 +1104,10 @@ and class_field =
     {
      pcf_pre_doc: attribute option;
      pcf_desc: class_field_desc;
-     pcf_loc: location;
+     pcf_loc: Location.t;
      pcf_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
      pcf_post_doc: attribute option;
-     pcf_tokens: tokens;
+     pcf_tokens: Tokens.seq;
     }
 
 and class_field_desc =
@@ -1215,13 +1163,13 @@ and class_declaration = class_expr class_infos
 and module_type =
     {
      pmty_desc: module_type_desc;
-     pmty_loc: location;
+     pmty_loc: Location.t;
      pmty_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
-     pmty_tokens: tokens;
+     pmty_tokens: Tokens.seq;
     }
 
 and module_type_desc =
-  | Pmty_ident of longident loc  (** [Pmty_ident(S)] represents [S] *)
+  | Pmty_ident of Longident.t loc  (** [Pmty_ident(S)] represents [S] *)
   | Pmty_signature of signature  (** [sig ... end] *)
   | Pmty_functor of attributes * functor_parameter list * module_type * modes
       (** [functor(X : MT1 @@ modes) -> MT2 @ modes] *)
@@ -1229,9 +1177,9 @@ and module_type_desc =
   | Pmty_with of module_type * with_constraint list  (** [MT with ...] *)
   | Pmty_typeof of attributes * module_expr  (** [module type of ME] *)
   | Pmty_extension of extension  (** [[%id]] *)
-  | Pmty_alias of longident loc  (** [(module M)] *)
+  | Pmty_alias of Longident.t loc  (** [(module M)] *)
   (*_ [Pmty_strengthen] might be a better fit for [with_constraint] *)
-  | Pmty_strengthen of module_type * longident loc (** [MT with S] *)
+  | Pmty_strengthen of module_type * Longident.t loc (** [MT with S] *)
   | Pmty_parens of module_type
 
 and functor_parameter =
@@ -1246,15 +1194,15 @@ and signature =
   {
     psg_modalities : modalities;
     psg_items : signature_item list;
-    psg_loc : location;
-    psg_tokens: tokens;
+    psg_loc : Location.t;
+    psg_tokens: Tokens.seq;
   }
 
 and signature_item =
     {
      psig_desc: signature_item_desc;
-     psig_loc: location;
-     psig_tokens: tokens;
+     psig_loc: Location.t;
+     psig_tokens: Tokens.seq;
     }
 
 and signature_item_desc =
@@ -1300,8 +1248,8 @@ and module_declaration =
      pmd_body: module_declaration_body;
      pmd_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
      pmd_post_doc: attribute option;
-     pmd_loc: location;
-     pmd_tokens : tokens;
+     pmd_loc: Location.t;
+     pmd_tokens : Tokens.seq;
     }
 (** Values of type [module_declaration] represents [S : MT] *)
 
@@ -1310,11 +1258,11 @@ and module_substitution =
      pms_pre_doc: attribute option;
      pms_ext_attrs: ext_attribute;
      pms_name: string loc;
-     pms_manifest: longident loc;
+     pms_manifest: Longident.t loc;
      pms_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
      pms_post_doc: attribute option;
-     pms_loc: location;
-     pms_tokens : tokens;
+     pms_loc: Location.t;
+     pms_tokens : Tokens.seq;
     }
 (** Values of type [module_substitution] represents [S := M] *)
 
@@ -1326,8 +1274,8 @@ and module_type_declaration =
      pmtd_type: module_type option;
      pmtd_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
      pmtd_post_doc: attribute option;
-     pmtd_loc: location;
-     pmtd_tokens : tokens;
+     pmtd_loc: Location.t;
+     pmtd_tokens : Tokens.seq;
     }
 (** Values of type [module_type_declaration] represents:
    - [S = MT],
@@ -1341,10 +1289,10 @@ and 'a open_infos =
      popen_ext_attrs: ext_attribute;
      popen_expr: 'a;
      popen_override: override_flag;
-     popen_loc: location;
+     popen_loc: Location.t;
      popen_attributes: attributes;
      popen_post_doc: attribute option;
-     popen_tokens : tokens;
+     popen_tokens : Tokens.seq;
     }
 (** Values of type ['a open_infos] represents:
     - [open! X] when {{!open_infos.popen_override}[popen_override]}
@@ -1354,7 +1302,7 @@ and 'a open_infos =
                   is {{!Asttypes.override_flag.Fresh}[Fresh]}
 *)
 
-and open_description = longident loc open_infos
+and open_description = Longident.t loc open_infos
 (** Values of type [open_description] represents:
     - [open M.N]
     - [open M(N).O] *)
@@ -1371,10 +1319,10 @@ and 'a include_infos =
      pincl_kind : include_kind;
      pincl_ext_attrs: ext_attribute;
      pincl_mod: 'a;
-     pincl_loc: location;
+     pincl_loc: Location.t;
      pincl_attributes: attributes;
      pincl_post_doc: attribute option;
-     pincl_tokens : tokens;
+     pincl_tokens : Tokens.seq;
     }
 
 and include_description = module_type include_infos
@@ -1386,26 +1334,26 @@ and include_declaration = module_expr include_infos
 and with_constraint =
   {
     wc_desc: with_constraint_desc;
-    wc_loc: location;
-    wc_tokens: tokens;
+    wc_loc: Location.t;
+    wc_tokens: Tokens.seq;
   }
 
 and with_constraint_desc =
-  | Pwith_type of ptype_params * longident loc *
+  | Pwith_type of ptype_params * Longident.t loc *
                   private_flag * core_type * ptype_constraint list
       (** [with type X.t = ...]
 
-            Note: the last component of the longident must match
+            Note: the last component of the Longident.t must match
             the name of the type_declaration. *)
-  | Pwith_module of longident loc * longident loc
+  | Pwith_module of Longident.t loc * Longident.t loc
       (** [with module X.Y = Z] *)
-  | Pwith_modtype of longident loc * module_type
+  | Pwith_modtype of Longident.t loc * module_type
       (** [with module type X.Y = Z] *)
-  | Pwith_modtypesubst of longident loc * module_type
+  | Pwith_modtypesubst of Longident.t loc * module_type
       (** [with module type X.Y := sig end] *)
-  | Pwith_typesubst of ptype_params * longident loc * core_type
+  | Pwith_typesubst of ptype_params * Longident.t loc * core_type
       (** [with type X.t := ..., same format as [Pwith_type]] *)
-  | Pwith_modsubst of longident loc * longident loc
+  | Pwith_modsubst of Longident.t loc * Longident.t loc
       (** [with module X.Y := Z] *)
 
 (** {2 Value expressions for the module language} *)
@@ -1413,13 +1361,13 @@ and with_constraint_desc =
 and module_expr =
     {
      pmod_desc: module_expr_desc;
-     pmod_loc: location;
+     pmod_loc: Location.t;
      pmod_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
-     pmod_tokens: tokens;
+     pmod_tokens: Tokens.seq;
     }
 
 and module_expr_desc =
-  | Pmod_ident of longident loc  (** [X] *)
+  | Pmod_ident of Longident.t loc  (** [X] *)
   | Pmod_structure of attributes * structure  (** [struct[@attrs] ... end] *)
   | Pmod_functor of attributes * functor_parameter list * module_expr
     (** [functor [@attr] (X : MT1) (X2 : MT2) -> ME] *)
@@ -1448,13 +1396,13 @@ and module_instance =
   (** [M(P1)(MI1)...(Pn)(MIn)] *)
          *)
 
-and structure = structure_item list * tokens
+and structure = structure_item list * Tokens.seq
 
 and structure_item =
     {
      pstr_desc: structure_item_desc;
-     pstr_loc: location;
-     pstr_tokens: tokens;
+     pstr_loc: Location.t;
+     pstr_tokens: Tokens.seq;
     }
 
 and structure_item_desc =
@@ -1520,8 +1468,8 @@ and value_binding =
     pvb_ret_modes: modes;
     pvb_attributes: attributes;
     pvb_post_doc: attribute option;
-    pvb_loc: location;
-    pvb_tokens: tokens;
+    pvb_loc: Location.t;
+    pvb_tokens: Tokens.seq;
   } (** [let modes pat params : type_constraint @@ ret_modes = exp] *)
 
 and module_binding =
@@ -1536,8 +1484,8 @@ and module_binding =
      pmb_expr: module_expr;
      pmb_attributes: attributes;
      pmb_post_doc: attribute option;
-     pmb_loc: location;
-     pmb_tokens : tokens;
+     pmb_loc: Location.t;
+     pmb_tokens : Tokens.seq;
     }
 (** Values of type [module_binding] represents [module X = ME] *)
 
@@ -1553,14 +1501,9 @@ and jkind_annotation_desc =
   | Parens of jkind_annotation_desc
 
 and jkind_annotation =
-  { pjkind_loc : location
+  { pjkind_loc : Location.t
   ; pjkind_desc : jkind_annotation_desc
   }
-[@@deriving visitors { variety = "reduce";
-                       data=false;
-                       polymorphic = true;
-                       ancestors = ["reduce_const"]
-                     }]
 
 (** {1 Toplevel} *)
 
@@ -1574,17 +1517,17 @@ and toplevel_directive =
   {
     pdir_name: string loc;
     pdir_arg: directive_argument option;
-    pdir_loc: location;
+    pdir_loc: Location.t;
   }
 
 and directive_argument =
   {
     pdira_desc: directive_argument_desc;
-    pdira_loc: location;
+    pdira_loc: Location.t;
   }
 
 and directive_argument_desc =
   | Pdir_string of string
   | Pdir_int of string * char option
-  | Pdir_ident of longident
+  | Pdir_ident of Longident.t
   | Pdir_bool of bool
