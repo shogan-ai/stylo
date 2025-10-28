@@ -27,12 +27,23 @@
       ((pps visitors.ppx) parsetree)))
   (flags :standard -w -9-63 -open Dbg_print))
 
+;; Can't explicitely depend on a .cmt ...
+;; So we depend on the cmo and pray for a cmt to be next to it and not stale
+;;
+;; Cf. https://github.com/ocaml/dune/issues/12633
+
 (rule
   (target ast_mapper.ml)
-  ; Can't explicitely depend on a .cmt ...
-  ; So we depend on the cmo and pray for a cmt to be next to it and not stale
   (deps %{cmo:parsetree} %{cmo:longident} %{cmo:tokens} %{cmi:asttypes}
         %{cmo:location})
   (action
     (with-stdout-to %{target}
       (run ./gen_visitors/gen_mapper.exe %{deps}))))
+
+(rule
+  (target ast_reduce.ml)
+  (deps %{cmo:parsetree} %{cmo:longident} %{cmo:tokens} %{cmi:asttypes}
+        %{cmo:location})
+  (action
+    (with-stdout-to %{target}
+      (run ./gen_visitors/gen_reducer.exe %{deps}))))

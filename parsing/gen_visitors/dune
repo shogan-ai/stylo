@@ -1,3 +1,3 @@
-(executable
-  (name gen_mapper)
+(executables
+  (names gen_mapper gen_reducer)
   (libraries compiler-libs.common))
