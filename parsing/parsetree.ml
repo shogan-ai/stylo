@@ -70,44 +70,6 @@ class virtual ['self] reduce_predefs = object(_ : 'self)
   method visit_modalities : 'env 'modalities. 'env -> 'modalities -> _ = fun _ _ -> []
 end
 
-class virtual ['self] map_predefs = object(self : 'self)
-  method visit_location : 'env. 'env -> _ = fun _ _l -> _l
-  method visit_loc :
-    'env 'a. ('env -> 'a -> 'a) -> 'env -> 'a loc -> 'a loc =
-    fun visit_arg env ll ->
-      { loc = self#visit_location env ll.loc
-      ; txt = visit_arg env ll.txt }
-
-  method visit_str_or_op : 'env. 'env -> _ = fun _ s -> s
-  inherit ['self] Longident.map
-
-  method visit_tokens : 'env. 'env -> tokens -> tokens = fun _ l -> l
-
-  (* From Asttypes *)
-
-  method visit_label : 'env. 'env -> label -> _ = fun _ l -> l
-  method visit_injectivity : 'env. 'env -> injectivity -> _ = fun _ i -> i
-  method visit_index_kind : 'env. 'env -> index_kind -> _ = fun _ k -> k
-  method visit_variance : 'env. 'env -> variance -> _ = fun _ v -> v
-  method visit_closed_flag : 'env. 'env -> closed_flag -> _ = fun _ cf -> cf
-  method visit_mutable_flag : 'env. 'env -> mutable_flag -> _ = fun _ mf -> mf
-  method visit_virtual_flag : 'env. 'env -> virtual_flag -> _ = fun _ vf -> vf
-  method visit_override_flag : 'env. 'env -> override_flag -> _ = fun _ o -> o
-  method visit_private_flag : 'env. 'env -> private_flag -> _ = fun _ p -> p
-  method visit_direction_flag : 'env. 'env -> direction_flag -> _ = fun _ d -> d
-  method visit_rec_flag : 'env. 'env -> rec_flag -> _ = fun _ r -> r
-
-  method visit_paren_kind : 'env. 'env -> paren_kind -> _ = fun _ p -> p
-
-  (* Defined later in the file *)
-
-  method visit_include_kind :
-    'env. 'env -> 'include_kind -> _ = fun _ i -> i
-  method visit_mode : 'env 'mode. 'env -> 'mode -> 'mode = fun _ m -> m
-  method visit_modality
-    : 'env 'moda. 'env -> 'moda -> 'moda = fun _ m -> m
-end
-
 (**************************************************************)
 
 type constant =
@@ -145,24 +107,15 @@ type constant =
   *)
 [@@deriving visitors { name = "reduce_const"; variety = "reduce";
                        polymorphic = true;
-                       ancestors = ["reduce_predefs"]},
-            visitors { name = "map_const"; variety = "map";
-                       polymorphic = true;
-                       ancestors = ["map_predefs"]}]
+                       ancestors = ["reduce_predefs"]}]
 
 [@@@ocaml.warning "-7"]
 
 type modality = | Modality of string [@@unboxed]
 type modalities = modality loc list
-[@@deriving visitors { name = "map_modalities"; variety = "map";
-                       polymorphic = true;
-                       ancestors = ["map_const"]}]
 
 type mode = | Mode of string [@@unboxed]
 type modes = mode loc list
-[@@deriving visitors { name = "map_modes"; variety = "map";
-                       polymorphic = true;
-                       ancestors = ["map_modalities"]}]
 
 type include_kind = Structure | Functor
 
@@ -1607,12 +1560,7 @@ and jkind_annotation =
                        data=false;
                        polymorphic = true;
                        ancestors = ["reduce_const"]
-                     },
-            visitors { variety = "map";
-                       data=false;
-                       polymorphic = true;
-                       ancestors = ["map_modes"]
-                     } ]
+                     }]
 
 (** {1 Toplevel} *)
 

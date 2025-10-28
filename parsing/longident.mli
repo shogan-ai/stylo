@@ -47,9 +47,3 @@ class virtual ['self] reduce : object('self)
 
   method visit_longident : 'env. 'env -> t -> 'a
 end
-
-class virtual ['self] map : object('self)
-  method virtual visit_tokens : 'env. 'env -> Tokens.seq -> Tokens.seq
-
-  method visit_longident : 'env. 'env -> t -> t
-end
