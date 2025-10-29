@@ -485,3 +485,9 @@ let rec replace_first_child ~subst = function
   | [] -> invalid_arg "Tokens.replace_first_child: never saw a child"
   | { desc = Child_node; _ } :: xs -> subst @ xs
   | x :: xs -> x :: replace_first_child ~subst xs
+
+let is_child t = t.desc = Child_node
+let is_comment t =
+  match t.desc with
+  | Comment _ -> true
+  | _ -> false
