@@ -20,6 +20,10 @@ end
 
 module Req = Requirement
 
+(* TODO: currently the tracker could be associated with several groups, we could
+   add a dynamic check to prevent that. *)
+type flatness = bool ref
+
 type softness =
   | Hard (** always introduce a line break *)
   | Soft (** Vanishes after blank lines, adds a break otherwise *)
@@ -29,7 +33,7 @@ type whitespace =
   | Line_break of softness
   | Break of int * softness
   | Non_breakable
-  | Vanishing_space
+  | Vanishing_space of flatness
 
 (* FIXME: comments and strings can contain newlines, they should be represented
    by something other than "string". *)
@@ -37,6 +41,7 @@ type t =
   | Empty
   | Token of string
   | Optional of {
+      vanishing_level: flatness;
       before: whitespace option;
       token: string;
       after: whitespace option;
@@ -46,7 +51,7 @@ type t =
   | Cat of Req.t * t * t
   | Nest of Req.t * int * t
   | Relative_nest of Req.t * int * t
-  | Group of Req.t * t
+  | Group of Req.t * flatness option * t
 
 let requirement = function
   | Empty -> Req.of_int 0
@@ -56,11 +61,11 @@ let requirement = function
   | Whitespace Break (spaces, _) -> Req.of_int spaces
   | Whitespace Line_break _ -> Req.infinity
   | Whitespace Non_breakable -> Req.of_int 1
-  | Whitespace Vanishing_space -> Req.of_int 0 (* FIXME: really? *)
+  | Whitespace Vanishing_space _ -> Req.of_int 0 (* FIXME: really? *)
   | Cat (r, _, _)
   | Nest (r, _, _)
   | Relative_nest (r, _, _)
-  | Group (r, _) -> r
+  | Group (r, _, _) -> r
 
 let empty = Empty
 let string s = Token s
@@ -72,12 +77,14 @@ let softest_line = Whitespace (Line_break Softest)
 let softest_break = Whitespace (Break (1, Softest))
 
 let nbsp = Whitespace Non_breakable
-let vanishing_space = Whitespace Vanishing_space
+let vanishing_space lvl = Whitespace (Vanishing_space lvl)
 
-let opt_token ?ws_before ?ws_after tok =
+let opt_token ?ws_before ?ws_after vanishing_level tok =
   match ws_before, ws_after with
   | Some _, Some _ -> invalid_arg "Document.opt_token"
-  | _ -> Optional { before = ws_before; after = ws_after; token = tok }
+  | _ ->
+    Optional
+      { vanishing_level; before = ws_before; after = ws_after; token = tok }
 
 (* FIXME *)
 let comment s = Comment ("(*" ^ s ^ "*)")
@@ -99,6 +106,8 @@ let relative_nest i = function
   | Empty -> Empty
   | t -> Relative_nest (requirement t, i, t)
 
-let group = function
+let group ?flatness = function
   | Empty -> Empty
-  | t -> Group (requirement t, t)
+  | t -> Group (requirement t, flatness, t)
+
+let flatness_tracker () = ref false

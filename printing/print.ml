@@ -779,12 +779,15 @@ end = struct
       then nest 2 (group arg)
       else preceeding_tok ^^ nest 2 (group (break 1 ^^ arg))
     in
+    let flatness = flatness_tracker () in
     let (acc, last_arrow) =
       List.fold_left (fun (acc, between) arg ->
         acc ^?^ pp_arg between arg, S.rarrow
-      ) (empty, group (S.colon ^^ vanishing_space)) args
+      ) (empty, group (S.colon ^^ vanishing_space flatness)) args
     in
-    acc ^/^ last_arrow ^^ nest 2 (group (break 1 ^^ codom))
+    group ~flatness (
+      acc ^/^ last_arrow ^^ nest 2 (group (break 1 ^^ codom))
+    )
 
   let pp_for_decl { ptyp_desc; ptyp_attributes; ptyp_tokens; ptyp_loc=_} =
     let desc =

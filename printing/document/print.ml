@@ -87,19 +87,19 @@ let text buf state s =
 
 let whitespace buf state indent flat = function
   | Break (spaces, soft) ->
-    if flat > 0 then (
+    if flat then (
       Buffer.add_spaces buf spaces;
       incr_col state spaces
     ) else
       newline state indent soft buf
   | Line_break soft ->
-    assert (flat = 0);
+    assert (not flat);
     newline state indent soft buf
   | Non_breakable ->
     Buffer.add_spaces buf 1;
     incr_col state 1
-  | Vanishing_space ->
-    if flat <> 1 then
+  | Vanishing_space tracked_lvl_is_flat ->
+    if not flat || !(tracked_lvl_is_flat :> bool ref) then
       state
     else (
       Buffer.add_spaces buf 1;
@@ -110,8 +110,8 @@ let rec pretty buf state indent flat = function
   | Empty -> state
   | Token s
   | Comment s -> text buf state s
-  | Optional { before; after; token } ->
-    if flat > 0 then
+  | Optional { before; after; vanishing_level; token } ->
+    if !(vanishing_level :> bool ref) then
       state
     else
       let ws state = function
@@ -134,12 +134,14 @@ let rec pretty buf state indent flat = function
       max (state.line_indent + rel_indent) indent
     in
     pretty buf state indent flat t
-  | Group (req, t) ->
+  | Group (req, flat_track_opt, t) ->
     let flat =
-      if Requirement.(to_int @@ req + of_int state.column) <= state.max_width
-      then flat + 1
-      else flat
+      flat
+      || Requirement.(to_int @@ req + of_int state.column) <= state.max_width
     in
+    Option.iter (fun flatness ->
+      (flatness : flatness :> bool ref) := flat
+    ) flat_track_opt;
     pretty buf state indent flat t
 
 let to_string ~width d =
@@ -152,5 +154,5 @@ let to_string ~width d =
     ; line = Is_empty
     }
   in
-  let _final_state = pretty buf init 0 0 d in
+  let _final_state = pretty buf init 0 false d in
   Buffer.contents buf

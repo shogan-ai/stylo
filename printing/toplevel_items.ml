@@ -7,9 +7,9 @@ open Ocaml_syntax.Tokens
    For no obvious reason (sometimes it's between a flat and a non flat,
    sometimes between two non flats, but not always). *)
 
-let add_item doc item =
+let add_item ?flatness doc item =
   match doc with
-  | Empty -> group (item ^^ break 0)
+  | Empty -> group ?flatness (item ^^ break 0)
   | _ ->
     (* flat items don't force blank lines, only non-flat ones do. *)
     (* Notice the [nest] trick here: without it any comment "attached" to the
@@ -35,7 +35,8 @@ let add_item doc item =
        The nest allows the comment insertion code to traverse the group,
        delaying the comment until after the [nest 0 blankline], and producing
        the output we expect. *)
-    doc ^^ softline ^^ group (nest 0 (soft_break 0) ^^ item ^^ break 0)
+    doc ^^ softline ^^
+    group ?flatness (nest 0 (soft_break 0) ^^ item ^^ break 0)
 
 type cont =
   | Semi_followed_by of seq
@@ -43,8 +44,8 @@ type cont =
   | Child_followed_by of seq
   | Done
 
-let opt_semisemi_doc =
-  Document.opt_token ~ws_before:(Line_break Softest) ";;"
+let opt_semisemi_doc vanishing_level =
+  Document.opt_token ~ws_before:(Line_break Softest) vanishing_level ";;"
 
 let rec advance_tokens = function
   | [] -> Done
@@ -66,7 +67,12 @@ let pp_keeping_semi pp_item =
     | Semi_followed_by tokens ->
       perhaps_semi (doc ^?^ Syntax.semisemi) items tokens
     | Opt_semi_followed_by tokens ->
-      perhaps_semi (doc ^^ opt_semisemi_doc) items tokens
+      (* This one is optional, but will never actually disappear since we are
+         not actually tracking the flatness of any group.
+         Pretty sure this branch is dead code, and we could [assert false] here,
+         but why bother? *)
+      let noise = flatness_tracker () in
+      perhaps_semi (doc ^^ opt_semisemi_doc noise) items tokens
     | Child_followed_by _ as cont ->
       expect_item doc items cont
     | Done -> doc, Done
@@ -77,9 +83,12 @@ let pp_keeping_semi pp_item =
       let item = pp_item item in
       begin match advance_tokens tokens with
       | Semi_followed_by tokens ->
-        perhaps_semi (add_item doc @@ item ^/^ Syntax.semisemi) items tokens
+        let item = item ^/^ Syntax.semisemi in
+        perhaps_semi (add_item doc item) items tokens
       | Opt_semi_followed_by tokens ->
-        perhaps_semi (add_item doc @@ item ^^ opt_semisemi_doc) items tokens
+        let flatness = flatness_tracker () in
+        let item = item ^^ opt_semisemi_doc flatness in
+        perhaps_semi (add_item ~flatness doc item) items tokens
       | cont ->
         expect_item (add_item doc item) items cont
       end

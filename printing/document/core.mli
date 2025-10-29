@@ -9,6 +9,8 @@ module Requirement : sig
   val ( + ) : t -> t -> t
 end
 
+type flatness = private bool ref
+
 type softness =
   | Hard (** always introduce a line break *)
   | Soft (** Vanishes after blank lines, adds a break otherwise *)
@@ -20,7 +22,7 @@ type whitespace =
   (** [Break (n, softness)] prints as [n] spaces in flat mode, and behaves
       as a [Line_break softness] otherwise. *)
   | Non_breakable (** a simple space. *)
-  | Vanishing_space
+  | Vanishing_space of flatness
   (** Prints as a space in flat mode when the parent is not flat, and vanished
       otherwise. *)
 
@@ -28,6 +30,7 @@ type t = private
   | Empty
   | Token of string
   | Optional of {
+      vanishing_level: flatness;
       before: whitespace option;
       token: string;
       after: whitespace option;
@@ -37,14 +40,15 @@ type t = private
   | Cat of Requirement.t * t * t
   | Nest of Requirement.t * int * t
   | Relative_nest of Requirement.t * int * t
-  | Group of Requirement.t * t
+  | Group of Requirement.t * flatness option * t
 
 val requirement : t -> Requirement.t
 
 val empty : t
 val string : string -> t
 
-val opt_token : ?ws_before:whitespace -> ?ws_after:whitespace -> string -> t
+val opt_token
+  : ?ws_before:whitespace -> ?ws_after:whitespace -> flatness -> string -> t
 
 val break : int -> t
 val soft_break : int -> t
@@ -55,7 +59,7 @@ val softest_break : t
 (** [Break (1, Softest)], used between docstrings. *)
 
 val nbsp : t
-val vanishing_space : t
+val vanishing_space : flatness -> t
 
 val comment : string -> t
 val docstring : string -> t
@@ -63,4 +67,6 @@ val docstring : string -> t
 val (^^) : t -> t -> t
 val nest : int -> t -> t
 val relative_nest : int -> t -> t
-val group : t -> t
+val group : ?flatness:flatness -> t -> t
+
+val flatness_tracker : unit -> flatness
