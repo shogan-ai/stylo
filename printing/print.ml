@@ -807,7 +807,8 @@ and Pattern : sig
 end = struct
   let rec pp ?(pipe=false) p =
     let without_pipe =
-      group (pp_desc p)
+      let pat_lvl = flatness_tracker () in
+      group ~flatness:pat_lvl (pp_desc pat_lvl p)
       |> Attribute.attach ~attrs:p.ppat_attributes
     in
     if pipe then
@@ -816,7 +817,7 @@ end = struct
     else
       without_pipe
 
-  and pp_desc p =
+  and pp_desc pat_flatness p =
     let (!!) kw = Ext_attribute.decorate kw p.ppat_ext_attr in
     match p.ppat_desc with
     | Ppat_any -> S.underscore
@@ -851,9 +852,48 @@ end = struct
     | Ppat_exception p -> !!S.exception_ ^/^ pp  p
     | Ppat_extension ext -> Extension.pp ext
     | Ppat_open (lid, p) -> pp_open lid p
-    | Ppat_parens p -> parens (pp p)
+    | Ppat_parens { pat; optional } -> pp_parens ~optional pat_flatness pat
     | Ppat_list elts -> pp_list (nb_semis p.ppat_tokens) elts
     | Ppat_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
+
+  and pp_parens ~optional flatness pat =
+    match pat.ppat_desc with
+    | Ppat_tuple (pats, closed) ->
+      pp_parens_tuple ~optional ~closed flatness ~attrs:pat.ppat_attributes pats
+    | _ ->
+      let pat = pp pat in
+      let before, after =
+        (* No break? *)
+        if optional
+        then opt_token flatness "(", opt_token flatness ")"
+        else S.lparen, S.rparen
+      in
+      before ^^ nest 1 pat ^^ after
+
+  and pp_parens_tuple ~attrs ~optional ~closed flatness pats =
+    let lparen, rparen =
+      if optional
+      then
+        let break = Break (1, Hard (* doesn't make a difference *)) in
+        opt_token flatness "(" ~ws_after:break,
+        opt_token flatness ~ws_before:break ")"
+      else
+        S.lparen ^^ break 1, break 1 ^^ S.rparen
+    in
+    let comma = S.comma ^^ break 1 in
+    let pats =
+      List.mapi (fun i pat ->
+        let before = if i = 0 then lparen else comma in
+        group (before ^^ nest 2 (Argument.pp pp pat))
+      ) pats
+      |> separate (break 0)
+    in
+    let pats =
+      match closed with
+      | Asttypes.Closed -> pats
+      | Open -> pats ^^ break 0 ^^ group (comma ^^ S.dotdot)
+    in
+    Attribute.attach ~attrs pats ^^ group rparen
 
   and pp_open lid p =
     let space =

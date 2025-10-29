@@ -373,7 +373,7 @@ and pattern_desc =
   | Ppat_exception of pattern  (** Pattern [exception P] *)
   | Ppat_extension of extension  (** Pattern [[%id]] *)
   | Ppat_open of Longident.t loc * pattern  (** Pattern [M.(P)] *)
-  | Ppat_parens of pattern
+  | Ppat_parens of { pat: pattern; optional: bool }
   | Ppat_list of pattern list
   | Ppat_cons of pattern * pattern
 

@@ -1914,7 +1914,7 @@ class_fun_def:
 ;
 class_self_pattern:
     LPAREN pattern RPAREN
-      { mkpat ~loc:$sloc (Ppat_parens $2) }
+      { mkpat ~loc:$sloc (Ppat_parens { pat = $2; optional = false }) }
   | LPAREN pattern COLON core_type RPAREN
       { mkpat_with_modes ~loc:$sloc ~pat:$2 ~cty:(Some $4) ~modes:[] }
   | /* empty */
@@ -3395,7 +3395,7 @@ simple_pattern:
 
 simple_pattern_not_ident:
   | LPAREN pattern RPAREN
-      { mkpat (Ppat_parens $2) ~loc:$sloc }
+      { mkpat (Ppat_parens { pat = $2; optional = false }) ~loc:$sloc }
   | simple_delimited_pattern
       { $1 }
   | LPAREN MODULE ext_attributes mkrhs(module_name) RPAREN
@@ -3427,7 +3427,7 @@ simple_pattern_not_ident:
   | mkrhs(mod_longident) DOT LPAREN pattern RPAREN
       { let sub =
           let loc = ($startpos($3), $endpos) in
-          mkpat ~loc (Ppat_parens $4)
+          mkpat ~loc (Ppat_parens { pat = $4; optional = false })
         in
         Ppat_open ($1, sub) }
   | mod_longident DOT LPAREN pattern error
