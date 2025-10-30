@@ -1169,9 +1169,8 @@ end = struct
     | Pexp_index_op access ->
       pp_index_op (nb_semis exp.pexp_tokens)
         access.kind access.seq access.op access.indices access.assign
-    | Pexp_parens { begin_end = false; exp = Some exp } -> parens (pp exp)
-    | Pexp_parens { begin_end = false; exp = None } -> assert false
-    | Pexp_parens { begin_end = true; exp } ->
+    | Pexp_parens { exp; optional = _ } -> parens (pp exp)
+    | Pexp_begin_end exp ->
       prefix !!S.begin_ (optional pp exp) ^/^ S.end_
     | Pexp_list elts -> pp_list (nb_semis exp.pexp_tokens) elts
     | Pexp_cons (hd, tl) -> pp hd ^/^ S.cons ^/^ pp tl
@@ -1268,7 +1267,7 @@ end = struct
   and pp_if_branch kw = function
     | { pexp_ext_attr = { pea_attrs = []; pea_ext = None }
       ; pexp_attributes = []
-      ; pexp_desc = Pexp_parens { begin_end = false; exp = Some e }
+      ; pexp_desc = Pexp_parens { exp = e; optional = _ }
       ; _ } ->
       group (kw ^/^ S.lparen) ^^ nest 2 (group (break 0 ^^ pp e ^^ S.rparen))
     | exp -> kw ^^ nest 2 (group (break 1 ^^ pp exp))
@@ -1449,15 +1448,15 @@ end = struct
   let is_function p =
     match p.pexp_desc with
     | Pexp_parens
-        { begin_end = false
-        ; exp = Some { pexp_desc = Pexp_function _; _ }
+        { optional = _
+        ; exp = { pexp_desc = Pexp_function _; _ }
         } ->
       true
     | _ -> false
 
   let pp_function_parts indent_fun ?lbl exp =
     match exp.pexp_desc with
-    | Pexp_parens { begin_end = false; exp = Some fun_exp } ->
+    | Pexp_parens { exp = fun_exp; optional = _ } ->
       let (fun_and_params, body) = Expression.pp_function_parts fun_exp in
       let first_part =
         optional (stringf "~%s:") lbl ^^ S.lparen ^^ fun_and_params

@@ -551,7 +551,8 @@ and expression_desc =
       indices: expression list;
       assign: expression option
     }
-  | Pexp_parens of { begin_end: bool; exp: expression option }
+  | Pexp_parens of { exp: expression; optional: bool }
+  | Pexp_begin_end of expression option
   | Pexp_list of expression list
   | Pexp_cons of expression * expression
   | Pexp_exclave of expression

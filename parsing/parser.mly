@@ -2565,7 +2565,7 @@ unboxed_access:
 
 simple_expr:
   | LPAREN seq_expr RPAREN
-      { mkexp ~loc:$sloc (Pexp_parens { begin_end = false; exp = Some $2 }) }
+      { mkexp ~loc:$sloc (Pexp_parens { exp = $2; optional = false }) }
   | LPAREN seq_expr error
       { unclosed "(" $loc($1) ")" $loc($3) }
   | LPAREN seq_expr type_constraint_with_modes RPAREN
@@ -2599,9 +2599,9 @@ simple_expr:
 ;
 %inline simple_expr_attrs:
   | BEGIN ext_attributes e = seq_expr END
-    { Pexp_parens { begin_end = true; exp = Some e }, $2 }
+    { Pexp_begin_end (Some e), $2 }
   | BEGIN ext_attributes END
-      { Pexp_parens { begin_end = true; exp = None }, $2 }
+      { Pexp_begin_end None, $2 }
   | BEGIN ext_attributes seq_expr error
       { unclosed "begin" $loc($1) "end" $loc($4) }
   | NEW ext_attributes mkrhs(class_longident)
@@ -2777,7 +2777,7 @@ block_access:
   | od=open_dot_declaration DOT LPAREN seq_expr RPAREN
       { let exp =
           let loc = $startpos($3), $endpos($5) in
-          mkexp ~loc (Pexp_parens { begin_end = false; exp = Some $4 })
+          mkexp ~loc (Pexp_parens { exp = $4; optional = false })
         in
         Pexp_dot_open(od, exp) }
   | od=open_dot_declaration DOT LBRACELESS object_expr_content GREATERRBRACE
