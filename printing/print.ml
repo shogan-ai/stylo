@@ -878,7 +878,9 @@ end = struct
         opt_token flatness "(" ~ws_after:break,
         opt_token flatness ~ws_before:break ")"
       else
-        S.lparen ^^ break 1, break 1 ^^ S.rparen
+        let space_when_multiline = group (vanishing_space flatness) in
+        S.lparen ^^ space_when_multiline ^^ break 0,
+        space_when_multiline ^^ break 0 ^^ S.rparen
     in
     let comma = S.comma ^^ break 1 in
     let pats =
