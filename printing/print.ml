@@ -1169,7 +1169,7 @@ end = struct
     | Pexp_index_op access ->
       pp_index_op (nb_semis exp.pexp_tokens)
         access.kind access.seq access.op access.indices access.assign
-    | Pexp_parens { exp; optional = _ } -> parens (pp exp)
+    | Pexp_parens { exp; optional } -> pp_parens ~optional exp
     | Pexp_begin_end exp ->
       prefix !!S.begin_ (optional pp exp) ^/^ S.end_
     | Pexp_list elts -> pp_list (nb_semis exp.pexp_tokens) elts
@@ -1267,7 +1267,7 @@ end = struct
   and pp_if_branch kw = function
     | { pexp_ext_attr = { pea_attrs = []; pea_ext = None }
       ; pexp_attributes = []
-      ; pexp_desc = Pexp_parens { exp = e; optional = _ }
+      ; pexp_desc = Pexp_parens { exp = e; optional = false }
       ; _ } ->
       group (kw ^/^ S.lparen) ^^ nest 2 (group (break 0 ^^ pp e ^^ S.rparen))
     | exp -> kw ^^ nest 2 (group (break 1 ^^ pp exp))
@@ -1316,6 +1316,48 @@ end = struct
   and pp_tuple elts =
     separate_map (S.comma ^^ break 1) (Argument.pp pp) elts
     |> group
+
+  and pp_parens_tuple ~attrs ~optional flatness pats =
+    let lparen, rparen =
+      if optional
+      then
+        let cond = Condition.flat flatness in
+        let break = Break (1, Hard (* doesn't make a difference *)) in
+        opt_token cond "(" ~ws_after:break,
+        opt_token cond ~ws_before:break ")"
+      else
+        let pat_is_flat = Condition.flat flatness in
+        let space_when_multiline = group (vanishing_space pat_is_flat) in
+        S.lparen ^^ space_when_multiline ^^ break 0,
+        space_when_multiline ^^ break 0 ^^ S.rparen
+    in
+    let comma = S.comma ^^ break 1 in
+    let elts =
+      List.mapi (fun i exp ->
+        let before = if i = 0 then lparen else comma in
+        group (before ^^ nest 2 (Argument.pp pp exp))
+      ) pats
+      |> separate (break 0)
+    in
+    Attribute.attach ~attrs elts ^^ group rparen
+
+  and pp_parens ~optional exp =
+    let flatness = flatness_tracker () in
+    group ~flatness @@
+    match exp.pexp_desc with
+    | Pexp_tuple elts ->
+      pp_parens_tuple ~optional flatness ~attrs:exp.pexp_attributes elts
+    | _ ->
+      let exp = pp exp in
+      let before, after =
+        (* No break? *)
+        if optional
+        then
+          let cond = Condition.flat flatness in
+          opt_token cond "(", opt_token cond ")"
+        else S.lparen, S.rparen
+      in
+      before ^^ nest 1 exp ^^ after
 
   and pp_apply e args = Application.pp (pp e) args
 
@@ -1448,7 +1490,7 @@ end = struct
   let is_function p =
     match p.pexp_desc with
     | Pexp_parens
-        { optional = _
+        { optional = false
         ; exp = { pexp_desc = Pexp_function _; _ }
         } ->
       true
@@ -1456,7 +1498,7 @@ end = struct
 
   let pp_function_parts indent_fun ?lbl exp =
     match exp.pexp_desc with
-    | Pexp_parens { exp = fun_exp; optional = _ } ->
+    | Pexp_parens { exp = fun_exp; optional = false } ->
       let (fun_and_params, body) = Expression.pp_function_parts fun_exp in
       let first_part =
         optional (stringf "~%s:") lbl ^^ S.lparen ^^ fun_and_params

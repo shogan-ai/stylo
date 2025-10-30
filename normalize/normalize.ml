@@ -57,10 +57,6 @@ let map_structure mapper env (items, tokens) =
   let tokens_with_minimal_semi = walk_both items tokens_no_semi in
   super.structure mapper env (items, tokens_with_minimal_semi)
 
-let default_expr_passing_context mapper _ desc =
-  let parent_for_recursive_calls = Context.Expr in
-  super.expression_desc mapper parent_for_recursive_calls desc
-
 let default_vb_passing_context mapper _ vb =
   let parent_for_recursive_calls = Context.Value_binding in
   super.value_binding mapper parent_for_recursive_calls vb
@@ -74,7 +70,8 @@ let normalizer =
     attribute = map_attribute
   ; pattern = Pattern.map
   ; pattern_desc = Pattern.map_desc
-  ; expression_desc = default_expr_passing_context
+  ; expression = Expression.map
+  ; expression_desc = Expression.map_desc
   ; argument_desc = default_arg_passing_context
   ; value_binding = default_vb_passing_context
   ; structure = map_structure
