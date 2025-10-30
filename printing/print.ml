@@ -1309,7 +1309,9 @@ end = struct
       let op = pp_op op in
       (* Basically we align a sublock after the op... except when we finish on a
          literal function in which case we only indent by 2 ??? *)
-      let indent = 2 in
+      let indent =
+        Requirement.to_int (requirement op) + 1 (* space *) + 2 (* indent *)
+      in
       let op_and_f = op ^^ nest indent (group (break 1 ^^ pp f)) in
       Application.pp ~indent op_and_f args
     | Pexp_infix_apply { op = next_op; arg1; arg2 } when not on_left ->
@@ -1435,7 +1437,7 @@ end = struct
       true
     | _ -> false
 
-  let pp_function_parts ~indent ?lbl exp =
+  let pp_function_parts indent_fun ?lbl exp =
     match exp.pexp_desc with
     | Pexp_parens { begin_end = false; exp = Some fun_exp } ->
       let (fun_and_params, body) = Expression.pp_function_parts fun_exp in
@@ -1443,40 +1445,40 @@ end = struct
         optional (stringf "~%s:") lbl ^^ S.lparen ^^ fun_and_params
       in
       first_part,
-      group (relative_nest indent (break 1 ^^ body) ^^ S.rparen)
+      group (indent_fun 2 (break 1 ^^ body) ^^ S.rparen)
       |> Attribute.attach ~attrs:exp.pexp_attributes
     | _ -> assert false
 
-  let pp_arg_parts indent arg =
+  let pp_arg_parts indent_fun arg =
     match arg.parg_desc with
     | Parg_unlabelled { legacy_modes=[]; arg; typ_constraint=None; modes=[] }
       when is_function arg ->
-      pp_function_parts ~indent arg
+      pp_function_parts indent_fun arg
     | Parg_labelled { optional=false; legacy_modes=[]; name;
                       maybe_punned=Some arg; typ_constraint=None;modes=[];
                       default=None }
       when is_function arg ->
-      pp_function_parts ~indent ~lbl:name arg
+      pp_function_parts indent_fun ~lbl:name arg
     | _ ->
       Argument.pp Expression.pp arg, empty
 
-  let pp_last_arg indent arg =
-    let p1, p2 = pp_arg_parts indent arg in
+  let pp_last_arg arg =
+    let p1, p2 = pp_arg_parts relative_nest arg in
     [ p1 ], p2
 
-  let pp_arg indent arg =
-    let p1, p2 = pp_arg_parts indent arg in
+  let pp_arg arg =
+    let p1, p2 = pp_arg_parts nest arg in
     p1 ^^ p2
 
-  let rec pp_args indent = function
+  let rec pp_args = function
     | [] -> assert false
-    | [ arg ] -> pp_last_arg indent arg
+    | [ arg ] -> pp_last_arg arg
     | arg :: args ->
-      let args, trailing = pp_args indent args in
-      pp_arg indent arg :: args, trailing
+      let args, trailing = pp_args args in
+      pp_arg arg :: args, trailing
 
   let pp ?(indent=2) f args =
-    let args, trailing = pp_args indent args in
+    let args, trailing = pp_args args in
     let f_and_args = separate (break 1) (f :: args) in
     nest indent (group f_and_args) ^^ trailing
 end
@@ -2356,7 +2358,7 @@ end = struct
 
   let pp_parts sg =
     with_modalities S.sig_ ~modalities:sg.psg_modalities,
-    pp_keeping_semi sg,
+    softest_line ^^ pp_keeping_semi sg,
     S.end_
 
   let pp sg =
@@ -2656,7 +2658,8 @@ end = struct
 
   let pp_parts attrs str =
     Attribute.attach ~attrs S.struct_,
-    group (pp_keeping_semi str), S.end_
+    softest_line ^^ group (pp_keeping_semi str),
+    S.end_
 
   let pp_implementation str =
     group (pp_keeping_semi str)
