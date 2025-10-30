@@ -11,6 +11,19 @@ end
 
 type flatness = private bool ref
 
+module Condition : sig
+  type t
+
+  val always : t
+
+  val (&&) : t -> t -> t
+  val not : t -> t
+
+  val flat : flatness -> t
+
+  val check : t -> bool
+end
+
 type softness =
   | Hard (** always introduce a line break *)
   | Soft (** Vanishes after blank lines, adds a break otherwise *)
@@ -22,15 +35,14 @@ type whitespace =
   (** [Break (n, softness)] prints as [n] spaces in flat mode, and behaves
       as a [Line_break softness] otherwise. *)
   | Non_breakable (** a simple space. *)
-  | Vanishing_space of flatness
-  (** Prints as a space in flat mode when the parent is not flat, and vanished
-      otherwise. *)
+  | Vanishing_space of Condition.t
+  (** Prints as a space when the condition is not met, vanishes otherwise. *)
 
 type t = private
   | Empty
   | Token of string
   | Optional of {
-      vanishing_level: flatness;
+      vanishing_cond: Condition.t;
       before: whitespace option;
       token: string;
       after: whitespace option;
@@ -48,7 +60,7 @@ val empty : t
 val string : string -> t
 
 val opt_token
-  : ?ws_before:whitespace -> ?ws_after:whitespace -> flatness -> string -> t
+  : ?ws_before:whitespace -> ?ws_after:whitespace -> Condition.t -> string -> t
 
 val break : int -> t
 val soft_break : int -> t
@@ -59,7 +71,7 @@ val softest_break : t
 (** [Break (1, Softest)], used between docstrings. *)
 
 val nbsp : t
-val vanishing_space : flatness -> t
+val vanishing_space : Condition.t -> t
 
 val comment : string -> t
 val docstring : string -> t

@@ -779,13 +779,25 @@ end = struct
       then nest 2 (group arg)
       else preceeding_tok ^^ nest 2 (group (break 1 ^^ arg))
     in
-    let flatness = flatness_tracker () in
+    let arrow_type_flatness = flatness_tracker () in
     let (acc, last_arrow) =
+      let colon_space =
+        let colon_space_flatness = flatness_tracker () in
+        let extra_space_cond =
+          let open Condition in
+          flat colon_space_flatness (* If that condition can't be met, the
+                                       layout is going to be awful anyway... *)
+          && not (flat arrow_type_flatness)
+        in
+        group ~flatness:colon_space_flatness (
+          S.colon ^^ vanishing_space (Condition.not extra_space_cond)
+        )
+      in
       List.fold_left (fun (acc, between) arg ->
         acc ^?^ pp_arg between arg, S.rarrow
-      ) (empty, group (S.colon ^^ vanishing_space flatness)) args
+      ) (empty, colon_space) args
     in
-    group ~flatness (
+    group ~flatness:arrow_type_flatness (
       acc ^/^ last_arrow ^^ nest 2 (group (break 1 ^^ codom))
     )
 
@@ -865,7 +877,9 @@ end = struct
       let before, after =
         (* No break? *)
         if optional
-        then opt_token flatness "(", opt_token flatness ")"
+        then
+          let cond = Condition.flat flatness in
+          opt_token cond "(", opt_token cond ")"
         else S.lparen, S.rparen
       in
       before ^^ nest 1 pat ^^ after
@@ -874,11 +888,13 @@ end = struct
     let lparen, rparen =
       if optional
       then
+        let cond = Condition.flat flatness in
         let break = Break (1, Hard (* doesn't make a difference *)) in
-        opt_token flatness "(" ~ws_after:break,
-        opt_token flatness ~ws_before:break ")"
+        opt_token cond "(" ~ws_after:break,
+        opt_token cond ~ws_before:break ")"
       else
-        let space_when_multiline = group (vanishing_space flatness) in
+        let pat_is_flat = Condition.flat flatness in
+        let space_when_multiline = group (vanishing_space pat_is_flat) in
         S.lparen ^^ space_when_multiline ^^ break 0,
         space_when_multiline ^^ break 0 ^^ S.rparen
     in

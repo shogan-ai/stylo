@@ -98,8 +98,8 @@ let whitespace buf state indent flat = function
   | Non_breakable ->
     Buffer.add_spaces buf 1;
     incr_col state 1
-  | Vanishing_space tracked_lvl_is_flat ->
-    if not flat || !(tracked_lvl_is_flat :> bool ref) then
+  | Vanishing_space cond ->
+    if Condition.check cond then
       state
     else (
       Buffer.add_spaces buf 1;
@@ -110,8 +110,8 @@ let rec pretty buf state indent flat = function
   | Empty -> state
   | Token s
   | Comment s -> text buf state s
-  | Optional { before; after; vanishing_level; token } ->
-    if !(vanishing_level :> bool ref) then
+  | Optional { before; after; vanishing_cond; token } ->
+    if Condition.check vanishing_cond then
       state
     else
       let ws state = function

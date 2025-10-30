@@ -67,12 +67,11 @@ let pp_keeping_semi pp_item =
     | Semi_followed_by tokens ->
       perhaps_semi (doc ^?^ Syntax.semisemi) items tokens
     | Opt_semi_followed_by tokens ->
-      (* This one is optional, but will never actually disappear since we are
-         not actually tracking the flatness of any group.
+      (* This one is optional, and will always disappear since we are not
+         actually tracking the flatness of any group.
          Pretty sure this branch is dead code, and we could [assert false] here,
          but why bother? *)
-      let noise = flatness_tracker () in
-      perhaps_semi (doc ^^ opt_semisemi_doc noise) items tokens
+      perhaps_semi (doc ^^ opt_semisemi_doc Condition.always) items tokens
     | Child_followed_by _ as cont ->
       expect_item doc items cont
     | Done -> doc, Done
@@ -87,7 +86,7 @@ let pp_keeping_semi pp_item =
         perhaps_semi (add_item doc item) items tokens
       | Opt_semi_followed_by tokens ->
         let flatness = flatness_tracker () in
-        let item = item ^^ opt_semisemi_doc flatness in
+        let item = item ^^ opt_semisemi_doc (Condition.flat flatness) in
         perhaps_semi (add_item ~flatness doc item) items tokens
       | cont ->
         expect_item (add_item doc item) items cont

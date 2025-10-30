@@ -24,6 +24,20 @@ module Req = Requirement
    add a dynamic check to prevent that. *)
 type flatness = bool ref
 
+module Condition = struct
+  type t = bool lazy_t
+
+  let always = lazy true
+
+  let (!!) = Lazy.force
+
+  let flat r = lazy !r
+  let not t = lazy (not !!t)
+  let (&&) t1 t2 = lazy (!!t1 && !!t2)
+
+  let check = (!!)
+end
+
 type softness =
   | Hard (** always introduce a line break *)
   | Soft (** Vanishes after blank lines, adds a break otherwise *)
@@ -33,7 +47,7 @@ type whitespace =
   | Line_break of softness
   | Break of int * softness
   | Non_breakable
-  | Vanishing_space of flatness
+  | Vanishing_space of Condition.t
 
 (* FIXME: comments and strings can contain newlines, they should be represented
    by something other than "string". *)
@@ -41,7 +55,7 @@ type t =
   | Empty
   | Token of string
   | Optional of {
-      vanishing_level: flatness;
+      vanishing_cond: Condition.t;
       before: whitespace option;
       token: string;
       after: whitespace option;
@@ -79,12 +93,12 @@ let softest_break = Whitespace (Break (1, Softest))
 let nbsp = Whitespace Non_breakable
 let vanishing_space lvl = Whitespace (Vanishing_space lvl)
 
-let opt_token ?ws_before ?ws_after vanishing_level tok =
+let opt_token ?ws_before ?ws_after vanishing_cond tok =
   match ws_before, ws_after with
   | Some _, Some _ -> invalid_arg "Document.opt_token"
   | _ ->
     Optional
-      { vanishing_level; before = ws_before; after = ws_after; token = tok }
+      { vanishing_cond; before = ws_before; after = ws_after; token = tok }
 
 (* FIXME *)
 let comment s = Comment ("(*" ^ s ^ "*)")
