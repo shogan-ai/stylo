@@ -1538,8 +1538,8 @@ end = struct
 
   let pp ?(indent=2) f args =
     let args, trailing = pp_args args in
-    let f_and_args = separate (break 1) (f :: args) in
-    nest indent (group f_and_args) ^^ trailing
+    let f_and_args = separate (break 1) args in
+    group (f ^^ nest indent (group (break 1 ^^ f_and_args))) ^^ trailing
 end
 
 and Case : sig
