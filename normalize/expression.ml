@@ -23,7 +23,50 @@ let map_desc mapper _ desc =
   let parent_for_recursive_calls = Context.Expr desc in
   super.expression_desc mapper parent_for_recursive_calls desc
 
+let insert_pipe_if_missing ~after:kw =
+  let open Tokens in
+  let rec insert_before_child = function
+    | [] -> assert false
+    | tok :: toks ->
+      match tok.desc with
+      | Child_node ->
+        { tok with desc = Token BAR } :: tok :: toks
+      | Token BAR -> tok :: toks
+      | _ -> tok :: insert_before_child toks
+  in
+  let rec seek = function
+    | [] -> assert false
+    | tok :: toks ->
+      tok ::
+      (match tok.desc with
+       | Opt_token t
+       | Token t when Tokens.Raw.equals t kw -> insert_before_child toks
+       | _ -> seek toks)
+  in
+  seek
+
+let map_function_body mapper ctxt fb =
+  let fb =
+    match fb.pfb_desc with
+    | Pfunction_cases _ ->
+      (* Force leading pipe *)
+      let tokens = insert_pipe_if_missing ~after:FUNCTION fb.pfb_tokens in
+      { fb with pfb_tokens = tokens }
+    | _ -> fb
+  in
+  super.function_body mapper ctxt fb
+
 let map mapper (parent : Context.parent) exp =
+  (* local changes first *)
+  let exp =
+    match exp.pexp_desc with
+    | Pexp_match _ ->
+      (* Force leading pipe *)
+      let tokens = insert_pipe_if_missing ~after:WITH exp.pexp_tokens in
+      { exp with pexp_tokens = tokens }
+    | _ -> exp
+  in
+  (* context dependent changes *)
   let exp =
     match parent, exp.pexp_desc with
     (* Nothing special to do if parent is parens. *)

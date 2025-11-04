@@ -72,6 +72,7 @@ let normalizer =
   ; pattern_desc = Pattern.map_desc
   ; expression = Expression.map
   ; expression_desc = Expression.map_desc
+  ; function_body = Expression.map_function_body
   ; argument_desc = default_arg_passing_context
   ; value_binding = default_vb_passing_context
   ; structure = map_structure
