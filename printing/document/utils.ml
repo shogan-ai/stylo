@@ -44,11 +44,10 @@ let flow_map sep f docs =
 let flow sep docs =
   flow_map sep (fun x -> x) docs
 
-let prefix_gen n b left right =
+let prefix ?indent:(n=2) ?(extra_indent=0) ?(spaces=1) left right =
+  let indent = n + extra_indent in
   match left, right with
   | Empty, doc
   | doc, Empty -> doc
   | _ ->
-    group (left ^^ nest n (break b ^^ right))
-
-let prefix = prefix_gen 2 1
+    group (left ^^ nest indent (break spaces ^^ right))

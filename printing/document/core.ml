@@ -114,7 +114,7 @@ let (^^) t1 t2 =
 
 let nest i = function
   | Empty -> Empty
-  | t -> Nest (requirement t, i, t)
+  | t -> if i = 0 then t else Nest (requirement t, i, t)
 
 let relative_nest i = function
   | Empty -> Empty
