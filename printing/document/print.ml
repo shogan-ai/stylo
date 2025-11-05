@@ -8,7 +8,7 @@ type line_info =
 type state = {
   max_width: int;
   column: int;
-  line_indent: int;
+  line_indent: int; (* might refer to the previous line! *)
   line: line_info;
 }
 
@@ -22,7 +22,7 @@ module Buffer : sig
   type t
 
   val create : int -> t
-  val newline : indent:int -> t -> unit
+  val newline : t -> unit
   val add_spaces : t -> int -> unit
   val add_string : t -> string -> unit
   val contents : t -> string
@@ -49,9 +49,8 @@ end = struct
 
   let create n = { buf = Buffer.create n; delayed_ws = 0 }
 
-  let newline ~indent t =
-    Buffer.add_char t.buf '\n';
-    t.delayed_ws <- indent
+  let newline t =
+    Buffer.add_char t.buf '\n'
 
   let add_spaces t n =
     t.delayed_ws <- t.delayed_ws + n
@@ -63,27 +62,42 @@ end = struct
   let contents t = Buffer.contents t.buf
 end
 
-let newline st indent soft t =
+let newline st soft t =
   match soft, st.line with
   | Soft, Follows_blank_line
   | Softest, (Is_empty | Follows_blank_line) -> st
   | _ ->
-    Buffer.newline t ~indent;
+    Buffer.newline t;
     let line =
       match st.line with
       | Has_text -> Is_empty
       | _ -> Follows_blank_line
     in
     { st with
-      column = indent;
-      line_indent = indent;
+      column = 0;
       line;
     }
 
-let text buf state s =
+let text buf state indent s =
+  let state =
+    match state.line with
+    | Has_text -> state
+    | _ ->
+      Buffer.add_spaces buf indent;
+      { state with column = indent; line_indent = indent }
+  in
   Buffer.add_string buf s;
   incr_col state (String.length s)
   |> has_text
+
+let add_spaces buf state indent n =
+  let n =
+    match state.line with
+    | Has_text -> n
+    | _ -> indent + n
+  in
+  Buffer.add_spaces buf n;
+  incr_col state n
 
 let whitespace buf state indent flat = function
   | Break (spaces, soft) ->
@@ -91,25 +105,22 @@ let whitespace buf state indent flat = function
       Buffer.add_spaces buf spaces;
       incr_col state spaces
     ) else
-      newline state indent soft buf
+      newline state soft buf
   | Line_break soft ->
     assert (not flat);
-    newline state indent soft buf
+    newline state soft buf
   | Non_breakable ->
-    Buffer.add_spaces buf 1;
-    incr_col state 1
+    add_spaces buf state indent 1
   | Vanishing_space cond ->
     if Condition.check cond then
       state
-    else (
-      Buffer.add_spaces buf 1;
-      incr_col state 1
-    )
+    else
+      add_spaces buf state indent 1
 
 let rec pretty buf state indent flat = function
   | Empty -> state
   | Token s
-  | Comment s -> text buf state s
+  | Comment s -> text buf state indent s
   | Optional { before; after; vanishing_cond; token } ->
     if Condition.check vanishing_cond then
       state
@@ -119,7 +130,7 @@ let rec pretty buf state indent flat = function
         | Some ws -> whitespace buf state indent flat ws
       in
       let state' = ws state before in
-      let state'' = text buf state' token in
+      let state'' = text buf state' indent token in
       ws state'' after
   | Whitespace ws -> whitespace buf state indent flat ws
   | Cat (_, t1, t2) ->
@@ -136,8 +147,18 @@ let rec pretty buf state indent flat = function
     pretty buf state indent flat t
   | Group (req, flat_track_opt, t) ->
     let flat =
-      flat
-      || Requirement.(to_int @@ req + of_int state.column) <= state.max_width
+      flat ||
+      let gp_req =
+        let open Requirement in
+        match state.line with
+        | Has_text -> to_int (req + of_int state.column)
+        | _ ->
+          assert (state.column = 0);
+          to_int_including_indent ~prev_line_indent:state.line_indent
+            ~current_indent:indent req
+      in
+      gp_req <= state.max_width
+
     in
     Option.iter (fun flatness ->
       (flatness : flatness :> bool ref) := flat

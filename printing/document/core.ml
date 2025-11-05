@@ -7,15 +7,61 @@ module Requirement : sig
   val to_int : t -> int
 
   val ( + ) : t -> t -> t
+  (** Beware: not commutative! *)
+
+  val nest : int -> t -> t
+  val relative_nest : int -> t -> t
+
+  val to_int_including_indent
+    : prev_line_indent:int -> current_indent:int -> t -> int
 end = struct
-  type t = int
+  type indent =
+    | Fixed_increase of int
+    | Relative_increase of int
 
-  let infinity = max_int
+  type t = {
+    compact_width: int;
+    potential_extra_indent: indent;
+  }
 
-  let of_int i = i
-  let to_int i = i
+  let of_int i =
+    { compact_width = i; potential_extra_indent = Fixed_increase 0 }
+  let to_int i = i.compact_width
 
-  let (+) a b = if a = infinity || b = infinity then infinity else a + b
+  let infinity = of_int max_int
+
+  let to_int_including_indent ~prev_line_indent ~current_indent t =
+    if t = infinity
+    then t.compact_width
+    else
+      let indent =
+        match t.potential_extra_indent with
+        | Fixed_increase n -> current_indent + n
+        | Relative_increase n ->
+          max (prev_line_indent + n) current_indent
+      in
+      t.compact_width + indent
+
+  let nest i t =
+    if t = infinity
+    then infinity
+    else
+      let indent =
+        match t.potential_extra_indent with
+        | Fixed_increase n -> Fixed_increase (n + i)
+        | Relative_increase n -> Relative_increase (n + i)
+      in
+      { t with potential_extra_indent = indent }
+
+  let relative_nest i t =
+    if t = infinity
+    then infinity
+    else { t with potential_extra_indent = Relative_increase i }
+
+  let (+) a b =
+    if a = infinity || b = infinity
+    then infinity
+    else { a with compact_width = a.compact_width + b.compact_width }
 end
 
 module Req = Requirement
@@ -114,11 +160,11 @@ let (^^) t1 t2 =
 
 let nest i = function
   | Empty -> Empty
-  | t -> if i = 0 then t else Nest (requirement t, i, t)
+  | t -> if i = 0 then t else Nest (Req.nest i (requirement t), i, t)
 
 let relative_nest i = function
   | Empty -> Empty
-  | t -> Relative_nest (requirement t, i, t)
+  | t -> Relative_nest (Req.relative_nest i (requirement t), i, t)
 
 let group ?flatness = function
   | Empty -> Empty

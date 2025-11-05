@@ -7,6 +7,9 @@ module Requirement : sig
   val to_int : t -> int
 
   val ( + ) : t -> t -> t
+
+  val to_int_including_indent
+    : prev_line_indent:int -> current_indent:int -> t -> int
 end
 
 type flatness = private bool ref
