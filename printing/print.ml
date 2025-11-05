@@ -3232,7 +3232,7 @@ end = struct
           exp.main ^?^
         exp.stop
       in
-      prefix ~extra_indent bindings_and_typ eq_and_exp
+      prefix ~indent:extra_indent bindings_and_typ eq_and_exp
 
 
   let pp ?preceeding ?item ?(equal_sign = S.equals) ?pre_text ?pre_doc ~keyword
