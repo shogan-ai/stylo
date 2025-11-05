@@ -118,6 +118,9 @@ let map mapper (parent : Context.parent) pat =
       | _ when simple_pattern sub -> remove_parens pat
       | _ -> pat
       end
+    | Expr _, Ppat_parens { pat = { ppat_desc = Ppat_or _; _ }; _ }
+      when pat.ppat_attributes = [] ->
+      remove_parens pat
     (* Nothing special to do if parent is parens. *)
     | Pat Ppat_parens _, _ -> pat
     (* Add parens as necessary *)
