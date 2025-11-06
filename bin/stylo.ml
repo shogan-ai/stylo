@@ -88,6 +88,9 @@ let fuzzer_batch fn =
         | with_comments ->
           let styled = Document.Print.to_string ~width:!width with_comments in
           match Ast_checker.check_same_ast fn i ~impl:(not intf) src styled with
+          | exception _ ->
+            Format.eprintf "%s, line %d: syntax error in output@." fn i;
+            has_errors := true
           | false ->
             Format.eprintf "%s, line %d: ast changed@." fn i;
             has_errors := true
