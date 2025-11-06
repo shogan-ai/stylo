@@ -137,7 +137,7 @@ let rec pretty buf state indent flat = function
     let state' = pretty buf state indent flat t1 in
     pretty buf state' indent flat t2
   | Nest (_, i, t) ->
-    pretty buf state (indent + i) flat t
+    pretty buf state (indent + Lazy.force i) flat t
   | Relative_nest (_, rel_indent, t) ->
     let indent =
       (* we don't want to decrease the indent, we just don't want to increase it

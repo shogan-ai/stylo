@@ -241,7 +241,7 @@ let rec walk_both state seq doc =
 
     | _, Doc.Nest (_, i, doc) ->
       let rest, doc, state' = walk_both (under_nest state) seq doc in
-      rest, Doc.nest i doc, exit_nest state state'
+      rest, Doc.nest ~extra_indent:i 0 doc, exit_nest state state'
     | _, Doc.Relative_nest (_, i, doc) ->
       let rest, doc, state' = walk_both (under_nest state) seq doc in
       rest, Doc.relative_nest i doc, exit_nest state state'

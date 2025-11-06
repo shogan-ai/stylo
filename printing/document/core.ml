@@ -9,15 +9,15 @@ module Requirement : sig
   val ( + ) : t -> t -> t
   (** Beware: not commutative! *)
 
-  val nest : int -> t -> t
+  val nest : int lazy_t -> t -> t
   val relative_nest : int -> t -> t
 
   val to_int_including_indent
     : prev_line_indent:int -> current_indent:int -> t -> int
 end = struct
   type indent =
-    | Fixed_increase of int
-    | Relative_increase of int
+    | Fixed_increase of int lazy_t
+    | Relative_increase of int lazy_t
 
   type t = {
     compact_width: int;
@@ -25,7 +25,7 @@ end = struct
   }
 
   let of_int i =
-    { compact_width = i; potential_extra_indent = Fixed_increase 0 }
+    { compact_width = i; potential_extra_indent = Fixed_increase (lazy 0) }
   let to_int i = i.compact_width
 
   let infinity = of_int max_int
@@ -36,9 +36,9 @@ end = struct
     else
       let indent =
         match t.potential_extra_indent with
-        | Fixed_increase n -> current_indent + n
+        | Fixed_increase n -> current_indent + Lazy.force n
         | Relative_increase n ->
-          max (prev_line_indent + n) current_indent
+          max (prev_line_indent + Lazy.force n) current_indent
       in
       t.compact_width + indent
 
@@ -48,15 +48,17 @@ end = struct
     else
       let indent =
         match t.potential_extra_indent with
-        | Fixed_increase n -> Fixed_increase (n + i)
-        | Relative_increase n -> Relative_increase (n + i)
+        | Fixed_increase n ->
+          Fixed_increase (lazy (Lazy.force n + Lazy.force i))
+        | Relative_increase n ->
+          Relative_increase (lazy (Lazy.force n + Lazy.force i))
       in
       { t with potential_extra_indent = indent }
 
   let relative_nest i t =
     if t = infinity
     then infinity
-    else { t with potential_extra_indent = Relative_increase i }
+    else { t with potential_extra_indent = Relative_increase (lazy i) }
 
   let (+) a b =
     if a = infinity || b = infinity
@@ -109,7 +111,7 @@ type t =
   | Comment of string
   | Whitespace of whitespace
   | Cat of Req.t * t * t
-  | Nest of Req.t * int * t
+  | Nest of Req.t * int lazy_t * t
   | Relative_nest of Req.t * int * t
   | Group of Req.t * flatness option * t
 
@@ -158,9 +160,18 @@ let (^^) t1 t2 =
     let req = Req.(requirement t1 + requirement t2) in
     Cat (req, t1, t2)
 
-let nest i = function
+let nest ?extra_indent i = function
   | Empty -> Empty
-  | t -> if i = 0 then t else Nest (Req.nest i (requirement t), i, t)
+  | t ->
+    match extra_indent, i with
+    | None, 0 -> t
+    | None, i ->
+      let indent = lazy i in
+      Nest (Req.nest indent (requirement t), indent, t)
+    | Some e_i, i ->
+      let indent = lazy (Lazy.force e_i + i) in
+      Nest (Req.nest indent (requirement t), indent, t)
+
 
 let relative_nest i = function
   | Empty -> Empty
