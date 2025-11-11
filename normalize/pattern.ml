@@ -84,6 +84,7 @@ let try_removing_parens parent p =
   | { ppat_desc = Ppat_parens { pat = p'; optional = _ }; _ } ->
     begin match parent with
     | Ppat_open _ -> p
+    | Ppat_alias _
     | Ppat_lazy _
     | Ppat_tuple _
     | Ppat_construct _ when not (simple_pattern p') -> p
