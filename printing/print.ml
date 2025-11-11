@@ -1738,7 +1738,7 @@ end = struct
     let constr = S.bquote ^^ string lbl in
     let arg = optional pp eo in
     let constr, extra_indent = Preceeding.group_with preceeding constr in
-    group (constr ^/^ nest ~extra_indent 2 arg)
+    group (constr ^?^ nest ~extra_indent 2 arg)
 
   and pp_record ~preceeding ?(unboxed = false) nb_semis expr_opt fields =
     let semi_as_term = List.compare_length_with fields nb_semis = 0 in
