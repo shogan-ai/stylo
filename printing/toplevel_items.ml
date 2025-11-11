@@ -24,19 +24,29 @@ let add_item ?flatness doc item =
        ]}
        the following would happen:
        1. [flat_item] is printed (and is flat)
-       2. the [break 0] that follows vanishes
-       3. [hardline] is printed
+       2. the [break 0] that follows it vanishes
+       3. [softline] adds a \n
        4. the comment is inserted (with no extra spacing as it is between two
        spaces/breaks already)
-       5. a hardline is inserted because of [blank_line]
-       That is: we have no blank line, and the item the comment refers to
-       becomes unclear.
+       5. a \n is inserted because of [soft_break 0] (since item is not flat)
+
+       As a result we have no blank line, and the item to which the comment
+       refers becomes unclear.
 
        The nest allows the comment insertion code to traverse the group,
-       delaying the comment until after the [nest 0 blankline], and producing
-       the output we expect. *)
+       delaying the comment until after the [nest soft_break], and producing
+       the output we expect.
+
+       N.B. there is an extra level of trickery: [nest n doc] is a smart
+       constructor that just returns [doc] if [n = 0] (and there's no
+       [extra_indent]).
+       Here we want to force the insertion of a [Nest] node, without changing
+       the indentation of [doc], ... so we additionally give an [~extra_indent],
+       also set to 0. *)
     doc ^^ softline ^^
-    group ?flatness (nest 0 (soft_break 0) ^^ item ^^ break 0)
+    group ?flatness (
+      nest ~extra_indent:(lazy 0) (0)
+        (soft_break 0) ^^ item ^^ break 0)
 
 type cont =
   | Semi_followed_by of seq

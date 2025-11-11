@@ -1,0 +1,6 @@
+let flat1 = true
+let flat2 = true
+
+(* cmt on non_flat *)
+let non_flat = function
+  | cannot_be_flat -> true
