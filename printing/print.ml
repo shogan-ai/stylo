@@ -51,14 +51,7 @@ let str_or_op (so : Longident.str_or_op) =
   match so with
   | Str s -> string s
   | Str_trailing_hash s -> string s ^^ S.hash
-  | Op s ->
-    let s =
-      if String.get s 0 = '*' || String.get s (String.length s - 1) = '*' then
-        break 1 ^^ string s ^^ break 1
-      else
-        string s
-    in
-    parens s
+  | Op s -> parens (break 1 ^^ string s ^^ break 1)
   | DotOp (op, paren_kind, index_mod, assign) ->
     let index_mod = if index_mod = "" then empty else S.semi ^^ S.dotdot in
     let left, right =
@@ -271,7 +264,7 @@ end = struct
   let pp_list ?item l = separate_map (break 0) (pp ?item) l
 
   let attach ?item ?(text = []) ?pre_doc ?post_doc ~attrs t =
-    let with_attrs = t ^?^ pp_list ?item attrs in
+    let with_attrs = group (t ^?^ pp_list ?item attrs) in
     begin match text with
     | [] -> empty
     | text ->
@@ -317,7 +310,7 @@ end = struct
   let pp_classic ~floating names payload =
     let name = Attribute.pp_attr_name names in
     (if floating then S.lbracket_percentpercent else S.lbracket_percent)
-    ^^ name ^^ Payload.pp payload ^^ S.rbracket
+    ^^ name ^^ nest 2 (Payload.pp payload ^^ S.rbracket)
 
   let pp ?(floating=false) (ext_name, ext_payload, _tokens) =
     match ext_payload with
@@ -1272,7 +1265,7 @@ end = struct
     | Pexp_sequence (e1, e2) ->
       (* FIXME: ext_attr not at the beginning, the token synchronisation is
          going to have issues. *)
-      pp ?preceeding e1 ^^ !!S.semi ^/^ pp e2
+      pp ?preceeding e1 ^^ !!S.semi ^^ hardline ^^ pp e2
     | Pexp_seq_empty e ->
       pp ?preceeding e ^^ S.semi
       (* the following is needed if we're at the end of a record (or
@@ -1414,7 +1407,13 @@ end = struct
       nest ~extra_indent 2 (optional pp exp) ^?^
       nest ~extra_indent 0 S.end_
     | Pexp_list elts -> pp_list ~preceeding (nb_semis exp.pexp_tokens) elts
-    | Pexp_cons (hd, tl) -> pp ?preceeding hd ^/^ S.cons ^/^ pp tl
+    | Pexp_cons (hd, tl) ->
+      let extra_indent = Preceeding.implied_indent preceeding in
+      let cons = Preceeding.mk ~extra_indent (S.cons ^^ break 1) ~indent:2 in
+      group (
+        pp ?preceeding hd ^/^
+        pp ~preceeding:cons tl
+      )
     | Pexp_exclave exp ->
       let excl, extra_indent = Preceeding.group_with preceeding S.exclave__ in
       excl ^/^ nest ~extra_indent 2 (pp exp)
@@ -1567,20 +1566,32 @@ end = struct
       group (kw ^/^ S.lparen) ^^ nest 2 (group (break 0 ^^ pp e ^^ S.rparen))
     | exp -> kw ^^ nest 2 (group (break 1 ^^ pp exp))
 
-  and pp_delimited_seq ~preceeding (opn, cls) nb_semis elts =
-    let opn, extra_indent = Preceeding.group_with preceeding opn in
-    let semi_as_term = List.compare_length_with elts nb_semis = 0 in
-    let elts =
-      if semi_as_term then
-        separate_map (break 1) (fun elt -> pp elt ^^ S.semi) elts
-      else
-        separate_map (S.semi ^^ break 1) pp elts
-    in
-    group (
-      opn ^?^
-      nest ~extra_indent 2 elts ^?^
-      nest ~extra_indent 0 cls
-    )
+  and pp_delimited_seq ~preceeding (opn, cls) nb_semis = function
+    | [] ->
+      let opn, extra_indent = Preceeding.group_with preceeding opn in
+      group (opn ^/^ nest ~extra_indent 0 cls)
+    | elts ->
+      let semi_as_term = List.compare_length_with elts nb_semis = 0 in
+      let pre_opn, extra_indent =
+        Preceeding.extend preceeding (opn ^^ break 1) ~indent:2 in
+      let semi_as_pre =
+        Preceeding.mk ~extra_indent ~indent:2 (S.semi ^^ break 1)
+      in
+      let opn_and_elts =
+        foldli (fun i acc elt ->
+          if i = 0 then
+            pp ~preceeding:pre_opn elt
+          else
+            acc ^^ break 0 ^^ pp ~preceeding:semi_as_pre elt
+        ) empty elts
+      in
+      group (
+        opn_and_elts ^^
+        nest ~extra_indent 0 (
+          (if semi_as_term then break 0 ^^ S.semi else empty) ^/^
+          cls
+        )
+      )
 
   and pp_pack ~preceeding ~ext_attr me ty =
     let lparen_module, extra_indent =
@@ -1593,7 +1604,7 @@ end = struct
     in
     group (
       lparen_module ^/^
-      nest ~extra_indent 2 me_and_ty ^/^
+      nest ~extra_indent 2 me_and_ty ^^
       nest ~extra_indent 0 S.rparen
     )
 
@@ -1885,7 +1896,7 @@ end = struct
     let args = separate (break 1) args in
     group (
       f ^/^
-      nest ?extra_indent indent (group args)
+      nest ?extra_indent indent args
     ) ^^
     nest ?extra_indent 0 trailing
 end
@@ -1923,9 +1934,10 @@ end = struct
       prefix (group (pp_pattern pipe pc_lhs))
         (pp_guard pc_guard) ^^
       nest 2 (
-        (* always try to put on the same line as what preceeds if it fits. *)
-        group (break 1 ^^ S.rarrow) ^/^
-        Expression.pp pc_rhs
+        (* always try to put things on the same line as what preceeds if they
+           fit. *)
+        group (break 1 ^^ S.rarrow) ^^
+        group (break 1 ^^ Expression.pp pc_rhs)
       )
     )
 
@@ -2329,19 +2341,30 @@ end = struct
       | [] -> empty
       | vars -> Core_type.pp_poly_bindings vars ^^ S.dot
     in
-    prefix
-      (group ((if pipe then S.pipe else empty) ^?^
-              constr_ident pcd_name.txt))
-      (match pcd_args, pcd_res with
-       | Pcstr_tuple [], None -> empty
-       | args, None ->
-         S.of_ ^/^ Constructor_argument.pp_args args
-       | Pcstr_tuple [], Some ct ->
-         S.colon ^?^ pcd_vars ^?^ Core_type.pp ct
-       | args, Some ct ->
-         S.colon ^?^ pcd_vars ^?^
-         Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct)
-    |> Attribute.attach ~attrs:pcd_attributes ?post_doc:pcd_doc
+    let name = group (constr_ident pcd_name.txt) in
+    let constr =
+      match pcd_args, pcd_res with
+      | Pcstr_tuple [], None -> name
+      | args, None ->
+        group (name ^/^ nest 2 S.of_) ^/^ nest 2 @@ Constructor_argument.pp_args args
+      | Pcstr_tuple [], Some ct ->
+        group (name ^/^ nest 2 S.colon) ^?^ nest 2 (pcd_vars ^?^ Core_type.pp ct)
+      | args, Some ct ->
+        group (name ^/^ nest 2 S.colon) ^?^ nest 2 (
+          pcd_vars ^?^
+          Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct
+        )
+    in
+    let without_pipe =
+      Attribute.attach ~attrs:pcd_attributes ?post_doc:pcd_doc
+        constr
+      |> group
+    in
+    if pipe then (
+      (* we never want to break after the pipe. *)
+      S.pipe ^^ nbsp ^^ nest 2 without_pipe
+    ) else
+      without_pipe
 
   let pp_variant = function
     | [] -> S.pipe
@@ -3343,14 +3366,22 @@ end = struct
       ?item ~attrs:pvb_attributes
       ?post_doc:pvb_post_doc
 
-  let rec pp_list ?preceeding ?(item=false) ~start = function
+  let pp_ands ?extra_indent ~item ~sep bindings =
+    List.map (fun it -> nest ?extra_indent 0 @@ group (pp ~item [S.and_] it))
+      bindings
+    |> separate sep
+
+  let pp_list ?preceeding ?(item=false) ~start = function
     | [] -> empty
     | [ x ] -> pp ?preceeding ~item start x
     | x :: xs ->
       let sep = if item then hardline ^^ hardline else break 1 in
+      let extra_indent =
+        Option.map (fun _ -> Preceeding.implied_indent preceeding) preceeding
+      in
       group (pp ?preceeding ~item start x) ^^
       sep ^^
-      pp_list ~item ~start:[S.and_] xs
+      pp_ands ?extra_indent ~item ~sep xs
 end
 
 and Module_binding : sig
