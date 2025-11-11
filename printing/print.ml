@@ -1217,7 +1217,9 @@ end = struct
       op ^^ opt_space_then_pp ~extra_indent arg
     | Pexp_infix_apply {op; arg1; arg2} ->
       let extra_indent = Preceeding.implied_indent preceeding in
-      pp ?preceeding arg1 ^/^ nest ~extra_indent 0 (pp_op_apply op arg2)
+      group (
+        pp ?preceeding arg1 ^/^ nest ~extra_indent 0 (pp_op_apply op arg2)
+      )
     | Pexp_apply (e, args) -> pp_apply ~preceeding e args
     | Pexp_match (e, cases) ->
       pp_match ~preceeding ~ext_attrs:exp.pexp_ext_attr
@@ -1367,7 +1369,7 @@ end = struct
         pre_let ^/^
         nest ~extra_indent 0 (Open_declaration.pp ~item:false od ^/^ S.in_)
       in
-      let_open ^^ hardline ^^ nest ~extra_indent 0 (pp e)
+      group let_open ^^ hardline ^^ nest ~extra_indent 0 (pp e)
     | Pexp_letop lo ->
       (* FIXME: pass fwd. *)
       Preceeding.group_with preceeding @@ Letop.pp lo
@@ -1547,7 +1549,7 @@ end = struct
     let if_cond = if_ ^/^ nest ~extra_indent 2 (pp e1) in
     let then_ = pp_if_branch S.then_ e2 in
     let else_ = optional pp_else_branch e3_o in
-    if_cond ^/^ nest ~extra_indent 0 (then_ ^?^ else_)
+    group if_cond ^/^ nest ~extra_indent 0 (then_ ^?^ else_)
 
   and pp_else_branch = function
     | { pexp_ext_attr = ext_attrs
@@ -1784,6 +1786,7 @@ end = struct
       nest ~extra_indent 2
         (optional (fun v -> group @@ Type_constraint.pp v) rf.typ)
     in
+    group @@
     match rf.value with
     | None -> lhs
     | Some v ->
