@@ -250,8 +250,8 @@ end = struct
     separate_map S.dot pp_one ids.txt
 
   let pp lbat name payload =
-    group @@ nest 2 (
-      lbat ^^ pp_attr_name name ^^ Payload.pp payload ^^ S.rbracket
+    group (
+      lbat ^^ pp_attr_name name ^^ nest 2 @@ Payload.pp payload ^^ S.rbracket
     )
 
   let pp_floating { attr_name; attr_payload; attr_loc = _; attr_tokens = _ } =
