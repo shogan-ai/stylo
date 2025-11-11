@@ -50,6 +50,7 @@ end = struct
   let create n = { buf = Buffer.create n; delayed_ws = 0 }
 
   let newline t =
+    t.delayed_ws <- 0;
     Buffer.add_char t.buf '\n'
 
   let add_spaces t n =
