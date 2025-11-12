@@ -31,7 +31,13 @@ let append_trailing_comments (tokens, doc, _) =
     | [ T.{ desc = Token EOF; _ } ] -> doc
     | tok :: toks ->
       match tok.T.desc with
-      | Comment (c, _) -> aux Doc.Utils.(doc ^?^ Doc.comment c) toks
+      | Comment c ->
+        let doc =
+          if !(c.explicitely_inserted)
+          then doc
+          else Doc.Utils.(doc ^?^ Doc.comment c.text)
+        in
+        aux doc toks
       | Token _
       | Opt_token _ -> raise (Error (Missing_token tok.pos))
       | Child_node -> assert false
@@ -42,8 +48,9 @@ let rec consume_leading_comments acc = function
   | [] -> acc, []
   | first :: rest ->
     match first.T.desc with
-    | Comment (c, _) ->
-      consume_leading_comments Doc.Utils.(acc ^?^ Doc.comment c) rest
+    | Comment c when not !(c.explicitely_inserted) ->
+      consume_leading_comments Doc.Utils.(acc ^?^ Doc.comment c.text) rest
+    | Comment _
     | Token _
     | Opt_token _ -> acc, rest
     | Child_node -> assert false
@@ -52,11 +59,13 @@ let rec consume_only_leading_comments ?(restrict_to_before=false) acc = function
   | [] -> acc, []
   | first :: rest ->
     match first.T.desc with
-    | Comment (c, attached) ->
-      if restrict_to_before && attached <> Before then
+    | Comment c ->
+      if !(c.explicitely_inserted) ||
+         restrict_to_before && c.attachement <> Before
+      then
         acc, first :: rest
       else
-        consume_only_leading_comments Doc.Utils.(acc ^?^ Doc.comment c) rest
+        consume_only_leading_comments Doc.Utils.(acc ^?^ Doc.comment c.text) rest
     | Token _
     | Opt_token _ -> acc, first :: rest
     | Child_node -> assert false
@@ -130,7 +139,7 @@ let saw_leaf st =
 
 let is_comment_attaching_before elt =
   match elt.T.desc with
-  | Comment (_, Before) -> true
+  | Comment c -> c.attachement = Before
   | _ -> false
 
 let attach_before_comments state tokens doc =
@@ -147,7 +156,10 @@ let attach_before_comments state tokens doc =
         let open Doc in
         group @@ List.fold_left (fun acc cmt ->
           match cmt.T.desc with
-          | Comment (c, _) -> acc ^^ (group (break 1 ^^ comment c))
+          | Comment c ->
+            if !(c.explicitely_inserted)
+            then acc
+            else acc ^^ group (break 1 ^^ comment c.text)
           | _ -> assert false
         ) doc to_append
       in
@@ -167,27 +179,9 @@ let rec walk_both state seq doc =
 
   | first :: rest ->
     match first.T.desc, doc with
-    | (* FIXME: the comment that was explicitely inserted might be the nth one
-         from a list of several comments.
-         If we drop the first and advance, we will reinsert the token that is
-         already there...
-         So here we have this shitty check to see whether the comment should be
-         skipped or not.
-
-         TODO: improve *)
-      T.Comment (c, _), Doc.Comment _
-      when Doc.comment c <> doc && Doc.docstring c <> doc ->
-      let rest, doc, state' = walk_both (no_space state) rest doc in
-      let doc =
-        insert_space_if_required ~inserting_comment:true state
-          Doc.Utils.(Doc.comment c ^/^ doc)
-      in
-      rest, doc, state'
-
     (* Synchronized, advance *)
     | T.Token _, Doc.Token p
-    | T.Opt_token _, Doc.Optional { token = p; _ }
-    | T.Comment _, Doc.Comment p ->
+    | T.Opt_token _, Doc.Optional { token = p; _ } ->
       dprintf "assume %a synced at %d:%d with << %s >>@."
         Tokens.pp_elt first
         first.pos.pos_lnum
@@ -199,6 +193,11 @@ let rec walk_both state seq doc =
     (* Skip "whitespaces" *)
     | _, Doc.Empty -> seq, doc, state
     | _, Doc.Whitespace _ -> seq, doc, no_space state
+
+    (* Skip explicitely inserted comment *)
+    | _, Doc.Comment _ -> seq, doc, state
+    | T.Comment { explicitely_inserted; _ }, _ when !explicitely_inserted ->
+      walk_both state rest doc
 
     (* Comments missing in the doc, insert them *)
     | T.Comment _, Doc.(Token _ | Optional _) ->
@@ -262,10 +261,6 @@ let rec walk_both state seq doc =
         else insert_space_if_required state (Doc.group ?flatness doc)
       in
       attach_before_comments return_state rest doc
-
-    (* Token missing from the document: this is a hard error. *)
-    | T.(Token _ | Opt_token _), Doc.Comment _ ->
-      raise (Error (Missing_token first.pos))
 
     | T.Token _, Doc.Optional _
     | T.Opt_token _, Doc.Token _ ->

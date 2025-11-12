@@ -304,10 +304,16 @@ end
 
 type attachment = Before | After | Floating
 
+type comment = {
+  text: string;
+  attachement: attachment;
+  explicitely_inserted: bool ref;
+}
+
 type desc =
   | Token of token
   | Opt_token of token
-  | Comment of string * attachment
+  | Comment of comment
   | Child_node
 
 type elt = {
@@ -328,7 +334,7 @@ let desc_as_string = function
       "optional(" ^ Raw.to_string t ^ ")"
     else
       "opttok"
-  | Comment (c, _) -> Printf.sprintf "(* %s *)" c
+  | Comment c -> Printf.sprintf "(* %s *)" c.text
   | Child_node -> "child"
 
 let pp_elt ppf e = Format.pp_print_string ppf (desc_as_string e.desc)

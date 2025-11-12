@@ -359,9 +359,9 @@ let extra_def p1 p2 items =
     items
 
 let mk_arrow_arg ~loc lbl legacy_modes typ modes =
-  let doc, doc_toks =
+  let doc =
     rhs_info (snd loc)
-    |> Tokens_and_doc.info
+    |> Docs.info
   in
   let tokens = Tokens.at loc in
   {
@@ -371,7 +371,7 @@ let mk_arrow_arg ~loc lbl legacy_modes typ modes =
     aa_modes = modes;
     aa_doc = doc;
     aa_loc = make_loc loc;
-    aa_tokens = tokens @ doc_toks;
+    aa_tokens = tokens;
   }
 
 let mklb first ~loc body ext_attrs attrs =
@@ -1311,8 +1311,9 @@ structure_item:
   | mkstr(
       item_extension post_item_attributes
         { let docs, _sloc = symbol_docs $sloc in
+          let ext = Ext.mk $1 $2 ~docs in
           (* FIXME: sloc not used for item tokens! *)
-          Pstr_extension ($1, add_docs_attrs docs $2) }
+          Pstr_extension ext }
     | floating_attribute
         { Pstr_attribute $1 }
     | kind_abbreviation_decl
@@ -1626,7 +1627,8 @@ signature:
 signature_item:
   | item_extension post_item_attributes
       { let docs, sloc = symbol_docs $sloc in
-        mksig ~loc:sloc (Psig_extension ($1, (add_docs_attrs docs $2))) }
+        let ext = Ext.mk $1 $2 ~docs in
+        mksig ~loc:sloc (Psig_extension ext) }
   | mksig(
       floating_attribute
         { Psig_attribute $1 }

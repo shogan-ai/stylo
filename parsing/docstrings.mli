@@ -29,7 +29,7 @@ val init : unit -> unit
 type docstring = Docstring.t
 
 (** Create a docstring *)
-val docstring : string -> Location.t -> docstring
+val docstring : string -> Location.t -> bool ref -> docstring
 
 (** Register a docstring *)
 val register : docstring -> unit
@@ -70,14 +70,6 @@ type docs =
 
 val empty_docs : docs
 
-val docs_attr_tokens : (Lexing.position, Tokens.seq) Hashtbl.t
-
-val docs_attr : docstring -> Parsetree.attribute
-
-(** Convert item documentation to attributes and add them to an
-    attribute list *)
-val add_docs_attrs : docs -> Parsetree.attributes -> Parsetree.attributes
-
 (** Fetch the item documentation for the current symbol. This also
     marks this documentation (for ambiguity warnings). *)
 val symbol_docs : unit -> docs
@@ -106,12 +98,6 @@ type info = docstring option
 
 val empty_info : info
 
-val info_attr : docstring -> Parsetree.attribute
-
-(** Convert field info to attributes and add them to an
-    attribute list *)
-val add_info_attrs : info -> Parsetree.attributes -> Parsetree.attributes
-
 (** Fetch the field info for the current symbol. *)
 val symbol_info : unit -> info
 
@@ -127,11 +113,6 @@ type text = docstring list
 
 val empty_text : text
 val empty_text_lazy : text Lazy.t
-
-val text_attr : docstring -> Parsetree.attribute
-
-(** Convert text to attributes and add them to an attribute list *)
-val add_text_attrs : text -> Parsetree.attributes -> Parsetree.attributes
 
 (** Fetch the text preceding the current symbol. *)
 val symbol_text : unit -> text

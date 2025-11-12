@@ -209,6 +209,12 @@ end = struct
     | Some (t, indent) -> group (t ^^ nest ~extra_indent:indent 0 doc), indent
 end
 
+module Doc = struct
+  let pp = docstring
+  let pp_floating s =
+    softline ^^ pp s ^^ softline
+end
+
 module rec Attribute : sig
   val pp : ?item:bool -> attribute -> t
   val pp_floating : attribute -> t
@@ -218,23 +224,13 @@ module rec Attribute : sig
 
   val attach
     :  ?item:bool
-    -> ?text:attributes
-    -> ?pre_doc:attribute
-    -> ?post_doc:attribute
+    -> ?text:string list
+    -> ?pre_doc:string
+    -> ?post_doc:string
     -> attrs:attributes
     -> t
     -> t
 end = struct
-  let pp_doc : payload -> t = function
-    | PStr ([ {
-      pstr_desc =
-        Pstr_eval
-          ({ pexp_desc = Pexp_constant Pconst_string (s, _loc, None); _ }, []);
-      _ } ], _)
-      ->
-      docstring s
-    | _ -> assert false
-
   let pp_attr_name ids =
     let pp_one = function
       | "let" -> S.let_
@@ -248,18 +244,12 @@ end = struct
     )
 
   let pp_floating { attr_name; attr_payload; attr_loc = _; attr_tokens = _ } =
-    match attr_name.txt with
-    | ["ocaml"; ("doc"|"text")]  (* FIXME *) ->
-      softline ^^ pp_doc attr_payload ^^ softline
-    | _ -> pp S.lbracket_atatat attr_name attr_payload
+    pp S.lbracket_atatat attr_name attr_payload
 
   let pp ?(item=false)
       { attr_name; attr_payload; attr_loc = _; attr_tokens = _ } =
-    match attr_name.txt with
-    | ["ocaml"; ("doc"|"text")]  (* FIXME *) -> pp_doc attr_payload
-    | _ ->
-      pp (if item then S.lbracket_atat else S.lbracket_at) attr_name
-        attr_payload
+    pp (if item then S.lbracket_atat else S.lbracket_at) attr_name
+      attr_payload
 
   let pp_list ?item l = separate_map (break 0) (pp ?item) l
 
@@ -269,14 +259,14 @@ end = struct
     | [] -> empty
     | text ->
       softline ^^ softline ^^
-      separate_map (break 1) pp text ^^
+      separate_map (break 1) Doc.pp text ^^
       softline ^^ softline
     end ^^
-    optional (fun a -> softline ^^ pp_doc a.attr_payload) pre_doc ^?/^
+    optional Doc.pp pre_doc ^?/^
     match post_doc with
     | None -> with_attrs
-    | Some a ->
-      group (with_attrs ^^ softest_break ^^ pp_doc a.attr_payload) ^^ softline
+    | Some s ->
+      group (with_attrs ^^ softest_break ^^ Doc.pp s) ^^ softline
 end
 
 and Ext_attribute : sig
@@ -306,6 +296,8 @@ end
 
 and Extension : sig
   val pp : ?floating:bool -> extension -> t
+
+  val pp_toplevel : toplevel_extension -> t
 end = struct
   let pp_classic ~floating names payload =
     let name = Attribute.pp_attr_name names in
@@ -322,6 +314,11 @@ end = struct
       let blank = if delim <> "" then " " else "" in
       stringf "{%s%s%s%s|%s|%s}" percent ext_name blank delim s delim
     | _ -> pp_classic ~floating ext_name ext_payload
+
+  let pp_toplevel { te_ext; te_attrs; te_pre_doc; te_post_doc } =
+    pp ~floating:true te_ext
+    |> Attribute.attach ~item:true ?pre_doc:te_pre_doc ~attrs:te_attrs
+         ?post_doc:te_post_doc
 end
 
 and Payload : sig
@@ -429,6 +426,7 @@ end = struct
       | Pstr_extension _
       | Pstr_class _
       | Pstr_class_type _
+      | Pstr_docstring _
         ->
         false
 
@@ -449,6 +447,7 @@ end = struct
       | Psig_kind_abbrev (_, jk) -> jkind_annotation jk
       | Psig_attribute _
       | Psig_extension _
+      | Psig_docstring _
       | Psig_class _
       | Psig_class_type _
       (* FIXME: any of the following could have a with constraint. *)
@@ -633,7 +632,7 @@ end = struct
       in
       pp_arrow dom.aa_tokens dom.aa_lbl
         (pp_surrounded dom.aa_legacy_modes dom.aa_modes dom.aa_type
-           ^?^ optional Attribute.pp dom.aa_doc)
+           ^?^ optional Doc.pp dom.aa_doc)
         (pp_surrounded codom_legacy_modes codom_modes codom_type)
     | Ptyp_tuple elts -> pp_tuple elts
     | Ptyp_unboxed_tuple elts -> S.hash_lparen ^^ pp_tuple elts ^^ S.rparen
@@ -708,7 +707,7 @@ end = struct
   and row_field preceeding_tok { prf_desc; prf_attributes; prf_doc;
                                  prf_loc = _; prf_tokens = _ } =
     prefix (row_field_desc preceeding_tok prf_desc)
-      (Attribute.pp_list prf_attributes ^?^ optional Attribute.pp prf_doc)
+      (Attribute.pp_list prf_attributes ^?^ optional Doc.pp prf_doc)
 
   and row_field_desc preceeding_tok = function
     | Rinherit ct -> group (preceeding_tok ^/^ pp ct)
@@ -765,7 +764,7 @@ end = struct
     let semi = List.exists (fun t -> t.Tokens.desc = Token SEMI) pof_tokens in
     prefix (group (object_field_desc pof_desc)) (
       Attribute.pp_list pof_attributes
-      ^?^ optional Attribute.pp pof_doc
+      ^?^ optional Doc.pp pof_doc
     ) ^^ if semi then S.semi else empty
 
   and object_field_desc = function
@@ -810,7 +809,7 @@ end = struct
       in
       let arg =
         label ^^ typ_and_modes
-        ^?^ optional Attribute.pp aa_doc
+        ^?^ optional Doc.pp aa_doc
       in
       if preceeding_tok = empty
       then nest 2 (group arg)
@@ -2262,7 +2261,7 @@ end = struct
     (* We want the attributes (and doc) to line up with the field name, not the
        semicolon. *)
     prefix field
-      (Attribute.pp_list pld_attributes ^?^ optional Attribute.pp pld_doc)
+      (Attribute.pp_list pld_attributes ^?^ optional Doc.pp pld_doc)
 
   let pp_decl ?(unboxed=false) lbls =
     let maybe_trailing_semi, lbls =
@@ -2560,6 +2559,7 @@ end = struct
       S.constraint_ ^/^ Core_type.pp ct1 ^/^ S.equals ^/^ Core_type.pp ct2
     | Pctf_attribute attr -> Attribute.pp_floating attr
     | Pctf_extension ext -> Extension.pp ~floating:true ext
+    | Pctf_docstring s -> Doc.pp_floating s
 
   and pp { pcty_desc; pcty_attributes; pcty_loc = _; pcty_tokens = _ } =
     pp_desc pcty_desc
@@ -2690,6 +2690,7 @@ end = struct
     | Pcf_initializer e -> S.initializer_ ^/^ Expression.pp e
     | Pcf_attribute attr -> Attribute.pp_floating attr
     | Pcf_extension ext -> Extension.pp ~floating:true ext
+    | Pcf_docstring s -> Doc.pp_floating s
 
   and pp_value lbl mut = function
     | Cfk_virtual ct ->
@@ -2820,8 +2821,8 @@ end = struct
     | Psig_class cds -> Class_description.pp_list cds
     | Psig_class_type ctds -> Class_type_declaration.pp_list ctds
     | Psig_attribute attr -> Attribute.pp_floating attr
-    | Psig_extension (ext, attrs) ->
-      Attribute.attach ~item:true ~attrs (Extension.pp ~floating:true ext)
+    | Psig_docstring s -> Doc.pp_floating s
+    | Psig_extension te -> Extension.pp_toplevel te
     | Psig_kind_abbrev (name, k) ->
       S.kind_abbrev__ ^/^ string name.txt ^/^ S.equals ^/^
         Jkind_annotation.pp k
@@ -3131,8 +3132,9 @@ end = struct
     | Pstr_class_type ctds -> Class_type_declaration.pp_list ctds
     | Pstr_include incl -> Include_declaration.pp incl
     | Pstr_attribute a -> Attribute.pp_floating a
-    | Pstr_extension (ext, attrs) ->
-      Attribute.attach ~item:true ~attrs (Extension.pp ~floating:true ext)
+    | Pstr_docstring s -> Doc.pp s
+    | Pstr_extension te ->
+      Extension.pp_toplevel te
       |> group
     | Pstr_kind_abbrev (name, k) ->
       S.kind_abbrev__ ^/^ string name.txt ^/^ S.equals ^/^
@@ -3200,14 +3202,14 @@ and Generic_binding : sig
     :  ?preceeding:Preceeding.t
     -> ?item:bool
     -> ?equal_sign:t
-    -> ?pre_text:attributes
-    -> ?pre_doc:attribute
+    -> ?pre_text:string list
+    -> ?pre_doc:string
     -> keyword:t
     -> ?params:t list
     -> ?constraint_:rhs
     -> ?rhs:rhs
     -> ?attrs:attributes
-    -> ?post_doc:attribute
+    -> ?post_doc:string
     -> t
     -> t
 end = struct

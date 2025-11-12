@@ -1,14 +1,5 @@
 (** {1 Flattening to a sequence of tokens } *)
 
-let is_source_token_of_attached_docstring (tok : Tokens.elt) =
-  match tok.desc with
-  | Comment _ ->
-    begin match Hashtbl.find Docstrings.docs_attr_tokens tok.pos with
-    | ds -> not (List.memq tok ds)
-    | exception Not_found -> false
-    end
-  | _ -> false
-
 let rec combine_children (top : Tokens.seq) children =
   match top, children with
   | [], [] -> [] (* done *)
@@ -17,21 +8,7 @@ let rec combine_children (top : Tokens.seq) children =
   | { desc = Child_node; _ } :: tokens, child :: children ->
     child @ combine_children tokens children
   | tok :: tokens, _ ->
-    if is_source_token_of_attached_docstring tok then
-      (* When attaching a docstring an attribute is synthezised. When that
-         happens, we assign a fresh [Comment] to its [pattr_tokens] field.
-
-         We need to do that because docstrings are fetched from outside a symbol
-         location in the parser, so we in general won't have access to the
-         source token.
-         However, that means we now have two tokens for a given docstring,
-         that's one too many.
-
-         Here, we "drop" source tokens which correspond to a docstring (even
-         though it might have been assigned to a different node). *)
-      combine_children tokens children
-    else
-      tok :: combine_children tokens children
+    tok :: combine_children tokens children
 
 (* dbg printing *)
 let pp_child ppf =

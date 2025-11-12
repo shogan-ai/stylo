@@ -93,13 +93,18 @@ end = struct
 
   let canonical_id curr_unit = function
     | Path.Pident id when Ident.is_predef id -> Predef (Ident.name id)
+    | Pdot (Pident id, name) when Ident.name id = "Stdlib" ->
+      Predef name (* Admittedly hackish. *)
     | p ->
       let id =
         match p with
         | Pident id -> curr_unit, Ident.name id
         | Pdot (Pdot (__double_underscore_wrapper, unit_name), name) ->
           unit_name, name
-        | _ -> assert false
+        | _ ->
+          Format.eprintf "Unexpected path: @[<hov 2>%a@]@."
+            (Format_doc.compat Path.print) p;
+          exit 1
       in
       let rec follow_indirs id =
         match Hashtbl.find canonical_decls id with
@@ -183,6 +188,7 @@ let mapper_call curr_unit fmt p =
   let predefs =
     ["option", "map_option"
     ;"list", "map_list"
+    ;"ref", "(fun _map_content _env cell -> cell)"
     ]
   in
   let without_mapper =

@@ -313,7 +313,8 @@ let wrap_comment_lexer comment lexbuf =
   let s = get_stored_string () in
   reset_string_buffer ();
   s,
-  { start_loc with Location.loc_end = end_loc.Location.loc_end }
+  { start_loc with Location.loc_end = end_loc.Location.loc_end },
+  ref false
 
 let error lexbuf e = raise (Error(e, Location.curr lexbuf))
 let error_loc loc e = raise (Error(e, loc))
@@ -670,33 +671,34 @@ rule token = parse
   | '#'? "\'\'"
       { error lexbuf Empty_character_literal }
   | "(*"
-      { let s, loc = wrap_comment_lexer comment lexbuf in
-        COMMENT (s, loc) }
+      { let s, loc, inserted = wrap_comment_lexer comment lexbuf in
+        COMMENT (s, loc, inserted) }
   | "(**"
-      { let s, loc = wrap_comment_lexer comment lexbuf in
+      { let s, loc, inserted = wrap_comment_lexer comment lexbuf in
         if !handle_docstrings then
-          DOCSTRING (Docstrings.docstring s loc)
+          DOCSTRING (Docstrings.docstring s loc inserted)
         else
-          COMMENT ("*" ^ s, loc)
+          COMMENT ("*" ^ s, loc, inserted)
       }
   | "(**" (('*'+) as stars)
-      { let s, loc =
+      { let s, loc, inserted =
           wrap_comment_lexer
             (fun lexbuf ->
                store_string ("*" ^ stars);
                comment lexbuf)
             lexbuf
         in
-        COMMENT (s, loc) }
+        COMMENT (s, loc, inserted) }
   | "(*)"
-      { let s, loc = wrap_comment_lexer comment lexbuf in
-        COMMENT (s, loc) }
+      { let s, loc, inserted = wrap_comment_lexer comment lexbuf in
+        COMMENT (s, loc, inserted) }
   | "(*" (('*'*) as stars) "*)"
-      { if !handle_docstrings && stars="" then
+      { let inserted = ref false in
+        if !handle_docstrings && stars="" then
          (* (**) is an empty docstring *)
-          DOCSTRING(Docstrings.docstring "" (Location.curr lexbuf))
+          DOCSTRING(Docstrings.docstring "" (Location.curr lexbuf) inserted)
         else
-          COMMENT (stars, Location.curr lexbuf) }
+          COMMENT (stars, Location.curr lexbuf, inserted) }
   | "*)"
       { lexbuf.Lexing.lex_curr_pos <- lexbuf.Lexing.lex_curr_pos - 1;
         let curpos = lexbuf.lex_curr_p in
@@ -1105,7 +1107,7 @@ and skip_hash_bang = parse
     let post_pos = lexeme_end_p lexbuf in
     let rec loop lines docs lexbuf =
       match token_with_comments lexbuf with
-      | COMMENT (s, loc) ->
+      | COMMENT (s, loc, _) ->
           add_comment (s, loc);
           let lines' =
             match lines with
@@ -1161,12 +1163,13 @@ and skip_hash_bang = parse
   type staged_comment = {
     sc_loc: Location.t;
     sc_str: string;
+    sc_inserted: bool ref;
     sc_before: newline_state;
     sc_indent: Line_indent.t;
   }
 
-  let stage_comment sc_before sc_loc sc_str =
-    { sc_loc; sc_str; sc_before; sc_indent = Line_indent.copy () }
+  let stage_comment sc_before sc_loc sc_str sc_inserted =
+    { sc_inserted; sc_loc; sc_str; sc_before; sc_indent = Line_indent.copy () }
 
   let unstage_comment newline_after sc =
     let attachement : Tokens.attachment =
@@ -1201,20 +1204,25 @@ and skip_hash_bang = parse
           Before
         )
     in
+    let cmt =
+      { Tokens.explicitely_inserted = sc.sc_inserted
+      ; text = sc.sc_str
+      ; attachement }
+    in
     Tokens.Indexed_list.append
       Tokens.Indexed_list.global
       ~pos:sc.sc_loc.loc_start
-      (Comment (sc.sc_str, attachement))
+      (Comment cmt)
 
   let token_updating_indexed_list lexbuf =
     let post_pos = lexeme_end_p lexbuf in
     let rec loop lines docs sc_opt lexbuf =
       match token_with_comments lexbuf with
-      | COMMENT (s, loc) ->
+      | COMMENT (s, loc, inserted) ->
           Line_indent.new_info lines loc.loc_start;
           add_comment (s, loc);
           Option.iter (unstage_comment lines) sc_opt;
-          let sc = stage_comment lines loc s in
+          let sc = stage_comment lines loc s inserted in
           let lines' =
             match lines with
             | NoLine -> NoLine
@@ -1240,6 +1248,7 @@ and skip_hash_bang = parse
           Option.iter (unstage_comment lines) sc_opt;
           let sc =
             stage_comment lines doc_loc (Docstrings.docstring_body doc)
+              doc.ds_explicitely_inserted
           in
           let docs' = acc_docstring lines docs doc in
           loop NoLine docs' (Some sc) lexbuf

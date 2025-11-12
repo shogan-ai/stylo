@@ -160,6 +160,7 @@ module Struct = struct
     | Pstr_include _, Pstr_include _
     | Pstr_extension _, Pstr_extension _
     | Pstr_kind_abbrev _, Pstr_kind_abbrev _
+    | Pstr_docstring _, Pstr_docstring _
       ->
       true
     | Pstr_attribute _, Pstr_attribute _ ->
@@ -181,7 +182,8 @@ module Struct = struct
       | Pstr_include _
       | Pstr_attribute _
       | Pstr_extension _
-      | Pstr_kind_abbrev _), _ ->
+      | Pstr_kind_abbrev _
+      | Pstr_docstring _), _ ->
       false
 
   let group_by_desc = function

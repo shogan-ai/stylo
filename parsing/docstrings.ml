@@ -23,16 +23,15 @@ type docstring = Docstring.t
 
 let docstrings : docstring list ref = ref []
 
-let empty_ext_attr = { Parsetree.pea_ext = None; pea_attrs = [] }
-
 (* Warn for unused and ambiguous docstrings *)
 
 (* Docstring constructors and destructors *)
 
-let docstring body loc =
+let docstring body loc inserted =
   let ds =
     { ds_body = body;
       ds_loc = loc;
+      ds_explicitely_inserted = inserted;
       ds_attached = Unattached;
       ds_associated = Zero; }
   in
@@ -53,67 +52,11 @@ type docs =
 
 let empty_docs = { docs_pre = None; docs_post = None }
 
-let doc_loc = {txt = ["ocaml";"doc"]; loc = Location.none}
-
-let docs_attr_tokens = Hashtbl.create 42
-let remember_token t =
-  let lst =
-    match Hashtbl.find docs_attr_tokens t.Tokens.pos with
-    | exception Not_found -> [t]
-    | lst -> t::lst
-  in
-  Dbg_print.dprintf "registering docstring at %d:%d@."
-    t.pos.pos_lnum (t.pos.pos_cnum - t.pos.pos_bol);
-  Hashtbl.replace docs_attr_tokens t.pos lst
-
-let docs_attr ds =
-  let open Parsetree in
-  let body = ds.ds_body in
-  let loc = ds.ds_loc in
-  let exp =
-    { pexp_ext_attr = empty_ext_attr;
-      pexp_desc = Pexp_constant (Pconst_string(body, loc, None));
-      pexp_loc = loc;
-      pexp_attributes = [];
-      pexp_tokens = [] (* FIXME! *);
-    }
-  in
-  let item =
-    { pstr_desc = Pstr_eval (exp, []); pstr_loc = loc;
-      pstr_tokens = []; }
-  in
-  let tok_elt = { Tokens.desc = Comment (body, After (* FIXME *)); pos = loc.loc_start } in
-  remember_token tok_elt;
-  { attr_name = doc_loc;
-    attr_payload = PStr ([item], []);
-    attr_loc = loc;
-    attr_tokens = [tok_elt]}
-
-let add_docs_attrs docs attrs =
-  let attrs =
-    match docs.docs_pre with
-    | None | Some { ds_body=""; _ } -> attrs
-    | Some ds -> docs_attr ds :: attrs
-  in
-  let attrs =
-    match docs.docs_post with
-    | None | Some { ds_body=""; _ } -> attrs
-    | Some ds -> attrs @ [docs_attr ds]
-  in
-  attrs
-
 (* Docstrings attached to constructors or fields *)
 
 type info = docstring option
 
 let empty_info = None
-
-let info_attr = docs_attr
-
-let add_info_attrs info attrs =
-  match info with
-  | None | Some {ds_body=""; _} -> attrs
-  | Some ds -> attrs @ [info_attr ds]
 
 (* Docstrings not attached to a specific item *)
 
@@ -122,35 +65,6 @@ type text = docstring list
 let empty_text = []
 let empty_text_lazy = lazy []
 
-let text_loc = {txt = ["ocaml";"text"]; loc = Location.none}
-
-let text_attr ds =
-  let open Parsetree in
-  let body = ds.ds_body in
-  let loc = ds.ds_loc in
-  let exp =
-    { pexp_ext_attr = empty_ext_attr;
-      pexp_desc = Pexp_constant (Pconst_string(body, loc, None));
-      pexp_loc = loc;
-      pexp_attributes = [];
-      pexp_tokens = [] (* FIXME! *);
-    }
-  in
-  let item =
-    { pstr_desc = Pstr_eval (exp, []); pstr_loc = loc;
-      pstr_tokens = []; }
-  in
-  let tok_elt = { Tokens.desc = Comment (body, Floating); pos = loc.loc_start } in
-  remember_token tok_elt;
-  { attr_name = text_loc;
-    attr_payload = PStr ([item], []);
-    attr_loc = loc;
-    attr_tokens = [tok_elt]}
-
-let add_text_attrs dsl attrs =
-  let fdsl = List.filter (function {ds_body=""} -> false| _ ->true) dsl in
-  (List.map text_attr fdsl) @ attrs
-
 (* Find the first non-info docstring in a list, attach it and return it *)
 let get_docstring ~info dsl =
   let rec loop = function
@@ -158,6 +72,7 @@ let get_docstring ~info dsl =
     | {ds_attached = Info; _} :: rest -> loop rest
     | ds :: _ ->
         ds.ds_attached <- if info then Info else Docs;
+        ds.ds_explicitely_inserted := true;
         Some ds
   in
   loop dsl
@@ -169,6 +84,7 @@ let get_docstrings dsl =
     | {ds_attached = Info; _} :: rest -> loop acc rest
     | ds :: rest ->
         ds.ds_attached <- Docs;
+        ds.ds_explicitely_inserted := true;
         loop (ds :: acc) rest
   in
     loop [] dsl

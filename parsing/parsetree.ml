@@ -87,6 +87,13 @@ and extension = string list loc * payload * Tokens.seq
          Sub-language placeholder -- rejected by the typechecker.
       *)
 
+and toplevel_extension =
+  { te_pre_doc: string option
+  ; te_ext: extension
+  ; te_attrs: attributes
+  ; te_post_doc: string option }
+(** [[%%id]] (** docstrings *) *)
+
 and attributes = attribute list
 
 and payload =
@@ -118,7 +125,7 @@ and arrow_arg = {
   aa_legacy_modes: modes;
   aa_type: core_type;
   aa_modes: modes;
-  aa_doc: attribute option;
+  aa_doc: string option;
   aa_loc: Location.t;
   aa_tokens: Tokens.seq;
 }
@@ -246,7 +253,7 @@ and row_field = {
   prf_desc : row_field_desc;
   prf_loc : Location.t;
   prf_attributes : attributes;
-  prf_doc: attribute option;
+  prf_doc: string option;
   prf_tokens: Tokens.seq;
 }
 
@@ -269,7 +276,7 @@ and object_field = {
   pof_desc : object_field_desc;
   pof_loc : Location.t;
   pof_attributes : attributes;
-  pof_doc: attribute option;
+  pof_doc: string option;
   pof_tokens: Tokens.seq;
 }
 
@@ -745,14 +752,14 @@ and comprehension_expression =
 
 and value_description =
     {
-     pval_pre_doc: attribute option;
+     pval_pre_doc: string option;
      pval_ext_attrs: ext_attribute;
      pval_name: Longident.str_or_op loc;
      pval_type: core_type;
      pval_modalities : modalities;
      pval_prim: string list;
      pval_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
-     pval_post_doc: attribute option;
+     pval_post_doc: string option;
      pval_loc: Location.t;
      pval_tokens: Tokens.seq;
     }
@@ -775,8 +782,8 @@ and ptype_params = ptype_param list
 and ptype_constraint = core_type * core_type * Location.t
 and type_declaration =
     {
-     ptype_pre_text: attributes;
-     ptype_pre_doc: attribute option;
+     ptype_pre_text: string list;
+     ptype_pre_doc: string option;
      ptype_ext_attrs: ext_attribute;
      ptype_name: string loc;
      ptype_params: ptype_params;
@@ -788,7 +795,7 @@ and type_declaration =
      ptype_cstrs: ptype_constraint list;
       (** [... constraint T1=T1'  ... constraint Tn=Tn'] *)
      ptype_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
-     ptype_post_doc: attribute option;
+     ptype_post_doc: string option;
      ptype_loc: Location.t;
      ptype_tokens: Tokens.seq;
     }
@@ -834,7 +841,7 @@ and label_declaration =
      pld_type: core_type;
      pld_loc: Location.t;
      pld_attributes: attributes;  (** [l : T [\@id1] [\@id2]] *)
-     pld_doc: attribute option;
+     pld_doc: string option;
      pld_tokens: Tokens.seq;
     }
 (**
@@ -857,7 +864,7 @@ and constructor_declaration =
      pcd_res: core_type option;
      pcd_loc: Location.t;
      pcd_attributes: attributes;  (** [C of ... [\@id1] [\@id2]] *)
-     pcd_doc: attribute option;
+     pcd_doc: string option;
      pcd_tokens: Tokens.seq;
     }
 
@@ -888,7 +895,7 @@ and constructor_arguments =
 
 and type_extension =
     {
-     ptyext_pre_doc: attribute option;
+     ptyext_pre_doc: string option;
      ptyext_ext_attrs: ext_attribute;
      ptyext_path: Longident.t loc;
      ptyext_params: ptype_param list;
@@ -896,7 +903,7 @@ and type_extension =
      ptyext_private: private_flag;
      ptyext_loc: Location.t;
      ptyext_attributes: attributes;  (** ... [\@\@id1] [\@\@id2] *)
-     ptyext_post_doc: attribute option;
+     ptyext_post_doc: string option;
      ptyext_tokens: Tokens.seq;
     }
 (**
@@ -910,18 +917,18 @@ and extension_constructor =
      pext_kind: extension_constructor_kind;
      pext_loc: Location.t;
      pext_attributes: attributes;  (** [C of ... [\@id1] [\@id2]] *)
-     pext_doc: attribute option;
+     pext_doc: string option;
      pext_tokens: Tokens.seq;
    }
 
 and type_exception =
   {
-    ptyexn_pre_doc: attribute option;
+    ptyexn_pre_doc: string option;
     ptyexn_ext_attrs: ext_attribute;
     ptyexn_constructor : extension_constructor;
     ptyexn_loc : Location.t;
     ptyexn_attributes : attributes;  (** [... [\@\@id1] [\@\@id2]] *)
-    ptyexn_post_doc: attribute option;
+    ptyexn_post_doc: string option;
     ptyexn_tokens: Tokens.seq;
   }
 (** Definition of a new exception ([exception E]). *)
@@ -992,11 +999,11 @@ and class_signature =
 
 and class_type_field =
     {
-     pctf_pre_doc: attribute option;
+     pctf_pre_doc: string option;
      pctf_desc: class_type_field_desc;
      pctf_loc: Location.t;
      pctf_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
-     pctf_post_doc: attribute option;
+     pctf_post_doc: string option;
      pctf_tokens: Tokens.seq;
     }
 
@@ -1012,11 +1019,12 @@ and class_type_field_desc =
   | Pctf_constraint of (core_type * core_type)  (** [constraint T1 = T2] *)
   | Pctf_attribute of attribute  (** [[\@\@\@id]] *)
   | Pctf_extension of extension  (** [[%%id]] *)
+  | Pctf_docstring of string
 
 and 'a class_infos =
     {
-     pci_pre_text: attributes;
-     pci_pre_doc: attribute option;
+     pci_pre_text: string list;
+     pci_pre_doc: string option;
      pci_virt: virtual_flag;
      pci_ext_attrs: ext_attribute;
      pci_params: ptype_param list;
@@ -1026,7 +1034,7 @@ and 'a class_infos =
      pci_expr: 'a;
      pci_loc: Location.t;
      pci_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
-     pci_post_doc: attribute option;
+     pci_post_doc: string option;
      pci_tokens: Tokens.seq;
     }
 (** Values of type [class_expr class_infos] represents:
@@ -1103,11 +1111,11 @@ and class_structure =
 
 and class_field =
     {
-     pcf_pre_doc: attribute option;
+     pcf_pre_doc: string option;
      pcf_desc: class_field_desc;
      pcf_loc: Location.t;
      pcf_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
-     pcf_post_doc: attribute option;
+     pcf_post_doc: string option;
      pcf_tokens: Tokens.seq;
     }
 
@@ -1151,6 +1159,7 @@ and class_field_desc =
   | Pcf_initializer of expression  (** [initializer E] *)
   | Pcf_attribute of attribute  (** [[\@\@\@id]] *)
   | Pcf_extension of extension  (** [[%%id]] *)
+  | Pcf_docstring of string
 
 and class_field_kind =
   | Cfk_virtual of core_type
@@ -1232,9 +1241,10 @@ and signature_item_desc =
   | Psig_class_type of class_type_declaration list
       (** [class type ct1 = ... and ... and ctn = ...] *)
   | Psig_attribute of attribute  (** [[\@\@\@id]] *)
-  | Psig_extension of extension * attributes  (** [[%%id]] *)
+  | Psig_extension of toplevel_extension
   | Psig_kind_abbrev of string loc * jkind_annotation
       (** [kind_abbrev_ name = k] *)
+  | Psig_docstring of string
 
 and module_declaration_body =
   | With_params of functor_parameter list * module_type * modes
@@ -1242,13 +1252,13 @@ and module_declaration_body =
 
 and module_declaration =
     {
-     pmd_pre_text: attributes;
-     pmd_pre_doc: attribute option;
+     pmd_pre_text: string list;
+     pmd_pre_doc: string option;
      pmd_ext_attrs: ext_attribute;
      pmd_name: string option loc * modalities;
      pmd_body: module_declaration_body;
      pmd_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
-     pmd_post_doc: attribute option;
+     pmd_post_doc: string option;
      pmd_loc: Location.t;
      pmd_tokens : Tokens.seq;
     }
@@ -1256,12 +1266,12 @@ and module_declaration =
 
 and module_substitution =
     {
-     pms_pre_doc: attribute option;
+     pms_pre_doc: string option;
      pms_ext_attrs: ext_attribute;
      pms_name: string loc;
      pms_manifest: Longident.t loc;
      pms_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
-     pms_post_doc: attribute option;
+     pms_post_doc: string option;
      pms_loc: Location.t;
      pms_tokens : Tokens.seq;
     }
@@ -1269,12 +1279,12 @@ and module_substitution =
 
 and module_type_declaration =
     {
-     pmtd_pre_doc: attribute option;
+     pmtd_pre_doc: string option;
      pmtd_ext_attrs: ext_attribute;
      pmtd_name: string loc;
      pmtd_type: module_type option;
      pmtd_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
-     pmtd_post_doc: attribute option;
+     pmtd_post_doc: string option;
      pmtd_loc: Location.t;
      pmtd_tokens : Tokens.seq;
     }
@@ -1286,13 +1296,13 @@ and module_type_declaration =
 
 and 'a open_infos =
     {
-     popen_pre_doc: attribute option;
+     popen_pre_doc: string option;
      popen_ext_attrs: ext_attribute;
      popen_expr: 'a;
      popen_override: override_flag;
      popen_loc: Location.t;
      popen_attributes: attributes;
-     popen_post_doc: attribute option;
+     popen_post_doc: string option;
      popen_tokens : Tokens.seq;
     }
 (** Values of type ['a open_infos] represents:
@@ -1316,13 +1326,13 @@ and open_declaration = module_expr open_infos
 
 and 'a include_infos =
     {
-     pincl_pre_doc: attribute option;
+     pincl_pre_doc: string option;
      pincl_kind : include_kind;
      pincl_ext_attrs: ext_attribute;
      pincl_mod: 'a;
      pincl_loc: Location.t;
      pincl_attributes: attributes;
-     pincl_post_doc: attribute option;
+     pincl_post_doc: string option;
      pincl_tokens : Tokens.seq;
     }
 
@@ -1435,9 +1445,10 @@ and structure_item_desc =
       (** [class type ct1 = ... and ... and ctn = ...] *)
   | Pstr_include of include_declaration  (** [include ME] *)
   | Pstr_attribute of attribute  (** [[\@\@\@id]] *)
-  | Pstr_extension of extension * attributes  (** [[%%id]] *)
+  | Pstr_extension of toplevel_extension
   | Pstr_kind_abbrev of string loc * jkind_annotation
       (** [kind_abbrev_ name = k] *)
+  | Pstr_docstring of string
 
 and value_constraint =
   | Pvc_constraint of {
@@ -1457,8 +1468,8 @@ and value_constraint =
 
 and value_binding =
   {
-    pvb_pre_text: attributes;
-    pvb_pre_doc: attribute option;
+    pvb_pre_text: string list;
+    pvb_pre_doc: string option;
     pvb_ext_attrs: ext_attribute;
     pvb_legacy_modes: modes;
     pvb_pat: pattern;
@@ -1468,15 +1479,15 @@ and value_binding =
     pvb_expr: expression option;
     pvb_ret_modes: modes;
     pvb_attributes: attributes;
-    pvb_post_doc: attribute option;
+    pvb_post_doc: string option;
     pvb_loc: Location.t;
     pvb_tokens: Tokens.seq;
   } (** [let modes pat params : type_constraint @@ ret_modes = exp] *)
 
 and module_binding =
     {
-     pmb_pre_text: attributes;
-     pmb_pre_doc: attribute option;
+     pmb_pre_text: string list;
+     pmb_pre_doc: string option;
      pmb_ext_attrs: ext_attribute;
      pmb_name: string option loc * modes;
      pmb_params: functor_parameter list;
@@ -1484,7 +1495,7 @@ and module_binding =
      pmb_modes: modes;
      pmb_expr: module_expr;
      pmb_attributes: attributes;
-     pmb_post_doc: attribute option;
+     pmb_post_doc: string option;
      pmb_loc: Location.t;
      pmb_tokens : Tokens.seq;
     }

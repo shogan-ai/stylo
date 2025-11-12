@@ -31,7 +31,18 @@ let map_structure mapper env (items, tokens) =
   in
   let rec walk_both items tokens =
     match tokens with
-    | [] -> assert (items = []); []
+    | [] ->
+      let is_ds item =
+        match item.pstr_desc with
+        | Pstr_docstring _ -> true
+        | _ ->
+          let pos = item.pstr_loc.loc_start in
+          dprintf "unexpected item at %d:%d@."
+            pos.pos_lnum
+            (pos.pos_cnum - pos.pos_bol);
+          false
+      in
+      assert (List.for_all is_ds items); []
     | t :: tokens ->
       match t.Tokens.desc with
       | Token EOF (* TODO: filter this out earlier in the pipeline... *)

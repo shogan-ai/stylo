@@ -157,7 +157,7 @@
 %token WHEN                   "when"
 %token WHILE                  "while"
 %token WITH                   "with"
-%token <string * Location.t> COMMENT    "(* comment *)"
+%token <string * Location.t * bool ref> COMMENT    "(* comment *)"
 %token <Docstring.t> DOCSTRING "(** documentation *)"
 
 %token EOL                    "\\n"      (* not great, but EOL is unused *)

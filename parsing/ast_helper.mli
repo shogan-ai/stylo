@@ -42,8 +42,8 @@ val with_default_loc: loc -> (unit -> 'a) -> 'a
     (** Set the [default_loc] within the scope of the execution
         of the provided function. *)
 
-module Tokens_and_doc : sig
-  val info : docstring option -> attribute option * Tokens.seq
+module Docs : sig
+  val info : docstring option -> string option
 end
 
 (** {1 Constants} *)
@@ -64,6 +64,10 @@ end
 module Attr : sig
   val mk: ?loc:loc -> tokens:Tokens.seq -> string list with_loc -> payload
     -> attribute
+end
+
+module Ext : sig
+  val mk: ?docs:docs -> extension -> attributes -> toplevel_extension
 end
 
 (** {1 Core language} *)
