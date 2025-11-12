@@ -1173,19 +1173,33 @@ and skip_hash_bang = parse
       match sc.sc_before, newline_after with
       | (NoLine | BlankEquivalentLine),
         (NoLine | BlankEquivalentLine) ->
+        dprintf "floating (same on both side)@.";
         Floating
-      | (NoLine | BlankEquivalentLine), _ -> Before
-      | _, (NoLine | BlankEquivalentLine) -> After
-      | NewLine, BlankLine -> Before
-      | BlankLine, NewLine -> After
-      | BlankLine, BlankLine -> Floating
+      | (NoLine | BlankEquivalentLine), _ ->
+        dprintf "before (same line)@.";
+        Before
+      | _, (NoLine | BlankEquivalentLine) ->
+        dprintf "after (same line)@.";
+        After
+      | NewLine, BlankLine ->
+        dprintf "before (blank after)@.";
+        Before
+      | BlankLine, NewLine ->
+        dprintf "after (blank before)@.";
+        After
+      | BlankLine, BlankLine ->
+        dprintf "floating (really)@.";
+        Floating
       | NewLine, NewLine ->
         let cmt_indent = sc.sc_indent.curr_tok in
         let next_indent = Line_indent.current_line () in
-        if cmt_indent = next_indent then
+        if cmt_indent = next_indent then (
+          dprintf "after (same indent)@.";
           After
-        else
+        ) else (
+          dprintf "before (default)@.";
           Before
+        )
     in
     Tokens.Indexed_list.append
       Tokens.Indexed_list.global
