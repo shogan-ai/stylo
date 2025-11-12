@@ -1173,8 +1173,8 @@ and skip_hash_bang = parse
       match sc.sc_before, newline_after with
       | (NoLine | BlankEquivalentLine),
         (NoLine | BlankEquivalentLine) ->
-        dprintf "floating (same on both side)@.";
-        Floating
+        dprintf "before (same on both side -> default)@.";
+        Before
       | (NoLine | BlankEquivalentLine), _ ->
         dprintf "before (same line)@.";
         Before
