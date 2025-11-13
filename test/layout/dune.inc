@@ -41,6 +41,27 @@
   (action (diff %{dep:flat_non_flat_groups_and_comments.out} %{dep:flat_non_flat_groups_and_comments.snd-run})))
 
 (rule
+  (target relative_nest.out)
+  (action
+    (with-stdout-to %{target}
+      (run ../../bin/stylo.exe %{dep:relative_nest.ml}))))
+
+(rule
+  (target relative_nest.snd-run)
+  (action
+    (with-stdout-to %{target}
+      (run ../../bin/stylo.exe %{dep:relative_nest.out}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:relative_nest.ref} %{dep:relative_nest.out})))
+
+; idempotence check
+(rule
+  (alias runtest)
+  (action (diff %{dep:relative_nest.out} %{dep:relative_nest.snd-run})))
+
+(rule
   (target tuples.out)
   (action
     (with-stdout-to %{target}

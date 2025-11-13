@@ -73,7 +73,7 @@ let rec consume_only_leading_comments ?(restrict_to_before=false) acc = function
 let rec first_is_comment = function
   | Doc.Comment _ -> `yes
   | Token _ | Optional _ -> `no
-  | Group (_, _, d) | Nest (_, _, d) | Relative_nest (_, _, d) ->
+  | Group (_, _, d) | Nest (_, _, d) ->
     first_is_comment d
   | Empty | Whitespace _ -> `maybe
   | Cat (_, d1, d2) ->
@@ -87,7 +87,7 @@ let rec first_is_space = function
   | Doc.Whitespace _ -> `yes
   | Token _ | Comment _ -> `no
   | Optional o -> if Option.is_some o.before then `yes else `no
-  | Group (_, _, d) | Nest (_, _, d) | Relative_nest (_, _, d) ->
+  | Group (_, _, d) | Nest (_, _, d) ->
     first_is_space d
   | Empty -> `maybe
   | Cat (_, d1, d2) ->
@@ -98,7 +98,7 @@ let rec first_is_space = function
 let first_is_space d = first_is_space d = `yes
 
 let rec nest_before_leaf = function
-  | Doc.Nest _ | Relative_nest _ -> `yes
+  | Doc.Nest _ -> `yes
   | Token _ | Optional _ | Comment _ | Whitespace _ -> `no
   | Group (_, _, d) -> nest_before_leaf d
   | Empty -> `maybe
@@ -241,9 +241,6 @@ let rec walk_both state seq doc =
     | _, Doc.Nest (_, i, doc) ->
       let rest, doc, state' = walk_both (under_nest state) seq doc in
       rest, Doc.nest ~extra_indent:i 0 doc, exit_nest state state'
-    | _, Doc.Relative_nest (_, i, doc) ->
-      let rest, doc, state' = walk_both (under_nest state) seq doc in
-      rest, Doc.relative_nest i doc, exit_nest state state'
 
     | _, Doc.Group (_, flatness, doc) ->
       let rest, doc, state' =

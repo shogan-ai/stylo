@@ -8,8 +8,7 @@ module Requirement : sig
 
   val ( + ) : t -> t -> t
 
-  val to_int_including_indent
-    : prev_line_indent:int -> current_indent:int -> t -> int
+  val to_int_including_indent : current_indent:int -> t -> int
 end
 
 type flatness = private bool ref
@@ -54,7 +53,6 @@ type t = private
   | Whitespace of whitespace
   | Cat of Requirement.t * t * t
   | Nest of Requirement.t * int lazy_t * t
-  | Relative_nest of Requirement.t * int * t
   | Group of Requirement.t * flatness option * t
 
 val requirement : t -> Requirement.t
@@ -81,7 +79,6 @@ val docstring : string -> t
 
 val (^^) : t -> t -> t
 val nest : ?extra_indent:int lazy_t -> int -> t -> t
-val relative_nest : int -> t -> t
 val group : ?flatness:flatness -> t -> t
 
 val flatness_tracker : unit -> flatness

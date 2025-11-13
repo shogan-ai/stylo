@@ -139,13 +139,6 @@ let rec pretty buf state indent flat = function
     pretty buf state' indent flat t2
   | Nest (_, i, t) ->
     pretty buf state (indent + Lazy.force i) flat t
-  | Relative_nest (_, rel_indent, t) ->
-    let indent =
-      (* we don't want to decrease the indent, we just don't want to increase it
-         too much. *)
-      max (state.line_indent + rel_indent) indent
-    in
-    pretty buf state indent flat t
   | Group (req, flat_track_opt, t) ->
     let flat =
       flat ||
@@ -155,8 +148,7 @@ let rec pretty buf state indent flat = function
         | Has_text -> to_int (req + of_int state.column)
         | _ ->
           assert (state.column = 0);
-          to_int_including_indent ~prev_line_indent:state.line_indent
-            ~current_indent:indent req
+          to_int_including_indent ~current_indent:indent req
       in
       gp_req <= state.max_width
 

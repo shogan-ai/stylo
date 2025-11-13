@@ -1852,54 +1852,64 @@ end = struct
       true
     | _ -> false
 
-  let pp_function_parts indent_fun ?lbl exp =
+  let pp_function_parts ?app_prefix_flatness ?lbl exp =
     match exp.pexp_desc with
     | Pexp_parens { exp = fun_exp; optional = false } ->
       let (fun_and_params, body) = Expression.pp_function_parts fun_exp in
       let first_part =
         optional (stringf "~%s:") lbl ^^ S.lparen ^^ fun_and_params
       in
+      let extra_indent =
+        Option.map (fun app_prefix_flatness ->
+          lazy (
+            if Condition.(check @@ flat app_prefix_flatness)
+            then (-2) (* We cancel the indentation in that case *)
+            else 0
+          )
+        ) app_prefix_flatness
+      in
       first_part,
-      group (indent_fun 2 (break 1 ^^ body) ^^ S.rparen)
+      group (nest ?extra_indent 2 (break 1 ^^ body) ^^ S.rparen)
       |> Attribute.attach ~attrs:exp.pexp_attributes
     | _ -> assert false
 
-  let pp_arg_parts indent_fun arg =
+  let pp_arg_parts ?app_prefix_flatness arg =
     match arg.parg_desc with
     | Parg_unlabelled { legacy_modes=[]; arg; typ_constraint=None; modes=[] }
       when is_function arg ->
-      pp_function_parts indent_fun arg
+      pp_function_parts ?app_prefix_flatness arg
     | Parg_labelled { optional=false; legacy_modes=[]; name;
                       maybe_punned=Some arg; typ_constraint=None;modes=[];
                       default=None }
       when is_function arg ->
-      pp_function_parts indent_fun ~lbl:name arg
+      pp_function_parts ?app_prefix_flatness ~lbl:name arg
     | _ ->
       Argument.pp Expression.pp arg, empty
 
-  let pp_last_arg arg =
-    let p1, p2 = pp_arg_parts relative_nest arg in
+  let pp_last_arg app_prefix_flatness arg =
+    let p1, p2 = pp_arg_parts ~app_prefix_flatness arg in
     [ p1 ], p2
 
   let pp_arg arg =
-    let p1, p2 = pp_arg_parts nest arg in
+    let p1, p2 = pp_arg_parts arg in
     p1 ^^ p2
 
-  let rec pp_args = function
+  let rec pp_args app_prefix_flatness = function
     | [] -> assert false
-    | [ arg ] -> pp_last_arg arg
+    | [ arg ] -> pp_last_arg app_prefix_flatness arg
     | arg :: args ->
-      let args, trailing = pp_args args in
+      let args, trailing = pp_args app_prefix_flatness args in
       pp_arg arg :: args, trailing
 
   let pp ?extra_indent ?(indent=2) f args =
-    let args, trailing = pp_args args in
+    let app_prefix_flatness = flatness_tracker () in
+    let args, trailing = pp_args app_prefix_flatness args in
     let args = separate (break 1) args in
-    group (
+    group ~flatness:app_prefix_flatness (
       f ^/^
       nest ?extra_indent indent args
     ) ^^
-    nest ?extra_indent 0 trailing
+    nest ?extra_indent 2 trailing
 end
 
 and Case : sig
