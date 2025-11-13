@@ -1540,11 +1540,13 @@ end = struct
     group (pp_ite ?preceeding ?kw ext_attr e1 e2 e3_o)
 
   and pp_ite ?preceeding ?(kw=S.if_) ext_attr e1 e2 e3_o =
-    let if_, extra_indent =
-      Ext_attribute.decorate kw ext_attr
-      |> Preceeding.group_with preceeding
+    let pre_kw, extra_indent =
+      let decorated = Ext_attribute.decorate kw ext_attr in
+      let pre_ext = group (decorated ^^ break 1) in
+      let ext_indent = Requirement.to_int (requirement pre_ext) in
+      Preceeding.extend preceeding pre_ext ~indent:ext_indent
     in
-    let if_cond = if_ ^/^ nest ~extra_indent 2 (pp e1) in
+    let if_cond = pp ~preceeding:pre_kw e1 in
     let then_ = pp_if_branch S.then_ e2 in
     let else_ = optional pp_else_branch e3_o in
     group if_cond ^/^ nest ~extra_indent 0 (then_ ^?^ else_)
@@ -1554,7 +1556,7 @@ end = struct
       ; pexp_attributes = [] (* we'd need to be under parens to have attrs *)
       ; pexp_desc = Pexp_ifthenelse (e1, e2, e3)
       ; _ } ->
-      pp_ite ~kw:(group (S.else_ ^/^ S.if_)) ext_attrs e1 e2 e3
+      pp_ite ~kw:(S.else_ ^/^ S.if_) ext_attrs e1 e2 e3
     | exp -> pp_if_branch S.else_ exp
 
   and pp_if_branch kw = function
