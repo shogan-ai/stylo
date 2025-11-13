@@ -3200,6 +3200,7 @@ and Generic_binding : sig
 
   val pp
     :  ?preceeding:Preceeding.t
+    -> ?params_indent:int
     -> ?item:bool
     -> ?equal_sign:t
     -> ?pre_text:string list
@@ -3221,14 +3222,20 @@ end = struct
     | Single_part d -> Single_part (f d)
     | Three_parts r -> Three_parts { r with stop = f r.stop }
 
-  let pp ?preceeding ~equal_sign ~keyword ~params ?constraint_ ?rhs bound =
+  let pp ?preceeding ?(params_indent=2)
+        ~equal_sign ~keyword ~params ?constraint_ ?rhs bound =
     let keyword, extra_indent =
       Preceeding.group_with preceeding (group keyword)
     in
     let bindings =
-      List.fold_left (fun acc elt ->
-        acc ^^ nest ~extra_indent 2 (group (break 1 ^^ elt))
-      ) keyword (bound :: params)
+      let main = group (keyword ^/^ nest ~extra_indent 2 bound) in
+      match params with
+      | [] -> main
+      | _ ->
+        group (
+          main ^/^
+          separate_map (break 1) (nest ~extra_indent params_indent) params
+        )
     in
     match constraint_, rhs with
     | None, None ->
@@ -3312,11 +3319,11 @@ end = struct
       )
 
 
-  let pp ?preceeding ?item ?(equal_sign = S.equals) ?pre_text ?pre_doc ~keyword
+  let pp ?preceeding ?params_indent ?item ?(equal_sign = S.equals) ?pre_text ?pre_doc ~keyword
         ?(params=[]) ?constraint_ ?rhs ?(attrs=[]) ?post_doc bound =
     (* Here we assume that [preceeding] cannot be [Some _] at the same time as
        [pre_text] or [pre_doc]. *)
-    pp ?preceeding ~equal_sign ~keyword ~params ?constraint_ ?rhs bound
+    pp ?preceeding ?params_indent ~equal_sign ~keyword ~params ?constraint_ ?rhs bound
     |> Attribute.attach ?item ?text:pre_text ?pre_doc ?post_doc ~attrs
 end
 
@@ -3424,7 +3431,8 @@ end = struct
     let params = List.map Functor_parameter.pp pmb_params in
     let constraint_ = modal_constraint pmb_constraint pmb_modes in
     Generic_binding.pp ~pre_text:pmb_pre_text ?pre_doc:pmb_pre_doc
-      ~keyword:kw bound ~params
+      ~keyword:kw bound
+      ~params_indent:4 ~params
       ?constraint_
       ~rhs:(Module_expr.as_rhs pmb_expr)
       ~attrs:pmb_attributes ?item
