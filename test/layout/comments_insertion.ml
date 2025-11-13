@@ -1,0 +1,24 @@
+let flat = 1
+
+(* floating *)
+
+let foo =
+  if whatever
+  then (* some comment *)
+    smtg
+  else (
+    match not_flat with
+    | () -> ()
+  )
+
+(* floating2 *)
+
+let foo2 =
+  if whatever2
+  then
+    (* some comment2 *)
+    smtg2
+  else (
+    match not_flat2 with
+    | () -> ()
+  )
