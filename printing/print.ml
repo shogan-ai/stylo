@@ -2984,32 +2984,40 @@ end = struct
 end
 
 and Include_infos : sig
-  val pp : 'a. ('a -> t) -> 'a include_infos -> t
+  val pp : 'a. ('a -> Generic_binding.rhs) -> 'a include_infos -> t
 end = struct
   let pp pp_mod { pincl_kind ; pincl_mod; pincl_attributes; pincl_ext_attrs;
                   pincl_pre_doc; pincl_post_doc; pincl_loc = _;
                   pincl_tokens = _ } =
-    Ext_attribute.decorate S.include_ pincl_ext_attrs ^/^
-    begin match pincl_kind with
-      | Functor -> S.functor_ ^^ break 1
+    let keywords =
+      Ext_attribute.decorate S.include_ pincl_ext_attrs ^?^
+      match pincl_kind with
+      | Functor -> S.functor_
       | Structure -> empty
-    end ^^
-    pp_mod pincl_mod
-    |> Attribute.attach ~item:true ~attrs:pincl_attributes
+    in
+    let include_ =
+      match pp_mod pincl_mod with
+      | Generic_binding.Single_part doc -> group (keywords ^/^ doc)
+      | Three_parts { start; main; stop } ->
+        group (keywords ^/^ start) ^/^
+        nest 2 main ^/^
+        stop
+    in
+    Attribute.attach ~item:true ~attrs:pincl_attributes
       ?pre_doc:pincl_pre_doc ?post_doc:pincl_post_doc
-    |> group
+      include_
 end
 
 and Include_description : sig
   val pp : include_description -> t
 end = struct
-  let pp = Include_infos.pp Module_type.pp
+  let pp = Include_infos.pp Module_type.as_rhs
 end
 
 and Include_declaration : sig
   val pp : include_declaration -> t
 end = struct
-  let pp = Include_infos.pp Module_expr.pp
+  let pp = Include_infos.pp Module_expr.as_rhs
 end
 
 and With_constraint : sig
