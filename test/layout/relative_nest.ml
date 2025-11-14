@@ -1,3 +1,10 @@
+(** In ocamlformat, the body of a syntactic function is indented differently depending on
+    the context (expected) but also depending on whether the function is of the form
+    [fun _ ->] or [function].
+
+    This is apparent on the [bar] examples: in one case we indent by two *relative to the
+    previous line*, in the others by three. *)
+
 let foo =
   List.map (function
     | None -> true
