@@ -137,8 +137,9 @@ let rec pretty buf state indent flat = function
   | Cat (_, t1, t2) ->
     let state' = pretty buf state indent flat t1 in
     pretty buf state' indent flat t2
-  | Nest (_, i, t) ->
-    pretty buf state (indent + Lazy.force i) flat t
+  | Nest (_, i, vanish, t) ->
+    let indent = indent + if Condition.check vanish then 0 else i in
+    pretty buf state indent flat t
   | Group (req, flat_track_opt, t) ->
     let flat =
       flat ||
@@ -147,14 +148,6 @@ let rec pretty buf state indent flat = function
         match state.line with
         | Has_text -> to_int (req + of_int state.column)
         | _ ->
-          (* FIXME: I think this is not quite right.
-             The indent below the group might depend on the group flatness. Here
-             we are forcing the computation of that indent while the flatness
-             hasn't been decided yet.
-
-             We probably want to remove the lazyness from [Nest] but make them
-             "optional" just like tokens. And the "optional_extra_indent" part
-             of [Req.t] would become eager (and pessimistic). *)
           assert (state.column = 0);
           to_int_including_indent ~current_indent:indent req
       in

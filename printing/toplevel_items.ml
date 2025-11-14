@@ -45,8 +45,9 @@ let add_item ?flatness doc item =
        also set to 0. *)
     doc ^^ softline ^^
     group ?flatness (
-      nest ~extra_indent:(lazy 0) (0)
-        (soft_break 0) ^^ item ^^ break 0)
+      nest 1 (nest (-1) (soft_break 0)) ^^
+      item ^^ break 0
+    )
 
 type cont =
   | Semi_followed_by of seq

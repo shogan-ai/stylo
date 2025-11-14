@@ -1,29 +1,29 @@
 open Document
 
-type nonrec t = (t * int lazy_t)
+type nest_fun = t -> t
+
+type nonrec t = t * nest_fun
 
 let implied_nest = function
   | None -> Fun.id
-  | Some (_, i) -> nest ~extra_indent:i 0
+  | Some (_, f) -> f
 
-let mk doc ~indent = (doc, lazy indent)
+let mk doc ~indent =
+  let vanish =
+    match doc with
+    | Optional { vanishing_cond; _ } -> Some vanishing_cond
+    | _ -> None
+  in
+  (doc, nest ?vanish indent)
 
 let extend t_opt doc ~indent =
-  let indent =
-    match doc with
-    | Document.Optional { vanishing_cond; _ } ->
-      lazy (if Condition.check vanishing_cond then 0 else indent)
-    | _ -> lazy indent
-  in
+  let _, nest as suf = mk doc ~indent in
   match t_opt with
-  | None -> (doc, indent), Fun.id
-  | Some (preceeding, previous_indent) ->
-    (preceeding ^^ doc, lazy (Lazy.force previous_indent + Lazy.force indent)),
-    nest ~extra_indent:previous_indent 0
+  | None -> suf, Fun.id
+  | Some (preceeding, previous_nest) ->
+    (preceeding ^^ doc, Fun.compose nest previous_nest), previous_nest
 
 let group_with t doc =
   match t with
   | None -> doc, Fun.id
-  | Some (t, indent) ->
-    let nest = nest ~extra_indent:indent 0 in
-    group (t ^^ nest doc), nest
+  | Some (t, nest) -> group (t ^^ nest doc), nest

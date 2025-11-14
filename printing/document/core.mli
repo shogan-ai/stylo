@@ -52,7 +52,7 @@ type t = private
   | Comment of string
   | Whitespace of whitespace
   | Cat of Requirement.t * t * t
-  | Nest of Requirement.t * int lazy_t * t
+  | Nest of Requirement.t * int * Condition.t * t
   | Group of Requirement.t * flatness option * t
 
 val requirement : t -> Requirement.t
@@ -78,7 +78,7 @@ val comment : string -> t
 val docstring : string -> t
 
 val (^^) : t -> t -> t
-val nest : ?extra_indent:int lazy_t -> int -> t -> t
+val nest : ?vanish:Condition.t -> int -> t -> t
 val group : ?flatness:flatness -> t -> t
 
 val flatness_tracker : unit -> flatness

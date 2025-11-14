@@ -1797,17 +1797,12 @@ end = struct
       let first_part =
         optional (stringf "~%s:") lbl ^^ S.lparen ^^ fun_and_params
       in
-      let extra_indent =
-        Option.map (fun app_prefix_flatness ->
-          lazy (
-            if Condition.(check @@ flat app_prefix_flatness)
-            then (-2) (* We cancel the indentation in that case *)
-            else 0
-          )
-        ) app_prefix_flatness
-      in
       first_part,
-      group (nest ?extra_indent 2 (break 1 ^^ body) ^^ S.rparen)
+      group (
+        nest ?vanish:(Option.map Condition.flat app_prefix_flatness) 2
+          (break 1 ^^ body)
+        ^^ S.rparen
+      )
       |> Attribute.attach ~attrs:exp.pexp_attributes
     | _ -> assert false
 

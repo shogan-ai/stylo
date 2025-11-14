@@ -9,16 +9,16 @@ module Requirement : sig
   val ( + ) : t -> t -> t
   (** Beware: not commutative! *)
 
-  val nest : int lazy_t -> t -> t
+  val nest : int -> t -> t
 
   val to_int_including_indent : current_indent:int -> t -> int
 end = struct
   type t = {
     compact_width: int;
-    potential_extra_indent: int lazy_t;
+    potential_extra_indent: int;
   }
 
-  let of_int i = { compact_width = i; potential_extra_indent = (lazy 0) }
+  let of_int i = { compact_width = i; potential_extra_indent = 0 }
   let to_int i = i.compact_width
 
   let infinity = of_int max_int
@@ -27,14 +27,14 @@ end = struct
     if t = infinity
     then t.compact_width
     else
-      let indent = current_indent + Lazy.force t.potential_extra_indent in
+      let indent = current_indent + t.potential_extra_indent in
       t.compact_width + indent
 
   let nest i t =
     if t = infinity
     then infinity
     else
-      let indent = lazy (Lazy.force i + Lazy.force t.potential_extra_indent) in
+      let indent = i + t.potential_extra_indent in
       { t with potential_extra_indent = indent }
 
   let (+) a b =
@@ -88,7 +88,7 @@ type t =
   | Comment of string
   | Whitespace of whitespace
   | Cat of Req.t * t * t
-  | Nest of Req.t * int lazy_t * t
+  | Nest of Req.t * int * Condition.t * t
   | Group of Req.t * flatness option * t
 
 let requirement = function
@@ -101,7 +101,7 @@ let requirement = function
   | Whitespace Non_breakable -> Req.of_int 1
   | Whitespace Vanishing_space _ -> Req.of_int 0 (* FIXME: really? *)
   | Cat (r, _, _)
-  | Nest (r, _, _)
+  | Nest (r, _, _, _)
   | Group (r, _, _) -> r
 
 let empty = Empty
@@ -135,17 +135,13 @@ let (^^) t1 t2 =
     let req = Req.(requirement t1 + requirement t2) in
     Cat (req, t1, t2)
 
-let nest ?extra_indent i = function
-  | Empty -> Empty
-  | t ->
-    match extra_indent, i with
-    | None, 0 -> t
-    | None, i ->
-      let indent = lazy i in
-      Nest (Req.nest indent (requirement t), indent, t)
-    | Some e_i, i ->
-      let indent = lazy (Lazy.force e_i + i) in
-      Nest (Req.nest indent (requirement t), indent, t)
+let nest ?vanish i t =
+  match i, t with
+  | 0, _
+  | _, Empty -> t
+  | _ ->
+    let cond = Option.value vanish ~default:Condition.(not always) in
+    Nest (Req.nest i (requirement t), i, cond, t)
 
 
 let group ?flatness = function
