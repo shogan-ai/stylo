@@ -112,11 +112,6 @@ let whitespace buf state indent flat = function
     newline state soft buf
   | Non_breakable ->
     add_spaces buf state indent 1
-  | Vanishing_space cond ->
-    if Condition.check cond then
-      state
-    else
-      add_spaces buf state indent 1
 
 let rec pretty buf state indent flat = function
   | Empty -> state
@@ -133,7 +128,11 @@ let rec pretty buf state indent flat = function
       let state' = ws state before in
       let state'' = text buf state' indent token in
       ws state'' after
-  | Whitespace ws -> whitespace buf state indent flat ws
+  | Whitespace (vanishing_cond, ws) ->
+    if Condition.check vanishing_cond then
+      state
+    else
+      whitespace buf state indent flat ws
   | Cat (_, t1, t2) ->
     let state' = pretty buf state indent flat t1 in
     pretty buf state' indent flat t2

@@ -53,6 +53,7 @@ module Condition = struct
   type t = bool lazy_t
 
   let always = lazy true
+  let never = lazy false
 
   let (!!) = Lazy.force
 
@@ -72,7 +73,6 @@ type whitespace =
   | Line_break of softness
   | Break of int * softness
   | Non_breakable
-  | Vanishing_space of Condition.t
 
 (* FIXME: comments and strings can contain newlines, they should be represented
    by something other than "string". *)
@@ -86,35 +86,39 @@ type t =
       after: whitespace option;
     }
   | Comment of string
-  | Whitespace of whitespace
+  | Whitespace of Condition.t * whitespace
   | Cat of Req.t * t * t
   | Nest of Req.t * int * Condition.t * t
   | Group of Req.t * flatness option * t
+
+let ws_req = function
+  | Break (spaces, _) -> Req.of_int spaces
+  | Line_break _ -> Req.infinity
+  | Non_breakable -> Req.of_int 1
 
 let requirement = function
   | Empty -> Req.of_int 0
   | Token s
   | Comment s -> Req.of_int (String.length s)
   | Optional _ -> Req.of_int 0 (* vanishes if flat so ... *)
-  | Whitespace Break (spaces, _) -> Req.of_int spaces
-  | Whitespace Line_break _ -> Req.infinity
-  | Whitespace Non_breakable -> Req.of_int 1
-  | Whitespace Vanishing_space _ -> Req.of_int 0 (* FIXME: really? *)
+  | Whitespace (_, ws) -> ws_req ws
   | Cat (r, _, _)
   | Nest (r, _, _, _)
   | Group (r, _, _) -> r
 
+let ws ws = Whitespace (Condition.never, ws)
+
 let empty = Empty
 let string s = Token s
-let break spaces = Whitespace (Break (spaces, Hard))
-let soft_break spaces = Whitespace (Break (spaces, Soft))
-let hardline = Whitespace (Line_break Hard)
-let softline = Whitespace (Line_break Soft)
-let softest_line = Whitespace (Line_break Softest)
-let softest_break = Whitespace (Break (1, Softest))
+let break spaces = ws (Break (spaces, Hard))
+let soft_break spaces = ws (Break (spaces, Soft))
+let hardline = ws (Line_break Hard)
+let softline = ws (Line_break Soft)
+let softest_line = ws (Line_break Softest)
+let softest_break = ws (Break (1, Softest))
 
-let nbsp = Whitespace Non_breakable
-let vanishing_space lvl = Whitespace (Vanishing_space lvl)
+let nbsp = ws Non_breakable
+let vanishing_space cond = Whitespace (cond, Non_breakable)
 
 let opt_token ?ws_before ?ws_after vanishing_cond tok =
   match ws_before, ws_after with

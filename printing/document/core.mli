@@ -37,8 +37,6 @@ type whitespace =
   (** [Break (n, softness)] prints as [n] spaces in flat mode, and behaves
       as a [Line_break softness] otherwise. *)
   | Non_breakable (** a simple space. *)
-  | Vanishing_space of Condition.t
-  (** Prints as a space when the condition is not met, vanishes otherwise. *)
 
 type t = private
   | Empty
@@ -50,7 +48,7 @@ type t = private
       after: whitespace option;
     }
   | Comment of string
-  | Whitespace of whitespace
+  | Whitespace of Condition.t * whitespace
   | Cat of Requirement.t * t * t
   | Nest of Requirement.t * int * Condition.t * t
   | Group of Requirement.t * flatness option * t
