@@ -3,13 +3,10 @@ open Document.Utils
 
 open Ocaml_syntax.Tokens
 
-(* FIXME: sometimes there are two blank lines between defs.
-   For no obvious reason (sometimes it's between a flat and a non flat,
-   sometimes between two non flats, but not always). *)
-
-let add_item ?flatness doc item =
+let add_item ?flatness last_in_group doc item =
+  let post_break = if last_in_group then empty else break 0 in
   match doc with
-  | Empty -> group ?flatness (item ^^ break 0)
+  | Empty -> group ?flatness (item ^^ post_break)
   | _ ->
     (* flat items don't force blank lines, only non-flat ones do. *)
     (* Notice the [nest] trick here: without it any comment "attached" to the
@@ -46,7 +43,7 @@ let add_item ?flatness doc item =
     doc ^^ softline ^^
     group ?flatness (
       nest 1 (nest (-1) (soft_break 0)) ^^
-      item ^^ break 0
+      item ^^ post_break
     )
 
 type cont =
@@ -91,16 +88,17 @@ let pp_keeping_semi pp_item =
     | [], _ -> doc, cont
     | item :: items, Child_followed_by tokens ->
       let item = pp_item item in
+      let last = items = [] in
       begin match advance_tokens tokens with
       | Semi_followed_by tokens ->
         let item = item ^/^ Syntax.semisemi in
-        perhaps_semi (add_item doc item) items tokens
+        perhaps_semi (add_item last doc item) items tokens
       | Opt_semi_followed_by tokens ->
         let flatness = flatness_tracker () in
         let item = item ^^ opt_semisemi_doc (Condition.flat flatness) in
-        perhaps_semi (add_item ~flatness doc item) items tokens
+        perhaps_semi (add_item ~flatness last doc item) items tokens
       | cont ->
-        expect_item (add_item doc item) items cont
+        expect_item (add_item last doc item) items cont
       end
     | _ -> assert false
   in
