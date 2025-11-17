@@ -240,7 +240,7 @@ let rec walk_both state seq doc =
 
     | _, Doc.Nest (_, i, vanish, doc) ->
       let rest, doc, state' = walk_both (under_nest state) seq doc in
-      rest, Doc.nest ~vanish i doc, exit_nest state state'
+      rest, Doc.nest ?vanish i doc, exit_nest state state'
 
     | _, Doc.Group (_, flatness, doc) ->
       let rest, doc, state' =

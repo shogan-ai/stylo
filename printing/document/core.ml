@@ -53,15 +53,15 @@ module Condition = struct
   type t = bool lazy_t
 
   let always = lazy true
-  let never = lazy false
 
   let (!!) = Lazy.force
 
   let flat r = lazy !r
-  let not t = lazy (not !!t)
   let (&&) t1 t2 = lazy (!!t1 && !!t2)
 
-  let check = (!!)
+  let check = function
+    | None -> false
+    | Some t -> !!t
 end
 
 type softness =
@@ -86,9 +86,9 @@ type t =
       after: whitespace option;
     }
   | Comment of string
-  | Whitespace of Condition.t * whitespace
+  | Whitespace of Condition.t option * whitespace
   | Cat of Req.t * t * t
-  | Nest of Req.t * int * Condition.t * t
+  | Nest of Req.t * int * Condition.t option * t
   | Group of Req.t * flatness option * t
 
 let ws_req = function
@@ -101,12 +101,13 @@ let requirement = function
   | Token s
   | Comment s -> Req.of_int (String.length s)
   | Optional _ -> Req.of_int 0 (* vanishes if flat so ... *)
+  | Whitespace (Some _, _) -> Req.of_int 0
   | Whitespace (_, ws) -> ws_req ws
   | Cat (r, _, _)
   | Nest (r, _, _, _)
   | Group (r, _, _) -> r
 
-let ws ws = Whitespace (Condition.never, ws)
+let ws ws = Whitespace (None, ws)
 
 let empty = Empty
 let string s = Token s
@@ -118,7 +119,7 @@ let softest_line = ws (Line_break Softest)
 let softest_break = ws (Break (1, Softest))
 
 let nbsp = ws Non_breakable
-let vanishing_space cond = Whitespace (cond, Non_breakable)
+let vanishing_space cond = Whitespace (Some cond, Non_breakable)
 
 let opt_token ?ws_before ?ws_after vanishing_cond tok =
   match ws_before, ws_after with
@@ -143,10 +144,7 @@ let nest ?vanish i t =
   match i, t with
   | 0, _
   | _, Empty -> t
-  | _ ->
-    let cond = Option.value vanish ~default:Condition.(not always) in
-    Nest (Req.nest i (requirement t), i, cond, t)
-
+  | _ -> Nest (Req.nest i (requirement t), i, vanish, t)
 
 let group ?flatness = function
   | Empty -> Empty

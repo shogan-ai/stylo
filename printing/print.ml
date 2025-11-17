@@ -774,15 +774,8 @@ end = struct
     let arrow_type_flatness = flatness_tracker () in
     let (acc, last_arrow) =
       let colon_space =
-        let colon_space_flatness = flatness_tracker () in
-        let extra_space_cond =
-          let open Condition in
-          flat colon_space_flatness (* If that condition can't be met, the
-                                       layout is going to be awful anyway... *)
-          && not (flat arrow_type_flatness)
-        in
-        group ~flatness:colon_space_flatness (
-          S.colon ^^ vanishing_space (Condition.not extra_space_cond)
+        group (
+          S.colon ^^ vanishing_space (Condition.flat arrow_type_flatness)
         )
       in
       List.fold_left (fun (acc, between) arg ->

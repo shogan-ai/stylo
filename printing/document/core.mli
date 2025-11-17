@@ -19,11 +19,10 @@ module Condition : sig
   val always : t
 
   val (&&) : t -> t -> t
-  val not : t -> t
 
   val flat : flatness -> t
 
-  val check : t -> bool
+  val check : t option -> bool (* false when None *)
 end
 
 type softness =
@@ -48,9 +47,9 @@ type t = private
       after: whitespace option;
     }
   | Comment of string
-  | Whitespace of Condition.t * whitespace
+  | Whitespace of Condition.t option * whitespace
   | Cat of Requirement.t * t * t
-  | Nest of Requirement.t * int * Condition.t * t
+  | Nest of Requirement.t * int * Condition.t option * t
   | Group of Requirement.t * flatness option * t
 
 val requirement : t -> Requirement.t
