@@ -11,6 +11,8 @@ let implied_nest = function
 let mk doc ~indent =
   let vanish =
     match doc with
+    | Cat (_, Optional { vanishing_cond; _}, _)
+    | Cat (_, _, Optional { vanishing_cond; _})
     | Optional { vanishing_cond; _ } -> Some vanishing_cond
     | _ -> None
   in

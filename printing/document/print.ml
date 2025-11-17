@@ -117,17 +117,11 @@ let rec pretty buf state indent flat = function
   | Empty -> state
   | Token s
   | Comment s -> text buf state indent s
-  | Optional { before; after; vanishing_cond; token } ->
+  | Optional { vanishing_cond; token } ->
     if Condition.check (Some vanishing_cond) then
       state
     else
-      let ws state = function
-        | None -> state
-        | Some ws -> whitespace buf state indent flat ws
-      in
-      let state' = ws state before in
-      let state'' = text buf state' indent token in
-      ws state'' after
+      text buf state indent token
   | Whitespace (vanishing_cond, ws) ->
     if Condition.check vanishing_cond then
       state

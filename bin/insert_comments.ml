@@ -85,8 +85,7 @@ let first_is_comment d = first_is_comment d = `yes
 
 let rec first_is_space = function
   | Doc.Whitespace _ -> `yes
-  | Token _ | Comment _ -> `no
-  | Optional o -> if Option.is_some o.before then `yes else `no
+  | Token _ | Comment _ | Optional _ -> `no
   | Group (_, _, d) | Nest (_, _, _, d) ->
     first_is_space d
   | Empty -> `maybe

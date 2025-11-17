@@ -42,9 +42,7 @@ type t = private
   | Token of string
   | Optional of {
       vanishing_cond: Condition.t;
-      before: whitespace option;
       token: string;
-      after: whitespace option;
     }
   | Comment of string
   | Whitespace of Condition.t option * whitespace

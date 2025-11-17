@@ -81,9 +81,7 @@ type t =
   | Token of string
   | Optional of {
       vanishing_cond: Condition.t;
-      before: whitespace option;
       token: string;
-      after: whitespace option;
     }
   | Comment of string
   | Whitespace of Condition.t option * whitespace
@@ -121,13 +119,6 @@ let softest_break = ws (Break (1, Softest))
 let nbsp = ws Non_breakable
 let vanishing_space cond = Whitespace (Some cond, Non_breakable)
 
-let opt_token ?ws_before ?ws_after vanishing_cond tok =
-  match ws_before, ws_after with
-  | Some _, Some _ -> invalid_arg "Document.opt_token"
-  | _ ->
-    Optional
-      { vanishing_cond; before = ws_before; after = ws_after; token = tok }
-
 (* FIXME *)
 let comment s = Comment ("(*" ^ s ^ "*)")
 let docstring s = Comment ("(**" ^ s ^ "*)")
@@ -139,6 +130,18 @@ let (^^) t1 t2 =
   | _ ->
     let req = Req.(requirement t1 + requirement t2) in
     Cat (req, t1, t2)
+
+let opt_token ?ws_before ?ws_after vanishing_cond tok =
+  match ws_before, ws_after with
+  | Some _, Some _ -> invalid_arg "Document.opt_token"
+  | _ ->
+    let ws = function
+      | None -> empty
+      | Some ws -> Whitespace (Some vanishing_cond, ws)
+    in
+    ws ws_before ^^
+    Optional { vanishing_cond; token = tok } ^^
+    ws ws_after
 
 let nest ?vanish i t =
   match i, t with
