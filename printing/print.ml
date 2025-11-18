@@ -180,6 +180,7 @@ module rec Attribute : sig
 
   val attach
     :  ?item:bool
+    -> ?flatness:flatness
     -> ?text:string list
     -> ?pre_doc:string
     -> ?post_doc:string
@@ -209,8 +210,15 @@ end = struct
 
   let pp_list ?item l = separate_map (break 0) (pp ?item) l
 
-  let attach ?item ?(text = []) ?pre_doc ?post_doc ~attrs t =
-    let with_attrs = group (t ^?^ pp_list ?item attrs) in
+  let attach ?item ?flatness ?(text = []) ?pre_doc ?post_doc ~attrs t =
+    let with_attrs =
+      match attrs, flatness with
+      | [], None -> t
+      | _ ->
+        (* we care about the flatness of the group, so we introduce it even in
+           the absence of attributes. *)
+        group ?flatness (t ^?^ pp_list ?item attrs)
+    in
     begin match text with
     | [] -> empty
     | text ->
@@ -545,88 +553,199 @@ end = struct
 end
 
 and Core_type : sig
-  val pp : core_type -> t
+  val pp : ?preceeding:Preceeding.t -> core_type -> t
   val pp_for_decl : core_type -> t
 
-  val pp_arrow : Tokens.seq -> arg_label -> t -> t -> t
+  module Arrow : sig
+    type printer = ?preceeding:Preceeding.t -> unit -> t
+
+    val pp_arg_moded_ty : modes -> modes -> core_type -> printer
+
+    val collect_args :
+      core_type -> (arrow_arg list * (modes * modes * core_type)) option
+
+    val pp : ?preceeding:Preceeding.t -> arrow_arg list -> pp_rhs:printer -> t
+
+    val pp_for_descr : flatness -> arrow_arg list -> pp_rhs:printer -> t
+  end
 
   val pp_poly_bindings : (string loc * jkind_annotation option) list -> t
-
-  val collect_arrow_args :
-    core_type -> (arrow_arg list * (modes * modes * core_type)) option
-
-  val pp_arrow_for_descr :
-    arrow_arg list -> t -> t
 end = struct
-  let pp_arrow tokens arg_lbl arg rhs =
-    begin match arg_lbl with
-    | Nolabel -> empty
-    | Labelled s -> string s ^^ S.colon
-    | Optional s ->
-      if
-        List.exists (function
-          | Tokens.{ desc = Token OPTLABEL _; _ } -> true
-          | _ -> false
-        ) tokens
-      then stringf "?%s:" s
-      else S.qmark ^^ string s ^^ S.colon
-    end ^^
-    arg ^/^ S.rarrow ^/^ rhs
+  module Arrow = struct
+    type printer = ?preceeding:Preceeding.t -> unit -> t
 
-  let rec pp { ptyp_desc; ptyp_attributes; ptyp_tokens; ptyp_loc=_} =
-    group (pp_desc ptyp_tokens ptyp_desc)
+    let collect_args ct =
+      let rec aux rev_args = function
+        | [], [], { ptyp_desc = Ptyp_arrow arrow; _ } ->
+          (* there can't be attributes on Ptyp_arrow, they'd be on Ptyp_parens *)
+          aux (arrow.domain :: rev_args)
+            (arrow.codom_legacy_modes, arrow.codom_modes, arrow.codom_type)
+        | codom -> List.rev rev_args, codom
+      in
+      match ct.ptyp_desc with
+      | Ptyp_arrow { domain=dom; codom_legacy_modes; codom_type; codom_modes } ->
+        Some (aux [dom] (codom_legacy_modes, codom_modes, codom_type))
+      | _ -> None
+
+
+    let pp_arg_moded_ty pre_m post_m ty ?preceeding () =
+      let pre_nest = Preceeding.implied_nest preceeding in
+      let pre_ty =
+        match pre_m with
+        | [] -> Core_type.pp ?preceeding ty
+        | _ ->
+          let pre_modes, _ =
+            Preceeding.group_with preceeding (modes_legacy pre_m)
+          in
+          pre_modes ^/^ pre_nest (Core_type.pp ty)
+      in
+      with_modes ~modes:post_m pre_ty ~extra_nest:pre_nest
+
+    let pp_arg ?preceeding
+          { aa_lbl; aa_legacy_modes; aa_type; aa_modes; aa_doc; aa_tokens;
+            aa_loc = _ } =
+      let pre_nest = Preceeding.implied_nest preceeding in
+      let arg =
+        match aa_lbl with
+        | Nolabel ->
+          pp_arg_moded_ty ?preceeding aa_legacy_modes aa_modes aa_type ()
+        | Labelled s ->
+          let lbl, _ = Preceeding.group_with preceeding (string s ^^ S.colon) in
+          lbl ^^ pre_nest (pp_arg_moded_ty aa_legacy_modes aa_modes aa_type ())
+        | Optional s ->
+          let lbl =
+            if
+              List.exists (function
+                | Tokens.{ desc = Token OPTLABEL _; _ } -> true
+                | _ -> false
+              ) aa_tokens
+            then stringf "?%s:" s
+            else S.qmark ^^ string s ^^ S.colon
+          in
+          let lbl, _ = Preceeding.group_with preceeding lbl in
+          lbl ^^ pre_nest (pp_arg_moded_ty aa_legacy_modes aa_modes aa_type ())
+      in
+      let arg = arg ^?^ pre_nest @@ optional Doc.pp aa_doc in
+      group arg
+
+    let pp ?preceeding ?(pre_nest=Fun.id) args ~(pp_rhs:printer) =
+      let arrow_pre = Preceeding.mk (S.rarrow ^^ break 1) ~indent:3 in
+      let args =
+        List.mapi (fun i arg ->
+          if i = 0
+          then pp_arg ?preceeding arg
+          else pre_nest @@ pp_arg ~preceeding:arrow_pre arg
+        ) args
+        |> separate (break 1)
+      in
+      args ^/^ pre_nest @@ pp_rhs ~preceeding:arrow_pre ()
+
+    let pp_for_descr descr_flatness args ~pp_rhs =
+      let colon_pre =
+        group (S.colon ^/^ vanishing_space (Condition.flat descr_flatness))
+        |> Preceeding.mk ~indent:3
+      in
+      pp ~preceeding:colon_pre args ~pp_rhs
+
+    let pp ?preceeding args ~pp_rhs =
+      pp ?preceeding ~pre_nest:(Preceeding.implied_nest preceeding)
+        args ~pp_rhs
+  end
+
+  let rec pp ?preceeding
+            ({ ptyp_desc=_; ptyp_attributes; ptyp_tokens = _; ptyp_loc=_} as ct)
+    =
+    group (pp_desc ?preceeding ct)
     |> Attribute.attach ~attrs:ptyp_attributes
 
-  and pp_desc tokens = function
-    | Ptyp_any None -> S.underscore
-    | Ptyp_any Some k -> S.underscore ^/^ S.colon ^/^ Jkind_annotation.pp k
-    | Ptyp_var (s, ko) -> pp_var s ko
-    | Ptyp_arrow { domain=dom; codom_legacy_modes; codom_type; codom_modes } ->
-      let pp_surrounded pre_m post_m ty =
-        modes_legacy pre_m ^?^ pp ty
-        |> with_modes ~modes:post_m
+  and pp_desc ?preceeding ct =
+    let tokens = ct.ptyp_tokens in
+    match ct.ptyp_desc with
+    | Ptyp_any None ->
+      Preceeding.group_with preceeding S.underscore
+      |> fst
+    | Ptyp_any Some k ->
+      let underscore, pre_nest =
+        Preceeding.group_with preceeding S.underscore
       in
-      pp_arrow dom.aa_tokens dom.aa_lbl
-        (pp_surrounded dom.aa_legacy_modes dom.aa_modes dom.aa_type
-           ^?^ optional Doc.pp dom.aa_doc)
-        (pp_surrounded codom_legacy_modes codom_modes codom_type)
-    | Ptyp_tuple elts -> pp_tuple elts
-    | Ptyp_unboxed_tuple elts -> S.hash_lparen ^^ pp_tuple elts ^^ S.rparen
-    | Ptyp_constr (args, lid) -> Type_constructor.pp_core_type tokens args lid.txt
-    | Ptyp_object (fields, closed) -> pp_object fields closed
+      underscore ^/^ pre_nest (S.colon ^/^ Jkind_annotation.pp k)
+    | Ptyp_var (s, ko) -> pp_var ?preceeding s ko
+    | Ptyp_arrow _ ->
+      let args, (codom_legacy_modes, codom_modes, codom_type) =
+        Option.get (Arrow.collect_args ct)
+      in
+      Arrow.pp ?preceeding args
+        ~pp_rhs:(Arrow.pp_arg_moded_ty codom_legacy_modes codom_modes codom_type)
+    | Ptyp_tuple elts -> pp_tuple ?preceeding elts
+    | Ptyp_unboxed_tuple elts ->
+      let hlparen, pre_nest =
+        Preceeding.group_with preceeding S.hash_lparen
+      in
+      hlparen ^^ pre_nest (pp_tuple elts ^^ S.rparen)
+    | Ptyp_constr (args, lid) ->
+      Type_constructor.pp_core_type tokens args lid.txt
+      |> Preceeding.group_with preceeding
+      |> fst
+    | Ptyp_object (fields, closed) -> pp_object ?preceeding fields closed
     | Ptyp_class (lid, args) ->
       Type_constructor.pp_core_type ~class_:true tokens args lid.txt
+      |> Preceeding.group_with preceeding
+      |> fst
     | Ptyp_alias (ct, name, None) ->
-      pp ct ^/^ S.as_ ^/^
-      S.squote ^^ string (Option.get name).txt
+      let pre_nest = Preceeding.implied_nest preceeding in
+      pp ?preceeding ct ^/^ pre_nest (
+        S.as_ ^/^
+        S.squote ^^ string (Option.get name).txt
+      )
     | Ptyp_alias (ct, name_o, Some jkind) ->
-      pp ct ^/^ S.as_ ^/^
-      S.lparen ^^ break 0 ^^ (
-        match name_o with
-        | None -> S.underscore
-        | Some s -> S.squote ^^ string s.txt
-      ) ^^ S.colon ^^ Jkind_annotation.pp jkind ^^ break 0 ^^ S.rparen
+      let pre_nest = Preceeding.implied_nest preceeding in
+      pp ?preceeding ct ^/^ pre_nest (
+        S.as_ ^/^
+        S.lparen ^^ break 0 ^^ (
+          match name_o with
+          | None -> S.underscore
+          | Some s -> S.squote ^^ string s.txt
+        ) ^^ S.colon ^^ Jkind_annotation.pp jkind ^^ break 0 ^^ S.rparen
+      )
     | Ptyp_variant (fields, cf, lbls) ->
-      pp_variant ~tokens fields cf lbls
+      pp_variant ?preceeding ~tokens fields cf lbls
     | Ptyp_poly (bound_vars, ct) ->
-      pp_poly_bindings bound_vars ^^ break 0 ^^ S.dot ^/^ pp ct
-    | Ptyp_package pkg -> package_type pkg
+      let pre_vars, pre_nest =
+        Preceeding.group_with preceeding
+          (pp_poly_bindings bound_vars)
+      in
+      pre_vars ^^ break 0 ^^ pre_nest (S.dot ^/^ pp ct)
+    | Ptyp_package pkg -> package_type ?preceeding pkg
     | Ptyp_open (lid, ct) ->
       let space =
         match ct.ptyp_desc with
         | Ptyp_unboxed_tuple _ -> break 1
         | _ -> empty
       in
-      longident lid.txt ^^ S.dot ^^ space ^^ pp ct
-    | Ptyp_of_kind jkind -> S.type_ ^/^ S.colon ^/^ Jkind_annotation.pp jkind
-    | Ptyp_extension ext -> Extension.pp ext
-    | Ptyp_parens ct -> parens (pp ct)
+      let pre_lid, pre_nest =
+        Preceeding.group_with preceeding (longident lid.txt ^^ S.dot)
+      in
+      pre_lid ^^ pre_nest (space ^^ pp ct)
+    | Ptyp_of_kind jkind ->
+      let pre_type, pre_nest = Preceeding.group_with preceeding S.type_ in
+      pre_type ^/^ pre_nest (S.colon ^/^ Jkind_annotation.pp jkind)
+    | Ptyp_extension ext ->
+      Extension.pp ext
+      |> Preceeding.group_with preceeding
+      |> fst
+    | Ptyp_parens ct -> pp_parens ?preceeding ct
 
-  and pp_var var_name jkind =
-    let var = S.squote ^^ string var_name in
+  and pp_parens ?preceeding ct =
+    let lparen, pre_nest = Preceeding.extend preceeding S.lparen ~indent:1 in
+    pp ~preceeding:lparen ct ^^ pre_nest S.rparen
+
+  and pp_var ?preceeding var_name jkind =
+    let var, pre_nest =
+      Preceeding.group_with preceeding (S.squote ^^ string var_name)
+    in
     match jkind with
     | None -> var
-    | Some k -> var ^/^ S.colon ^/^ Jkind_annotation.pp k
+    | Some k -> var ^/^ pre_nest (S.colon ^/^ Jkind_annotation.pp k)
 
   and pp_poly_bindings bound_vars =
     let pp_bound (var, jkind) =
@@ -637,59 +756,84 @@ end = struct
     in
     separate_map (break 1) pp_bound bound_vars
 
-  and pp_variant ?(compact=true) ~tokens fields (cf : Asttypes.closed_flag)
-        lbls =
+  and pp_variant ?(compact=true) ?preceeding ~tokens fields
+        (cf : Asttypes.closed_flag) lbls =
+    let pre_nest = Preceeding.implied_nest preceeding in
     let pp_fields bracket =
       let init =
         bracket ^?^ if pipe_before_child tokens then S.pipe else empty
       in
       match fields with
-      | [] -> init
+      | [] -> fst (Preceeding.group_with preceeding init)
       | rf :: rfs ->
-        let rf = row_field init rf in
-        let rfs = List.map (row_field S.pipe) rfs in
+        let indent = Requirement.to_int (requirement init) + 1 in
+        let first_pre, _ =
+          Preceeding.extend preceeding (init ^^ break 1) ~indent
+        in
+        let pipe_pre = Preceeding.mk (S.pipe ^^ break 1) ~indent in
+        let rf = row_field first_pre rf in
+        let rfs = List.map (fun rf -> pre_nest (row_field pipe_pre rf)) rfs in
         separate (if compact then break 1 else hardline) (rf :: rfs)
     in
     match cf, lbls with
-    | Closed, None -> pp_fields S.lbracket ^/^ S.rbracket
-    | Open, None -> pp_fields S.lbracket_gt ^/^ S.rbracket
-    | Closed, Some [] -> pp_fields S.lbracket_lt ^/^ S.rbracket
+    | Closed, None -> pp_fields S.lbracket ^/^ pre_nest S.rbracket
+    | Open, None -> pp_fields S.lbracket_gt ^/^ pre_nest S.rbracket
+    | Closed, Some [] -> pp_fields S.lbracket_lt ^/^ pre_nest S.rbracket
     | Closed, Some labels ->
-      pp_fields S.lbracket_lt ^/^
-      S.gt ^/^ separate_map (break 1) pp_poly_tag labels ^/^
-      S.rbracket
+      pp_fields S.lbracket_lt ^/^ pre_nest (
+        S.gt ^/^ separate_map (break 1) pp_poly_tag labels ^/^
+        S.rbracket
+      )
     | Open, Some _ -> assert false
 
-  and row_field preceeding_tok { prf_desc; prf_attributes; prf_doc;
+  and row_field preceeding { prf_desc; prf_attributes; prf_doc;
                                  prf_loc = _; prf_tokens = _ } =
-    prefix (row_field_desc preceeding_tok prf_desc)
-      (Attribute.pp_list prf_attributes ^?^ optional Doc.pp prf_doc)
+    let pre_nest = Preceeding.implied_nest (Some preceeding) in
+    prefix (row_field_desc preceeding prf_desc)
+      (pre_nest @@ Attribute.pp_list prf_attributes ^?^ optional Doc.pp prf_doc)
 
-  and row_field_desc preceeding_tok = function
-    | Rinherit ct -> group (preceeding_tok ^/^ pp ct)
-    | Rtag (label, _, []) -> group (preceeding_tok ^/^ pp_poly_tag label.txt)
+  and row_field_desc preceeding = function
+    | Rinherit ct -> pp ~preceeding ct
+    | Rtag (label, _, []) ->
+      pp_poly_tag label.txt
+      |> Preceeding.group_with (Some preceeding)
+      |> fst
     | Rtag (label, has_const, at_types) ->
+      let pre_tag, pre_nest =
+        Preceeding.group_with (Some preceeding)
+          (pp_poly_tag label.txt ^/^ S.of_)
+      in
       let args =
         (if has_const then S.ampersand ^^ break 1 else empty) ^^
         separate_map (break 1 ^^ S.ampersand ^^ break 1) pp at_types
       in
-      prefix
-        (prefix preceeding_tok
-           (group (pp_poly_tag label.txt ^/^ S.of_)))
-        args
+      group (pre_tag ^/^ pre_nest (nest 2 args))
 
   and pp_poly_tag lbl = S.bquote ^^ string lbl
 
-  and pp_tuple elts =
-    let pp_elt (lbl_opt, ct) =
-      begin match lbl_opt with
-      | None -> empty
-      | Some s -> string s ^^ S.colon ^^ break 0
-      end ^^ pp ct
+  and pp_tuple ?preceeding elts =
+    let pp_elt ?preceeding (lbl_opt, ct) =
+      match lbl_opt with
+      | None -> pp ?preceeding ct
+      | Some s ->
+        let lbl, pre_nest =
+          string s ^^ S.colon ^^ break 0
+          |> Preceeding.group_with preceeding
+        in
+        lbl ^^ pre_nest (pp ct)
     in
-    separate_map (break 1 ^^ S.star ^^ break 1) pp_elt elts
+    let pre_nest = Preceeding.implied_nest preceeding in
+    let elts =
+      List.mapi (fun i elt ->
+        if i = 0
+        then pp_elt ?preceeding elt
+        else pre_nest (pp_elt elt)
+      ) elts
+    in
+    separate (break 1 ^^ pre_nest S.star ^^ break 1) elts
 
-  and package_type { ppt_ext_attr; ppt_name = lid; ppt_eqs = constraints } =
+  and package_type ?preceeding
+        { ppt_ext_attr; ppt_name = lid; ppt_eqs = constraints } =
     let with_ =
       match constraints with
       | [] -> empty
@@ -703,17 +847,22 @@ end = struct
       | None -> S.module_
       | Some ea -> Ext_attribute.decorate S.module_ ea
     in
-    S.lparen ^^ module_ ^/^ longident lid.txt ^^ with_ ^^ break 0 ^^ S.rparen
+    let pre_lparen_module, pre_nest =
+      Preceeding.group_with preceeding (S.lparen ^^ module_)
+    in
+    pre_lparen_module ^/^ pre_nest (
+      longident lid.txt ^^ with_ ^^ break 0 ^^ S.rparen
+    )
 
-  and pp_object fields closed =
+  and pp_object ?preceeding fields closed =
+    let lt, pre_nest = Preceeding.group_with preceeding S.lt in
     let fields_doc = separate_map (break 1) object_field fields in
     let fields_and_dotdot =
       match fields, closed with
       | _, Asttypes.Closed -> fields_doc
-      | [], Open -> S.dotdot
-      | _, Open -> fields_doc ^/^ S.dotdot
+      | _, Open -> fields_doc ^?^ S.dotdot
     in
-    group (prefix S.lt fields_and_dotdot ^/^ S.gt)
+    lt ^/^ pre_nest (nest 2 fields_and_dotdot ^/^ S.gt)
 
   and object_field { pof_desc; pof_attributes; pof_doc; pof_tokens;
                      pof_loc = _ } =
@@ -727,71 +876,13 @@ end = struct
     | Oinherit ct -> pp ct
     | Otag (lbl, ct) -> string lbl.txt ^^ S.colon ^/^ pp ct
 
-  let collect_arrow_args ct =
-    let rec aux rev_args = function
-      | [], [], { ptyp_desc = Ptyp_arrow arrow; _ } ->
-        (* there can't be attributes on Ptyp_arrow, they'd be on Ptyp_parens *)
-        aux (arrow.domain :: rev_args)
-          (arrow.codom_legacy_modes, arrow.codom_modes, arrow.codom_type)
-      | codom -> List.rev rev_args, codom
-    in
-    match ct.ptyp_desc with
-    | Ptyp_arrow { domain=dom; codom_legacy_modes; codom_type; codom_modes } ->
-      Some (aux [dom] (codom_legacy_modes, codom_modes, codom_type))
-    | _ -> None
-
-
-  let pp_arrow_for_descr args codom =
-    let pp_arg preceeding_tok
-          { aa_lbl; aa_legacy_modes; aa_type; aa_modes; aa_doc; aa_tokens;
-            aa_loc = _ } =
-      let label =
-        match aa_lbl with
-        | Nolabel -> empty
-        | Labelled s -> string s ^^ S.colon
-        | Optional s ->
-          dprintf "arg tokens: %a@." Tokens.pp_seq aa_tokens;
-          if
-            List.exists (function
-              | Tokens.{ desc = Token OPTLABEL _; _ } -> true
-              | _ -> false
-            ) aa_tokens
-          then stringf "?%s:" s
-          else S.qmark ^^ string s ^^ S.colon
-      in
-      let typ_and_modes =
-        modes_legacy aa_legacy_modes ^?^ pp aa_type
-        |> with_modes ~modes:aa_modes
-      in
-      let arg =
-        label ^^ typ_and_modes
-        ^?^ optional Doc.pp aa_doc
-      in
-      if preceeding_tok = empty
-      then nest 2 (group arg)
-      else preceeding_tok ^^ nest 2 (group (break 1 ^^ arg))
-    in
-    let arrow_type_flatness = flatness_tracker () in
-    let (acc, last_arrow) =
-      let colon_space =
-        group (
-          S.colon ^^ vanishing_space (Condition.flat arrow_type_flatness)
-        )
-      in
-      List.fold_left (fun (acc, between) arg ->
-        acc ^?^ pp_arg between arg, S.rarrow
-      ) (empty, colon_space) args
-    in
-    group ~flatness:arrow_type_flatness (
-      acc ^/^ last_arrow ^^ nest 2 (group (break 1 ^^ codom))
-    )
-
-  let pp_for_decl { ptyp_desc; ptyp_attributes; ptyp_tokens; ptyp_loc=_} =
+  let pp_for_decl ({ ptyp_desc; ptyp_attributes; ptyp_tokens; ptyp_loc=_} as ct)
+    =
     let desc =
       match ptyp_desc with
       | Ptyp_variant (rf, cf, lbls) ->
         pp_variant ~compact:false ~tokens:ptyp_tokens rf cf lbls
-      | _ -> pp_desc ptyp_tokens ptyp_desc
+      | _ -> pp_desc ct
     in
     Attribute.attach desc ~attrs:ptyp_attributes
 
@@ -2135,17 +2226,12 @@ end
 and Value_description : sig
   val pp : value_description -> t
 end = struct
-  let pp_type ct =
-    match Core_type.collect_arrow_args ct with
+  let pp_type flatness ct =
+    match Core_type.Arrow.collect_args ct with
     | None -> S.colon ^/^ Core_type.pp ct
     | Some (args, (legacy_modes, post_modes, ty)) ->
-      dprintf "ICI!@.";
-      let codom =
-        modes_legacy legacy_modes ^?^ Core_type.pp ty
-        |> with_modes ~modes:post_modes
-        |> group
-      in
-      Core_type.pp_arrow_for_descr args codom
+      Core_type.Arrow.pp_for_descr flatness args
+        ~pp_rhs:(Core_type.Arrow.pp_arg_moded_ty legacy_modes post_modes ty)
       |> Attribute.attach ~attrs:ct.ptyp_attributes
 
   let pp { pval_pre_doc; pval_ext_attrs; pval_name; pval_type; pval_modalities;
@@ -2157,9 +2243,10 @@ end = struct
       | _ -> S.external_
     in
     let kw = Ext_attribute.decorate kw pval_ext_attrs in
-    prefix (group (kw ^/^ str_or_op pval_name.txt)) (
+    let flatness = flatness_tracker () in
+    group (kw ^/^ str_or_op pval_name.txt) ^/^ nest 2 (
       with_modalities ~modalities:pval_modalities
-        (group (pp_type pval_type))
+        (pp_type flatness pval_type)
       ^?^
       begin match pval_prim with
         | [] -> empty
@@ -2167,9 +2254,8 @@ end = struct
           S.equals ^/^ separate_map (break 1) (fun s -> stringf "%S" s) ps
       end
     )
-    |> Attribute.attach ~item:true ?pre_doc:pval_pre_doc ?post_doc:pval_post_doc
-      ~attrs:pval_attributes
-    |> group
+    |> Attribute.attach ~item:true ~flatness
+         ?pre_doc:pval_pre_doc ?post_doc:pval_post_doc ~attrs:pval_attributes
 end
 
 (** {2 Type declarations} *)
@@ -2459,13 +2545,17 @@ end = struct
       collect_arrow_args (arg :: rev_args) res
     | otherwise -> List.rev rev_args, otherwise
 
-  let rec pp_desc = function
+  let rec pp_desc ct =
+    match ct.pcty_desc with
     | Pcty_constr (lid, args) -> Type_constructor.pp_class_constr args lid.txt
     | Pcty_signature cs -> pp_signature cs
     | Pcty_arrow (arrow_arg, rhs) ->
-      ignore collect_arrow_args;
-      Core_type.pp_arrow arrow_arg.aa_tokens arrow_arg.aa_lbl
-        (Core_type.pp arrow_arg.aa_type) (pp rhs)
+      let args, rhs = collect_arrow_args [arrow_arg] rhs in
+      Core_type.Arrow.pp args
+        ~pp_rhs:(fun ?preceeding () ->
+          (* FIXME! *)
+          Preceeding.group_with preceeding (pp rhs)
+          |> fst)
     | Pcty_extension ext -> Extension.pp ext
     | Pcty_open (od, ct) ->
       S.let_ ^/^ Open_description.pp od ^/^ S.in_ ^/^ pp ct
@@ -2501,8 +2591,8 @@ end = struct
     | Pctf_extension ext -> Extension.pp ~floating:true ext
     | Pctf_docstring s -> Doc.pp_floating s
 
-  and pp { pcty_desc; pcty_attributes; pcty_loc = _; pcty_tokens = _ } =
-    pp_desc pcty_desc
+  and pp ({ pcty_desc=_; pcty_attributes; pcty_loc=_; pcty_tokens=_ } as ct) =
+    pp_desc ct
     |> Attribute.attach ~attrs:pcty_attributes
 end
 
