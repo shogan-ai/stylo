@@ -277,7 +277,7 @@ end = struct
       let percent = if floating then "%%" else "%" in
       let blank = if delim <> "" then " " else "" in
       stringf "{%s%s%s%s|%s|%s}" percent ext_name blank delim s delim
-    | _ -> pp_classic ~floating ext_name ext_payload
+    | _ -> group (pp_classic ~floating ext_name ext_payload)
 
   let pp_toplevel { te_ext; te_attrs; te_pre_doc; te_post_doc } =
     pp ~floating:true te_ext
@@ -445,8 +445,13 @@ end = struct
   let pp = function
     | PString _ -> assert false (* handled in Extension *)
     | PStr s ->
-      break 1 ^^ Structure.pp_implementation s ^^
-      if Ends_in_obj_type.structure s then break 1 else empty
+      let doc = Structure.pp_implementation s in
+      begin match doc with
+      | Empty -> doc
+      | _ ->
+        break 1 ^^ doc ^^
+        if Ends_in_obj_type.structure s then break 1 else empty
+      end
     | PSig s ->
       break 0 ^^ S.colon ^/^ Signature.pp_interface s ^^
       if Ends_in_obj_type.signature s then break 1 else empty
