@@ -472,6 +472,7 @@ end
 and Type_constructor : sig
   val pp_core_type
     : ?class_:bool
+    -> ?preceeding:Preceeding.t
     -> Tokens.seq
     -> core_type list
     -> Longident.t
@@ -492,7 +493,7 @@ end = struct
     | Brackets of { spaces_required: bool }
     | Parens of { omit_when_single_param: bool }
 
-  let pp delims params_docs ty_doc =
+  let pp ?preceeding delims params_docs ty_doc =
     let left, right, omit =
       match delims with
       | Brackets { spaces_required } ->
@@ -501,15 +502,21 @@ end = struct
       | Parens { omit_when_single_param } ->
         S.lparen, S.rparen, omit_when_single_param
     in
-    let params =
-      match params_docs with
-      | [] -> empty
-      | [ one ] when omit -> one
-      | params -> left ^^ separate (S.comma ^^ break 1) params ^^ right
-    in
-    params ^?^ ty_doc
+    match params_docs with
+    | [] ->
+      Preceeding.group_with preceeding ty_doc
+      |> fst
+    | p :: ps ->
+      match ps with
+      | [] when omit ->
+        let param, pre_nest = Preceeding.group_with preceeding p in
+        param ^/^ pre_nest ty_doc
+      | _ ->
+        let left, pre_nest = Preceeding.group_with preceeding left in
+        left ^^ pre_nest (separate (S.comma ^^ break 1) params_docs ^^ right)
+        ^/^ pre_nest ty_doc
 
-  let pp_core_type ?(class_=false) tokens args lid =
+  let pp_core_type ?(class_=false) ?preceeding tokens args lid =
     let delims =
       Parens {
         omit_when_single_param =
@@ -518,7 +525,7 @@ end = struct
     in
     let args = List.map Core_type.pp args in
     let lid = (if class_ then S.hash else empty) ^^ longident lid in
-    pp delims args lid
+    pp ?preceeding delims args lid
 
   let pp_decl ~kw tokens params name =
     let delims =
@@ -688,9 +695,7 @@ end = struct
       in
       hlparen ^^ pre_nest (pp_tuple elts ^^ S.rparen)
     | Ptyp_constr (args, lid) ->
-      Type_constructor.pp_core_type tokens args lid.txt
-      |> Preceeding.group_with preceeding
-      |> fst
+      Type_constructor.pp_core_type ?preceeding tokens args lid.txt
     | Ptyp_object (fields, closed) -> pp_object ?preceeding fields closed
     | Ptyp_class (lid, args) ->
       Type_constructor.pp_core_type ~class_:true tokens args lid.txt
@@ -812,7 +817,8 @@ end = struct
         (if has_const then S.ampersand ^^ break 1 else empty) ^^
         separate_map (break 1 ^^ S.ampersand ^^ break 1) pp at_types
       in
-      group (pre_tag ^/^ pre_nest (nest 2 args))
+      (* N.B. the [nest 0] below mimics ocamlformat, but feels *wrong*. *)
+      group (pre_tag ^/^ pre_nest (nest 0 args))
 
   and pp_poly_tag lbl = S.bquote ^^ string lbl
 
@@ -1561,13 +1567,11 @@ end = struct
       pre_nest close
     in
     match assign with
-    | None -> access
+    | None -> group access
     | Some e ->
-      flow (break 1) [
-        access;
-        pre_nest @@ nest 2 S.larrow;
-        pre_nest @@ nest 2 (pp e);
-      ]
+      let preceeding = Preceeding.mk (S.larrow ^^ break 1) ~indent:3 in
+      let assignment = pp ~preceeding e in
+      group access ^^ group (break 1 ^^ pre_nest assignment)
 
   and pp_ifthenelse ~preceeding ?kw ext_attr e1 e2 e3_o =
     (* group the whole [if .. then .. (else if ..)* else? ..] *)
@@ -1644,7 +1648,10 @@ end = struct
       Preceeding.extend preceeding S.lparen ~indent:1
     in
     let colon_constr =
-      optional (fun ct -> S.colon ^/^ Core_type.pp ct) ct_opt
+      optional (fun ct ->
+        let preceeding = Preceeding.mk (S.colon ^^ break 1) ~indent:2 in
+        Core_type.pp ~preceeding ct
+      ) ct_opt
       |> with_modes ~modes
     in
     group (
@@ -1657,8 +1664,16 @@ end = struct
       Preceeding.extend preceeding S.lparen ~indent:1
     in
     let lparen_e = pp ~preceeding:pre_lparen e in
-    let colon_ct1 = optional (fun ct -> S.colon ^/^ Core_type.pp ct) ct1 in
-    let coerce_ct2 = S.coerce ^/^ Core_type.pp ct2 in
+    let colon_ct1 =
+      optional (fun ct ->
+        let preceeding = Preceeding.mk (S.colon ^^ break 1) ~indent:2 in
+        Core_type.pp ~preceeding ct
+      ) ct1
+    in
+    let coerce_ct2 =
+      let preceeding = Preceeding.mk (S.coerce ^^ break 1) ~indent:3 in
+      Core_type.pp ~preceeding ct2
+    in
     group (
       lparen_e ^/^
       pre_nest (nest 1 (colon_ct1 ^?^ coerce_ct2) ^^ S.rparen)
