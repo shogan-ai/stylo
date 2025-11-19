@@ -1478,7 +1478,7 @@ end = struct
         | Mutable, Recursive -> [S.mutable_; S.rec_]
       )
     in
-    group (bindings ^/^ pre_nest S.in_) ^^ hardline ^^
+    group bindings ^^ hardline ^^
     pre_nest (pp body)
 
   and pp_function_parts ?preceeding exp =
@@ -2006,20 +2006,24 @@ and Letop : sig
   val pp : letop -> t
 end = struct
   let pp { let_; ands; body } =
-    let ands =
-      match ands with
-      | [] -> empty
-      | _ -> break 1 ^^ separate_map (break 1) Binding_op.pp ands
-    in
-    Binding_op.pp let_ ^^ ands ^/^ S.in_ ^^ hardline ^^
+    Binding_op.pp_list (let_ :: ands) ^^ hardline ^^
     Expression.pp body
 end
 
 and Binding_op : sig
   val pp : binding_op -> t
+  val pp_list : binding_op list -> t
 end = struct
-  let pp { pbop_op; pbop_binding; pbop_loc = _ }=
-    Value_binding.pp_list ~start:[string pbop_op.txt] [pbop_binding]
+  let pp ?last { pbop_op; pbop_binding; pbop_loc = _ }=
+    Value_binding.pp ~item:false ?last ~start:[string pbop_op.txt]
+      pbop_binding
+
+  let rec pp_list = function
+    | [] -> empty
+    | [ bop ] -> pp ~last:true bop
+    | bop :: bops -> pp bop ^/^ pp_list bops
+
+  let pp bop = pp bop
 end
 
 and Argument : sig
@@ -2695,7 +2699,7 @@ end = struct
         match rf with
         | Nonrecursive -> []
         | Recursive -> [S.rec_]
-      ) ^/^ S.in_ ^/^ pp body
+      ) ^/^ pp body
     | Pcl_constraint (ce, ct) ->
       parens (pp ce ^/^ S.colon ^/^ Class_type.pp ct)
     | Pcl_extension ext -> Extension.pp ext
@@ -2751,7 +2755,7 @@ end = struct
         S.val_ ^^ override_ over;
         mutable_ mut
       ] in
-      Value_binding.pp_list ~start [vb]
+      Value_binding.pp ~start vb
 
   and pp_method lbl priv = function
     | Cfk_virtual ct ->
@@ -2762,7 +2766,7 @@ end = struct
         S.method_ ^^ override_ over;
         private_ priv
       ] in
-      Value_binding.pp_list ~start [vb]
+      Value_binding.pp ~start vb
 
   and pp { pcl_ext_attrs; pcl_desc; pcl_attributes; pcl_loc = _ } =
     pp_desc pcl_ext_attrs pcl_desc
@@ -3392,6 +3396,12 @@ and Value_binding : sig
     -> ?item:bool
     -> start:t list
     -> value_binding list -> t
+
+  val pp
+    : ?preceeding:Preceeding.t
+    -> ?item:bool
+    -> ?last:bool (** if true, inserts an [in] kwd when [item = false]. *)
+    -> start:t list -> value_binding -> t
 end = struct
   let rhs e =
     (* FIXME: attributes ! *)
@@ -3400,7 +3410,19 @@ end = struct
       Function_body.as_rhs body
     | _ -> Single_part (Expression.pp e)
 
-  let pp ?preceeding ?item start
+  let rhs_optional_in ?(item=false) ~last expr_opt =
+    let rhs = Option.map rhs expr_opt in
+    if item || not last then
+      (* in kwd not needed *)
+      rhs
+    else
+      Some (
+        match rhs with
+        | None -> Single_part S.in_
+        | Some rhs -> Generic_binding.map_rhs_end (fun t -> t ^/^ S.in_) rhs
+      )
+
+  let pp ?preceeding ?item ?(last=false) ~start
         { pvb_legacy_modes; pvb_pat; pvb_modes; pvb_params; pvb_constraint;
           pvb_ret_modes; pvb_expr; pvb_attributes; pvb_pre_text; pvb_pre_doc;
           pvb_post_doc; pvb_loc = _; pvb_tokens = _; pvb_ext_attrs } =
@@ -3430,24 +3452,29 @@ end = struct
     pp ?preceeding ~pre_text:pvb_pre_text ?pre_doc:pvb_pre_doc
       ~keyword:kw_and_modes
       pat ~params ?constraint_
-      ?rhs:(Option.map rhs pvb_expr)
+      ?rhs:(rhs_optional_in ?item ~last pvb_expr)
       ?item ~attrs:pvb_attributes
       ?post_doc:pvb_post_doc
 
   let pp_ands ?(extra_nest=Fun.id) ~item ~sep bindings =
-    List.map (fun it -> extra_nest @@ group (pp ~item [S.and_] it))
-      bindings
-    |> separate sep
+    let rec aux = function
+      | [] -> assert false
+      | [ it ] -> extra_nest @@ group (pp ~item ~last:true ~start:[S.and_] it)
+      | it :: its ->
+        extra_nest (group (pp ~item ~start:[S.and_] it))
+        ^^ sep ^^ aux its
+    in
+    aux bindings
 
   let pp_list ?preceeding ?(item=false) ~start = function
     | [] -> empty
-    | [ x ] -> pp ?preceeding ~item start x
+    | [ x ] -> pp ?preceeding ~item ~last:true ~start x
     | x :: xs ->
       let sep = if item then hardline ^^ hardline else break 1 in
       let extra_nest =
         Option.map (fun _ -> Preceeding.implied_nest preceeding) preceeding
       in
-      group (pp ?preceeding ~item start x) ^^
+      group (pp ?preceeding ~item ~start x) ^^
       sep ^^
       pp_ands ?extra_nest ~item ~sep xs
 end
