@@ -2156,7 +2156,7 @@ and Function_body : sig
   (** [pp_parts (Pfunction_cases _)] is ["function", cases]
       [pp_parts (Pfunction_body e)] is [<empty>, e] *)
 
-  val as_rhs : function_body -> Generic_binding.rhs
+  val as_rhs : function_body -> Layout_module_binding.rhs
 end = struct
   let pp_cases ?preceeding ~tokens cases ext_attrs =
     let pre_function_, pre_nest =
@@ -2181,7 +2181,7 @@ end = struct
     | Pfunction_body _ -> assert false (* can't be on value binding rhs *)
     | Pfunction_cases (cases, ext_attrs) ->
       let kw, cases = pp_cases ~tokens:fb.pfb_tokens cases ext_attrs in
-      Generic_binding.Three_parts { start = kw; main = cases; stop = empty}
+      Layout_module_binding.Three_parts { start = kw; main = cases; stop = empty}
 end
 
 and Type_constraint : sig
@@ -2638,7 +2638,7 @@ end = struct
     let bound_class_thingy =
       Type_constructor.pp_class_info_decl pci_params pci_name.txt
     in
-    let open Generic_binding in
+    let open Layout_module_binding in
     let mk_constraint ct = Single_part (S.colon ^/^ Class_type.pp ct) in
     pp ?equal_sign
       ~pre_text:pci_pre_text
@@ -2783,7 +2783,7 @@ end
 and Module_type : sig
   val pp : module_type -> t
 
-  val as_rhs : module_type -> Generic_binding.rhs
+  val as_rhs : module_type -> Layout_module_binding.rhs
 end = struct
   let rec pp_desc = function
     | Pmty_ident lid -> longident lid.txt
@@ -2818,7 +2818,7 @@ end = struct
     |> Attribute.attach ~attrs:pmty_attributes
 
   let as_rhs ({ pmty_desc; pmty_attributes; pmty_loc=_; pmty_tokens=_ } as mty)
-    : Generic_binding.rhs =
+    : Layout_module_binding.rhs =
     match pmty_desc with
     | Pmty_signature sg ->
       let start, main, stop = Signature.pp_parts sg in
@@ -2944,7 +2944,7 @@ end = struct
       | With_params (params, mty, modes) ->
         let rhs =
           Module_type.as_rhs mty
-          |> Generic_binding.map_rhs_end (with_modes ~modes)
+          |> Layout_module_binding.map_rhs_end (with_modes ~modes)
         in
         List.map Functor_parameter.pp params,
         S.colon,
@@ -2952,11 +2952,11 @@ end = struct
       | Without_params (mty, modalities) ->
         let rhs =
           Module_type.as_rhs mty
-          |> Generic_binding.map_rhs_end (with_modalities ~modalities)
+          |> Layout_module_binding.map_rhs_end (with_modalities ~modalities)
         in
         [], equal_sign mty, rhs
     in
-    Generic_binding.pp ~item:true
+    Layout_module_binding.pp ~item:true
       ~pre_text:pmd_pre_text ?pre_doc:pmd_pre_doc
       ~keyword:(separate (break 1) keywords)
       binding
@@ -2981,11 +2981,11 @@ and Module_substitution : sig
 end = struct
   let pp { pms_name; pms_manifest; pms_attributes; pms_ext_attrs;
            pms_pre_doc; pms_post_doc; pms_loc = _; pms_tokens = _ } =
-    Generic_binding.pp ~item:true ~equal_sign:S.colon_equals
+    Layout_module_binding.pp ~item:true ~equal_sign:S.colon_equals
       ?pre_doc:pms_pre_doc
       ~keyword:(Ext_attribute.decorate S.module_ pms_ext_attrs)
       (string pms_name.txt)
-      ~rhs:(Generic_binding.Single_part (longident pms_manifest.txt))
+      ~rhs:(Layout_module_binding.Single_part (longident pms_manifest.txt))
       ~attrs:pms_attributes
       ?post_doc:pms_post_doc
 end
@@ -2996,7 +2996,7 @@ end = struct
   let pp ?(subst=false)
       { pmtd_name; pmtd_type; pmtd_attributes; pmtd_ext_attrs; pmtd_pre_doc;
         pmtd_post_doc; pmtd_loc = _; pmtd_tokens = _ } =
-    Generic_binding.pp ~item:true
+    Layout_module_binding.pp ~item:true
       ?pre_doc:pmtd_pre_doc
       ~keyword:(S.module_ ^/^ Ext_attribute.decorate S.type_ pmtd_ext_attrs)
       (string pmtd_name.txt)
@@ -3033,7 +3033,7 @@ end = struct
 end
 
 and Include_infos : sig
-  val pp : 'a. ('a -> Generic_binding.rhs) -> 'a include_infos -> t
+  val pp : 'a. ('a -> Layout_module_binding.rhs) -> 'a include_infos -> t
 end = struct
   let pp pp_mod { pincl_kind ; pincl_mod; pincl_attributes; pincl_ext_attrs;
                   pincl_pre_doc; pincl_post_doc; pincl_loc = _;
@@ -3046,7 +3046,7 @@ end = struct
     in
     let include_ =
       match pp_mod pincl_mod with
-      | Generic_binding.Single_part doc -> group (keywords ^/^ doc)
+      | Layout_module_binding.Single_part doc -> group (keywords ^/^ doc)
       | Three_parts { start; main; stop } ->
         group (keywords ^/^ start) ^/^
         nest 2 main ^/^
@@ -3102,7 +3102,7 @@ end
 
 and Module_expr : sig
   val pp : module_expr -> t
-  val as_rhs : module_expr -> Generic_binding.rhs
+  val as_rhs : module_expr -> Layout_module_binding.rhs
 
   (* TODO: not the most natural place for this. *)
   val pp_package_type : core_type -> t
@@ -3152,7 +3152,7 @@ end = struct
 
   let as_rhs
         ({ pmod_desc; pmod_attributes; pmod_loc = _; pmod_tokens = _ } as me)
-    : Generic_binding.rhs =
+    : Layout_module_binding.rhs =
     match pmod_desc with
     | Pmod_structure (attrs, str) ->
       let start, main, stop = Structure.pp_parts attrs str in
@@ -3244,7 +3244,7 @@ end = struct
   let pp x = group (pp x)
 end
 
-and Generic_binding : sig
+and Layout_module_binding : sig
   type rhs =
     | Single_part of t
     | Three_parts of { start: t; main: t; stop: t }
@@ -3281,6 +3281,16 @@ end = struct
     | Single_part d -> Single_part (f d)
     | Three_parts r -> Three_parts { r with stop = f r.stop }
 
+
+  (* Beware: [equal_sign] is never part of [rhs], we have to insert it
+     explicitely, whereas [constraint] sometimes include the "delimiter": a colon
+     or an at.
+     We could have had a [colon_sign] for symmetry, but pffff...
+
+     Also: "sometimes" == it does include it when it is [Single_part], but
+     doesn't for [Three_parts] as there it is always a colon, so we do it here.
+
+     The whole thing is kinda ugly. *)
   let pp ?preceeding ?(params_indent=2)
         ~equal_sign ~keyword ~params ?constraint_ ?rhs bound =
     let keyword, pre_nest =
@@ -3299,7 +3309,7 @@ end = struct
     in
     match constraint_, rhs with
     | None, None ->
-      (* let-punning and abstract module types *)
+      (* abstract module types *)
       bindings
     | None, Some Single_part doc ->
       group (
@@ -3307,8 +3317,6 @@ end = struct
         pre_nest @@ nest 2 doc
       )
     | Some Single_part doc, None ->
-      (* FIXME: weird asymmetry the "colon" is already part of [constraint_] but
-         [equal_sign] is not part of [rhs]... *)
       group (bindings ^/^ pre_nest @@ nest 2 doc)
     | Some Single_part typ, Some Single_part exp ->
       group (
@@ -3326,7 +3334,6 @@ end = struct
         pre_nest stop
       )
     | Some Three_parts { start; main; stop }, None ->
-      (* FIXME: here the "colon" is not included??? *)
       let bindings_and_main =
         group
           (bindings ^/^ pre_nest @@ nest 2 (group (S.colon ^/^ start))) ^/^
@@ -3337,7 +3344,6 @@ end = struct
         pre_nest stop
       )
     | Some Three_parts { start; main; stop }, Some Single_part doc ->
-      (* FIXME: here the "colon" is not included??? *)
       let bindings_and_main =
         group
           (bindings ^/^ pre_nest @@ nest 2 (group (S.colon ^/^ start))) ^/^
@@ -3422,7 +3428,7 @@ end = struct
     | None, None -> bindings ^?^ pre_nest in_kw
     | Some doc, None -> group (bindings ^/^ pre_nest (nest 2 doc ^?^ in_kw))
     (* constraint-less *)
-    | None, Some Generic_binding.Single_part doc ->
+    | None, Some Layout_module_binding.Single_part doc ->
       group (
         group (bindings ^/^ pre_nest @@ nest 2 S.equals) ^/^
         pre_nest (nest 2 doc) ^?^
@@ -3539,7 +3545,7 @@ and Module_binding : sig
 
   val pp_recmods : module_binding list -> t
 end = struct
-  let modal_constraint constr mode_l : Generic_binding.rhs option =
+  let modal_constraint constr mode_l : Layout_module_binding.rhs option =
     match Option.map Module_type.as_rhs constr, mode_l with
     | None, [] -> None
     | Some Three_parts { start; main; stop }, modes ->
@@ -3571,7 +3577,7 @@ end = struct
     in
     let params = List.map Functor_parameter.pp pmb_params in
     let constraint_ = modal_constraint pmb_constraint pmb_modes in
-    Generic_binding.pp ~pre_text:pmb_pre_text ?pre_doc:pmb_pre_doc
+    Layout_module_binding.pp ~pre_text:pmb_pre_text ?pre_doc:pmb_pre_doc
       ~keyword:kw bound
       ~params_indent:4 ~params
       ?constraint_
