@@ -84,4 +84,4 @@ val flatness_tracker : unit -> flatness
 
 val pp_pseudo : Format.formatter -> pseudo_token -> unit
 
-val multi_part_token : t -> t
+val fancy_string : string -> t

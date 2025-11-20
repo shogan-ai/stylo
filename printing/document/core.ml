@@ -170,6 +170,8 @@ let pp_pseudo ppf pt =
   in
   Format.pp_print_string ppf s
 
-let multi_part_token t =
-  let req = requirement t in
-  Token (Complex (req, t))
+let fancy_string s =
+  let leaf = Token (Trivial s) in
+  if String.contains s '\n'
+  then Token (Complex (Requirement.infinity, leaf))
+  else leaf

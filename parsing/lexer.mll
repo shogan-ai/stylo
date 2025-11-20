@@ -126,7 +126,6 @@ let reset_string_buffer () = Buffer.reset string_buffer
 let get_stored_string () = Buffer.contents string_buffer
 
 let store_string_char c = Buffer.add_char string_buffer c
-let store_string_utf_8_uchar u = Buffer.add_utf_8_uchar string_buffer u
 let store_string s = Buffer.add_string string_buffer s
 let store_substring s ~pos ~len = Buffer.add_substring string_buffer s pos len
 
@@ -276,13 +275,6 @@ let enqueue_hashop_from_end_of_lexbuf_window lexbuf ~hashop =
   enqueue_token_from_end_of_lexbuf_window lexbuf (HASHOP hashop)
     ~len:(String.length hashop)
 
-(* Escaped chars are interpreted in strings unless they are in comments. *)
-let store_escaped_char lexbuf c =
-  if in_comment () then store_lexeme lexbuf else store_string_char c
-
-let store_escaped_uchar lexbuf u =
-  if in_comment () then store_lexeme lexbuf else store_string_utf_8_uchar u
-
 let compute_quoted_string_idloc {Location.loc_start = orig_loc } shift id =
   let id_start_pos = orig_loc.Lexing.pos_cnum + shift in
   let loc_start =
@@ -391,21 +383,6 @@ let char_for_octal_code lexbuf i =
 
 let char_for_hexadecimal_code lexbuf i =
   Char.chr (num_value lexbuf ~base:16 ~first:i ~last:(i+1))
-
-let uchar_for_uchar_escape lexbuf =
-  let len = Lexing.lexeme_end lexbuf - Lexing.lexeme_start lexbuf in
-  let first = 3 (* skip opening \u{ *) in
-  let last = len - 2 (* skip closing } *) in
-  let digit_count = last - first + 1 in
-  match digit_count > 6 with
-  | true ->
-      illegal_escape lexbuf
-        "too many digits, expected 1 to 6 hexadecimal digits"
-  | false ->
-      let cp = num_value lexbuf ~base:16 ~first ~last in
-      if Uchar.is_valid cp then Uchar.unsafe_of_int cp else
-      illegal_escape lexbuf
-        (Printf.sprintf "%X is not a Unicode scalar value" cp)
 
 let is_keyword name =
   match lookup_keyword name with
@@ -973,20 +950,20 @@ and string = parse
         end;
         string lexbuf
       }
-  | '\\' (['\\' '\'' '\"' 'n' 't' 'b' 'r' ' '] as c)
-      { store_escaped_char lexbuf (char_for_backslash c);
+  | '\\' ['\\' '\'' '\"' 'n' 't' 'b' 'r' ' ']
+      { store_lexeme lexbuf;
         string lexbuf }
   | '\\' ['0'-'9'] ['0'-'9'] ['0'-'9']
-      { store_escaped_char lexbuf (char_for_decimal_code lexbuf 1);
+      { store_lexeme lexbuf;
          string lexbuf }
   | '\\' 'o' ['0'-'7'] ['0'-'7'] ['0'-'7']
-      { store_escaped_char lexbuf (char_for_octal_code lexbuf 2);
+      { store_lexeme lexbuf;
          string lexbuf }
   | '\\' 'x' ['0'-'9' 'a'-'f' 'A'-'F'] ['0'-'9' 'a'-'f' 'A'-'F']
-      { store_escaped_char lexbuf (char_for_hexadecimal_code lexbuf 2);
+      { store_lexeme lexbuf;
          string lexbuf }
   | '\\' 'u' '{' hex_digit+ '}'
-        { store_escaped_uchar lexbuf (uchar_for_uchar_escape lexbuf);
+      { store_lexeme lexbuf;
           string lexbuf }
   | '\\' _
       { store_lexeme lexbuf;
