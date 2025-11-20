@@ -625,7 +625,8 @@ end = struct
           pp_arg_moded_ty ?preceeding aa_legacy_modes aa_modes aa_type ()
         | Labelled s ->
           let lbl, _ = Preceeding.group_with preceeding (string s ^^ S.colon) in
-          lbl ^^ pre_nest (pp_arg_moded_ty aa_legacy_modes aa_modes aa_type ())
+          lbl ^^ break 0 ^^
+          nest 2 @@ pre_nest (pp_arg_moded_ty aa_legacy_modes aa_modes aa_type ())
         | Optional s ->
           let lbl =
             if
@@ -637,9 +638,10 @@ end = struct
             else S.qmark ^^ string s ^^ S.colon
           in
           let lbl, _ = Preceeding.group_with preceeding lbl in
-          lbl ^^ pre_nest (pp_arg_moded_ty aa_legacy_modes aa_modes aa_type ())
+          lbl ^^ break 0 ^^
+          nest 2 @@ pre_nest (pp_arg_moded_ty aa_legacy_modes aa_modes aa_type ())
       in
-      let arg = arg ^?^ pre_nest @@ optional Doc.pp aa_doc in
+      let arg = group arg ^?^ nest 2 @@ pre_nest @@ optional Doc.pp aa_doc in
       group arg
 
     let pp ?preceeding ?(pre_nest=Fun.id) args ~(pp_rhs:printer) =
@@ -2068,10 +2070,10 @@ end = struct
   let pp pp_arg arg =
     let parenthesize doc =
       if had_parens arg
-      then parens (break 0 ^^ doc ^^ break 0)
+      then parens doc
       else doc
     in
-    match arg.parg_desc with
+    group @@ match arg.parg_desc with
     | Parg_unlabelled { legacy_modes=[]; arg; typ_constraint=None; modes=[] } ->
       pp_arg arg
     | Parg_unlabelled { legacy_modes; arg; typ_constraint; modes } ->
@@ -2088,8 +2090,8 @@ end = struct
         optional; legacy_modes; name: string; maybe_punned = Some a;
         typ_constraint; modes; default;
       } ->
-      single_or_multi_token arg.parg_tokens ~optional name ^^
-      parenthesize (
+      single_or_multi_token arg.parg_tokens ~optional name ^^ break 0 ^^
+      nest 2 @@ parenthesize (
         pp_generic legacy_modes (pp_arg a) typ_constraint modes ?default
       )
 
@@ -2098,15 +2100,15 @@ end = struct
     let parenthesize fst_tok =
       let lparen, rparen, indent =
         if had_parens arg
-        then S.lparen ^^ break 0, break 0 ^^ S.rparen, 1
-        else empty, empty, 0
+        then S.lparen, break 0 ^^ S.rparen, 3
+        else empty, empty, 2
       in
       let pre, pre_nest =
-        Preceeding.extend preceeding (fst_tok ^^ lparen) ~indent
+        Preceeding.extend preceeding (fst_tok ^^ break 0 ^^ lparen) ~indent
       in
       pre, pre_nest rparen
     in
-    match arg.parg_desc with
+    group @@ match arg.parg_desc with
     | Parg_unlabelled { legacy_modes=[]; arg; typ_constraint=None; modes=[] } ->
       pp_preceeded_arg ?preceeding arg
     | Parg_unlabelled { legacy_modes; arg; typ_constraint; modes } ->
