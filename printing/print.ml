@@ -1476,7 +1476,7 @@ end = struct
         | Immutable, Recursive -> [S.rec_]
         | Mutable, Nonrecursive -> [S.mutable_]
         | Mutable, Recursive -> [S.mutable_; S.rec_]
-      )
+      ) ~add_in:true
     in
     group bindings ^^ hardline ^^
     pre_nest (pp body)
@@ -2011,19 +2011,16 @@ end = struct
 end
 
 and Binding_op : sig
-  val pp : binding_op -> t
   val pp_list : binding_op list -> t
 end = struct
-  let pp ?last { pbop_op; pbop_binding; pbop_loc = _ }=
-    Value_binding.pp ~item:false ?last ~start:[string pbop_op.txt]
-      pbop_binding
+  let pp ?(add_in=false) { pbop_op; pbop_binding; pbop_loc = _ }=
+    Value_binding.pp ~item:false ~start:[string pbop_op.txt]
+      pbop_binding ~add_in
 
   let rec pp_list = function
     | [] -> empty
-    | [ bop ] -> pp ~last:true bop
+    | [ bop ] -> pp ~add_in:true bop
     | bop :: bops -> pp bop ^/^ pp_list bops
-
-  let pp bop = pp bop
 end
 
 and Argument : sig
@@ -2694,7 +2691,7 @@ end = struct
     | Pcl_apply (ce, args) -> Application.pp (pp ce) args
     | Pcl_let (rf, vbs, body) ->
       (* FIXME: factorize with Pexp_let *)
-      Value_binding.pp_list ~item:true vbs ~start:(
+      Value_binding.pp_list ~item:true ~add_in:true vbs ~start:(
         S.let_ ::
         match rf with
         | Nonrecursive -> []
@@ -2755,7 +2752,7 @@ end = struct
         S.val_ ^^ override_ over;
         mutable_ mut
       ] in
-      Value_binding.pp ~start vb
+      Value_binding.pp ~start vb ~add_in:false
 
   and pp_method lbl priv = function
     | Cfk_virtual ct ->
@@ -2766,7 +2763,7 @@ end = struct
         S.method_ ^^ override_ over;
         private_ priv
       ] in
-      Value_binding.pp ~start vb
+      Value_binding.pp ~start vb ~add_in:false
 
   and pp { pcl_ext_attrs; pcl_desc; pcl_attributes; pcl_loc = _ } =
     pp_desc pcl_ext_attrs pcl_desc
@@ -3176,7 +3173,7 @@ end = struct
       Attribute.attach ~item:true ~attrs (Expression.pp e)
     | Pstr_value (rf, vbs) ->
       (* FIXME: factorize Pexp_let *)
-      Value_binding.pp_list ~item:true vbs ~start:(
+      Value_binding.pp_list ~item:true ~add_in:false vbs ~start:(
         S.let_ ::
         match rf with
         | Nonrecursive -> []
@@ -3394,15 +3391,74 @@ and Value_binding : sig
   val pp_list
     :  ?preceeding:Preceeding.t
     -> ?item:bool
+    -> add_in:bool
     -> start:t list
     -> value_binding list -> t
 
   val pp
     : ?preceeding:Preceeding.t
     -> ?item:bool
-    -> ?last:bool (** if true, inserts an [in] kwd when [item = false]. *)
+    -> add_in:bool
     -> start:t list -> value_binding -> t
 end = struct
+
+  let layout ?preceeding ~keyword ~params ?constraint_ ?rhs bound in_kw =
+    let keyword, pre_nest =
+      Preceeding.group_with preceeding (group keyword)
+    in
+    let bindings =
+      let main = group (keyword ^/^ pre_nest @@ nest 2 bound) in
+      match params with
+      | [] -> main
+      | _ ->
+        group (
+          main ^/^
+          separate_map (break 1)
+            (fun p -> pre_nest @@ nest 2 p) params
+        )
+    in
+    match constraint_, rhs with
+    (* let-punned *)
+    | None, None -> bindings ^?^ pre_nest in_kw
+    | Some doc, None -> group (bindings ^/^ pre_nest (nest 2 doc ^?^ in_kw))
+    (* constraint-less *)
+    | None, Some Generic_binding.Single_part doc ->
+      group (
+        group (bindings ^/^ pre_nest @@ nest 2 S.equals) ^/^
+        pre_nest (nest 2 doc) ^?^
+        pre_nest in_kw
+      )
+    | None, Some Three_parts { start; main; stop } ->
+      let bindings_and_main =
+        group
+          (bindings ^/^ pre_nest @@ nest 2 (group (S.equals ^/^ start))) ^/^
+        pre_nest @@ nest 2 main
+      in
+      group (
+        group bindings_and_main ^/^
+        pre_nest (stop ^?^ in_kw)
+      )
+    (* constraint and body *)
+    | Some typ, Some Single_part exp ->
+      group (
+        group (bindings ^/^ pre_nest @@ nest 2 (group (typ ^/^ S.equals))) ^/^
+        pre_nest (nest 2 exp) ^?^
+        pre_nest in_kw
+      )
+    | Some doc, Some Three_parts { start; main; stop } ->
+      let bindings_cstr_main =
+        group (
+          bindings ^/^
+          pre_nest @@ nest 2 (group (doc ^/^ S.equals ^/^ start))
+        ) ^/^
+        pre_nest @@ nest 2 main
+      in
+      group (
+        group bindings_cstr_main ^/^
+        pre_nest stop ^?^
+        pre_nest in_kw
+      )
+
   let rhs e =
     (* FIXME: attributes ! *)
     match e.pexp_desc with
@@ -3410,19 +3466,7 @@ end = struct
       Function_body.as_rhs body
     | _ -> Single_part (Expression.pp e)
 
-  let rhs_optional_in ?(item=false) ~last expr_opt =
-    let rhs = Option.map rhs expr_opt in
-    if item || not last then
-      (* in kwd not needed *)
-      rhs
-    else
-      Some (
-        match rhs with
-        | None -> Single_part S.in_
-        | Some rhs -> Generic_binding.map_rhs_end (fun t -> t ^/^ S.in_) rhs
-      )
-
-  let pp ?preceeding ?item ?(last=false) ~start
+  let pp ?preceeding ?(item=false) ~add_in ~start
         { pvb_legacy_modes; pvb_pat; pvb_modes; pvb_params; pvb_constraint;
           pvb_ret_modes; pvb_expr; pvb_attributes; pvb_pre_text; pvb_pre_doc;
           pvb_post_doc; pvb_loc = _; pvb_tokens = _; pvb_ext_attrs } =
@@ -3441,42 +3485,53 @@ end = struct
       | modes -> parens (with_modes pat ~modes)
     in
     let params = List.map Function_param.pp pvb_params in
-    let open Generic_binding in
     let constraint_ =
       match pvb_constraint, pvb_ret_modes with
       | None, [] -> None
-      | None, lst -> Some (Single_part (S.at ^/^ modes lst))
+      | None, lst -> Some (S.at ^/^ modes lst)
       | Some vc, lst ->
-        Some (Single_part (with_modes (Value_constraint.pp vc) ~modes:lst))
+        Some (with_modes (Value_constraint.pp vc) ~modes:lst)
     in
-    pp ?preceeding ~pre_text:pvb_pre_text ?pre_doc:pvb_pre_doc
+    let attrs, in_kw =
+      if not add_in
+      then pvb_attributes, empty
+      else
+        (* The attrs go before [in].
+           In this case there are also no docs, so the later call to attach is a
+           noop.
+           But I'd rather leave it than have two separate code paths depending
+           on whether we're adding [in] or not. *)
+        [], Attribute.pp_list ~item pvb_attributes ^?^ S.in_
+    in
+    layout ?preceeding
       ~keyword:kw_and_modes
       pat ~params ?constraint_
-      ?rhs:(rhs_optional_in ?item ~last pvb_expr)
-      ?item ~attrs:pvb_attributes
-      ?post_doc:pvb_post_doc
+      ?rhs:(Option.map rhs pvb_expr)
+      in_kw
+    |> Attribute.attach ~item ~text:pvb_pre_text ?pre_doc:pvb_pre_doc
+      ~attrs ?post_doc:pvb_post_doc
 
-  let pp_ands ?(extra_nest=Fun.id) ~item ~sep bindings =
+  let pp_ands ?(extra_nest=Fun.id) ~add_in ~item ~sep bindings =
     let rec aux = function
       | [] -> assert false
-      | [ it ] -> extra_nest @@ group (pp ~item ~last:true ~start:[S.and_] it)
+      | [ it ] -> extra_nest @@ group (pp ~item ~add_in ~start:[S.and_] it)
       | it :: its ->
-        extra_nest (group (pp ~item ~start:[S.and_] it))
+        extra_nest (group (pp ~item ~add_in:false ~start:[S.and_] it))
         ^^ sep ^^ aux its
     in
     aux bindings
 
-  let pp_list ?preceeding ?(item=false) ~start = function
+  let pp_list ?preceeding ?(item=false) ~add_in ~start = function
     | [] -> empty
-    | [ x ] -> pp ?preceeding ~item ~last:true ~start x
+    | [ x ] -> pp ?preceeding ~item ~add_in ~start x
     | x :: xs ->
       let sep = if item then hardline ^^ hardline else break 1 in
       let extra_nest =
         Option.map (fun _ -> Preceeding.implied_nest preceeding) preceeding
       in
-      group (pp ?preceeding ~item ~start x) ^^
+      group (pp ?preceeding ~add_in:false ~item ~start x) ^^
       sep ^^
-      pp_ands ?extra_nest ~item ~sep xs
+      pp_ands ?extra_nest ~add_in ~item ~sep xs
 end
 
 and Module_binding : sig
