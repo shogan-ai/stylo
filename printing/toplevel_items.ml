@@ -160,10 +160,7 @@ module Struct = struct
     | Pstr_extension _, Pstr_extension _
     | Pstr_kind_abbrev _, Pstr_kind_abbrev _
     | Pstr_docstring _, Pstr_docstring _
-      ->
-      true
     | Pstr_attribute _, Pstr_attribute _ ->
-      (* FIXME: don't group docstrings with regular attributes *)
       true
     | (* Keeping this match non-fragile to better track language updates. *)
       ( Pstr_eval _ (* never grouping those *)
