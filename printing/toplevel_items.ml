@@ -150,13 +150,17 @@ module Struct = struct
     | Pstr_type _, Pstr_type _
     | Pstr_typext _, Pstr_typext _
     | Pstr_exception _, Pstr_exception _
-    | Pstr_module _, Pstr_module _
-    | Pstr_recmodule _, Pstr_recmodule _
+    | (Pstr_module _
+      | Pstr_recmodule _
+      | Pstr_open _
+      | Pstr_include _),
+      (Pstr_module _
+      | Pstr_recmodule _
+      | Pstr_open _
+      | Pstr_include _)
     | Pstr_modtype _, Pstr_modtype _
-    | Pstr_open _, Pstr_open _
     | Pstr_class _, Pstr_class _
     | Pstr_class_type _, Pstr_class_type _
-    | Pstr_include _, Pstr_include _
     | Pstr_extension _, Pstr_extension _
     | Pstr_kind_abbrev _, Pstr_kind_abbrev _
     | Pstr_docstring _, Pstr_docstring _
