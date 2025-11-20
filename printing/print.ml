@@ -131,9 +131,8 @@ let constant = function
   | Pconst_char c -> stringf "'%s'" (Char.escaped c)
   | Pconst_untagged_char c -> stringf "#'%s'" (Char.escaped c)
   (* FIXME: handling of string literals is not good enough. *)
-  | Pconst_string (s, _, None) -> stringf "\"%s\"" s
-  | Pconst_string (s, _, Some delim) ->
-    fancy_string "{%s|%s|%s}" delim s delim
+  | Pconst_string (s, _, None) -> String_lit.pp s
+  | Pconst_string (s, _, Some delim) -> fancy_string "{%s|%s|%s}" delim s delim
 
 let separate_loc_list sep f = separate_map sep (fun l -> f l.txt)
 

@@ -175,3 +175,6 @@ let fancy_string s =
   if String.contains s '\n'
   then Token (Complex (Requirement.infinity, leaf))
   else leaf
+
+let formatted_string t =
+  Token (Complex (requirement t, t))
