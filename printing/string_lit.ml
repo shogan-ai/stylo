@@ -27,6 +27,8 @@ let pp_words =
     | _ ->
       let flatness = flatness_tracker () in
       let fits = Condition.flat flatness in
+      (* FIXME: if [sentence] fits exactly on the line, the code below will go
+         past the width limit: it adds two chars before breaking the line. *)
       sentence ^^ group ~flatness (
         (* If we are flat, then the {| \|} disappears, otherwise it stays and
            will be followed a linebreak. *)
