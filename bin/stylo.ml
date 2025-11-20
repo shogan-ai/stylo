@@ -77,8 +77,8 @@ let fuzzer_batch fn =
            errors, there's not much point. *)
         begin match Insert_comments.from_tokens tokens doc with
         | exception Insert_comments.Error e ->
-          Format.eprintf "%s, line %d: ERROR: %a@."
-            fn i Insert_comments.pp_error e;
+          Format.eprintf "%s, line %d: ERROR: %a@\n@\n%s@\n@."
+            fn i Insert_comments.pp_error e entrypoint_and_src;
           has_errors := true
 
         | exception exn ->
@@ -89,10 +89,12 @@ let fuzzer_batch fn =
           let styled = Document.Print.to_string ~width:!width with_comments in
           match Ast_checker.check_same_ast fn i ~impl:(not intf) src styled with
           | exception _ ->
-            Format.eprintf "%s, line %d: syntax error in output@." fn i;
+            Format.eprintf "%s, line %d: syntax error in output@\n%s@\n@."
+              fn i entrypoint_and_src;
             has_errors := true
           | false ->
-            Format.eprintf "%s, line %d: ast changed@." fn i;
+            Format.eprintf "%s, line %d: ast changed@\n%s@\n@." fn i
+              entrypoint_and_src;
             has_errors := true
           | true ->
             loop_lines (i + 1) ic
