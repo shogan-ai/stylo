@@ -3,12 +3,12 @@
 (rule
   (targets parser_tokens.ml parser_tokens.mli)
   (action
-    (run menhir --table --inspection --only-tokens %{dep:parser_tokens.mly})))
+    (run menhir --strategy simplified --table --inspection --only-tokens %{dep:parser_tokens.mly})))
 
 (menhir
   (modules parser parser_tokens)
   (merge_into parser)
-  (flags :standard --table --inspection --external-tokens Parser_tokens --cmly))
+  (flags :standard --strategy simplified --table --inspection --external-tokens Parser_tokens --cmly))
 
 (rule
   (target raw_grammar)
