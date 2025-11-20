@@ -181,11 +181,11 @@ let rec walk_both state seq doc =
     (* Synchronized, advance *)
     | T.Token _, Doc.Token p
     | T.Opt_token _, Doc.Optional { token = p; _ } ->
-      dprintf "assume %a synced at %d:%d with << %s >>@."
+      dprintf "assume %a synced at %d:%d with << %a >>@."
         Tokens.pp_elt first
         first.pos.pos_lnum
         (first.pos.pos_cnum - first.pos.pos_bol)
-        p;
+        Document.pp_pseudo p;
       let doc = insert_space_if_required state doc in
       attach_before_comments (saw_leaf state) rest doc
 

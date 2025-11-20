@@ -39,16 +39,20 @@ type whitespace =
 
 type t = private
   | Empty
-  | Token of string
+  | Token of pseudo_token
   | Optional of {
       vanishing_cond: Condition.t;
-      token: string;
+      token: pseudo_token;
     }
-  | Comment of string
+  | Comment of pseudo_token
   | Whitespace of Condition.t option * whitespace
   | Cat of Requirement.t * t * t
   | Nest of Requirement.t * int * Condition.t option * t
   | Group of Requirement.t * flatness option * t
+
+and pseudo_token = private
+  | Trivial of string
+  | Complex of Requirement.t * t
 
 val requirement : t -> Requirement.t
 
@@ -77,3 +81,7 @@ val nest : ?vanish:Condition.t -> int -> t -> t
 val group : ?flatness:flatness -> t -> t
 
 val flatness_tracker : unit -> flatness
+
+val pp_pseudo : Format.formatter -> pseudo_token -> unit
+
+val multi_part_token : t -> t

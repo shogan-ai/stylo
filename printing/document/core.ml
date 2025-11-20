@@ -73,31 +73,38 @@ type whitespace =
   | Line_break of softness
   | Break of int * softness
   | Non_breakable
-
 (* FIXME: comments and strings can contain newlines, they should be represented
    by something other than "string". *)
 type t =
   | Empty
-  | Token of string
+  | Token of pseudo_token
   | Optional of {
       vanishing_cond: Condition.t;
-      token: string;
+      token: pseudo_token;
     }
-  | Comment of string
+  | Comment of pseudo_token
   | Whitespace of Condition.t option * whitespace
   | Cat of Req.t * t * t
   | Nest of Req.t * int * Condition.t option * t
   | Group of Req.t * flatness option * t
+
+and pseudo_token =
+  | Trivial of string
+  | Complex of Req.t * t
 
 let ws_req = function
   | Break (spaces, _) -> Req.of_int spaces
   | Line_break _ -> Req.infinity
   | Non_breakable -> Req.of_int 1
 
+let pseudo_token_req = function
+  | Trivial s -> Req.of_int (String.length s)
+  | Complex (req, _) -> req
+
 let requirement = function
   | Empty -> Req.of_int 0
-  | Token s
-  | Comment s -> Req.of_int (String.length s)
+  | Token pt
+  | Comment pt -> pseudo_token_req pt
   | Optional _ -> Req.of_int 0 (* vanishes if flat so ... *)
   | Whitespace (Some _, _) -> Req.of_int 0
   | Whitespace (_, ws) -> ws_req ws
@@ -108,7 +115,7 @@ let requirement = function
 let ws ws = Whitespace (None, ws)
 
 let empty = Empty
-let string s = Token s
+let string s = Token (Trivial s)
 let break spaces = ws (Break (spaces, Hard))
 let soft_break spaces = ws (Break (spaces, Soft))
 let hardline = ws (Line_break Hard)
@@ -120,8 +127,8 @@ let nbsp = ws Non_breakable
 let vanishing_space cond = Whitespace (Some cond, Non_breakable)
 
 (* FIXME *)
-let comment s = Comment ("(*" ^ s ^ "*)")
-let docstring s = Comment ("(**" ^ s ^ "*)")
+let comment s = Comment (Trivial ("(*" ^ s ^ "*)"))
+let docstring s = Comment (Trivial ("(**" ^ s ^ "*)"))
 
 let (^^) t1 t2 =
   match t1, t2 with
@@ -140,7 +147,7 @@ let opt_token ?ws_before ?ws_after vanishing_cond tok =
       | Some ws -> Whitespace (Some vanishing_cond, ws)
     in
     ws ws_before ^^
-    Optional { vanishing_cond; token = tok } ^^
+    Optional { vanishing_cond; token = Trivial tok } ^^
     ws ws_after
 
 let nest ?vanish i t =
@@ -154,3 +161,15 @@ let group ?flatness = function
   | t -> Group (requirement t, flatness, t)
 
 let flatness_tracker () = ref false
+
+let pp_pseudo ppf pt =
+  let s =
+    match pt with
+    | Trivial s -> s
+    | Complex _ -> "<complex>"
+  in
+  Format.pp_print_string ppf s
+
+let multi_part_token t =
+  let req = requirement t in
+  Token (Complex (req, t))

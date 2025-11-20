@@ -115,13 +115,19 @@ let whitespace buf state indent flat = function
 
 let rec pretty buf state indent flat = function
   | Empty -> state
-  | Token s
-  | Comment s -> text buf state indent s
+  | Token Trivial s
+  | Comment Trivial s -> text buf state indent s
+  | Token Complex (_, t)
+  | Comment Complex (_, t) ->
+    pretty buf state indent flat t
   | Optional { vanishing_cond; token } ->
     if Condition.check (Some vanishing_cond) then
       state
     else
-      text buf state indent token
+      begin match token with
+      | Trivial s -> text buf state indent s
+      | Complex (_, t) -> pretty buf state indent flat t
+      end
   | Whitespace (vanishing_cond, ws) ->
     if Condition.check vanishing_cond then
       state
