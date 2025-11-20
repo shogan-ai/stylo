@@ -1532,9 +1532,12 @@ end = struct
       Case.pp_cases cases
         ~has_leading_pipe:(has_leading_pipe ~after:WITH tokens)
     in
-    group (try_ ^/^ pre_nest @@ nest 2 (pp e)) ^^
-    hardline ^^
-    pre_nest (S.with_ ^/^ cases)
+    group (
+      try_ ^/^
+      pre_nest (nest 2 (pp e)) ^/^
+      pre_nest S.with_
+    ) ^^ hardline ^^
+    pre_nest cases
 
   and pp_index_op ~preceeding nb_semis kind seq op indices assign =
     let open_, close =
@@ -2446,7 +2449,7 @@ end = struct
       eq ^/^ Core_type.pp_for_decl ct ^/^
       S.equals ^?^ private_ td.ptype_private ^?^ type_kind kind
     | None, kind ->
-      eq ^?^ private_ td.ptype_private ^?^ type_kind kind
+      group (eq ^?^ private_ td.ptype_private) ^?^ type_kind kind
 
   let pp ~kw_preceeding_params ~start ?subst td =
     let start =
