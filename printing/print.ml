@@ -2829,6 +2829,12 @@ end = struct
       let start, main, stop = Signature.pp_parts sg in
       let stop = Attribute.attach stop ~attrs:pmty_attributes in
       Three_parts { start; main; stop }
+    | Pmty_typeof (attrs, me) ->
+      let prefix = Attribute.attach ~attrs (S.module_ ^/^ S.type_ ^/^ S.of_) in
+      begin match Module_expr.as_rhs me with
+      | Single_part t -> Single_part (prefix ^/^ t)
+      | Three_parts rhs -> Three_parts { rhs with start = prefix ^/^ rhs.start }
+      end
     | _ -> Single_part (pp mty)
 end
 
@@ -3134,7 +3140,7 @@ end = struct
     | Pmod_functor (attrs, fps, me) ->
       Attribute.attach ~attrs S.functor_ ^/^
       separate_map (break 1) Functor_parameter.pp fps ^/^ S.rarrow ^/^ pp me
-    | Pmod_apply (m1, m2) -> pp m1 ^/^ pp m2
+    | Pmod_apply (m1, m2) -> pp m1 ^/^ nest 2 (pp m2)
     | Pmod_apply_unit me -> pp me ^^ S.lparen ^^ S.rparen
     | Pmod_constraint (me, mty_opt, modes) ->
       parens (
@@ -3162,6 +3168,23 @@ end = struct
     | Pmod_structure (attrs, str) ->
       let start, main, stop = Structure.pp_parts attrs str in
       let stop = Attribute.attach stop ~attrs:pmod_attributes in
+      Three_parts { start; main; stop }
+    | Pmod_apply
+        (m1, { pmod_attributes = []
+             ; pmod_desc =
+                 Pmod_parens
+                   { pmod_attributes = attrs2
+                   ; pmod_desc = Pmod_structure (attrs, str)
+                   ; _ }
+             ; _ }) ->
+      let start, main, stop = Structure.pp_parts attrs str in
+      let start = group (pp m1 ^/^ S.lparen ^^ start) in
+      let main = nest 2 main in
+      let stop =
+        let internal_stop = Attribute.attach stop ~attrs:attrs2 in
+        Attribute.attach (internal_stop ^^ S.rparen) ~attrs:pmod_attributes
+        |> nest 2
+      in
       Three_parts { start; main; stop }
     | _ -> Single_part (pp me)
 end
