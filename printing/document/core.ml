@@ -89,7 +89,7 @@ type t =
   | Group of Req.t * int * flatness option * t
 
 and pseudo_token =
-  | Trivial of string
+  | Trivial of Req.t * string
   | Complex of Req.t * t
 
 let ws_req = function
@@ -97,8 +97,20 @@ let ws_req = function
   | Line_break _ -> Req.infinity
   | Non_breakable -> Req.of_int 1
 
+let strlen s =
+  let byte_len = String.length s in
+  let rec aux len pos =
+    if pos >= byte_len
+    then len
+    else
+      let d = String.get_utf_8_uchar s pos in
+      let nb_bytes = Uchar.utf_decode_length d in
+      aux (len + 1) (pos + nb_bytes)
+  in
+  aux 0 0
+
 let pseudo_token_req = function
-  | Trivial s -> Req.of_int (String.length s)
+  | Trivial (req, _)
   | Complex (req, _) -> req
 
 let requirement = function
@@ -115,7 +127,7 @@ let requirement = function
 let ws ws = Whitespace (None, ws)
 
 let empty = Empty
-let string s = Token (Trivial s)
+let string s = Token (Trivial (Req.of_int (strlen s), s))
 let break spaces = ws (Break (spaces, Hard))
 let soft_break spaces = ws (Break (spaces, Soft))
 let hardline = ws (Line_break Hard)
@@ -127,8 +139,9 @@ let nbsp = ws Non_breakable
 let vanishing_space cond = Whitespace (Some cond, Non_breakable)
 
 (* FIXME *)
-let comment s = Comment (Trivial ("(*" ^ s ^ "*)"))
-let docstring s = Comment (Trivial ("(**" ^ s ^ "*)"))
+let comment s = Comment (Trivial (Req.of_int (strlen s), s))
+let docstring s = comment @@ "(**" ^ s ^ "*)"
+let comment s = comment @@ "(*" ^ s ^ "*)"
 
 let (^^) t1 t2 =
   match t1, t2 with
@@ -147,7 +160,8 @@ let opt_token ?ws_before ?ws_after vanishing_cond tok =
       | Some ws -> Whitespace (Some vanishing_cond, ws)
     in
     ws ws_before ^^
-    Optional { vanishing_cond; token = Trivial tok } ^^
+    Optional
+      { vanishing_cond; token = Trivial (Req.of_int (strlen tok), tok) } ^^
     ws ws_after
 
 let nest ?vanish i t =
@@ -165,13 +179,13 @@ let flatness_tracker () = ref false
 let pp_pseudo ppf pt =
   let s =
     match pt with
-    | Trivial s -> s
+    | Trivial (_, s) -> s
     | Complex _ -> "<complex>"
   in
   Format.pp_print_string ppf s
 
 let fancy_string s =
-  let leaf = Token (Trivial s) in
+  let leaf = Token (Trivial (Req.of_int (strlen s) ,s)) in
   if String.contains s '\n'
   then Token (Complex (Requirement.infinity, leaf))
   else leaf

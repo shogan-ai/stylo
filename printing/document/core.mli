@@ -51,7 +51,7 @@ type t = private
   | Group of Requirement.t * int * flatness option * t
 
 and pseudo_token = private
-  | Trivial of string
+  | Trivial of Requirement.t * string
   | Complex of Requirement.t * t
 
 val requirement : t -> Requirement.t

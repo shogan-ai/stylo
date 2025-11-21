@@ -79,7 +79,7 @@ let newline st soft t =
       line;
     }
 
-let text buf state indent s =
+let text buf state indent slen s =
   let state =
     match state.line with
     | Has_text -> state
@@ -88,7 +88,7 @@ let text buf state indent s =
       { state with column = indent; line_indent = indent }
   in
   Buffer.add_string buf s;
-  incr_col state (String.length s)
+  incr_col state (Requirement.to_int slen)
   |> has_text
 
 let add_spaces buf state indent n =
@@ -115,8 +115,8 @@ let whitespace buf state indent flat = function
 
 let rec pretty buf state indent flat = function
   | Empty -> state
-  | Token Trivial s
-  | Comment Trivial s -> text buf state indent s
+  | Token Trivial (len, s)
+  | Comment Trivial (len, s) -> text buf state indent len s
   | Token Complex (_, t)
   | Comment Complex (_, t) ->
     pretty buf state indent flat t
@@ -125,7 +125,7 @@ let rec pretty buf state indent flat = function
       state
     else
       begin match token with
-      | Trivial s -> text buf state indent s
+      | Trivial (len, s) -> text buf state indent len s
       | Complex (_, t) -> pretty buf state indent flat t
       end
   | Whitespace (vanishing_cond, ws) ->
