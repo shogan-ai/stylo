@@ -1,2 +1,4 @@
 (library
-  (name document))
+  (name document)
+  (libraries dbg_print)
+  (flags :standard -open Dbg_print))
