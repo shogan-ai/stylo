@@ -139,7 +139,7 @@ let rec pretty buf state indent flat = function
   | Nest (_, i, vanish, t) ->
     let indent = indent + if Condition.check vanish then 0 else i in
     pretty buf state indent flat t
-  | Group (req, flat_track_opt, t) ->
+  | Group (req, margin, flat_track_opt, t) ->
     let flat =
       flat ||
       let gp_req =
@@ -150,7 +150,7 @@ let rec pretty buf state indent flat = function
           assert (state.column = 0);
           to_int_including_indent ~current_indent:indent req
       in
-      gp_req <= state.max_width
+      gp_req <= (state.max_width - margin)
 
     in
     Option.iter (fun flatness ->

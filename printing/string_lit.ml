@@ -20,16 +20,21 @@ let split_lines s =
 let split_words s = String.split_on_char ' ' s
 
 let pp_words =
-  let add_word sentence word =
+  let add_word ?(last=false) sentence word =
+    let margin = if last then 0 else 2 in
     let word = string word in
     match sentence with
     | Empty -> word
     | _ ->
       let flatness = flatness_tracker () in
       let fits = Condition.flat flatness in
-      (* FIXME: if [sentence] fits exactly on the line, the code below will go
-         past the width limit: it adds two chars before breaking the line. *)
-      sentence ^^ group ~flatness (
+      (* A margin of 2 implies that if we are flat, the next word will have
+         space for to insert a space and backslash before breaking if it needs
+         to.
+         If we are not flat because of the margin but would be otherwise, then
+         no further word would have fit on the line anyway. So breaking here was
+         actually correct. *)
+      sentence ^^ group ~margin ~flatness (
         (* If we are flat, then the {| \|} disappears, otherwise it stays and
            will be followed a linebreak. *)
         opt_token ~ws_before:Non_breakable fits "\\" ^^
@@ -37,7 +42,12 @@ let pp_words =
         word
       )
   in
-  List.fold_left add_word empty
+  let rec aux acc = function
+    | [] -> acc
+    | [ x ] -> add_word ~last:true acc x
+    | x :: xs -> aux (add_word acc x) xs
+  in
+  aux empty
 
 let pp_line s =
   split_words s

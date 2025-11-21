@@ -86,7 +86,7 @@ type t =
   | Whitespace of Condition.t option * whitespace
   | Cat of Req.t * t * t
   | Nest of Req.t * int * Condition.t option * t
-  | Group of Req.t * flatness option * t
+  | Group of Req.t * int * flatness option * t
 
 and pseudo_token =
   | Trivial of string
@@ -110,7 +110,7 @@ let requirement = function
   | Whitespace (_, ws) -> ws_req ws
   | Cat (r, _, _)
   | Nest (r, _, _, _)
-  | Group (r, _, _) -> r
+  | Group (r, _, _, _) -> r
 
 let ws ws = Whitespace (None, ws)
 
@@ -156,9 +156,9 @@ let nest ?vanish i t =
   | _, Empty -> t
   | _ -> Nest (Req.nest i (requirement t), i, vanish, t)
 
-let group ?flatness = function
+let group ?(margin=0) ?flatness = function
   | Empty -> Empty
-  | t -> Group (requirement t, flatness, t)
+  | t -> Group (requirement t, margin, flatness, t)
 
 let flatness_tracker () = ref false
 

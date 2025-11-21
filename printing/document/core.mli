@@ -48,7 +48,7 @@ type t = private
   | Whitespace of Condition.t option * whitespace
   | Cat of Requirement.t * t * t
   | Nest of Requirement.t * int * Condition.t option * t
-  | Group of Requirement.t * flatness option * t
+  | Group of Requirement.t * int * flatness option * t
 
 and pseudo_token = private
   | Trivial of string
@@ -78,7 +78,16 @@ val docstring : string -> t
 
 val (^^) : t -> t -> t
 val nest : ?vanish:Condition.t -> int -> t -> t
-val group : ?flatness:flatness -> t -> t
+val group : ?margin:int -> ?flatness:flatness -> t -> t
+(** [group ~margin t] is used to extend the [t]'s requirement when deciding
+    whether to enter flat mode or not, but it doesn't change the requirement of
+    the group itself (and so doesn't propagate nor affect the parent's
+    flatness).
+
+    The value of [flatness] will be decided by the printer when traversing the
+    group and can then be part of a [Condition.t].
+    N.B. if the condition is checked before the group is traversed, it will be
+    assumed to be non-flat. *)
 
 val flatness_tracker : unit -> flatness
 

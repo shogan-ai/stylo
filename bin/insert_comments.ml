@@ -73,7 +73,7 @@ let rec consume_only_leading_comments ?(restrict_to_before=false) acc = function
 let rec first_is_comment = function
   | Doc.Comment _ -> `yes
   | Token _ | Optional _ -> `no
-  | Group (_, _, d) | Nest (_, _, _, d) ->
+  | Group (_, _, _, d) | Nest (_, _, _, d) ->
     first_is_comment d
   | Empty | Whitespace _ -> `maybe
   | Cat (_, d1, d2) ->
@@ -86,7 +86,7 @@ let first_is_comment d = first_is_comment d = `yes
 let rec first_is_space = function
   | Doc.Whitespace _ -> `yes
   | Token _ | Comment _ | Optional _ -> `no
-  | Group (_, _, d) | Nest (_, _, _, d) ->
+  | Group (_, _, _, d) | Nest (_, _, _, d) ->
     first_is_space d
   | Empty -> `maybe
   | Cat (_, d1, d2) ->
@@ -99,7 +99,7 @@ let first_is_space d = first_is_space d = `yes
 let rec nest_before_leaf = function
   | Doc.Nest _ -> `yes
   | Token _ | Optional _ | Comment _ | Whitespace _ -> `no
-  | Group (_, _, d) -> nest_before_leaf d
+  | Group (_, _, _, d) -> nest_before_leaf d
   | Empty -> `maybe
   | Cat (_, d1, d2) ->
     match nest_before_leaf d1 with
@@ -207,7 +207,7 @@ let rec walk_both state seq doc =
       in
       rest, doc, no_space state
 
-    | T.Comment _, Doc.Group (_, _, d)
+    | T.Comment _, Doc.Group (_, _, _, d)
       when
         not (nest_before_leaf d) (* traverse group to reach correct nesting *)
         && not (first_is_comment d) (* might be the same comment *) ->
@@ -241,7 +241,7 @@ let rec walk_both state seq doc =
       let rest, doc, state' = walk_both (under_nest state) seq doc in
       rest, Doc.nest ?vanish i doc, exit_nest state state'
 
-    | _, Doc.Group (_, flatness, doc) ->
+    | _, Doc.Group (_, margin, flatness, doc) ->
       let rest, doc, state' =
         walk_both { space_needed_before_next = No; at_end_of_a_group = true }
           seq doc
@@ -254,7 +254,7 @@ let rec walk_both state seq doc =
            group might start with a space. *)
         if first_is_space doc
         then Doc.group ?flatness doc
-        else insert_space_if_required state (Doc.group ?flatness doc)
+        else insert_space_if_required state (Doc.group ~margin ?flatness doc)
       in
       attach_before_comments return_state rest doc
 
