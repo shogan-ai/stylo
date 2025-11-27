@@ -192,3 +192,5 @@ let fancy_string s =
 
 let formatted_string t =
   Token (Complex (requirement t, t))
+
+let is_empty = function Empty -> true | _ -> false

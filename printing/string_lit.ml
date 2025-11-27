@@ -1,28 +1,32 @@
 open! Document
 open! Document.Utils
 
-let split_lines s =
-  let accumulate_merging_blank rev_lines = function
-    | "" ->
-      (* FIXME: ocamlformat does not merge the last line if it is blank but
-         keeps it the list.
-         Why? *)
-      begin match rev_lines with
-      | [] -> [""]
-      | last :: before -> (last ^ "\\n") :: before
-      end
-    | line -> line :: rev_lines
-  in
-  String.split_on_char '\n' s
-  |> List.fold_left accumulate_merging_blank []
-  |> List.rev
+(* A "good enough" approximation of what ocamlformat does.
 
-let split_words s = String.split_on_char ' ' s
+   Notable differences:
+   - we don't have a "preserve" mode
+   - we don't interpret format hints (e.g. "@," and "@;")
+   - empty lines don't get folded as a '\n' at the end of the previous line:
+   that makes ocamlformat go past the width limit in certain cases. *)
 
-let pp_words =
+let pp_words ?(last_line=false) ?(prefix=empty) words =
   let add_word ?(last=false) sentence word =
-    let margin = if last then 0 else 2 in
-    let word = string word in
+    let margin =
+      if not last
+      then 2 (* we might insert a space and backslash *)
+      else if not last_line
+      then 1 (* pp_lines might insert a backslash *)
+      else 0
+    in
+    let word =
+      nest 1 @@ string (
+        if not last
+        then word
+        else if not last_line
+        then word ^ "\\n"
+        else word ^ "\""
+      )
+    in
     match sentence with
     | Empty -> word
     | _ ->
@@ -47,18 +51,37 @@ let pp_words =
     | [ x ] -> add_word ~last:true acc x
     | x :: xs -> aux (add_word acc x) xs
   in
-  aux empty
+  aux prefix words
 
-let pp_line s =
-  split_words s
-  |> pp_words
-  |> nest 1
+let pp_lines lines =
+  let rec aux fits_on_one_line acc = function
+    | [] -> acc
+    | line :: lines ->
+      let first_line = Document.is_empty acc in
+      let last_line = List.is_empty lines in
+      let words = String.split_on_char ' ' line in
+      let acc =
+        if first_line
+        then
+          string "\"" ^^ pp_words ~last_line words
+        else
+          let prefix =
+            if line <> "" && String.get line 0 = ' '
+            then opt_token fits_on_one_line "\\"
+            else empty
+          in
+          acc ^^
+          opt_token fits_on_one_line "\\" ^^
+          break 0 ^^
+          pp_words ~last_line ~prefix words
+      in
+      aux fits_on_one_line acc lines
+  in
+  let flatness = flatness_tracker () in
+  let fits = Condition.flat flatness in
+  group ~flatness (aux fits empty lines)
 
 let pp s =
-  let lines =
-    (* we add the closing dquote here, so it makes it into the same [group] as
-       the last word. *)
-    split_lines (s ^ "\"")
-  in
-  let str = string "\"" ^^ separate_map hardline pp_line lines in
-  formatted_string str
+  String.split_on_char '\n' s
+  |> pp_lines
+  |> formatted_string
