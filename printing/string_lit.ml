@@ -34,14 +34,11 @@ let pp_words ?(last_line=false) ?(prefix=empty) words =
     | _ ->
       let flatness = flatness_tracker () in
       let fits = Condition.flat flatness in
-      (* A margin of 2 implies that if we are flat, the next word will have
-         space for to insert a space and backslash before breaking if it needs
-         to.
-         If we are not flat because of the margin but would be otherwise, then
+      (* If we are not flat because of the margin but would be otherwise, then
          no further word would have fit on the line anyway. So breaking here was
          actually correct. *)
       sentence ^^ group ~margin ~flatness (
-        (* If we are flat, then the {| \|} disappears, otherwise it stays and
+        (* If we are flat, then the backslash disappears, otherwise it stays and
            will be followed a linebreak. *)
         opt_token ~ws_before:Non_breakable fits "\\" ^^
         break 1 ^^
