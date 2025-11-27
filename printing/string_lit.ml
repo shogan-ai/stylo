@@ -6,8 +6,10 @@ open! Document.Utils
    Notable differences:
    - we don't have a "preserve" mode
    - we don't interpret format hints (e.g. "@," and "@;")
-   - empty lines don't get folded as a '\n' at the end of the previous line:
-   that makes ocamlformat go past the width limit in certain cases. *)
+   - empty lines don't always get folded as a '\n' at the end of the previous
+     line as that would sometimes go past the width limit.
+     We only fold the empty line when there's enough space for it.
+*)
 
 let pp_words ?(last_line=false) ?(prefix=empty) words =
   let add_word ?(last=false) sentence word =
@@ -64,9 +66,18 @@ let pp_lines lines =
         if first_line
         then
           string "\"" ^^ pp_words ~last_line words
+        else if line = "" then
+          let flatness = flatness_tracker () in
+          let folded_with_previous = Condition.flat flatness in
+          (* margin needed because we might be followed by '\\' or '"' *)
+          acc ^^ group ~flatness ~margin:1 (
+            opt_token folded_with_previous "\\" ^^
+            break 0 ^^
+            pp_words ~last_line words
+          )
         else
           let prefix =
-            if line <> "" && String.get line 0 = ' '
+            if String.get line 0 = ' '
             then opt_token fits_on_one_line "\\"
             else empty
           in
