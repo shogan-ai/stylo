@@ -5,4 +5,3 @@ let flat2 = true
 let non_flat = function
   | cannot_be_flat -> true
 ;;
-
