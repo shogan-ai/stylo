@@ -2,13 +2,13 @@
   (target relative_nest.out)
   (action
     (with-stdout-to %{target}
-      (run ../../bin/stylo.exe %{dep:relative_nest.ml}))))
+      (run ../../../bin/stylo.exe %{dep:relative_nest.ml}))))
 
 (rule
   (target relative_nest.snd-run)
   (action
     (with-stdout-to %{target}
-      (run ../../bin/stylo.exe %{dep:relative_nest.out}))))
+      (run ../../../bin/stylo.exe %{dep:relative_nest.out}))))
 
 (rule
   (alias runtest)
@@ -23,17 +23,17 @@
   (target tuples.out)
   (action
     (with-stdout-to %{target}
-      (run ../../bin/stylo.exe %{dep:tuples.ml}))))
+      (run ../../../bin/stylo.exe %{dep:tuples.ml}))))
 
 (rule
   (target tuples.snd-run)
   (action
     (with-stdout-to %{target}
-      (run ../../bin/stylo.exe %{dep:tuples.out}))))
+      (run ../../../bin/stylo.exe %{dep:tuples.out}))))
 
 (rule
   (alias runtest)
-  (action (diff %{dep:tuples.ref} %{dep:tuples.out})))
+  (action (diff %{dep:tuples.oxcamlformat-ref} %{dep:tuples.out})))
 
 ; idempotence check
 (rule

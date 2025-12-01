@@ -2,10 +2,10 @@
 
 (rule
  (aliases all default runtest)
- (deps gen-dune.sh (glob_files *.{ml,mli}))
+ (deps ../gen-dune.sh (glob_files *.{ml,mli,ref,oxcamlformat-ref}))
  (action
    (progn
      (with-stdout-to dune.inc.gen
-       (bash "./gen-dune.sh %{deps}"))
+       (bash "../gen-dune.sh %{deps}"))
      (diff? dune.inc dune.inc.gen))))
 

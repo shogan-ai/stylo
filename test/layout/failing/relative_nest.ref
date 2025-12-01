@@ -1,0 +1,135 @@
+(** In ocamlformat, the body of a syntactic function is indented differently depending on
+    the context (expected) but also depending on whether the function is of the form
+    [fun _ ->] or [function].
+
+    This is apparent on the [bar] examples: in one case we indent by two *relative to the
+    previous line*, in the others by three. *)
+
+let foo =
+  List.map (function
+    | None -> true
+    | Some _ -> false)
+;;
+
+let bar =
+  test
+    (List.map (function
+       | None -> true
+       | Some _ -> false))
+;;
+
+let baz =
+  test
+  @@ List.map (function
+    | None -> true
+    | Some _ -> false)
+;;
+
+let lol =
+  ( List.map (function
+      | None -> true
+      | Some _ -> false)
+  , true )
+;;
+
+let loool =
+  ( ( List.map (function
+        | None -> true
+        | Some _ -> false)
+    , true )
+  , true )
+;;
+
+let l0l =
+  ( test
+      (List.map (function
+         | None -> true
+         | Some _ -> false))
+  , true )
+;;
+
+let foo =
+  List.map (fun _ -> function
+    | None -> true
+    | Some _ -> false)
+;;
+
+let bar =
+  test
+    (List.map (fun _ -> function
+       | None -> true
+       | Some _ -> false))
+;;
+
+let baz =
+  test
+  @@ List.map (fun _ -> function
+    | None -> true
+    | Some _ -> false)
+;;
+
+let lol =
+  ( List.map (fun _ -> function
+      | None -> true
+      | Some _ -> false)
+  , true )
+;;
+
+let loool =
+  ( ( List.map (fun _ -> function
+        | None -> true
+        | Some _ -> false)
+    , true )
+  , true )
+;;
+
+let l0l =
+  ( test
+      (List.map (fun _ -> function
+         | None -> true
+         | Some _ -> false))
+  , true )
+;;
+
+let foo =
+  List.map (fun x ->
+    let () = () in
+    something x)
+;;
+
+let bar =
+  test
+    (List.map (fun x ->
+       let () = () in
+       something x))
+;;
+
+let baz =
+  test
+  @@ List.map (fun x ->
+    let () = () in
+    something x)
+;;
+
+let lol =
+  ( List.map (fun x ->
+      let () = () in
+      something x)
+  , true )
+;;
+
+let loool =
+  ( ( List.map (fun x ->
+        let () = () in
+        something x)
+    , true )
+  , true )
+;;
+
+let l0l =
+  ( test
+      (List.map (fun x ->
+         let () = () in
+         something x))
+  , true )
+;;
