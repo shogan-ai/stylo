@@ -1,0 +1,11 @@
+(include dune.inc)
+
+(rule
+ (aliases all default runtest)
+ (deps ../gen-dune.sh (glob_files *.{ml,mli}))
+ (action
+   (progn
+     (with-stdout-to dune.inc.gen
+       (bash "../gen-dune.sh %{deps}"))
+     (diff? dune.inc dune.inc.gen))))
+

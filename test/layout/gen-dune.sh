@@ -6,13 +6,13 @@ function check-file {
   (target $name.out)
   (action
     (with-stdout-to %{target}
-      (run ../../bin/stylo.exe %{dep:$f}))))
+      (run ../../../bin/stylo.exe %{dep:$f}))))
 
 (rule
   (target $name.snd-run)
   (action
     (with-stdout-to %{target}
-      (run ../../bin/stylo.exe %{dep:$name.out}))))
+      (run ../../../bin/stylo.exe %{dep:$name.out}))))
 
 (rule
   (alias runtest)
