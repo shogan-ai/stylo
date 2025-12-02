@@ -1534,8 +1534,13 @@ end = struct
     | _ -> assert false
 
   and pp_function ~preceeding exp =
+    let indent =
+      match exp.pexp_desc with
+      | Pexp_function ([], _, _) -> (* no params means [function] kw *) 0
+      | _ -> 2
+    in
     let (fun_and_params, body) = pp_function_parts ?preceeding exp in
-    fun_and_params ^/^ (* relative_ ? *)nest 2 body
+    fun_and_params ^/^ nest indent body
 
   and pp_match ~preceeding ~ext_attrs ~tokens e cases =
     let match_, pre_nest =
