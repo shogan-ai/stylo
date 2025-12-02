@@ -258,8 +258,11 @@ let rec walk_both state seq doc =
       in
       attach_before_comments return_state rest doc
 
-    | T.Token _, Doc.Optional _
-    | T.Opt_token _, Doc.Token _ ->
+    | T.Token _, Doc.Optional { token = p; _ }
+    | T.Opt_token _, Doc.Token p ->
+      dprintf "OPTIONAL MISMATCH %a with %a@."
+        T.pp_elt first
+        Doc.pp_pseudo p;
       raise (Error (Optional_mismatch first.pos))
 
     (* [Child_node] doesn't appear in linearized token stream *)
