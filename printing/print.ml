@@ -1540,7 +1540,7 @@ end = struct
       | _ -> 2
     in
     let (fun_and_params, body) = pp_function_parts ?preceeding exp in
-    fun_and_params ^/^ nest indent body
+    group (fun_and_params ^/^ nest indent body)
 
   and pp_match ~preceeding ~ext_attrs ~tokens e cases =
     let match_, pre_nest =
