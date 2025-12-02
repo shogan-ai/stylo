@@ -11,7 +11,7 @@ open! Document.Utils
      We only fold the empty line when there's enough space for it.
 *)
 
-let pp_words ?(last_line=false) ?(prefix=empty) words =
+let pp_words ?(last_line=false) words =
   let add_word ?(last=false) sentence word =
     let margin =
       if not last
@@ -50,7 +50,7 @@ let pp_words ?(last_line=false) ?(prefix=empty) words =
     | [ x ] -> add_word ~last:true acc x
     | x :: xs -> aux (add_word acc x) xs
   in
-  aux prefix words
+  aux empty words
 
 let pp_lines lines =
   let rec aux fits_on_one_line acc = function
@@ -81,7 +81,7 @@ let pp_lines lines =
           acc ^^
           opt_token fits_on_one_line "\\" ^^
           break 0 ^^
-          pp_words ~last_line ~prefix words
+          prefix ^^ pp_words ~last_line words
       in
       aux fits_on_one_line acc lines
   in
