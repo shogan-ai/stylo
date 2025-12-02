@@ -950,7 +950,10 @@ and string = parse
         end;
         string lexbuf
       }
-  | '\\' ['\\' '\'' '\"' 'n' 't' 'b' 'r' ' ']
+  | '\\' (['n' ' '] as c)
+      { store_string_char (char_for_backslash c);
+        string lexbuf }
+  | '\\' ['\\' '\'' '\"' 't' 'b' 'r']
       { store_lexeme lexbuf;
         string lexbuf }
   | '\\' ['0'-'9'] ['0'-'9'] ['0'-'9']
