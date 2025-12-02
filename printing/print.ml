@@ -3552,15 +3552,18 @@ end = struct
     (* constraint and body *)
     | Some typ, Some Single_part exp ->
       group (
-        group (bindings ^/^ pre_nest @@ nest 2 (group (typ ^/^ S.equals))) ^/^
+        group (
+          group (bindings ^/^ pre_nest @@ nest 2 typ) ^/^
+          pre_nest @@ nest 2 S.equals
+        ) ^/^
         pre_nest (nest 2 exp) ^?^
         pre_nest in_kw
       )
     | Some doc, Some Three_parts { start; main; stop } ->
       let bindings_cstr_main =
         group (
-          bindings ^/^
-          pre_nest @@ nest 2 (group (doc ^/^ S.equals ^/^ start))
+          group (bindings ^/^ pre_nest @@ nest 2 doc) ^/^
+          pre_nest (nest 2 @@ group (S.equals ^/^ start))
         ) ^/^
         pre_nest @@ nest 2 main
       in
