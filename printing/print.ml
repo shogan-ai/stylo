@@ -1455,13 +1455,7 @@ end = struct
       begin_ ^?^
       pre_nest (nest 2 (optional pp exp) ^?^ S.end_)
     | Pexp_list elts -> pp_list ~preceeding (nb_semis exp.pexp_tokens) elts
-    | Pexp_cons (hd, tl) ->
-      let pre_nest = Preceeding.implied_nest preceeding in
-      let cons = Preceeding.mk (S.cons ^^ break 1) ~indent:2 in
-      group (
-        pp ?preceeding hd ^/^
-        pre_nest (pp ~preceeding:cons tl)
-      )
+    | Pexp_cons _ -> group (pp_cons ?preceeding exp)
     | Pexp_exclave exp ->
       let excl, pre_nest = Preceeding.group_with preceeding S.exclave__ in
       excl ^/^ pre_nest @@ nest 2 (pp exp)
@@ -1785,7 +1779,9 @@ end = struct
         pp ?preceeding arg
       | Some op ->
         assert (Option.is_none preceeding);
-        group (pp_op op ^/^ pp arg)
+        let op = pp_op op ^^ break 1 in
+        let op_pre = Preceeding.mk op ~indent:2 in
+        pp ~preceeding:op_pre arg
     in
     match arg.pexp_desc with
     | Pexp_apply (f, args) when on_right ->
@@ -1812,6 +1808,25 @@ end = struct
         )
       )
     | _ -> default op
+
+  and pp_cons ?preceeding ?(on_right=false)lst =
+    match lst.pexp_desc with
+    | Pexp_cons (hd, tl) ->
+      let pre_nest = Preceeding.implied_nest preceeding in
+      pp_cons ?preceeding ~on_right hd ^/^
+      pre_nest (
+        pp_cons ~on_right:true tl
+        |> Attribute.attach ~attrs:lst.pexp_attributes
+      )
+    | _ ->
+      let preceeding =
+        if on_right then (
+          assert (Option.is_none preceeding);
+          Some (Preceeding.mk (S.cons ^^ break 1) ~indent:2)
+        ) else
+          preceeding
+      in
+      pp ?preceeding lst
 
   and pp_variant ~preceeding lbl eo =
     let constr = S.bquote ^^ string lbl in
