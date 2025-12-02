@@ -984,9 +984,27 @@ end = struct
     | Ppat_parens { pat; optional } ->
       pp_parens ~preceeding ~optional pat_flatness pat
     | Ppat_list elts -> pp_list ~preceeding (nb_semis p.ppat_tokens) elts
+    | Ppat_cons _ -> group (pp_cons ?preceeding p)
+
+  and pp_cons ?preceeding ?(on_right=false) lst =
+    match lst.ppat_desc with
     | Ppat_cons (hd, tl) ->
       let pre_nest = Preceeding.implied_nest preceeding in
-      pp ?preceeding hd ^/^ pre_nest (S.cons ^/^ pp tl)
+      pp_cons ?preceeding ~on_right hd ^/^
+      pre_nest (
+        pp_cons ~on_right:true tl
+        |> Attribute.attach ~attrs:lst.ppat_attributes
+      )
+    | _ ->
+      let preceeding =
+        if on_right then (
+          assert (Option.is_none preceeding);
+          Some (Preceeding.mk (S.cons ^^ break 1) ~indent:2)
+        ) else
+          preceeding
+      in
+      pp ?preceeding lst
+
 
   and pp_parens ~preceeding ~optional flatness pat =
     match pat.ppat_desc with

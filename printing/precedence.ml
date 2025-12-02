@@ -15,7 +15,7 @@ let of_infix_op name =
   | ('*' | '/' | '%'), _
   | _, ("mod" | "land" | "lor" | "lxor") -> 7
   | ('+' | '-'), _ -> 8
-  | _, "::" -> 9
+(*   | _, "::" -> 9 (* N.B. never used as represented by [Pexp_cons] *) *)
   | ('@' | '^'), _ -> 10
   | (* needs to be checked before the line below, because the patterns overlap
        ... *)
