@@ -1424,9 +1424,7 @@ end = struct
       |> fst
     | Pexp_pack (me, ty) ->
       pp_pack ~preceeding ~ext_attr:exp.pexp_ext_attr me ty
-    | Pexp_dot_open (lid, e) ->
-      let lid, nest = Preceeding.group_with preceeding (longident lid.txt) in
-      lid ^^ S.dot ^^ nest (pp e)
+    | Pexp_dot_open (lid, e) -> pp_dot_open ~preceeding lid e
     | Pexp_let_open (od, e) ->
       (* TODO: pass forward the "preceeding" ... *)
       let pre_let, pre_nest = Preceeding.group_with preceeding S.let_ in
@@ -1669,6 +1667,19 @@ end = struct
           cls
         )
       )
+
+  and pp_dot_open ~preceeding lid e =
+    let lid, pre_nest = Preceeding.group_with preceeding (longident lid.txt) in
+    group @@ match e with
+    | { pexp_ext_attr = { pea_attrs = []; pea_ext = None }
+      ; pexp_attributes = []
+      ; pexp_desc = Pexp_parens { exp = e; optional = false }
+      ; _ } ->
+      lid ^^ S.dot ^^ S.lparen ^^ break 0 ^^
+      pre_nest (nest 2 @@ pp e) ^^
+      S.rparen
+    | _ ->
+      lid ^^ S.dot ^^ pre_nest (pp e)
 
   and pp_pack ~preceeding ~ext_attr me ty =
     let lparen_module, pre_nest =
