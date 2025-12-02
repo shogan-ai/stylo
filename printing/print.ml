@@ -3001,7 +3001,7 @@ end = struct
         | _ -> false
       ) psg_tokens
     in
-    Toplevel_items.pp_keeping_semi pp_item (psg_items, items_tokens)
+    Toplevel_items.Sig.pp_grouped_keeping_semi pp_item (psg_items, items_tokens)
 
 
   let pp_parts sg =

@@ -195,6 +195,69 @@ module Struct = struct
     pp_grouped_keeping_semi pp_item groups tokens
 end
 
+module Sig = struct
+  open Ocaml_syntax.Parsetree
+
+  let same_group d1 d2 =
+    match d1.psig_desc, d2.psig_desc with
+    | Psig_value _, Psig_value _
+    | (Psig_type _
+      | Psig_typesubst _),
+      (Psig_type _
+      | Psig_typesubst _)
+    | Psig_typext _, Psig_typext _
+    | Psig_exception _, Psig_exception _
+    | (Psig_module _
+      | Psig_modsubst _
+      | Psig_recmodule _
+      | Psig_open _
+      | Psig_include _),
+      (Psig_module _
+      | Psig_modsubst _
+      | Psig_recmodule _
+      | Psig_open _
+      | Psig_include _)
+    | (Psig_modtype _
+      | Psig_modtypesubst _),
+      (Psig_modtype _
+      | Psig_modtypesubst _)
+    | Psig_class _, Psig_class _
+    | Psig_class_type _, Psig_class_type _
+    | Psig_extension _, Psig_extension _
+    | Psig_kind_abbrev _, Psig_kind_abbrev _
+    | Psig_docstring _, Psig_docstring _
+    | Psig_attribute _, Psig_attribute _ ->
+      true
+    | (* Keeping this match non-fragile to better track language updates. *)
+      ( Psig_value _
+      | Psig_type _
+      | Psig_typesubst _
+      | Psig_typext _
+      | Psig_exception _
+      | Psig_module _
+      | Psig_modsubst _
+      | Psig_recmodule _
+      | Psig_modtype _
+      | Psig_modtypesubst _
+      | Psig_open _
+      | Psig_class _
+      | Psig_class_type _
+      | Psig_include _
+      | Psig_attribute _
+      | Psig_extension _
+      | Psig_kind_abbrev _
+      | Psig_docstring _), _ ->
+      false
+
+  let group_by_desc = function
+    | [] -> []
+    | item :: items -> group_by_desc same_group [ item ] items
+
+  let pp_grouped_keeping_semi pp_item (items, tokens) =
+    let groups = group_by_desc items in
+    pp_grouped_keeping_semi pp_item groups tokens
+end
+
 let pp_keeping_semi pp (items, tokens) =
   match pp_keeping_semi pp empty items tokens with
   | t, Done -> t
