@@ -1633,6 +1633,11 @@ end = struct
     | exp -> pp_if_branch S.else_ exp
 
   and pp_if_branch kw = function
+    | { pexp_desc = Pexp_parens { exp = { pexp_desc = Pexp_tuple _; _ }; _ }
+      ; _ } as exp ->
+      (* we print parenthesized branches specially, but tuples do not count as
+         parenthesized branches! *)
+      kw ^^ nest 2 (group (break 1 ^^ pp exp))
     | { pexp_ext_attr = { pea_attrs = []; pea_ext = None }
       ; pexp_attributes = []
       ; pexp_desc = Pexp_parens { exp = e; optional = false }
