@@ -1820,12 +1820,19 @@ end = struct
     match arg.pexp_desc with
     | Pexp_apply (f, args) when on_right ->
       let op = Option.get op in
-      (* N.B. the app is not under parentheses, that's why this is valid! *)
+      (* N.B. the app is not under parentheses, that's why this is valid!
+         (we are not dropping attributes or anything) *)
       let op = pp_op op ^^ break 1 in
       let indent = Requirement.to_int (requirement op) in
       let op_pre = Preceeding.mk op ~indent in
       let f = pp ~preceeding:op_pre f in
       Application.pp ~indent:(indent + 2) f args
+    | Pexp_function _ when on_right ->
+      let op = pp_op (Option.get op) ^^ break 1 in
+      let op_pre = Preceeding.mk op ~indent:0 (* ! *) in
+      let kw_and_params, body = pp_function_parts ~preceeding:op_pre arg in
+      kw_and_params ^/^ body
+      |> Attribute.attach ~attrs:arg.pexp_attributes
     | Pexp_infix_apply { op = next_op; arg1; arg2 } ->
       let next_op_prec = Precedence.of_infix_op next_op in
       if op_prec <> next_op_prec then
