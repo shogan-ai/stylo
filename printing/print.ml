@@ -984,7 +984,12 @@ end = struct
     | Ppat_parens { pat; optional } ->
       pp_parens ~preceeding ~optional pat_flatness pat
     | Ppat_list elts -> pp_list ~preceeding (nb_semis p.ppat_tokens) elts
-    | Ppat_cons _ -> group (pp_cons ?preceeding p)
+    | Ppat_cons (hd, tl) ->
+      let pre_nest = Preceeding.implied_nest preceeding in
+      group (
+        pp_cons ?preceeding hd ^/^
+        pre_nest (pp_cons ~on_right:true tl)
+      )
 
   and pp_cons ?preceeding ?(on_right=false) lst =
     match lst.ppat_desc with
@@ -1473,7 +1478,12 @@ end = struct
       begin_ ^?^
       pre_nest (nest 2 (optional pp exp) ^?^ S.end_)
     | Pexp_list elts -> pp_list ~preceeding (nb_semis exp.pexp_tokens) elts
-    | Pexp_cons _ -> group (pp_cons ?preceeding exp)
+    | Pexp_cons (hd, tl) ->
+      let pre_nest = Preceeding.implied_nest preceeding in
+      group (
+        pp_cons ?preceeding hd ^/^
+        pre_nest (pp_cons ~on_right:true tl)
+      )
     | Pexp_exclave exp ->
       let excl, pre_nest = Preceeding.group_with preceeding S.exclave__ in
       excl ^/^ pre_nest @@ nest 2 (pp exp)
