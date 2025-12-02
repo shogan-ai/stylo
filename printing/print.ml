@@ -1259,8 +1259,10 @@ end = struct
       op ^^ opt_space_then_pp ~extra_nest:pre_nest arg
     | Pexp_infix_apply {op; arg1; arg2} ->
       let pre_nest = Preceeding.implied_nest preceeding in
+      let op_prec = Precedence.of_infix_op op in
       group (
-        pp ?preceeding arg1 ^/^ pre_nest (pp_op_apply op arg2)
+        pp_op_apply ?preceeding ~op_prec arg1 ^/^
+        pre_nest (pp_op_apply ~on_right:true ~op ~op_prec arg2)
       )
     | Pexp_apply (e, args) -> pp_apply ~preceeding e args
     | Pexp_match (e, cases) ->
@@ -1776,9 +1778,18 @@ end = struct
     let pre_nest = Preceeding.implied_nest preceeding in
     Application.pp ~extra_nest:pre_nest f args
 
-  and pp_op_apply ?(on_left=false) op arg =
+  and pp_op_apply ?preceeding ?(on_right=false) ?op ~op_prec arg =
+    let default = function
+      | None ->
+        assert (not on_right);
+        pp ?preceeding arg
+      | Some op ->
+        assert (Option.is_none preceeding);
+        group (pp_op op ^/^ pp arg)
+    in
     match arg.pexp_desc with
-    | Pexp_apply (f, args) ->
+    | Pexp_apply (f, args) when on_right ->
+      let op = Option.get op in
       (* N.B. the app is not under parentheses, that's why this is valid! *)
       let op = pp_op op in
       (* Basically we align a sublock after the op... except when we finish on a
@@ -1788,12 +1799,19 @@ end = struct
       in
       let op_and_f = op ^^ nest indent (group (break 1 ^^ pp f)) in
       Application.pp ~indent op_and_f args
-    | Pexp_infix_apply { op = next_op; arg1; arg2 } when not on_left ->
-      pp_op_apply ~on_left:true op arg1
-      ^/^ pp_op_apply next_op arg2
-      |> Attribute.attach ~attrs:arg.pexp_attributes
-    | _ ->
-      group (pp_op op ^/^ pp arg)
+    | Pexp_infix_apply { op = next_op; arg1; arg2 } ->
+      let next_op_prec = Precedence.of_infix_op next_op in
+      if op_prec <> next_op_prec then
+        default op
+      else (
+        let pre_nest = Preceeding.implied_nest preceeding in
+        pp_op_apply ?preceeding ?op ~op_prec arg1 ^/^
+        pre_nest (
+          pp_op_apply ~on_right:true ~op:next_op ~op_prec:next_op_prec arg2
+          |> Attribute.attach ~attrs:arg.pexp_attributes
+        )
+      )
+    | _ -> default op
 
   and pp_variant ~preceeding lbl eo =
     let constr = S.bquote ^^ string lbl in
