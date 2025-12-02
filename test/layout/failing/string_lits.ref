@@ -1,0 +1,31 @@
+let () =
+  let s =
+    "\027[1;94m@@@@@@@@\027[22;39m \027[1;45;37m--\027[22;49;39m \027[1mdiff of\027[0m \
+     \027[31m/home/username/sbs/da_ob\027[39m \027[1m&\027[22m \
+     \027[32m/home/us\027[0m│\027[1;94m@@@@@@@@\027[22;39m \027[1;46;37m++\027[22;49;39m \
+     \027[1mdiff of\027[22m \027[31m/home/username/sbs/da_nb\027[39m \027[1m&\027[22m \n\
+    \       but what if ??\n\
+    \      \027[32m/home/us\027[0m"
+  in
+  print_endline (strip s)
+;;
+
+let s = "haha\nfoo"
+
+let s =
+  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\
+   \n\n\
+  \   foo"
+;;
+
+let s =
+  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\
+   \n\n\
+  \   foo"
+;;
+
+let s =
+  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\n\
+   \n\
+  \   foo"
+;;
