@@ -1646,7 +1646,7 @@ end = struct
   and pp_delimited_seq ~preceeding (opn, cls) nb_semis = function
     | [] ->
       let opn, pre_nest = Preceeding.group_with preceeding opn in
-      group (opn ^/^ pre_nest cls)
+      group (opn ^^ pre_nest cls)
     | elts ->
       let semi_as_term = List.compare_length_with elts nb_semis = 0 in
       let pre_opn, pre_nest =
