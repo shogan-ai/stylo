@@ -3230,13 +3230,17 @@ end = struct
       longident ppt_name.txt ^?^ with_
     | _ -> assert false
 
-  let rec pp_desc = function
+  let rec pp { pmod_desc; pmod_attributes; pmod_loc = _; pmod_tokens = _ } =
+    pp_desc pmod_desc
+    |> Attribute.attach ~attrs:pmod_attributes
+
+  and pp_desc = function
     | Pmod_ident lid -> longident lid.txt
     | Pmod_structure (attrs, str) -> Structure.pp ~attrs str
     | Pmod_functor (attrs, fps, me) ->
       Attribute.attach ~attrs S.functor_ ^/^
       separate_map (break 1) Functor_parameter.pp fps ^/^ S.rarrow ^/^ pp me
-    | Pmod_apply (m1, m2) -> pp m1 ^/^ nest 2 (pp m2)
+    | Pmod_apply (m1, m2) -> pp_apply m1 m2
     | Pmod_apply_unit me -> pp me ^^ S.lparen ^^ S.rparen
     | Pmod_constraint (me, mty_opt, modes) ->
       parens (
@@ -3253,9 +3257,25 @@ end = struct
     | Pmod_extension ext -> Extension.pp ext
     | Pmod_parens me -> parens (pp me)
 
-  and pp { pmod_desc; pmod_attributes; pmod_loc = _; pmod_tokens = _ } =
-    pp_desc pmod_desc
-    |> Attribute.attach ~attrs:pmod_attributes
+  and pp_apply m1 m2 =
+    let m1 = pp m1 in
+    match m2 with
+    | { pmod_attributes = []
+      ; pmod_desc =
+          Pmod_parens
+            { pmod_attributes = attrs2
+            ; pmod_desc = Pmod_structure (attrs, str)
+            ; _ }
+      ; _ } ->
+      let start, main, stop = Structure.pp_parts attrs str in
+      let start = group (m1 ^/^ S.lparen ^^ start) in
+      let main = nest 2 main in
+      let stop =
+        let internal_stop = Attribute.attach stop ~attrs:attrs2 in
+        internal_stop ^^ S.rparen
+      in
+      start ^/^ main ^/^ stop
+    | _ -> m1 ^/^ nest 2 (pp m2)
 
   let as_rhs
         ({ pmod_desc; pmod_attributes; pmod_loc = _; pmod_tokens = _ } as me)
