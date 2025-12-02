@@ -2377,6 +2377,9 @@ end
 and Record : sig
   val pp_decl: ?unboxed:bool -> label_declaration list -> t
 end = struct
+
+  (* FIXME: use Preceeding here? *)
+
   let pp preceding_tok (* opening brace or previous semicolon *)
         { pld_name; pld_mutable; pld_global;
           pld_modalities; pld_type; pld_attributes;
@@ -2401,7 +2404,12 @@ end = struct
     (* We want the attributes (and doc) to line up with the field name, not the
        semicolon. *)
     prefix field
-      (Attribute.pp_list pld_attributes ^?^ optional Doc.pp pld_doc)
+      (* double nesting of attrs and docstrings *)
+      (nest 3 @@
+       group (
+         group (Attribute.pp_list pld_attributes) ^?^
+         optional Doc.pp pld_doc
+       ))
 
   let pp_decl ?(unboxed=false) lbls =
     let maybe_trailing_semi, lbls =
