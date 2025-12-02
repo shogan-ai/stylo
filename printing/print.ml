@@ -999,7 +999,7 @@ end = struct
       let preceeding =
         if on_right then (
           assert (Option.is_none preceeding);
-          Some (Preceeding.mk (S.cons ^^ break 1) ~indent:2)
+          Some (Preceeding.mk (S.cons ^^ break 1) ~indent:3)
         ) else
           preceeding
       in
@@ -1798,21 +1798,19 @@ end = struct
       | Some op ->
         assert (Option.is_none preceeding);
         let op = pp_op op ^^ break 1 in
-        let op_pre = Preceeding.mk op ~indent:2 in
+        let indent = Requirement.to_int (requirement op) in
+        let op_pre = Preceeding.mk op ~indent in
         pp ~preceeding:op_pre arg
     in
     match arg.pexp_desc with
     | Pexp_apply (f, args) when on_right ->
       let op = Option.get op in
       (* N.B. the app is not under parentheses, that's why this is valid! *)
-      let op = pp_op op in
-      (* Basically we align a sublock after the op... except when we finish on a
-         literal function in which case we only indent by 2 ??? *)
-      let indent =
-        Requirement.to_int (requirement op) + 1 (* space *) + 2 (* indent *)
-      in
-      let op_and_f = op ^^ nest indent (group (break 1 ^^ pp f)) in
-      Application.pp ~indent op_and_f args
+      let op = pp_op op ^^ break 1 in
+      let indent = Requirement.to_int (requirement op) in
+      let op_pre = Preceeding.mk op ~indent in
+      let f = pp ~preceeding:op_pre f in
+      Application.pp ~indent:(indent + 2) f args
     | Pexp_infix_apply { op = next_op; arg1; arg2 } ->
       let next_op_prec = Precedence.of_infix_op next_op in
       if op_prec <> next_op_prec then
@@ -1840,7 +1838,7 @@ end = struct
       let preceeding =
         if on_right then (
           assert (Option.is_none preceeding);
-          Some (Preceeding.mk (S.cons ^^ break 1) ~indent:2)
+          Some (Preceeding.mk (S.cons ^^ break 1) ~indent:3)
         ) else
           preceeding
       in
