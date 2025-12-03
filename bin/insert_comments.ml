@@ -196,7 +196,8 @@ let rec walk_both state seq doc =
 
     | T.Comment _, Doc.Group (_, _, _, d)
       when
-        (* traverse group to reach correct nesting *)
+        (* we can insert comments outside the group as they'll be at the same
+           nesting level as the next word. *)
         not (nest_before_leaf d) ->
       let to_prepend, rest = consume_only_leading_comments Doc.empty seq in
       let rest, doc, state' =
@@ -240,7 +241,7 @@ let rec walk_both state seq doc =
         (* Inserting now rather than in the group so as to not break it, but...
            group might start with a space. *)
         if first_is_space doc
-        then Doc.group ?flatness doc
+        then Doc.group ~margin ?flatness doc
         else insert_space_if_required state (Doc.group ~margin ?flatness doc)
       in
       attach_before_comments return_state rest doc
