@@ -99,7 +99,8 @@ type special_space_treatement =
    | Nothing_special
    | Remove_if_first_leaf
    | Insert_before_leaf
-   | Insert_before_inserting_comment of Document.t option
+   | Insert_before_inserting_comment
+   | Wrap_comment_with of Document.t
 
 type state = {
   space_handling: special_space_treatement;
@@ -125,7 +126,7 @@ let exit_nest prev st = { st with at_end_of_a_group = prev.at_end_of_a_group }
 
 let no_space st = { st with space_handling = Nothing_special }
 let saw_leaf st =
-  { st with space_handling = Insert_before_inserting_comment None }
+  { st with space_handling = Insert_before_inserting_comment }
 
 let is_comment_attaching_before elt =
   match elt.T.desc with
@@ -156,12 +157,30 @@ let attach_before_comments state tokens doc =
       tokens, doc, { state with space_handling = Insert_before_leaf }
 
 let insert_space_if_required ?(inserting_comment=false) state doc =
-  match state.space_handling with
-  | Insert_before_leaf -> Doc.(break 1 ^^ doc)
-  | Insert_before_inserting_comment brk_opt when inserting_comment ->
-    let brk = Option.value brk_opt ~default:(Doc.break 1) in
-    Doc.(brk ^^ doc)
-  | _ -> doc
+  let brk =
+    match state.space_handling, inserting_comment with
+    | Insert_before_leaf, _
+    | Insert_before_inserting_comment, true -> Doc.break 1
+    | Wrap_comment_with brk, true -> brk
+    | _ -> Doc.empty
+  in
+  Doc.(brk ^^ doc)
+
+let process_whitespace state duplicable ws =
+  if state.space_handling = Remove_if_first_leaf then
+    Doc.empty, no_space state
+  else if duplicable then
+    ws, { state with space_handling = Wrap_comment_with ws }
+  else
+    ws, no_space state
+
+let insert_comments_before_leaf tokens state leaf_doc =
+  let to_prepend, remaining_toks = consume_leading_comments Doc.empty tokens in
+  let doc =
+    insert_space_if_required ~inserting_comment:true state
+      Doc.Utils.(to_prepend ^/^ leaf_doc)
+  in
+  remaining_toks, doc, no_space state
 
 let rec walk_both state seq doc =
   match seq with
@@ -182,17 +201,11 @@ let rec walk_both state seq doc =
       let doc = insert_space_if_required state doc in
       attach_before_comments (saw_leaf state) rest doc
 
-    (* Skip "whitespaces" *)
+    (* Whitespace: don't consume token *)
     | _, Doc.Empty -> seq, doc, state
     | _, Doc.Whitespace (_, duplicable, _) ->
-      begin match state.space_handling with
-      | Remove_if_first_leaf -> seq, Doc.empty, no_space state
-      | _ when duplicable ->
-        seq, doc, { state with
-                    space_handling = Insert_before_inserting_comment (Some doc) }
-      | _ ->
-        seq, doc, no_space state
-      end
+      let doc, state' = process_whitespace state duplicable doc in
+      seq, doc, state'
 
     (* Skip explicitely inserted comment *)
     | _, Doc.Comment _ -> seq, doc, state
@@ -201,44 +214,13 @@ let rec walk_both state seq doc =
 
     (* Comments missing in the doc, insert them *)
     | T.Comment _, Doc.(Token _ | Optional _) ->
-      let to_prepend, rest = consume_leading_comments Doc.empty seq in
-      let doc =
-        insert_space_if_required ~inserting_comment:true state
-          Doc.Utils.(to_prepend ^/^ doc)
-      in
-      rest, doc, no_space state
+      insert_comments_before_leaf seq state doc
 
     | T.Comment _, Doc.Group (_, margin, flatness, d)
-      when
-        (* we can insert comments outside the group as they'll be at the same
-           nesting level as the next word. *)
-        not (nest_before_leaf d) ->
-      let to_prepend, rest = consume_only_leading_comments Doc.empty seq in
-      let rest, d, state' =
-        walk_both
-          { space_handling =
-              begin match state.space_handling with
-              | Insert_before_inserting_comment Some _ -> Remove_if_first_leaf
-              | _ -> Nothing_special
-              end
-          ; at_end_of_a_group = true }
-          rest d
-      in
-      let doc = Doc.group ~margin ?flatness d in
-      let doc =
-        let doc =
-          match state.space_handling with
-          | Insert_before_inserting_comment Some ws ->
-            (* The previous leaf was a whitespace that was marked so it would be
-               be duplicated to wrap around comments, replacing the ws that
-               followed it, if any. *)
-            Doc.(to_prepend ^^ ws ^^ doc)
-          | _ when first_is_space doc -> Doc.(to_prepend ^^ doc)
-          | _ -> Doc.Utils.(to_prepend ^/^ doc)
-        in
-        insert_space_if_required ~inserting_comment:true state doc
-      in
-      attach_before_comments state' rest doc
+      when not (nest_before_leaf d) ->
+      (* we can insert comments outside the group as they'll be at the same
+         nesting level as the next word. *)
+      insert_comments_before_group seq state margin flatness d
 
     (* Traverse document structure *)
     | _, Doc.Cat (_, left, right) ->
@@ -256,21 +238,7 @@ let rec walk_both state seq doc =
       rest, Doc.nest ?vanish i doc, exit_nest state state'
 
     | _, Doc.Group (_, margin, flatness, doc) ->
-      let rest, doc, state' =
-        walk_both { space_handling = Nothing_special; at_end_of_a_group = true }
-          seq doc
-      in
-      let return_state =
-        { state' with at_end_of_a_group = state.at_end_of_a_group }
-      in
-      let doc =
-        (* Inserting now rather than in the group so as to not break it, but...
-           group might start with a space. *)
-        if first_is_space doc
-        then Doc.group ~margin ?flatness doc
-        else insert_space_if_required state (Doc.group ~margin ?flatness doc)
-      in
-      attach_before_comments return_state rest doc
+      traverse_group seq state margin flatness doc
 
     | T.Token _, Doc.Optional { token = p; _ }
     | T.Opt_token _, Doc.Token p ->
@@ -281,6 +249,51 @@ let rec walk_both state seq doc =
 
     (* [Child_node] doesn't appear in linearized token stream *)
     | T.Child_node, _ -> assert false
+
+and traverse_group tokens state margin flatness grouped_doc =
+  let rest, d, state' =
+    walk_both { space_handling = Nothing_special; at_end_of_a_group = true }
+      tokens grouped_doc
+  in
+  let return_state =
+    { state' with at_end_of_a_group = state.at_end_of_a_group }
+  in
+  let doc =
+    (* Inserting now rather than in the group so as to not break it, but...
+       group might start with a space. *)
+    if first_is_space d
+    then Doc.group ~margin ?flatness d
+    else insert_space_if_required state (Doc.group ~margin ?flatness d)
+  in
+  attach_before_comments return_state rest doc
+
+and insert_comments_before_group tokens state margin flatness grouped_doc =
+  let to_prepend, rest = consume_only_leading_comments Doc.empty tokens in
+  let rest, d, state' =
+    let space_handling =
+      (* we behave differently from [traverse_group] here: if [space_handling]
+         when reaching the group specifies we need to wrap comment it also
+         implies that we need to remove the whitespace already in the doc that
+         would have followed the comment.
+
+         This is very ad-hoc and makes me sad. *)
+      match state.space_handling with
+      | Wrap_comment_with _ -> Remove_if_first_leaf
+      | _ -> Nothing_special
+    in
+    walk_both { space_handling; at_end_of_a_group = true } rest grouped_doc
+  in
+  let doc = Doc.group ~margin ?flatness d in
+  let doc =
+    let doc =
+      match state.space_handling with
+      | Wrap_comment_with ws -> Doc.(to_prepend ^^ ws ^^ doc)
+      | _ when first_is_space doc -> Doc.(to_prepend ^^ doc)
+      | _ -> Doc.Utils.(to_prepend ^/^ doc)
+    in
+    insert_space_if_required ~inserting_comment:true state doc
+  in
+  attach_before_comments state' rest doc
 
 let from_tokens tokens doc =
   walk_both init_state tokens doc
