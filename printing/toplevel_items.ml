@@ -8,41 +8,17 @@ let add_item ?flatness last_in_group doc item =
   match doc with
   | Empty -> group ?flatness (item ^^ post_break)
   | _ ->
-    (* flat items don't force blank lines, only non-flat ones do. *)
-    (* Notice the [nest] trick here: without it any comment "attached" to the
-       item would be inserted outside the group (because we don't want to
-       unflatten things).
-       As a result, in situations such as
-       {[
-         flat_item
+    doc ^^
+    (* if there is a comment attached to [item] (and not what preceeded it!)
+       we force a blank line before it, regardless of the flatness of [item] or
+       the item before it.
 
-         (* cmt *)
-         non_flat_item
-       ]}
-       the following would happen:
-       1. [flat_item] is printed (and is flat)
-       2. the [break 0] that follows it vanishes
-       3. [softline] adds a \n
-       4. the comment is inserted (with no extra spacing as it is between two
-       spaces/breaks already)
-       5. a \n is inserted because of [soft_break 0] (since item is not flat)
-
-       As a result we have no blank line, and the item to which the comment
-       refers becomes unclear.
-
-       The nest allows the comment insertion code to traverse the group,
-       delaying the comment until after the [nest soft_break], and producing
-       the output we expect.
-
-       N.B. there is an extra level of trickery: [nest n doc] is a smart
-       constructor that just returns [doc] if [n = 0] (and there's no
-       [extra_indent]).
-       Here we want to force the insertion of a [Nest] node, without changing
-       the indentation of [doc], ... so we additionally give an [~extra_indent],
-       also set to 0. *)
-    doc ^^ softline ^^
+       Otherwise, we just insert a line break (unless there was a blank line
+       already). *)
+    triple_when_followed_by_comment softline ^^
     group ?flatness (
-      nest 1 (nest (-1) (soft_break 0)) ^^
+      (* flat items don't force blank lines, only non-flat ones do. *)
+      soft_break 0 ^^
       item ^^ post_break
     )
 

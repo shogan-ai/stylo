@@ -128,7 +128,7 @@ let rec pretty buf state indent flat = function
       | Trivial (len, s) -> text buf state indent len s
       | Complex (_, t) -> pretty buf state indent flat t
       end
-  | Whitespace (vanishing_cond, ws) ->
+  | Whitespace (vanishing_cond, _, ws) ->
     if Condition.check vanishing_cond then
       state
     else

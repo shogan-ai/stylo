@@ -95,10 +95,14 @@ let rec nest_before_leaf = function
 
 let nest_before_leaf d = nest_before_leaf d = `yes
 
-type space_needed = No | Always | Only_if_inserting_comment
+type special_space_treatement =
+   | Nothing_special
+   | Remove_if_first_leaf
+   | Insert_before_leaf
+   | Insert_before_inserting_comment of Document.t option
 
 type state = {
-  space_needed_before_next: space_needed;
+  space_handling: special_space_treatement;
   (** Whether a space should be inserted before the next leaf node (token or
       comment).
 
@@ -113,15 +117,15 @@ type state = {
 }
 
 let init_state =
-  { space_needed_before_next = No
+  { space_handling = Nothing_special
   ; at_end_of_a_group = false }
 
 let under_nest st = { st with at_end_of_a_group = false }
 let exit_nest prev st = { st with at_end_of_a_group = prev.at_end_of_a_group }
 
-let no_space st = { st with space_needed_before_next = No }
+let no_space st = { st with space_handling = Nothing_special }
 let saw_leaf st =
-  { st with space_needed_before_next = Only_if_inserting_comment }
+  { st with space_handling = Insert_before_inserting_comment None }
 
 let is_comment_attaching_before elt =
   match elt.T.desc with
@@ -149,13 +153,15 @@ let attach_before_comments state tokens doc =
           | _ -> assert false
         ) doc to_append
       in
-      tokens, doc, { state with space_needed_before_next = Always }
+      tokens, doc, { state with space_handling = Insert_before_leaf }
 
 let insert_space_if_required ?(inserting_comment=false) state doc =
-  let sn = state.space_needed_before_next in
-  if sn = Always || (sn = Only_if_inserting_comment && inserting_comment)
-  then Doc.(break 1 ^^ doc)
-  else doc
+  match state.space_handling with
+  | Insert_before_leaf -> Doc.(break 1 ^^ doc)
+  | Insert_before_inserting_comment brk_opt when inserting_comment ->
+    let brk = Option.value brk_opt ~default:(Doc.break 1) in
+    Doc.(brk ^^ doc)
+  | _ -> doc
 
 let rec walk_both state seq doc =
   match seq with
@@ -178,7 +184,15 @@ let rec walk_both state seq doc =
 
     (* Skip "whitespaces" *)
     | _, Doc.Empty -> seq, doc, state
-    | _, Doc.Whitespace _ -> seq, doc, no_space state
+    | _, Doc.Whitespace (_, duplicable, _) ->
+      begin match state.space_handling with
+      | Remove_if_first_leaf -> seq, Doc.empty, no_space state
+      | _ when duplicable ->
+        seq, doc, { state with
+                    space_handling = Insert_before_inserting_comment (Some doc) }
+      | _ ->
+        seq, doc, no_space state
+      end
 
     (* Skip explicitely inserted comment *)
     | _, Doc.Comment _ -> seq, doc, state
@@ -194,21 +208,33 @@ let rec walk_both state seq doc =
       in
       rest, doc, no_space state
 
-    | T.Comment _, Doc.Group (_, _, _, d)
+    | T.Comment _, Doc.Group (_, margin, flatness, d)
       when
         (* we can insert comments outside the group as they'll be at the same
            nesting level as the next word. *)
         not (nest_before_leaf d) ->
       let to_prepend, rest = consume_only_leading_comments Doc.empty seq in
-      let rest, doc, state' =
-        walk_both { space_needed_before_next = No; at_end_of_a_group = true }
-          rest doc
+      let rest, d, state' =
+        walk_both
+          { space_handling =
+              begin match state.space_handling with
+              | Insert_before_inserting_comment Some _ -> Remove_if_first_leaf
+              | _ -> Nothing_special
+              end
+          ; at_end_of_a_group = true }
+          rest d
       in
+      let doc = Doc.group ~margin ?flatness d in
       let doc =
         let doc =
-          if first_is_space doc
-          then Doc.(to_prepend ^^ doc)
-          else Doc.Utils.(to_prepend ^/^ doc)
+          match state.space_handling with
+          | Insert_before_inserting_comment Some ws ->
+            (* The previous leaf was a whitespace that was marked so it would be
+               be duplicated to wrap around comments, replacing the ws that
+               followed it, if any. *)
+            Doc.(to_prepend ^^ ws ^^ doc)
+          | _ when first_is_space doc -> Doc.(to_prepend ^^ doc)
+          | _ -> Doc.Utils.(to_prepend ^/^ doc)
         in
         insert_space_if_required ~inserting_comment:true state doc
       in
@@ -231,7 +257,7 @@ let rec walk_both state seq doc =
 
     | _, Doc.Group (_, margin, flatness, doc) ->
       let rest, doc, state' =
-        walk_both { space_needed_before_next = No; at_end_of_a_group = true }
+        walk_both { space_handling = Nothing_special; at_end_of_a_group = true }
           seq doc
       in
       let return_state =

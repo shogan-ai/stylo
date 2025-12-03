@@ -83,7 +83,7 @@ type t =
       token: pseudo_token;
     }
   | Comment of pseudo_token
-  | Whitespace of Condition.t option * whitespace
+  | Whitespace of Condition.t option * bool * whitespace
   | Cat of Req.t * t * t
   | Nest of Req.t * int * Condition.t option * t
   | Group of Req.t * int * flatness option * t
@@ -118,13 +118,13 @@ let requirement = function
   | Token pt
   | Comment pt -> pseudo_token_req pt
   | Optional _ -> Req.of_int 0 (* vanishes if flat so ... *)
-  | Whitespace (Some _, _) -> Req.of_int 0
-  | Whitespace (_, ws) -> ws_req ws
+  | Whitespace (Some _, _, _) -> Req.of_int 0
+  | Whitespace (_, _, ws) -> ws_req ws
   | Cat (r, _, _)
   | Nest (r, _, _, _)
   | Group (r, _, _, _) -> r
 
-let ws ws = Whitespace (None, ws)
+let ws ws = Whitespace (None, false, ws)
 
 let empty = Empty
 let string s = Token (Trivial (Req.of_int (strlen s), s))
@@ -136,7 +136,12 @@ let softest_line = ws (Line_break Softest)
 let softest_break = ws (Break (1, Softest))
 
 let nbsp = ws Non_breakable
-let vanishing_space cond = Whitespace (Some cond, Non_breakable)
+let vanishing_space cond = Whitespace (Some cond, false, Non_breakable)
+
+let triple_when_followed_by_comment = function
+  | Whitespace (_, true, _) as already_duplicable -> already_duplicable
+  | Whitespace (cond, false, ws) -> Whitespace (cond, true, ws)
+  | _ -> invalid_arg "Document.double_when_followed_by_comment"
 
 (* FIXME *)
 let comment s = Comment (Trivial (Req.of_int (strlen s), s))
@@ -157,7 +162,7 @@ let opt_token ?ws_before ?ws_after vanishing_cond tok =
   | _ ->
     let ws = function
       | None -> empty
-      | Some ws -> Whitespace (Some vanishing_cond, ws)
+      | Some ws -> Whitespace (Some vanishing_cond, false, ws)
     in
     ws ws_before ^^
     Optional

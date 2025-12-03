@@ -45,7 +45,7 @@ type t = private
       token: pseudo_token;
     }
   | Comment of pseudo_token
-  | Whitespace of Condition.t option * whitespace
+  | Whitespace of Condition.t option * bool * whitespace
   | Cat of Requirement.t * t * t
   | Nest of Requirement.t * int * Condition.t option * t
   | Group of Requirement.t * int * flatness option * t
@@ -72,6 +72,9 @@ val softest_break : t
 
 val nbsp : t
 val vanishing_space : Condition.t -> t
+
+val triple_when_followed_by_comment : t -> t
+(** @raises Invalid_argument unless called on a single whitespace *)
 
 val comment : string -> t
 val docstring : string -> t
