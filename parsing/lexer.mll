@@ -1030,6 +1030,10 @@ and skip_hash_bang = parse
            token was a newline. *)
     | BlankLine (* There have been blank lines. *)
     | BlankEquivalentLine
+    (* The was a comment after some blank lines.
+       For the purpose of docstrings attachement this is the same as a blank
+       line.
+       But for comments attachement this is the same as NoLine! *)
 
   type doc_state =
     | Initial  (* There have been no docstrings yet *)
