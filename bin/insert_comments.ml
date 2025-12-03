@@ -70,19 +70,6 @@ let rec consume_only_leading_comments ?(restrict_to_before=false) acc = function
     | Opt_token _ -> acc, first :: rest
     | Child_node -> assert false
 
-let rec first_is_comment = function
-  | Doc.Comment _ -> `yes
-  | Token _ | Optional _ -> `no
-  | Group (_, _, _, d) | Nest (_, _, _, d) ->
-    first_is_comment d
-  | Empty | Whitespace _ -> `maybe
-  | Cat (_, d1, d2) ->
-    match first_is_comment d1 with
-    | `maybe -> first_is_comment d2
-    | res -> res
-
-let first_is_comment d = first_is_comment d = `yes
-
 let rec first_is_space = function
   | Doc.Whitespace _ -> `yes
   | Token _ | Comment _ | Optional _ -> `no
@@ -209,8 +196,8 @@ let rec walk_both state seq doc =
 
     | T.Comment _, Doc.Group (_, _, _, d)
       when
-        not (nest_before_leaf d) (* traverse group to reach correct nesting *)
-        && not (first_is_comment d) (* might be the same comment *) ->
+        (* traverse group to reach correct nesting *)
+        not (nest_before_leaf d) ->
       let to_prepend, rest = consume_only_leading_comments Doc.empty seq in
       let rest, doc, state' =
         walk_both { space_needed_before_next = No; at_end_of_a_group = true }
