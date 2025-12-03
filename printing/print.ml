@@ -1312,22 +1312,9 @@ end = struct
       pp_record ~preceeding (nb_semis exp.pexp_tokens) eo fields
     | Pexp_record_unboxed_product (eo, fields) ->
       pp_record ~preceeding ~unboxed:true (nb_semis exp.pexp_tokens) eo fields
-    (* FIXME: factorize the next 3 cases *)
-    | Pexp_field (e, lid) ->
-      let pre_nest = Preceeding.implied_nest preceeding in
-      pp ?preceeding e ^^ S.dot ^^ pre_nest (longident lid.txt)
-    | Pexp_unboxed_field (e, lid) ->
-      let pre_nest = Preceeding.implied_nest preceeding in
-      pp ?preceeding e ^^ S.dothash ^^ pre_nest (longident lid.txt)
-    | Pexp_setfield (e1, lid, e2) ->
-      let pre_nest = Preceeding.implied_nest preceeding in
-      let access =
-        pp ?preceeding e1 ^^ S.dot ^^ pre_nest (longident lid.txt)
-      in
-      group (
-        group (access ^/^ pre_nest @@ nest 2 S.larrow) ^/^
-        pre_nest @@ nest 2 (pp e2)
-      )
+    | Pexp_field (e, lid) -> pp_field ?preceeding e lid
+    | Pexp_unboxed_field (e, lid) -> pp_field ?preceeding ~unboxed:true e lid
+    | Pexp_setfield (e1, lid, e2) -> pp_setfield ?preceeding e1 lid e2
     | Pexp_array (mut, es) ->
       pp_array ~preceeding (nb_semis exp.pexp_tokens) mut es
     | Pexp_idx (ba, uas) ->
@@ -1836,13 +1823,19 @@ end = struct
     match arg.pexp_desc with
     | Pexp_apply (f, args) when on_right ->
       let op = Option.get op in
-      (* N.B. the app is not under parentheses, that's why this is valid!
-         (we are not dropping attributes or anything) *)
-      let op = pp_op op ^^ break 1 in
-      let indent = Requirement.to_int (requirement op) in
-      let op_pre = Preceeding.mk op ~indent in
-      let f = pp ~preceeding:op_pre f in
-      Application.pp ~indent:(indent + 2) f args
+      begin match op.pexp_desc with
+      | Pexp_ident { txt = { desc = Lident Op ":="; _ }; _ } ->
+        (* ":=" should be laid out like "<-", not like a regular infix op. *)
+        default (Some op)
+      | _ ->
+        (* N.B. the app is not under parentheses, that's why this is valid!
+           (we are not dropping attributes or anything) *)
+        let op = pp_op op ^^ break 1 in
+        let indent = Requirement.to_int (requirement op) in
+        let op_pre = Preceeding.mk op ~indent in
+        let f = pp ~preceeding:op_pre f in
+        Application.pp ~indent:(indent + 2) f args
+      end
     | Pexp_function _ when on_right ->
       let op = pp_op (Option.get op) ^^ break 1 in
       let op_pre = Preceeding.mk op ~indent:0 (* ! *) in
@@ -1918,6 +1911,22 @@ end = struct
       pre_nest
         ((if semi_as_term then S.semi else empty) ^?^ S.rbrace)
     )
+
+  and pp_field ?preceeding ?(unboxed=false) e lid =
+    let dot = if unboxed then S.dothash else S.dot in
+    let pre_nest = Preceeding.implied_nest preceeding in
+    group (
+      pp ?preceeding e ^^ dot ^^ pre_nest (longident lid.txt)
+    )
+
+  and pp_setfield ?preceeding e1 lid e2 =
+    let pre_nest = Preceeding.implied_nest preceeding in
+    let access = pp_field ?preceeding e1 lid in
+    let assignment =
+      let arrow_pre = Preceeding.mk (S.larrow ^^ break 1) ~indent:3 in
+      pp ~preceeding:arrow_pre e2
+    in
+    group (access ^/^ pre_nest assignment)
 end
 
 and Record_field : sig
