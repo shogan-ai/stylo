@@ -44,20 +44,36 @@ let append_trailing_comments (tokens, doc, _) =
   in
   aux doc tokens
 
-let rec consume_leading_comments ?(restrict_to_before=false) acc = function
-  | [] -> acc, []
-  | first :: rest ->
-    match first.T.desc with
-    | Comment c ->
-      if !(c.explicitely_inserted) ||
-         restrict_to_before && c.attachement <> Before
-      then
-        acc, first :: rest
-      else
-        consume_leading_comments Doc.Utils.(acc ^?^ Doc.comment c.text) rest
-    | Token _
-    | Opt_token _ -> acc, first :: rest
-    | Child_node -> assert false
+let consume_leading_comments =
+  let rec aux (floating, attached_after as acc) = function
+    | [] -> acc, []
+    | first :: rest ->
+      match first.T.desc with
+      | Child_node -> assert false
+      | Comment c when not !(c.explicitely_inserted) ->
+        let acc =
+          let cmt = Doc.comment c.text in
+          match c.attachement with
+          (* It looks like we might reorder comment if some [Floating] comments
+             follow some [After] ones. But that cannot happen, by construction.
+          *)
+          | After -> floating, Doc.Utils.(attached_after ^?^ cmt)
+          | Floating -> Doc.Utils.(floating ^?^ cmt), attached_after
+          (* Ideally we'd [assert false] here: [Before] comments have
+             necessarily been consumed already.
+
+             ... however, comments at the beginning of the file (before anycode)
+             currently get marked as [Before] by the lexer.
+             This is should be fixed eventually (because some might actually be
+             [After]!) but for now we treat them as floating here. *)
+          | Before -> Doc.Utils.(floating ^?^ cmt), attached_after
+        in
+        aux acc rest
+      | Comment _
+      | Token _
+      | Opt_token _ -> acc, first :: rest
+  in
+  aux Doc.(empty, empty)
 
 let rec first_is_space = function
   | Doc.Whitespace _ -> `yes
@@ -162,6 +178,14 @@ let prepend_comments_to_doc state comments doc =
     | _ when first_is_space doc -> Doc.empty
     | _ -> Doc.break 1
   in
+  let comments =
+    match comments with
+    | Doc.Empty, comments
+    | comments, Doc.Empty -> comments
+    | floating, attached_after ->
+      (* FIXME: we want to duplicate brk when [Wrap_comment_with] *)
+      Doc.(floating ^^ brk ^^ attached_after)
+  in
   let doc = Doc.(comments ^^ brk ^^ doc) in
   insert_space_if_required ~inserting_comment:true state doc
 
@@ -259,7 +283,7 @@ and traverse_group tokens state margin flatness grouped_doc =
   attach_before_comments return_state rest doc
 
 and insert_comments_before_group tokens state margin flatness grouped_doc =
-  let to_prepend, rest = consume_leading_comments Doc.empty tokens in
+  let to_prepend, rest = consume_leading_comments tokens in
   let rest, d, state' =
     let space_handling =
       (* we behave differently from [traverse_group] here: if [space_handling]
@@ -279,7 +303,7 @@ and insert_comments_before_group tokens state margin flatness grouped_doc =
   attach_before_comments state' rest doc
 
 and insert_comments_before_token tokens state leaf_doc =
-  let to_prepend, rest = consume_leading_comments Doc.empty tokens in
+  let to_prepend, rest = consume_leading_comments tokens in
   let rest, leaf_doc, state' = walk_both (no_space state) rest leaf_doc in
   let doc = prepend_comments_to_doc state to_prepend leaf_doc in
   rest, doc, state'
