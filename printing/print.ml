@@ -209,7 +209,7 @@ end = struct
     pp (if item then S.lbracket_atat else S.lbracket_at) attr_name
       attr_payload
 
-  let pp_list ?item l = separate_map (break 0) (pp ?item) l
+  let pp_list ?item l = separate_map (break 1) (pp ?item) l
 
   let attach ?item ?flatness ?(text = []) ?pre_doc ?post_doc ~attrs t =
     let with_attrs =
