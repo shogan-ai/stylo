@@ -140,6 +140,7 @@ let is_comment_attaching_before elt =
 
 let attach_before_comments state tokens doc =
   if state.at_end_of_a_group then
+    (* delay until outside the group. *)
     tokens, doc, state
   else
     match List.take_while is_comment_attaching_before tokens with
@@ -229,13 +230,13 @@ let rec walk_both state seq doc =
 
     (* Comments missing in the doc, insert them *)
     | T.Comment _, Doc.(Token _ | Optional _) ->
-      insert_comments_before_token seq state doc
+      insert_comments_before_subtree seq state doc
 
-    | T.Comment _, Doc.Group (_, margin, flatness, d)
+    | T.Comment _, Doc.Group (_, _, _, d)
       when not (nest_before_leaf d) ->
       (* we can insert comments outside the group as they'll be at the same
          nesting level as the next word. *)
-      insert_comments_before_group seq state margin flatness d
+      insert_comments_before_subtree seq state doc
 
     (* Traverse document structure *)
     | _, Doc.Cat (_, left, right) ->
@@ -282,21 +283,11 @@ and traverse_group tokens state margin flatness grouped_doc =
   in
   attach_before_comments return_state rest doc
 
-and insert_comments_before_group tokens state margin flatness grouped_doc =
+and insert_comments_before_subtree tokens state doc =
   let to_prepend, rest = consume_leading_comments tokens in
-  let rest, d, state' =
-    let space_handling = Nothing_special in
-    walk_both { space_handling; at_end_of_a_group = true } rest grouped_doc
-  in
-  let doc = Doc.group ~margin ?flatness d in
+  let rest, doc, state' = walk_both (no_space state) rest doc in
   let doc = prepend_comments_to_doc state to_prepend doc in
   attach_before_comments state' rest doc
-
-and insert_comments_before_token tokens state leaf_doc =
-  let to_prepend, rest = consume_leading_comments tokens in
-  let rest, leaf_doc, state' = walk_both (no_space state) rest leaf_doc in
-  let doc = prepend_comments_to_doc state to_prepend leaf_doc in
-  rest, doc, state'
 
 let from_tokens tokens doc =
   walk_both init_state tokens doc
