@@ -8,17 +8,12 @@ let add_item ?flatness last_in_group doc item =
   match doc with
   | Empty -> group ?flatness (item ^^ post_break)
   | _ ->
-    doc ^^
-    (* if there is a comment attached to [item] (and not what preceeded it!)
-       we force a blank line before it, regardless of the flatness of [item] or
-       the item before it.
-
-       Otherwise, we just insert a line break (unless there was a blank line
-       already). *)
-    triple_when_followed_by_comment softline ^^
+    let comments_inserted, hint = flush_comments ~surround_with:softline in
+    doc ^^ softline ^^
+    hint ^^
     group ?flatness (
       (* flat items don't force blank lines, only non-flat ones do. *)
-      soft_break 0 ^^
+      vanishing_whitespace comments_inserted (soft_break 0) ^^
       item ^^ post_break
     )
 
@@ -80,6 +75,14 @@ let pp_keeping_semi pp_item =
   in
   perhaps_semi
 
+let rec separate_groups = function
+  | [] -> empty
+  | [ group ] -> group
+  | g :: gs ->
+    let _, hint = flush_comments ~surround_with:softline in
+    (* We want a single blank line between groups. *)
+    g ^^ softline ^^ softline ^^ hint ^^ separate_groups gs
+
 let pp_grouped_keeping_semi pp_item groups tokens =
   let tokens_of_cont =
     (* Meh. *)
@@ -98,7 +101,7 @@ let pp_grouped_keeping_semi pp_item groups tokens =
       tokens_of_cont cont, doc
     ) tokens groups
   with
-  | [], groups -> separate (softline ^^ softline) groups
+  | [], groups -> separate_groups groups
   | tokens, [] ->
     (* Here we have an empty struct/sig with potential semis.
        This code could be simplified for the special case, but meh. *)

@@ -657,7 +657,9 @@ end = struct
 
     let pp_for_descr descr_flatness args ~pp_rhs =
       let colon_pre =
-        group (S.colon ^/^ vanishing_space (Condition.flat descr_flatness))
+        group (
+          S.colon ^/^ vanishing_whitespace (Condition.flat descr_flatness) nbsp
+        )
         |> Preceeding.mk ~indent:3
       in
       pp ~preceeding:colon_pre args ~pp_rhs
@@ -1038,7 +1040,9 @@ end = struct
         opt_token cond ~ws_before:break ")"
       else
         let pat_is_flat = Condition.flat flatness in
-        let space_when_multiline = group (vanishing_space pat_is_flat) in
+        let space_when_multiline =
+          group (vanishing_whitespace pat_is_flat nbsp)
+        in
         S.lparen ^^ space_when_multiline ^^ break 0,
         space_when_multiline ^^ break 0 ^^ S.rparen
     in
@@ -1766,7 +1770,9 @@ end = struct
         opt_token cond ~ws_before:break ")"
       else
         let pat_is_flat = Condition.flat flatness in
-        let space_when_multiline = group (vanishing_space pat_is_flat) in
+        let space_when_multiline =
+          group (vanishing_whitespace pat_is_flat nbsp)
+        in
         S.lparen ^^ space_when_multiline ^^ break 0,
         space_when_multiline ^^ break 0 ^^ S.rparen
     in

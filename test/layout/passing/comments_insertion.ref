@@ -1,6 +1,7 @@
 let flat = 1
 
 (* floating *)
+
 let foo =
   if whatever
   then (* some comment *) smtg
@@ -10,6 +11,7 @@ let foo =
 ;;
 
 (* floating2 *)
+
 let foo2 =
   if whatever2
   then

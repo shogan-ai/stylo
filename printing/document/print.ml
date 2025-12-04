@@ -114,7 +114,8 @@ let whitespace buf state indent flat = function
     add_spaces buf state indent 1
 
 let rec pretty buf state indent flat = function
-  | Empty -> state
+  | Empty
+  | Comments_flushing_hint _ -> state
   | Token Trivial (len, s)
   | Comment Trivial (len, s) -> text buf state indent len s
   | Token Complex (_, t)
@@ -128,7 +129,7 @@ let rec pretty buf state indent flat = function
       | Trivial (len, s) -> text buf state indent len s
       | Complex (_, t) -> pretty buf state indent flat t
       end
-  | Whitespace (vanishing_cond, _, ws) ->
+  | Whitespace (vanishing_cond, ws) ->
     if Condition.check vanishing_cond then
       state
     else

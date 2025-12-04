@@ -45,7 +45,8 @@ type t = private
       token: pseudo_token;
     }
   | Comment of pseudo_token
-  | Whitespace of Condition.t option * bool * whitespace
+  | Comments_flushing_hint of bool ref * t
+  | Whitespace of Condition.t option * whitespace
   | Cat of Requirement.t * t * t
   | Nest of Requirement.t * int * Condition.t option * t
   | Group of Requirement.t * int * flatness option * t
@@ -71,10 +72,20 @@ val softest_break : t
 (** [Break (1, Softest)], used between docstrings. *)
 
 val nbsp : t
-val vanishing_space : Condition.t -> t
+val vanishing_whitespace : Condition.t -> t -> t
 
-val triple_when_followed_by_comment : t -> t
-(** @raises Invalid_argument unless called on a single whitespace *)
+val flush_comments : surround_with:t -> Condition.t * t
+(** An explicit hint for the comments insertion algorithm to flush comments at
+    this point: it allows for floating comments to be displayed as such, whereas
+    they would otherwise be attached to what follows them.
+
+    Renders as [empty] if there are no comments to insert.
+
+    The [Condition.t] will evaluate to true if some comments were inserted,
+    false otherwise.
+    N.B. the condition will necessarily get it's final value before the printing
+    engine runs, so it can be used to make elements preceeding the comments
+    vanish, not just elements who follow them. *)
 
 val comment : string -> t
 val docstring : string -> t
