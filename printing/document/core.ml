@@ -73,8 +73,7 @@ type whitespace =
   | Line_break of softness
   | Break of int * softness
   | Non_breakable
-(* FIXME: comments and strings can contain newlines, they should be represented
-   by something other than "string". *)
+
 type t =
   | Empty
   | Token of pseudo_token
