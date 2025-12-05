@@ -18,6 +18,7 @@ let cleaner =
   in
   let super = Ast_mapper.default_mapper in
   let map_location _ _ _ = Location.none in
+  let map_location_stack _ _ _ = [] in
   let map_attribute (mapper : 'env Ast_mapper.mapper) (env : 'env) attr =
     let attr_payload =
       if not (from_docstring attr) then
@@ -54,6 +55,7 @@ let cleaner =
     attribute = map_attribute
   ; attributes = map_attributes
   ; location = map_location
+  ; location_stack = map_location_stack
   }
 
   (*
