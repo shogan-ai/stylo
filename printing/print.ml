@@ -1110,7 +1110,13 @@ end = struct
       match ty_opt with
       | None -> with_modes ~extra_nest:pre_nest ~modes p
       | Some ty ->
-        let p = p ^/^ pre_nest (S.colon ^/^ Core_type.pp ty) in
+        (* Fit colon at EOL if we can. *)
+        let p =
+          p ^^ pre_nest (
+            group (break 1 ^^ S.colon) ^/^
+            nest 2 (Core_type.pp ty)
+          )
+        in
         with_atat_modes ~extra_nest:pre_nest ~modes p
     in
     p_with_extras ^^ S.rparen
