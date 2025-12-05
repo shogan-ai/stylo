@@ -2403,7 +2403,7 @@ end = struct
 
   (* FIXME: use Preceeding here? *)
 
-  let pp preceding_tok (* opening brace or previous semicolon *)
+  let pp_field ?preceeding
         { pld_name; pld_mutable; pld_global;
           pld_modalities; pld_type; pld_attributes;
           pld_doc; pld_loc = _; pld_tokens = _ } =
@@ -2414,25 +2414,24 @@ end = struct
       | Immutable, true -> S.global__
       | Mutable, true -> assert false
     in
-    let field =
-      prefix
-        (prefix preceding_tok
-           (group (mut_or_glob ^?^ string pld_name.txt ^/^ S.colon)))
-        (Core_type.pp pld_type ^^
-         begin match pld_modalities with
-         | [] -> empty
-         | ms -> break 1 ^^ S.atat ^/^ modalities ms
-         end)
+    let fld_name_colon, pre_nest =
+      Preceeding.group_with preceeding
+        (group @@ mut_or_glob ^?^ string pld_name.txt ^/^ S.colon)
     in
-    (* We want the attributes (and doc) to line up with the field name, not the
-       semicolon. *)
-    prefix field
-      (* double nesting of attrs and docstrings *)
-      (nest 3 @@
-       group (
-         group (Attribute.pp_list pld_attributes) ^?^
-         optional Doc.pp pld_doc
-       ))
+    let typ_and_modalities =
+      Core_type.pp pld_type
+      |> with_modalities ~modalities:pld_modalities
+    in
+    group (
+      fld_name_colon ^/^
+      pre_nest @@ nest 2 typ_and_modalities
+    ) ^?^
+    pre_nest @@ nest 3 (* oxcamlformat indents by 3 instead of 2 here, why? *) (
+      group (
+        group (Attribute.pp_list pld_attributes) ^?^
+        optional Doc.pp pld_doc
+      )
+    )
 
   let pp_decl ?(unboxed=false) lbls =
     let maybe_trailing_semi, lbls =
@@ -2442,7 +2441,8 @@ end = struct
           then S.semi
           else empty
         in
-        next_tok, pp preceding_tok lbl
+        let preceeding = Preceeding.mk (preceding_tok ^^ break 1) ~indent:2 in
+        next_tok, group (pp_field ~preceeding lbl)
       ) (if unboxed then S.hash_lbrace else S.lbrace) lbls
     in
     separate hardline lbls ^?^ maybe_trailing_semi ^?^ S.rbrace
