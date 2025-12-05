@@ -6,7 +6,10 @@ open Ocaml_syntax.Tokens
 let add_item ?flatness last_in_group doc item =
   let post_break = if last_in_group then empty else break 0 in
   match doc with
-  | Empty -> group ?flatness (item ^^ post_break)
+  | Empty ->
+    let _, hint = flush_comments ~surround_with:softline in
+    hint ^^
+    group ?flatness (item ^^ post_break)
   | _ ->
     let comments_inserted, hint = flush_comments ~surround_with:softline in
     doc ^^ softline ^^
