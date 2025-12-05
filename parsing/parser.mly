@@ -499,9 +499,27 @@ let package_type_of_module_type pmty =
           err loc "Syntaxerr.Constrained_types";
         if priv <> Public then
           err loc "Syntaxerr.Private_types";
-        (lid, ty)
+        (lid, ty, wc.wc_tokens)
     | _ ->
         err pmty.pmty_loc "Not_with_type"
+  in
+  let unwrap_constraints =
+    (* [map_cstr] makes a [with_constraint] node disappear, inlining its actual
+        subtrees in a way.
+        We need to retrieve the constraint's token and inline them as well. *)
+    let rec aux simplified_cstrs_rev tokens_rev cstrs tokens =
+      match tokens, cstrs with
+      | [], [] -> List.rev simplified_cstrs_rev, List.rev tokens_rev
+      | Tokens.{ desc = Child_node; _ } :: tokens, c :: cs ->
+        let lid, ty, children_tokens = map_cstr c in
+        aux ((lid, ty) :: simplified_cstrs_rev)
+          (List.rev_append children_tokens tokens_rev)
+          cs tokens
+      | tok :: tokens, cs ->
+          aux simplified_cstrs_rev (tok :: tokens_rev) cs tokens
+      | _ -> assert false
+    in
+    aux [] []
   in
   match pmty with
   | {pmty_desc = Pmty_ident lid} ->
@@ -512,7 +530,8 @@ let package_type_of_module_type pmty =
       | attr :: _ ->
         err attr.attr_loc "Syntaxerr.Misplaced_attribute"
       end;
-      (lid, List.map map_cstr cstrs, pmty.pmty_attributes, pmty.pmty_tokens)
+      let cstrs, tokens = unwrap_constraints cstrs pmty.pmty_tokens in
+      (lid, cstrs, pmty.pmty_attributes, tokens)
   | _ ->
       err pmty.pmty_loc "Neither_identifier_nor_with_type"
 
