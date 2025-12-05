@@ -8,7 +8,7 @@
 (menhir
   (modules parser parser_tokens)
   (merge_into parser)
-  (flags :standard --strategy simplified --table --inspection --external-tokens Parser_tokens --cmly))
+  (flags :standard --lalr --strategy simplified --table --inspection --external-tokens Parser_tokens --cmly))
 
 (rule
   (target raw_grammar)
