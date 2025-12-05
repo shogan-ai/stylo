@@ -87,7 +87,10 @@ let fuzzer_batch fn =
 
         | with_comments ->
           let styled = Document.Print.to_string ~width:!width with_comments in
-          match Ast_checker.check_same_ast fn i ~impl:(not intf) src styled with
+          match
+            Ast_checker.Cst_checker.check_same_ast fn i ~impl:(not intf)
+              src styled
+          with
           | exception _ ->
             Format.eprintf "%s, line %d: syntax error in output@\n%s@\n@."
               fn i entrypoint_and_src;
@@ -147,7 +150,7 @@ let () =
           let reprinted = Document.Print.to_string ~width doc in
           let source = In_channel.(with_open_text fn input_all) in
           not @@
-          Ast_checker.check_same_ast fn 0
+          Ast_checker.Oxcaml_checker.check_same_ast fn 0
             ~impl:(Filename.check_suffix fn ".ml") source reprinted
         then
           (* TODO: location, etc *)
