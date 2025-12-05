@@ -1805,7 +1805,15 @@ end = struct
           opt_token cond "(", opt_token cond ")"
         else S.lparen, S.rparen
       in
-      let before,pre_nest = Preceeding.extend preceeding before ~indent:1 in
+      let indent =
+        (* Special case which reproduces inconsistencies in oxcamlformat's
+           output. *)
+        match exp.pexp_desc with
+        | Pexp_function ([], _, _) -> 2
+        | Pexp_function _ -> 0
+        | _ -> 1
+      in
+      let before,pre_nest = Preceeding.extend preceeding before ~indent in
       pp ~preceeding:before exp ^^
       pre_nest after
 
