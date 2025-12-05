@@ -1,0 +1,15 @@
+(ocamllex (modules lexer))
+(menhir
+  (modules parser)
+  (flags
+    --lalr
+    --unused-token COMMENT --unused-token DOCSTRING
+    --unused-token EOL --unused-token GREATERRBRACKET
+    --strategy simplified
+    ))
+
+(library
+  (name oxcaml_frontend)
+  (libraries menhirLib)
+  (modules_without_implementation asttypes parsetree)
+  (flags :standard -w +a-4-9-40-41-42-44-45-48-63-66-67-70))
