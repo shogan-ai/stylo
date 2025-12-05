@@ -30,7 +30,13 @@ end = struct
     let process_cmt fn =
       let cmt = Cmt_format.read_cmt fn in
       let modname =
-        let wrapping = "ocaml_syntax__" in
+        let wrapping =
+          (* FIXME: just split on '__' ... *)
+          let prefix = "Ocaml_syntax__" in
+          if String.starts_with ~prefix cmt.cmt_modname
+          then prefix
+          else "Oxcaml_frontend__"
+        in
         String.sub cmt.cmt_modname (String.length wrapping)
           (String.length cmt.cmt_modname - String.length wrapping)
       in
@@ -223,6 +229,8 @@ let rec ty_constr_mapper curr_unit fmt (path, ct_list) =
       fprintf fmt "@[<hov 2>@[<hov 2>(fun@ env __arg@ ->@]@ ";
       map_field curr_unit fmt ct "__arg";
       fprintf fmt ")@]"
+    | Ttyp_arrow _ ->
+      fprintf fmt "id_map"
     | _ ->
       eprintf "Only variables, named types and tuples thereof allowed \
                as type constructor arguments@.";
@@ -255,8 +263,9 @@ and destruct_and_map_tuple curr_unit fmt types value_name =
 and map_field curr_unit fmt ct value_name =
   match ct.ctyp_desc with
   | Ttyp_any
-  | Ttyp_arrow _
     -> assert false
+  | Ttyp_arrow _
+    -> fprintf fmt "id_map@ env %s" value_name
   | Ttyp_var s ->
     fprintf fmt "map_'%s@ env %s" s value_name
   | Ttyp_tuple types ->
