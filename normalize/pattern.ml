@@ -85,11 +85,13 @@ let try_removing_parens parent p =
     begin match parent with
     | Ppat_open _
     | Ppat_list _ -> p
+    | Ppat_exception _
     | Ppat_alias _
     | Ppat_lazy _
     | Ppat_tuple _
     | Ppat_construct _
-    | Ppat_variant _ when not (simple_pattern p') -> p
+    | Ppat_variant _
+    | Ppat_cons _ when not (simple_pattern p') -> p
     | _ ->
       (* parens are not mandatory but we might still optionally keep them.
          Removing them and letting recursive calls reintroduce them would be
