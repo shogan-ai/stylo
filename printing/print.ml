@@ -669,11 +669,16 @@ end = struct
         args ~pp_rhs
   end
 
-  let rec pp ?preceeding
+  let rec pp ?preceeding ?(in_parens=false)
             ({ ptyp_desc=_; ptyp_attributes; ptyp_tokens = _; ptyp_loc=_} as ct)
     =
+    let attach_attrs doc =
+      if in_parens
+      then doc ^^ Attribute.pp_list ptyp_attributes
+      else doc ^?^ Attribute.pp_list ptyp_attributes
+    in
     group (pp_desc ?preceeding ct)
-    |> Attribute.attach ~attrs:ptyp_attributes
+    |> attach_attrs
 
   and pp_desc ?preceeding ct =
     let tokens = ct.ptyp_tokens in
@@ -752,7 +757,7 @@ end = struct
 
   and pp_parens ?preceeding ct =
     let lparen, pre_nest = Preceeding.extend preceeding S.lparen ~indent:1 in
-    pp ~preceeding:lparen ct ^^ pre_nest S.rparen
+    pp ~in_parens:true ~preceeding:lparen ct ^^ pre_nest S.rparen
 
   and pp_var ?preceeding var_name jkind =
     let var, pre_nest =
@@ -902,6 +907,7 @@ end = struct
     in
     Attribute.attach desc ~attrs:ptyp_attributes
 
+  let pp ?preceeding ct = pp ?preceeding ct
 end
 
 (** {2 Patterns} *)
