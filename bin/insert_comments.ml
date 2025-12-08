@@ -89,6 +89,19 @@ let rec first_is_space = function
 
 let first_is_space d = first_is_space d = `yes
 
+let rec first_is_flushhint = function
+  | Doc.Comments_flushing_hint _ -> `yes
+  | Token _ | Comment _ | Optional _ | Whitespace _ -> `no
+  | Group (_, _, _, d) | Nest (_, _, _, d) ->
+    first_is_flushhint d
+  | Empty -> `maybe
+  | Cat (_, d1, d2) ->
+    match first_is_flushhint d1 with
+    | `maybe -> first_is_flushhint d2
+    | res -> res
+
+let first_is_flushhint d = first_is_flushhint d = `yes
+
 let rec nest_before_leaf = function
   | Doc.Nest _ -> `yes
   | Token _ | Optional _ | Comment _ | Whitespace _ -> `no
@@ -233,9 +246,10 @@ let rec walk_both state seq doc =
       insert_comments_before_subtree seq state doc
 
     | T.Comment _, Doc.Group (_, _, _, d)
-      when not (nest_before_leaf d) ->
+      when not (nest_before_leaf d) && not (first_is_flushhint d) ->
       (* we can insert comments outside the group as they'll be at the same
-         nesting level as the next word. *)
+         nesting level as the next word and there's no hint that comments should
+         be inside the group. *)
       insert_comments_before_subtree seq state doc
 
     (* Traverse document structure *)

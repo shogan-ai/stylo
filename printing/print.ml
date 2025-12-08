@@ -3377,7 +3377,11 @@ end = struct
 
   let pp ?(attrs=[]) str =
     let struct_ = Attribute.attach ~attrs S.struct_ in
-    group (prefix struct_ (pp_keeping_semi str) ^/^ S.end_)
+    group (
+      struct_ ^/^
+      nest 2 (pp_keeping_semi str) ^/^
+      S.end_
+    )
 
   let pp_parts attrs str =
     Attribute.attach ~attrs S.struct_,
