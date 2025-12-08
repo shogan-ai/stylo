@@ -1190,6 +1190,11 @@ and skip_hash_bang = parse
       ~pos:sc.sc_loc.loc_start
       (Comment cmt)
 
+  let previous_token = ref None
+  let lines_init_state = function
+    | Some (STRUCT | SIG) -> NewLine
+    | _ -> NoLine
+
   let token_updating_indexed_list lexbuf =
     let post_pos = lexeme_end_p lexbuf in
     let rec loop lines_for_comments lines_for_docstrings docs sc_opt lexbuf =
@@ -1235,6 +1240,7 @@ and skip_hash_bang = parse
           let docs' = acc_docstring lines_for_docstrings docs doc in
           loop NoLine NoLine docs' (Some sc) lexbuf
       | tok ->
+          previous_token := Some tok;
           let start_pos = lexeme_start_p lexbuf in
           Line_indent.new_info lines_for_comments start_pos;
           Option.iter (unstage_comment lines_for_comments) sc_opt;
@@ -1245,7 +1251,7 @@ and skip_hash_bang = parse
             (Token tok);
           tok
     in
-      loop NoLine NoLine Initial None lexbuf
+      loop (lines_init_state !previous_token) NoLine Initial None lexbuf
 
   let init () =
     is_in_string := false;
