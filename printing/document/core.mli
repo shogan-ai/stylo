@@ -45,7 +45,7 @@ type t = private
       token: pseudo_token;
     }
   | Comment of pseudo_token
-  | Comments_flushing_hint of bool ref * t
+  | Comments_flushing_hint of bool ref * t * t
   | Whitespace of Condition.t option * whitespace
   | Cat of Requirement.t * t * t
   | Nest of Requirement.t * int * Condition.t option * t
@@ -74,7 +74,7 @@ val softest_break : t
 val nbsp : t
 val vanishing_whitespace : Condition.t -> t -> t
 
-val flush_comments : surround_with:t -> Condition.t * t
+val flush_comments : ws_before:t -> ws_after:t -> Condition.t * t
 (** An explicit hint for the comments insertion algorithm to flush comments at
     this point: it allows for floating comments to be displayed as such, whereas
     they would otherwise be attached to what follows them.

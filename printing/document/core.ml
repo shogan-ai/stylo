@@ -82,7 +82,7 @@ type t =
       token: pseudo_token;
     }
   | Comment of pseudo_token
-  | Comments_flushing_hint of bool ref * t
+  | Comments_flushing_hint of bool ref * t * t
   | Whitespace of Condition.t option * whitespace
   | Cat of Req.t * t * t
   | Nest of Req.t * int * Condition.t option * t
@@ -141,14 +141,10 @@ let vanishing_whitespace cond = function
   | Whitespace (None, ws) -> Whitespace (Some cond, ws)
   | _ -> invalid_arg "Document.vanishing_whitespace"
 
-let flush_comments ~surround_with:ws =
-  match ws with
-  | Whitespace (None, _) ->
-    let inserted_comments = ref false in
-    let cond : Condition.t = lazy !inserted_comments in
-    cond, Comments_flushing_hint (inserted_comments, ws)
-  | _ ->
-    invalid_arg "Document.flush_comments"
+let flush_comments ~ws_before ~ws_after =
+  let inserted_comments = ref false in
+  let cond : Condition.t = lazy !inserted_comments in
+  cond, Comments_flushing_hint (inserted_comments, ws_before, ws_after)
 
 (* FIXME *)
 let comment s = Comment (Trivial (Req.of_int (strlen s), s))

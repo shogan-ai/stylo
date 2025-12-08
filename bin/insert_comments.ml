@@ -193,13 +193,13 @@ let prepend_comments_to_doc state (floating, attached_after) doc =
   in
   insert_space_if_required ~inserting_comment:true state doc
 
-let flush_comments tokens ~surround_with:ws state =
+let flush_comments tokens ~before:ws_b ~after:ws_a state =
   let to_prepend, rest = consume_leading_comments tokens in
   let doc =
     match to_prepend with
-    | Empty, after -> Doc.(ws ^^ after ^^ ws)
-    | floating, Empty -> Doc.(ws ^^ floating ^^ ws ^^ ws)
-    | floating, after -> Doc.(ws ^^ floating ^^ ws ^^ ws ^^ after ^^ ws)
+    | Empty, after -> Doc.(ws_b ^^ after ^^ ws_a)
+    | floating, Empty -> Doc.(ws_b ^^ floating ^^ ws_a ^^ ws_a)
+    | floating, after -> Doc.(ws_b ^^ floating ^^ ws_a ^^ ws_a ^^ after ^^ ws_a)
   in
   let doc = insert_space_if_required ~inserting_comment:true state doc in
   rest, doc, { state with space_handling = Nothing_special }
@@ -233,9 +233,9 @@ let rec walk_both state seq doc =
     | T.Comment { explicitely_inserted; _ }, _ when !explicitely_inserted ->
       walk_both state rest doc
 
-    | T.Comment _, Doc.Comments_flushing_hint (inserted, ws) ->
+    | T.Comment _, Doc.Comments_flushing_hint (inserted, before, after) ->
       inserted := true;
-      flush_comments seq ~surround_with:ws state
+      flush_comments seq ~before ~after state
 
     | _, Doc.Comments_flushing_hint _ ->
       (* No comments to insert, the hint vanishes. *)
