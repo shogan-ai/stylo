@@ -20,6 +20,27 @@
   (action (diff %{dep:relative_nest.out} %{dep:relative_nest.snd-run})))
 
 (rule
+  (target single_case_optional_pipe.out)
+  (action
+    (with-stdout-to %{target}
+      (run ../../../bin/stylo.exe %{dep:single_case_optional_pipe.ml}))))
+
+(rule
+  (target single_case_optional_pipe.snd-run)
+  (action
+    (with-stdout-to %{target}
+      (run ../../../bin/stylo.exe %{dep:single_case_optional_pipe.out}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:single_case_optional_pipe.ref} %{dep:single_case_optional_pipe.out})))
+
+; idempotence check
+(rule
+  (alias runtest)
+  (action (diff %{dep:single_case_optional_pipe.out} %{dep:single_case_optional_pipe.snd-run})))
+
+(rule
   (target string_lits.out)
   (action
     (with-stdout-to %{target}

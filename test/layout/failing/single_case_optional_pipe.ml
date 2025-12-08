@@ -1,0 +1,49 @@
+let foo = function var ->
+  let x = true in x
+
+let foo =
+  (function var -> let x = true in x)
+
+let foo =
+  Some (function var -> let x = true in x)
+
+let foo =
+  List.map (function var -> let x = true in x)
+
+let foo = function var ->
+  let x = true in x
+                 | test -> lol
+
+let foo =
+  (function var -> let x = true in x | test -> lol)
+
+let foo =
+  Some (function var -> let x = true in x | test -> lol)
+
+let foo =
+  List.map (function var -> let x = true in x | test -> lol)
+
+let foo = match smtg with var ->
+  let x = true in x
+
+let foo =
+  (match smtg with var -> let x = true in x)
+
+let foo =
+  Some (match smtg with var -> let x = true in x)
+
+let foo =
+  List.map (match smtg with var -> let x = true in x)
+
+let foo = match smtg with var ->
+  let x = true in x
+                 | test -> lol
+
+let foo =
+  (match smtg with var -> let x = true in x | test -> lol)
+
+let foo =
+  Some (match smtg with var -> let x = true in x | test -> lol)
+
+let foo =
+  List.map (match smtg with var -> let x = true in x | test -> lol)
