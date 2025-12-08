@@ -511,11 +511,12 @@ end = struct
       match ps with
       | [] when omit ->
         let param, pre_nest = Preceeding.group_with preceeding p in
-        param ^/^ pre_nest ty_doc
+        param ^/^ pre_nest @@ nest 2 ty_doc
       | _ ->
         let left, pre_nest = Preceeding.group_with preceeding left in
-        left ^^ pre_nest (separate (S.comma ^^ break 1) params_docs ^^ right)
-        ^/^ pre_nest ty_doc
+        left ^^ pre_nest @@ nest 2 (
+          separate (S.comma ^^ break 1) params_docs ^^ right ^/^ ty_doc
+        )
 
   let pp_core_type ?(class_=false) ?preceeding tokens args lid =
     let delims =
