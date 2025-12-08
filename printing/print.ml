@@ -3008,7 +3008,7 @@ end = struct
     | Psig_class cds -> Class_description.pp_list cds
     | Psig_class_type ctds -> Class_type_declaration.pp_list ctds
     | Psig_attribute attr -> Attribute.pp_floating attr
-    | Psig_docstring s -> Doc.pp_floating s
+    | Psig_docstring s -> Doc.pp s
     | Psig_extension te -> Extension.pp_toplevel te
     | Psig_kind_abbrev (name, k) ->
       S.kind_abbrev__ ^/^ string name.txt ^/^ S.equals ^/^
