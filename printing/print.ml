@@ -3480,6 +3480,10 @@ end = struct
             (fun p -> pre_nest @@ nest params_indent p) params
         )
     in
+    (* FIXME: the ':' and '=' (and friends) should be attached to what preceeds
+       them if we want to match oxcamlformat's janestreet style.
+       This is currently not doable as the colon is part of the constraint when
+       the constraint is Single_part. *)
     match constraint_, rhs with
     | None, None ->
       (* abstract module types *)
@@ -3499,7 +3503,7 @@ end = struct
     | None, Some Three_parts { start; main; stop } ->
       let bindings_and_main =
         group
-          (bindings ^/^ pre_nest @@ nest 2 (group (equal_sign ^/^ start))) ^/^
+          (bindings ^/^ pre_nest @@ group (nest 2 equal_sign ^/^ start)) ^/^
         pre_nest @@ nest 2 main
       in
       group (
@@ -3509,7 +3513,7 @@ end = struct
     | Some Three_parts { start; main; stop }, None ->
       let bindings_and_main =
         group
-          (bindings ^/^ pre_nest @@ nest 2 (group (S.colon ^/^ start))) ^/^
+          (bindings ^/^ pre_nest @@ group (nest 2 S.colon ^/^ start)) ^/^
         pre_nest @@ nest 2 main
       in
       group (
@@ -3519,7 +3523,7 @@ end = struct
     | Some Three_parts { start; main; stop }, Some Single_part doc ->
       let bindings_and_main =
         group
-          (bindings ^/^ pre_nest @@ nest 2 (group (S.colon ^/^ start))) ^/^
+          (bindings ^/^ pre_nest @@ group (nest 2 S.colon ^/^ start)) ^/^
         pre_nest @@ nest 2 main
       in
       let stop_and_rhs = group (stop ^/^ nest 2 equal_sign) ^/^ nest 2 doc in
@@ -3531,7 +3535,7 @@ end = struct
       let bindings_cstr_main =
         group (
           bindings ^/^
-          pre_nest @@ nest 2 (group (doc ^/^ equal_sign ^/^ start))
+          pre_nest @@ group (nest 2 (group (doc ^/^ equal_sign)) ^/^ start)
         ) ^/^
         pre_nest @@ nest 2 main
       in
