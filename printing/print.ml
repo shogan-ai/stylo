@@ -3262,9 +3262,9 @@ end = struct
         | [] -> empty
         | _ ->
           let one (lid, ct) =
-            longident lid.txt ^/^ S.equals ^/^ Core_type.pp ct
+            S.type_ ^/^ longident lid.txt ^/^ S.equals ^/^ Core_type.pp ct
           in
-          S.with_ ^/^ S.type_ ^/^
+          S.with_ ^/^
           separate_map (break 1 ^^ S.and_ ^^ break 1) one ppt_eqs
       in
       longident ppt_name.txt ^?^ with_
