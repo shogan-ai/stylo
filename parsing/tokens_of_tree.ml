@@ -44,11 +44,8 @@ let tokenizer =
     combine_children ~loc:Location.none node_toks sub_tokens
   in
   let reduce_attribute reducer env (a : Parsetree.attribute) =
-    match a.attr_name.txt with
-    | ["ocaml"; ("doc"|"text")] -> [a.attr_tokens]
-    | _ ->
-      let sub_tokens = super.attribute reducer env a in
-      combine_children ~loc:a.attr_loc a.attr_tokens sub_tokens
+    let sub_tokens = super.attribute reducer env a in
+    combine_children ~loc:a.attr_loc a.attr_tokens sub_tokens
   in
   let reduce_extension reducer env e =
     let sub_tokens = super.extension reducer env e in

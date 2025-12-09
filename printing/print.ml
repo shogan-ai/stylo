@@ -196,11 +196,7 @@ module rec Attribute : sig
     -> t
 end = struct
   let pp_attr_name ids =
-    let pp_one = function
-      | "let" -> S.let_
-      | s -> string s
-    in
-    separate_map S.dot pp_one ids.txt
+    separate_map S.dot string ids.txt
 
   let pp lbat name payload =
     group (
