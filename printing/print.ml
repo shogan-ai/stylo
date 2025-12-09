@@ -43,6 +43,12 @@ let rec pipe_before_child = function
   | Tokens.{ desc = Token BAR; _ } :: _ -> true
   | _ :: rest -> pipe_before_child rest
 
+let rec lparen_before_child = function
+  | []
+  | Tokens.{ desc = Child_node; _ } :: _ -> false
+  | Tokens.{ desc = Token LPAREN; _ } :: _ -> true
+  | _ :: rest -> lparen_before_child rest
+
 type 'a loc = 'a Location.loc = { txt: 'a; loc: Location.t }
 let stringf fmt = Printf.ksprintf string fmt
 let fancy_string fmt = Printf.ksprintf fancy_string fmt
@@ -482,8 +488,7 @@ and Type_constructor : sig
   val pp_class_constr : core_type list -> Longident.t -> t
 
   val pp_decl
-    : kw:Parser_tokens.token
-    -> Tokens.seq
+    :  Tokens.seq
     -> ptype_params
     -> t
     -> t
@@ -529,11 +534,11 @@ end = struct
     let lid = (if class_ then S.hash else empty) ^^ longident lid in
     pp ?preceeding delims args lid
 
-  let pp_decl ~kw tokens params name =
+  let pp_decl tokens params name =
     let delims =
       Parens {
         omit_when_single_param =
-          params <> [] && not (has_leading LPAREN ~after:kw tokens)
+          params <> [] && not (lparen_before_child tokens)
       }
     in
     let args = List.map Type_param.pp params in
@@ -2585,7 +2590,7 @@ end = struct
     | None, kind ->
       group (eq ^?^ private_ td.ptype_private) ^?^ type_kind kind
 
-  let pp ~kw_preceeding_params ~start ?subst td =
+  let pp ~start ?subst td =
     let start =
       match start with
       | [] -> assert false
@@ -2595,7 +2600,7 @@ end = struct
     in
     let lhs =
       prefix start (
-        Type_constructor.pp_decl ~kw:kw_preceeding_params td.ptype_tokens
+        Type_constructor.pp_decl td.ptype_tokens
           td.ptype_params (string td.ptype_name.txt)
         ^?^
         match td.ptype_jkind_annotation with
@@ -2612,17 +2617,14 @@ end = struct
       ~attrs:td.ptype_attributes
       ?post_doc:td.ptype_post_doc
 
-  let rec pp_list ~kw_preceeding_params ?subst start = function
+  let rec pp_list ?subst start = function
     | [] -> empty
     | td :: tds ->
-      group (pp ~kw_preceeding_params ?subst ~start td)
-      ^?^ pp_list ~kw_preceeding_params:AND ?subst [S.and_] tds
+      group (pp ?subst ~start td)
+      ^?^ pp_list ?subst [S.and_] tds
 
   let pp_list ?subst rf tds =
-    let kw_preceeding_params =
-      if rf = Asttypes.Nonrecursive then Parser_tokens.NONREC else TYPE
-    in
-    pp_list ~kw_preceeding_params ?subst [S.type_; nonrec_ rf] tds
+    pp_list ?subst [S.type_; nonrec_ rf] tds
 end
 
 and Type_extension : sig
@@ -2632,7 +2634,7 @@ end = struct
            ptyext_attributes; ptyext_ext_attrs; ptyext_pre_doc; ptyext_post_doc;
            ptyext_loc = _ ; ptyext_tokens }=
     Ext_attribute.decorate S.type_ ptyext_ext_attrs ^/^
-    Type_constructor.pp_decl ~kw:TYPE ptyext_tokens
+    Type_constructor.pp_decl ptyext_tokens
       ptyext_params (longident ptyext_path.txt)  ^/^
     S.plus_equals ^/^
     private_ ptyext_private ^?^
@@ -3219,7 +3221,7 @@ end = struct
     match wc.wc_desc with
     | Pwith_type (params, lid, priv, ct, cstrs) ->
       S.type_ ^/^
-      Type_constructor.pp_decl ~kw:TYPE wc.wc_tokens params
+      Type_constructor.pp_decl wc.wc_tokens params
         (longident lid.txt) ^/^
       S.equals ^?^ private_ priv ^?^
       Core_type.pp ct ^?^ Type_declaration.pp_constraints cstrs
@@ -3233,7 +3235,7 @@ end = struct
       Module_type.pp mty
     | Pwith_typesubst (params, lid, ct) ->
       S.type_ ^/^
-      Type_constructor.pp_decl ~kw:TYPE wc.wc_tokens params
+      Type_constructor.pp_decl wc.wc_tokens params
         (longident lid.txt) ^/^
       S.colon_equals ^/^ Core_type.pp ct
     | Pwith_modsubst (lid1, lid2) ->
