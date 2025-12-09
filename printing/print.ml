@@ -148,7 +148,7 @@ let modalities = separate_loc_list (break 1) modality
 let with_modalities ~modalities:l t =
   match l with
   | [] -> t
-  | _ -> t ^?^ S.atat ^/^ modalities l
+  | _ -> t ^?^ group (S.atat ^/^ modalities l)
 
 let mode (Mode s) = string s
 let modes = separate_loc_list (break 1) mode
@@ -268,8 +268,12 @@ and Extension : sig
 end = struct
   let pp_classic ~floating names payload =
     let name = Attribute.pp_attr_name names in
-    (if floating then S.lbracket_percentpercent else S.lbracket_percent)
-    ^^ name ^^ nest 2 (Payload.pp payload ^^ S.rbracket)
+    let opn, indent =
+      if floating
+      then S.lbracket_percentpercent, 0
+      else S.lbracket_percent, 2
+    in
+    opn ^^ name ^^ nest indent (Payload.pp payload ^^ S.rbracket)
 
   let pp ?(floating=false) (ext_name, ext_payload, _tokens) =
     match ext_payload with
@@ -456,13 +460,13 @@ end = struct
         if Ends_in_obj_type.structure s then break 1 else empty
       end
     | PSig s ->
-      break 0 ^^ S.colon ^/^ Signature.pp_interface s ^^
+      S.colon ^/^ Signature.pp_interface s ^^
       if Ends_in_obj_type.signature s then break 1 else empty
     | PTyp c ->
-      break 0 ^^ S.colon ^/^ Core_type.pp c ^^
+      S.colon ^/^ Core_type.pp c ^^
       if Ends_in_obj_type.core_type c then break 1 else empty
     | PPat (p, eo) ->
-      break 0 ^^ S.qmark ^/^ Pattern.pp p ^^
+      S.qmark ^/^ Pattern.pp p ^^
       match eo with
       | None -> empty
       | Some e -> break 1 ^^ S.when_ ^/^ Expression.pp e
@@ -584,7 +588,10 @@ and Core_type : sig
     val pp_for_descr : flatness -> arrow_arg list -> pp_rhs:printer -> t
   end
 
-  val pp_poly_bindings : (string loc * jkind_annotation option) list -> t
+  val pp_poly_bindings
+    :  ?preceeding:Preceeding.t
+    -> (string loc * jkind_annotation option) list
+    -> t
 end = struct
   module Arrow = struct
     type printer = ?preceeding:Preceeding.t -> unit -> t
@@ -732,11 +739,9 @@ end = struct
     | Ptyp_variant (fields, cf, lbls) ->
       pp_variant ?preceeding ~tokens fields cf lbls
     | Ptyp_poly (bound_vars, ct) ->
-      let pre_vars, pre_nest =
-        Preceeding.group_with preceeding
-          (pp_poly_bindings bound_vars)
-      in
-      pre_vars ^^ break 0 ^^ pre_nest (S.dot ^/^ pp ct)
+      let pre_nest = Preceeding.implied_nest preceeding in
+      let pre_vars = pp_poly_bindings ?preceeding bound_vars in
+      group (pre_vars ^^ break 0 ^^ pre_nest S.dot) ^/^ pre_nest (pp ct)
     | Ptyp_package pkg -> package_type ?preceeding pkg
     | Ptyp_open (lid, ct) ->
       let space =
@@ -769,14 +774,18 @@ end = struct
     | None -> var
     | Some k -> var ^/^ pre_nest (S.colon ^/^ Jkind_annotation.pp k)
 
-  and pp_poly_bindings bound_vars =
+  and pp_poly_bindings ?preceeding bound_vars =
     let pp_bound (var, jkind) =
       let var_and_kind = pp_var var.Location.txt jkind in
       match jkind with
       | None -> var_and_kind
       | Some _ -> parens var_and_kind
     in
-    separate_map (break 1) pp_bound bound_vars
+    match bound_vars with
+    | [] -> assert false
+    | v :: vs ->
+      let v, pre_nest = Preceeding.group_with preceeding (pp_bound v) in
+      v ^?^ pre_nest (separate_map (break 1) pp_bound vs)
 
   and pp_variant ?(compact=true) ?preceeding ~tokens fields
         (cf : Asttypes.closed_flag) lbls =
@@ -2092,7 +2101,11 @@ and Case : sig
 end = struct
   let pp_guard = function
     | None -> empty
-    | Some e -> group (S.when_ ^/^ Expression.pp e)
+    | Some e ->
+      let pre = S.when_ ^^ break 1 in
+      let indent = Requirement.to_int (requirement pre) in
+      let preceeding = Preceeding.mk pre ~indent in
+      Expression.pp ~preceeding e
 
   (* we only nest the pattern, not the pipes (there might be several due to
      or-patterns). *)
@@ -2383,7 +2396,9 @@ and Value_description : sig
 end = struct
   let pp_type flatness ct =
     match Core_type.Arrow.collect_args ct with
-    | None -> S.colon ^/^ Core_type.pp ct
+    | None ->
+      let preceeding = Preceeding.mk (S.colon ^^ break 1) ~indent:0 (* ... *) in
+      Core_type.pp ~preceeding ct
     | Some (args, (legacy_modes, post_modes, ty)) ->
       Core_type.Arrow.pp_for_descr flatness args
         ~pp_rhs:(Core_type.Arrow.pp_arg_moded_ty legacy_modes post_modes ty)
@@ -2406,7 +2421,9 @@ end = struct
       begin match pval_prim with
         | [] -> empty
         | ps ->
-          S.equals ^/^ separate_map (break 1) (fun s -> stringf "%S" s) ps
+          group (
+            S.equals ^/^ separate_map (break 1) (fun s -> stringf "%S" s) ps
+          )
       end
     )
     |> Attribute.attach ~item:true ~flatness
@@ -2935,14 +2952,13 @@ end = struct
       separate_map (break 1) Functor_parameter.pp_type fps ^/^ S.rarrow ^/^
       with_modes ~modes (pp mty)
     | Pmty_with (mty, cstrs) ->
-      pp mty ^^
-      begin match cstrs with
-      | [] -> empty
-      | _ ->
-        break 1 ^^ S.with_ ^/^
-        separate_map (break 1 ^^ S.and_ ^^ break 1)
-          With_constraint.pp cstrs
-      end
+      let _last_and, cstrs =
+        List.fold_left (fun (kw, acc) cstr ->
+          let cstr = With_constraint.pp cstr in
+          S.and_, acc ^?^ group (kw ^?^ cstr)
+        ) (S.with_, empty) cstrs
+      in
+      group (pp mty ^?^ cstrs)
     | Pmty_typeof (attrs, me) ->
       let kws = S.module_ ^/^ S.type_ ^/^ S.of_ in
       Attribute.attach kws ~attrs ^/^ Module_expr.pp me
@@ -2976,13 +2992,25 @@ and Functor_parameter : sig
   val pp : functor_parameter -> t
   val pp_type : functor_parameter -> t
 end = struct
+  let pp_named name mty =
+    match Module_type.as_rhs mty with
+    | Single_part mty -> group (name ^/^ S.colon ^/^ mty)
+    | Three_parts { start; main; stop } ->
+      group (
+        group (name ^/^ group (nest 2 S.colon ^/^ start)) ^/^
+        nest 2 main ^/^
+        stop
+      )
+
   let pp = function
     | Unit -> empty
     | Named (lbl, mty, modes) ->
-      begin match lbl.txt with
+      let name =
+        match lbl.txt with
         | None -> S.underscore
         | Some s -> string s
-      end ^/^ S.colon ^/^ with_modes (Module_type.pp mty) ~modes
+      in
+      with_modes (pp_named name mty) ~modes
     | Unnamed _ -> assert false
 
   let pp fp = parens (pp fp)
@@ -3191,7 +3219,7 @@ end = struct
     in
     let include_ =
       match pp_mod pincl_mod with
-      | Layout_module_binding.Single_part doc -> group (keywords ^/^ doc)
+      | Layout_module_binding.Single_part doc -> group (keywords ^/^ nest 2 doc)
       | Three_parts { start; main; stop } ->
         group (keywords ^/^ start) ^/^
         nest 2 main ^/^
@@ -3218,6 +3246,7 @@ and With_constraint : sig
   val pp : with_constraint -> t
 end = struct
   let pp wc =
+    group @@
     match wc.wc_desc with
     | Pwith_type (params, lid, priv, ct, cstrs) ->
       S.type_ ^/^
@@ -3726,7 +3755,7 @@ end = struct
     | [] -> empty
     | [ x ] -> pp ?preceeding ~item ~add_in ~start x
     | x :: xs ->
-      let sep = if item then hardline ^^ hardline else break 1 in
+      let sep = if item then hardline ^^ hardline else softest_line in
       let extra_nest =
         Option.map (fun _ -> Preceeding.implied_nest preceeding) preceeding
       in
