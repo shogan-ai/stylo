@@ -243,6 +243,7 @@ and package_type =
   { ppt_ext_attr: ext_attribute option;
     ppt_name: Longident.t loc;
     ppt_eqs: (Longident.t loc * core_type) list;
+    ppt_attrs: attributes;
     ppt_loc: Location.t;
     ppt_tokens: Tokens.seq;
   }

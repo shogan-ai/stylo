@@ -4579,12 +4579,13 @@ atomic_type:
           { ppt_ext_attr = ext_attr;
             ppt_name = lid;
             ppt_eqs = cstrs;
+            ppt_attrs = attrs;
             ppt_loc = make_loc $sloc;
             ppt_tokens = tokens; }
         in
         let descr = Ptyp_package pack_ty in
         let tokens = Tokens.at loc in
-        Typ.mk ~loc:(make_loc loc) ~tokens ~attrs descr }
+        Typ.mk ~loc:(make_loc loc) ~tokens descr }
 ;
 %inline package_type: package_type_ext_attr { $1 $sloc None }
 ;

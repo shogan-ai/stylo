@@ -856,7 +856,8 @@ end = struct
     separate (break 1 ^^ pre_nest S.star ^^ break 1) elts
 
   and package_type ?preceeding
-        { ppt_ext_attr; ppt_name = lid; ppt_eqs = constraints; _ } =
+        { ppt_ext_attr; ppt_name = lid; ppt_eqs = constraints; ppt_attrs = attrs
+        ; ppt_loc = _;  ppt_tokens = _ } =
     let with_ =
       match constraints with
       | [] -> empty
@@ -866,6 +867,7 @@ end = struct
         in
         break 1 ^^ S.with_ ^/^
         separate_map (break 1 ^^ S.and_ ^^ break 1) one constraints
+        |> Attribute.attach ~attrs
     in
     let module_ =
       match ppt_ext_attr with
@@ -3252,7 +3254,8 @@ and Module_expr : sig
 end = struct
   let pp_package_type ct =
     match ct.ptyp_desc with
-    | Ptyp_package { ppt_ext_attr = None; ppt_name; ppt_eqs; _ } ->
+    | Ptyp_package { ppt_ext_attr = None; ppt_name; ppt_eqs; ppt_attrs
+                   ; ppt_loc = _; ppt_tokens = _ } ->
       let with_ =
         match ppt_eqs with
         | [] -> empty
@@ -3264,6 +3267,7 @@ end = struct
           separate_map (break 1 ^^ S.and_ ^^ break 1) one ppt_eqs
       in
       longident ppt_name.txt ^?^ with_
+      |> Attribute.attach ~attrs:ppt_attrs
     | _ -> assert false
 
   let rec pp { pmod_desc; pmod_attributes; pmod_loc = _; pmod_tokens = _ } =
