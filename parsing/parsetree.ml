@@ -242,7 +242,10 @@ and arg_label = Asttypes.arg_label =
 and package_type =
   { ppt_ext_attr: ext_attribute option;
     ppt_name: Longident.t loc;
-    ppt_eqs: (Longident.t loc * core_type) list; }
+    ppt_eqs: (Longident.t loc * core_type) list;
+    ppt_loc: Location.t;
+    ppt_tokens: Tokens.seq;
+  }
 (** As {!package_type} typed values:
          - [(S, [])] represents [(module S)],
          - [(S, [(t1, T1) ; ... ; (tn, Tn)])]

@@ -855,7 +855,7 @@ end = struct
     separate (break 1 ^^ pre_nest S.star ^^ break 1) elts
 
   and package_type ?preceeding
-        { ppt_ext_attr; ppt_name = lid; ppt_eqs = constraints } =
+        { ppt_ext_attr; ppt_name = lid; ppt_eqs = constraints; _ } =
     let with_ =
       match constraints with
       | [] -> empty
@@ -3252,7 +3252,7 @@ and Module_expr : sig
 end = struct
   let pp_package_type ct =
     match ct.ptyp_desc with
-    | Ptyp_package { ppt_ext_attr = None; ppt_name; ppt_eqs } ->
+    | Ptyp_package { ppt_ext_attr = None; ppt_name; ppt_eqs; _ } ->
       let with_ =
         match ppt_eqs with
         | [] -> empty

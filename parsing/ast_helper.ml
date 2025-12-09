@@ -110,9 +110,11 @@ module Typ = struct
   let alias ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Ptyp_alias (a, b, c))
   let variant ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Ptyp_variant (a, b, c))
   let poly ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ptyp_poly (a, b))
+(*
   let package ?loc ?attrs ~tokens a b =
     let pkg = { ppt_ext_attr = None; ppt_name = a; ppt_eqs = b } in
     mk ?loc ?attrs ~tokens (Ptyp_package pkg)
+*)
   let extension ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ptyp_extension a)
   let open_ ?loc ?attrs ~tokens mod_ident t = mk ?loc ?attrs ~tokens (Ptyp_open (mod_ident, t))
 

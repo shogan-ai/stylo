@@ -100,8 +100,10 @@ module Typ :
                  -> label list option -> core_type
     val poly: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
       (str * jkind_annotation option) list -> core_type -> core_type
+(*
     val package: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> (lid * core_type) list
                  -> core_type
+*)
     val open_ : ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> core_type -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> core_type
 
