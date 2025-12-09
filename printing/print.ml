@@ -865,8 +865,10 @@ end = struct
       match constraints with
       | [] -> empty
       | _ ->
-        let one (lid, ct) = longident lid.txt ^/^ S.equals ^/^ pp ct in
-        break 1 ^^ S.with_ ^/^ S.type_ ^/^
+        let one (lid, ct) =
+          S.type_ ^/^ longident lid.txt ^/^ S.equals ^/^ pp ct
+        in
+        break 1 ^^ S.with_ ^/^
         separate_map (break 1 ^^ S.and_ ^^ break 1) one constraints
     in
     let module_ =

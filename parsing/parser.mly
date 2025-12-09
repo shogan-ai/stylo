@@ -507,19 +507,24 @@ let package_type_of_module_type pmty =
     (* [map_cstr] makes a [with_constraint] node disappear, inlining its actual
         subtrees in a way.
         We need to retrieve the constraint's token and inline them as well. *)
-    let rec aux simplified_cstrs_rev tokens_rev cstrs tokens =
+    let rec aux past_first_child simplified_cstrs_rev tokens_rev cstrs tokens =
       match tokens, cstrs with
       | [], [] -> List.rev simplified_cstrs_rev, List.rev tokens_rev
-      | Tokens.{ desc = Child_node; _ } :: tokens, c :: cs ->
-        let lid, ty, children_tokens = map_cstr c in
-        aux ((lid, ty) :: simplified_cstrs_rev)
-          (List.rev_append children_tokens tokens_rev)
-          cs tokens
+      | Tokens.{ desc = Child_node; _ } as child :: tokens, c :: cs ->
+        if not past_first_child then
+          (* The first [Child_node] corresponds to the module type name, not to
+             a constraint. *)
+          aux true simplified_cstrs_rev (child :: tokens_rev) cstrs tokens
+        else
+          let lid, ty, children_tokens = map_cstr c in
+          aux past_first_child ((lid, ty) :: simplified_cstrs_rev)
+            (List.rev_append children_tokens tokens_rev)
+            cs tokens
       | tok :: tokens, cs ->
-          aux simplified_cstrs_rev (tok :: tokens_rev) cs tokens
+        aux past_first_child simplified_cstrs_rev (tok :: tokens_rev) cs tokens
       | _ -> assert false
     in
-    aux [] []
+    aux false [] []
   in
   match pmty with
   | {pmty_desc = Pmty_ident lid} ->
@@ -4579,8 +4584,6 @@ atomic_type:
         in
         let descr = Ptyp_package pack_ty in
         let tokens = Tokens.at loc in
-        dprintf "package_type(%a)"
-          Tokens.pp_seq tokens;
         Typ.mk ~loc:(make_loc loc) ~tokens ~attrs descr }
 ;
 %inline package_type: package_type_ext_attr { $1 $sloc None }
