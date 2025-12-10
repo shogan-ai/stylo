@@ -32,13 +32,17 @@ let separate sep docs =
 
 let flow_map sep f docs =
   foldli (fun i accu doc ->
+    let doc = f doc in
     if i = 0 then
-      f doc
+      doc
     else
-      accu ^^
-      (* This idiom allows beginning a new line if [doc] does not
-        fit on the current line. *)
-      group (sep ^^ f doc)
+      match doc with
+      | Empty -> accu
+      | _ ->
+        accu ^^
+        (* This idiom allows beginning a new line if [doc] does not
+           fit on the current line. *)
+        group (sep ^^ doc)
   ) empty docs
 
 let flow sep docs =

@@ -255,7 +255,7 @@ end = struct
         separate_map (group (S.dot ^^ break 0)) string lst_loc.txt
     in
     let (++) = if space then (^?^) else (^^) in
-    kw_with_ext ++ Attribute.pp_list pea_attrs
+    kw_with_ext ++ nest 2 (Attribute.pp_list pea_attrs)
 
   let decorate_optional_override kw ovr =
     let kw, between =
@@ -3464,21 +3464,21 @@ and Value_constraint : sig
   val pp : value_constraint -> t
 end = struct
   let pp = function
-    | Pvc_constraint { locally_abstract_univars; typ } ->
-      S.colon ^/^
-      begin match locally_abstract_univars with
-        | [] -> empty
-        | vars ->
-          let pp_var (name, jkind) =
-            match jkind with
-            | None -> string name.txt
-            | Some j ->
-              parens (string name.txt ^/^ S.colon ^/^ Jkind_annotation.pp j)
-          in
-          S.type_ ^/^
-          separate_map (break 1) pp_var vars ^^ S.dot ^^ break 1
-      end ^^
-      Core_type.pp typ
+    | Pvc_constraint { locally_abstract_univars = []; typ } ->
+      S.colon ^/^ nest 2 @@ Core_type.pp typ
+    | Pvc_constraint { locally_abstract_univars = vars; typ } ->
+      let pp_var (name, jkind) =
+        match jkind with
+        | None -> string name.txt
+        | Some j ->
+          parens (string name.txt ^/^ S.colon ^/^ Jkind_annotation.pp j)
+      in
+      group (
+        S.colon ^/^ nest 2 (
+          group (S.type_ ^/^ separate_map (break 1) pp_var vars ^^ S.dot)
+        )
+      ) ^/^
+      nest 2 (Core_type.pp typ)
     | Pvc_coercion {ground; coercion} ->
       begin match ground with
         | None -> empty
@@ -3662,7 +3662,7 @@ end = struct
       Preceeding.group_with preceeding (group keyword)
     in
     let bindings =
-      let main = group (keyword ^/^ pre_nest @@ nest 2 bound) in
+      let main = keyword ^^ group (break 1 ^^ pre_nest @@ nest 2 bound) in
       match params with
       | [] -> main
       | _ ->
@@ -3732,8 +3732,10 @@ end = struct
       match start with
       | [] -> assert false
       | first_kw :: other_kws ->
-        Ext_attribute.decorate_value_binding first_kw pvb_ext_attrs
-          ^?^ separate (break 1) other_kws
+        let decorated =
+          Ext_attribute.decorate_value_binding first_kw pvb_ext_attrs
+        in
+        flow (break 1) (decorated :: List.map (nest 2) other_kws)
     in
     let kw_and_modes = start ^?^ modes_legacy pvb_legacy_modes in
     let pat = Pattern.pp pvb_pat in
