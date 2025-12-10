@@ -1,0 +1,123 @@
+module Str_items = struct
+  open! %foo [@bar] M
+  open! %foo M
+  open! [@bar] M
+
+  open %foo [@bar] M
+  open %foo M
+  open [@bar] M
+
+  include %foo [@bar] M
+  include %foo M
+  include [@bar] M
+
+  module type %foo [@bar] M
+  module type %foo M
+  module type [@bar] M
+
+  module %foo [@bar] M = struct end
+  module %foo M = struct end
+  module [@bar] M = struct end
+
+  let %foo [@bar] x = 3
+  let %foo x = 3
+  let [@bar] x = 3
+
+  let _ = let %foo [@bar] x = 3 in x
+  let _ = let %foo x = 3 in x
+  let _ = let [@bar] x = 3 in x
+
+  let _ = let module %foo [@bar] M = struct end in 3
+  let _ = let module %foo M = struct end in 3
+  let _ = let module [@bar] M = struct end in 3
+
+  type %foo [@bar] x = int
+  type %foo x = int
+  type [@bar] x = int
+
+  type %foo [@bar] x += A
+  type %foo x += A
+  type [@bar] x += A
+
+  exception %foo [@bar] E
+  exception %foo E
+  exception [@bar] E
+
+  val %foo [@bar] x : int
+  val %foo x : int
+  val [@bar] x : int
+
+  external %foo [@bar] x : int = "foo"
+  external %foo x : int = "foo"
+  external [@bar] x : int = "foo"
+
+  class type %foo [@bar] c = object end
+  class type %foo c = object end
+  class type [@bar] c = object end
+
+  class %foo [@bar] c = object end
+  class %foo c = object end
+  class [@bar] c = object end
+end
+
+module type Sig_items = sig
+  open! %foo [@bar] M
+  open! %foo M
+  open! [@bar] M
+
+  open %foo [@bar] M
+  open %foo M
+  open [@bar] M
+
+  include %foo [@bar] M
+  include %foo M
+  include [@bar] M
+
+  module type %foo [@bar] M
+  module type %foo M
+  module type [@bar] M
+
+  module type %foo [@bar] M := Foo
+  module type %foo M := Foo
+  module type [@bar] M := Foo
+
+  module %foo [@bar] M : sig end
+  module %foo M : sig end
+  module [@bar] M : sig end
+
+  module %foo [@bar] M := Foo
+  module %foo M := Foo
+  module [@bar] M := Foo
+
+  type %foo [@bar] x = int
+  type %foo x = int
+  type [@bar] x = int
+
+  type %foo [@bar] x := int
+  type %foo x := int
+  type [@bar] x := int
+
+  type %foo [@bar] x += A
+  type %foo x += A
+  type [@bar] x += A
+
+  exception %foo [@bar] E
+  exception %foo E
+  exception [@bar] E
+
+  val %foo [@bar] x : int
+  val %foo x : int
+  val [@bar] x : int
+
+  external %foo [@bar] x : int = "foo"
+  external %foo x : int = "foo"
+  external [@bar] x : int = "foo"
+
+  class type %foo [@bar] c = object end
+  class type %foo c = object end
+  class type [@bar] c = object end
+
+  class %foo [@bar] c : object end
+  class %foo c : object end
+  class [@bar] c : object end
+end

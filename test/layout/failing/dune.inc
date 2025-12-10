@@ -1,4 +1,25 @@
 (rule
+  (target ext_attributes.out)
+  (action
+    (with-stdout-to %{target}
+      (run ../../../bin/stylo.exe %{dep:ext_attributes.ml}))))
+
+(rule
+  (target ext_attributes.snd-run)
+  (action
+    (with-stdout-to %{target}
+      (run ../../../bin/stylo.exe %{dep:ext_attributes.out}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:ext_attributes.ref} %{dep:ext_attributes.out})))
+
+; idempotence check
+(rule
+  (alias runtest)
+  (action (diff %{dep:ext_attributes.out} %{dep:ext_attributes.snd-run})))
+
+(rule
   (target relative_nest.out)
   (action
     (with-stdout-to %{target}
