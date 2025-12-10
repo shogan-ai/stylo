@@ -161,12 +161,16 @@ let modes_legacy = separate_loc_list (break 1) mode_legacy
 let with_modes ?(extra_nest=Fun.id) ~modes:l t =
   match l with
   | [] -> t
-  | _ -> t ^?^ extra_nest (S.at ^/^ modes l)
+  | _ ->
+    let modes = extra_nest @@ group (S.at ^/^ modes l) in
+    match t with
+    | Empty -> modes
+    | _ -> t ^^ group (break 1 ^^ modes)
 
 let with_atat_modes ?(extra_nest=Fun.id) ~modes:l t =
   match l with
   | [] -> t
-  | _ -> t ^?^ extra_nest (S.atat ^/^ modes l)
+  | _ -> t ^?^ extra_nest @@ group (S.atat ^/^ modes l)
 
 let include_kind = function
   | Structure -> empty
@@ -211,7 +215,7 @@ end = struct
     pp (if item then S.lbracket_atat else S.lbracket_at) attr_name
       attr_payload
 
-  let pp_list ?item l = separate_map (break 1) (pp ?item) l
+  let pp_list ?item l = group @@ separate_map (break 1) (pp ?item) l
 
   let attach ?item ?flatness ?(text = []) ?pre_doc ?post_doc ~attrs t =
     let with_attrs =
@@ -238,17 +242,20 @@ end
 
 and Ext_attribute : sig
   val decorate : t -> ext_attribute -> t
+  val decorate_value_binding : t -> ext_attribute -> t
   val decorate_optional_override :
     t -> Asttypes.override_flag -> ext_attribute -> t
 end = struct
-  let decorate ~between kw { pea_ext; pea_attrs } =
-    Attribute.attach ~attrs:pea_attrs (
+  let decorate ?(space=true) ~between kw { pea_ext; pea_attrs } =
+    let kw_with_ext =
       match pea_ext with
       | None -> kw
       | Some lst_loc ->
         kw ^^ between ^^ string "%" ^^
         separate_map (group (S.dot ^^ break 0)) string lst_loc.txt
-    )
+    in
+    let (++) = if space then (^?^) else (^^) in
+    kw_with_ext ++ Attribute.pp_list pea_attrs
 
   let decorate_optional_override kw ovr =
     let kw, between =
@@ -258,7 +265,8 @@ end = struct
     in
     decorate kw ~between
 
-  let decorate = decorate ~between:empty
+  let decorate_value_binding = decorate ~between:empty ~space:false
+  let decorate kw ea = decorate ~between:empty kw ea
 end
 
 and Extension : sig
@@ -266,11 +274,16 @@ and Extension : sig
 
   val pp_toplevel : toplevel_extension -> t
 end = struct
+  let payload_indent = function
+    | PTyp _ | PPat _ | PString _ | PStr ([_], _) | PSig {psg_items = [_]; _} ->
+      2
+    | PStr _ | PSig _ -> 0
+
   let pp_classic ~floating names payload =
     let name = Attribute.pp_attr_name names in
     let opn, indent =
       if floating
-      then S.lbracket_percentpercent, 0
+      then S.lbracket_percentpercent, payload_indent payload
       else S.lbracket_percent, 2
     in
     opn ^^ name ^^ nest indent (Payload.pp payload ^^ S.rbracket)
@@ -1389,7 +1402,10 @@ end = struct
       pp_constraint ~preceeding e ct_opt modes
     | Pexp_coerce (e, ct1, ct2) ->
       pp_coerce ~preceeding e ct1 ct2
-    | Pexp_send (e, lbl) -> pp ?preceeding e ^/^ S.hash ^/^ string lbl.txt
+    | Pexp_send (e, lbl) ->
+      let pre_nest = Preceeding.implied_nest preceeding in
+      pp ?preceeding e ^^ break 0 ^^
+      pre_nest (S.hash ^^ break 0 ^^ string lbl.txt)
     | Pexp_new lid ->
       let new_, pre_nest = Preceeding.group_with preceeding !!S.new_ in
       group (new_ ^/^ pre_nest (longident lid.txt))
@@ -3704,7 +3720,7 @@ end = struct
       match start with
       | [] -> assert false
       | first_kw :: other_kws ->
-        Ext_attribute.decorate first_kw pvb_ext_attrs
+        Ext_attribute.decorate_value_binding first_kw pvb_ext_attrs
           ^?^ separate (break 1) other_kws
     in
     let kw_and_modes = start ^?^ modes_legacy pvb_legacy_modes in
