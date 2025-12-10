@@ -512,29 +512,37 @@ end = struct
     | Brackets of { spaces_required: bool }
     | Parens of { omit_when_single_param: bool }
 
-  let pp ?preceeding delims params_docs ty_doc =
+  let pp (type a) ?preceeding ~(pp_arg:?preceeding:Preceeding.t -> a -> t) delims
+        (args : a list) ty_doc =
+        let flatness = flatness_tracker () in
     let left, right, omit =
       match delims with
       | Brackets { spaces_required } ->
         let sp = if spaces_required then break 1 else empty in
         S.lbracket ^^ sp, sp ^^ S.rbracket, false
       | Parens { omit_when_single_param } ->
-        S.lparen, S.rparen, omit_when_single_param
+        let extra_space = vanishing_whitespace (Condition.flat flatness) nbsp in
+        S.lparen ^^ extra_space, extra_space ^^ S.rparen, omit_when_single_param
     in
-    match params_docs with
+    match args with
     | [] ->
       Preceeding.group_with preceeding ty_doc
       |> fst
-    | p :: ps ->
-      match ps with
+    | arg :: args ->
+      match args with
       | [] when omit ->
-        let param, pre_nest = Preceeding.group_with preceeding p in
-        param ^/^ pre_nest @@ nest 2 ty_doc
+        let pre_nest = Preceeding.implied_nest preceeding in
+        pp_arg ?preceeding arg ^/^ pre_nest @@ nest 2 ty_doc
       | _ ->
-        let left, pre_nest = Preceeding.group_with preceeding left in
-        left ^^ pre_nest @@ nest 2 (
-          separate (S.comma ^^ break 1) params_docs ^^ right ^/^ ty_doc
-        )
+        let left, pre_nest = Preceeding.extend preceeding left ~indent:2 in
+        let comma_pre = Preceeding.mk (S.comma ^^ break 1) ~indent:2 in
+        let left_and_args =
+          List.fold_left (fun acc arg ->
+            acc ^^ break 0 ^^ pre_nest (pp_arg ~preceeding:comma_pre arg)
+          ) (pp_arg ~preceeding:left arg) args
+        in
+        group ~flatness (left_and_args ^^ pre_nest right) ^/^
+        pre_nest @@ nest 2 ty_doc
 
   let pp_core_type ?(class_=false) ?preceeding tokens args lid =
     let delims =
@@ -543,9 +551,8 @@ end = struct
           args <> [] && not (starts_with LPAREN tokens)
       }
     in
-    let args = List.map Core_type.pp args in
     let lid = (if class_ then S.hash else empty) ^^ longident lid in
-    pp ?preceeding delims args lid
+    pp ?preceeding ~pp_arg:Core_type.pp delims args lid
 
   let pp_decl tokens params name =
     let delims =
@@ -554,8 +561,7 @@ end = struct
           params <> [] && not (lparen_before_child tokens)
       }
     in
-    let args = List.map Type_param.pp params in
-    pp delims args name
+    pp ~pp_arg:Type_param.pp delims params name
 
   let starts_or_ends_with_obj = function
     | [] -> false
@@ -574,14 +580,12 @@ end = struct
 
   let pp_class_constr args lid =
     let delims = Brackets { spaces_required = starts_or_ends_with_obj args } in
-    let args = List.map Core_type.pp args in
     let lid = longident lid in
-    pp delims args lid
+    pp ~pp_arg:Core_type.pp delims args lid
 
   let pp_class_info_decl params name =
     let delims = Brackets { spaces_required = false } in
-    let args = List.map Type_param.pp params in
-    pp delims args (string name)
+    pp ~pp_arg:Type_param.pp delims params (string name)
 end
 
 and Core_type : sig
@@ -2411,9 +2415,11 @@ and Value_description : sig
   val pp : value_description -> t
 end = struct
   let pp_type flatness ct =
+    (* FIXME: just pass the right preceeding to [Core_type] ... and ask it not
+       to group. *)
     match Core_type.Arrow.collect_args ct with
     | None ->
-      let preceeding = Preceeding.mk (S.colon ^^ break 1) ~indent:0 (* ... *) in
+      let preceeding = Preceeding.mk (S.colon ^^ break 1) ~indent:2 in
       Core_type.pp ~preceeding ct
     | Some (args, (legacy_modes, post_modes, ty)) ->
       Core_type.Arrow.pp_for_descr flatness args
@@ -2516,7 +2522,7 @@ end = struct
 end
 
 and Type_param : sig
-  val pp : ptype_param -> t
+  val pp : ?preceeding:Preceeding.t -> ptype_param -> t
 end = struct
   let var_inj_as_single_token =
     (* C.f. rule [type_variance] in the grammar. *)
@@ -2543,8 +2549,12 @@ end = struct
   )
 
 
-  let pp { ptp_typ; ptp_infos; ptp_tokens } =
-    pp_infos ptp_tokens ptp_infos ^^ Core_type.pp ptp_typ
+  let pp ?preceeding { ptp_typ; ptp_infos; ptp_tokens } =
+    match pp_infos ptp_tokens ptp_infos with
+    | Empty -> Core_type.pp ?preceeding ptp_typ
+    | infos ->
+      let infos, pre_nest = Preceeding.group_with preceeding infos in
+      infos ^^ pre_nest (Core_type.pp ptp_typ)
 end
 
 and Type_declaration : sig
