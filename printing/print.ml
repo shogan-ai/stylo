@@ -3718,10 +3718,14 @@ end = struct
       )
 
   let rhs e =
-    (* FIXME: attributes ! *)
+    (* N.B. if there were attributes we'd see [Pexp_parens] *)
     match e.pexp_desc with
     | Pexp_function ([], _, body) ->
       Function_body.as_rhs body
+    | Pexp_function _ ->
+      (* Specialized version of [Expression.pp_function]: we don't indent *)
+      let (fun_and_params, body) = Expression.pp_function_parts e in
+      Single_part (group (fun_and_params ^/^ body))
     | _ -> Single_part (Expression.pp e)
 
   let pp ?preceeding ?(item=false) ~add_in ~start
