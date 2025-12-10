@@ -2978,13 +2978,15 @@ end = struct
       separate_map (break 1) Functor_parameter.pp_type fps ^/^ S.rarrow ^/^
       with_modes ~modes (pp mty)
     | Pmty_with (mty, cstrs) ->
+      let flatness = flatness_tracker () in
+      let vspace = vanishing_whitespace (Condition.flat flatness) nbsp in
       let _last_and, cstrs =
         List.fold_left (fun (kw, acc) cstr ->
           let cstr = With_constraint.pp cstr in
-          S.and_, acc ^?^ group (kw ^?^ cstr)
+          vspace ^^ S.and_, acc ^?^ group (kw ^/^ cstr)
         ) (S.with_, empty) cstrs
       in
-      group (pp mty ^?^ cstrs)
+      group ~flatness (pp mty ^?^ cstrs)
     | Pmty_typeof (attrs, me) ->
       let kws = S.module_ ^/^ S.type_ ^/^ S.of_ in
       Attribute.attach kws ~attrs ^/^ Module_expr.pp me

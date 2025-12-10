@@ -99,6 +99,7 @@ let add_spaces buf state indent n =
   in
   Buffer.add_spaces buf n;
   incr_col state n
+  |> has_text
 
 let whitespace buf state indent flat = function
   | Break (spaces, soft) ->
