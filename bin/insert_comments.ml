@@ -230,10 +230,14 @@ let rec walk_both state seq doc =
 
     (* Skip explicitely inserted comment *)
     | _, Doc.Comment _ -> seq, doc, state
-    | T.Comment { explicitely_inserted; _ }, _ when !explicitely_inserted ->
+
+    | T.Comment { explicitely_inserted; _ }, Doc.(Token _ | Optional _)
+      when !explicitely_inserted ->
       walk_both state rest doc
 
-    | T.Comment _, Doc.Comments_flushing_hint (inserted, before, after) ->
+    | T.Comment { explicitely_inserted; _ },
+      Doc.Comments_flushing_hint (inserted, before, after)
+      when not !explicitely_inserted ->
       inserted := true;
       flush_comments seq ~before ~after state
 
@@ -245,8 +249,10 @@ let rec walk_both state seq doc =
     | T.Comment _, Doc.(Token _ | Optional _) ->
       insert_comments_before_subtree seq state doc
 
-    | T.Comment _, Doc.Group (_, _, _, d)
-      when not (nest_before_leaf d) && not (first_is_flushhint d) ->
+    | T.Comment { explicitely_inserted; _ }, Doc.Group (_, _, _, d)
+      when not !explicitely_inserted &&
+           not (nest_before_leaf d) &&
+           not (first_is_flushhint d) ->
       (* we can insert comments outside the group as they'll be at the same
          nesting level as the next word and there's no hint that comments should
          be inside the group. *)

@@ -387,10 +387,8 @@ module Sig = struct
     List.map
       (fun ds ->
          let loc = docstring_loc ds in
-         let _drop_source_tok = Tokens.at (loc.loc_start, loc.loc_end) in
-         dprintf "@[<hov 2>dropping:@ %a@]@."
-           Tokens.pp_seq _drop_source_tok;
-         mk ~loc ~tokens:[] (Psig_docstring ds.ds_body))
+         let ds_toks = Tokens.at (loc.loc_start, loc.loc_end) in
+         mk ~loc ~tokens:ds_toks (Psig_docstring ds.ds_body))
       f_txt
 end
 
@@ -427,10 +425,8 @@ module Str = struct
     List.map
       (fun ds ->
          let loc = docstring_loc ds in
-         let _drop_source_tok = Tokens.at (loc.loc_start, loc.loc_end) in
-         dprintf "@[<hov 2>dropping:@ %a@]@."
-           Tokens.pp_seq _drop_source_tok;
-         mk ~loc ~tokens:[] (Pstr_docstring ds.ds_body))
+         let ds_toks = Tokens.at (loc.loc_start, loc.loc_end) in
+         mk ~loc ~tokens:ds_toks (Pstr_docstring ds.ds_body))
       f_txt
 end
 
@@ -498,10 +494,8 @@ module Ctf = struct
     List.map
       (fun ds ->
          let loc = docstring_loc ds in
-         let _drop_source_tok = Tokens.at (loc.loc_start, loc.loc_end) in
-         dprintf "@[<hov 2>dropping:@ %a@]@."
-           Tokens.pp_seq _drop_source_tok;
-         mk ~loc ~tokens:[] (Pctf_docstring ds.ds_body))
+         let ds_toks = Tokens.at (loc.loc_start, loc.loc_end) in
+         mk ~loc ~tokens:ds_toks (Pctf_docstring ds.ds_body))
       f_txt
 
 (*   let attr d a = {d with pctf_attributes = d.pctf_attributes @ [a]} *)
@@ -535,10 +529,8 @@ module Cf = struct
     List.map
       (fun ds ->
          let loc = docstring_loc ds in
-         let _drop_source_tok = Tokens.at (loc.loc_start, loc.loc_end) in
-         dprintf "@[<hov 2>dropping:@ %a@]@."
-           Tokens.pp_seq _drop_source_tok;
-         mk ~loc ~tokens:[] (Pcf_docstring ds.ds_body))
+         let ds_toks = Tokens.at (loc.loc_start, loc.loc_end) in
+         mk ~loc ~tokens:ds_toks (Pcf_docstring ds.ds_body))
       f_txt
 
   let virtual_ ct = Cfk_virtual ct
