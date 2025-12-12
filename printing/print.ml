@@ -1342,14 +1342,13 @@ end = struct
     | Pexp_try (e, cases) ->
       pp_try ~preceeding ~ext_attrs:exp.pexp_ext_attr ~tokens:exp.pexp_tokens
         e cases
-    | Pexp_tuple elts ->
-      (* FIXME *)
-      Preceeding.group_with preceeding (pp_tuple elts)
-      |> fst
+    | Pexp_tuple elts -> pp_tuple ?preceeding elts
     | Pexp_unboxed_tuple elts ->
       let hash_lparen, pre_nest =
-        Preceeding.group_with preceeding S.hash_lparen in
-      hash_lparen ^^ pre_nest (nest 1 (pp_tuple elts) ^^ S.rparen)
+        Preceeding.extend preceeding S.hash_lparen ~indent:3
+      in
+      pp_tuple ~preceeding:hash_lparen ~pre_nest_override:pre_nest elts
+      ^^ pre_nest S.rparen
     | Pexp_construct (lid, arg) ->
       let lid, pre_nest =
         Preceeding.group_with preceeding @@ constr_longident lid.txt
@@ -1803,9 +1802,20 @@ end = struct
       ) unboxed_accesses
     )
 
-  and pp_tuple elts =
-    separate_map (S.comma ^^ break 1) (Argument.pp pp) elts
-    |> group
+  and pp_tuple ?preceeding ?pre_nest_override elts =
+    let pre_nest =
+      match pre_nest_override with
+      | None -> Preceeding.implied_nest preceeding
+      | Some nest -> nest
+    in
+    let comma = Preceeding.mk (S.comma ^^ break 1) ~indent:2 in
+    foldli (fun i acc exp ->
+      if i = 0 then
+        Argument.pp_preceeded ?preceeding pp exp
+      else
+        acc ^^ break 0 ^^
+        pre_nest @@ Argument.pp_preceeded ~preceeding:comma pp exp
+    ) empty elts
 
   and pp_parens_tuple ~preceeding ~attrs ~optional flatness elts =
     let lparen, rparen =
@@ -1824,16 +1834,7 @@ end = struct
         space_when_multiline ^^ break 0 ^^ S.rparen
     in
     let lparen, pre_nest = Preceeding.extend preceeding lparen ~indent:2 in
-    let comma = Preceeding.mk (S.comma ^^ break 1) ~indent:2 in
-    let elts =
-      foldli (fun i acc exp ->
-        if i = 0 then
-          Argument.pp_preceeded ~preceeding:lparen pp exp
-        else
-          acc ^^ break 0 ^^
-          pre_nest @@ Argument.pp_preceeded ~preceeding:comma pp exp
-      ) empty elts
-    in
+    let elts = pp_tuple ~preceeding:lparen ~pre_nest_override:pre_nest elts in
     (* FIXME: indent of attrs! *)
     Attribute.attach ~attrs elts ^^ pre_nest (group rparen)
 

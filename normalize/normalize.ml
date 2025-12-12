@@ -16,6 +16,10 @@ let map_attribute mapper env attr =
   else
     super.attribute mapper env attr
 
+let map_structure_item mapper _parent str_item =
+  let parent_for_recursive_calls = Context.Str_item str_item.pstr_desc in
+  super.structure_item mapper parent_for_recursive_calls str_item
+
 let map_structure mapper env (items, tokens) =
   let semisemi ~optional pos =
     let open Tokens in
@@ -86,6 +90,7 @@ let normalizer =
   ; function_body = Expression.map_function_body
   ; argument_desc = default_arg_passing_context
   ; value_binding = default_vb_passing_context
+  ; structure_item = map_structure_item
   ; structure = map_structure
   }
 
