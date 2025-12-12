@@ -3718,14 +3718,18 @@ end = struct
       )
 
   let rhs e =
-    (* N.B. if there were attributes we'd see [Pexp_parens] *)
     match e.pexp_desc with
     | Pexp_function ([], _, body) ->
+      (* N.B. if there were attributes we'd see [Pexp_parens] *)
       Function_body.as_rhs body
     | Pexp_function _ ->
       (* Specialized version of [Expression.pp_function]: we don't indent *)
       let (fun_and_params, body) = Expression.pp_function_parts e in
-      Single_part (group (fun_and_params ^/^ body))
+      let fun_ = group (fun_and_params ^/^ body) in
+      (* N.B. there can be attributes here in unexpected cases, for instance:
+         [fun _ -> x; [@attr]] the semicolon make the attribute attach to the
+         function, not the body. *)
+      Single_part (Attribute.attach fun_ ~attrs:e.pexp_attributes)
     | _ -> Single_part (Expression.pp e)
 
   let pp ?preceeding ?(item=false) ~add_in ~start
