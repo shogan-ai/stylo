@@ -2621,10 +2621,11 @@ end = struct
       Attribute.attach ~attrs:pcd_attributes ?post_doc:pcd_doc
         (group constr)
       |> group
+      |> nest 2
     in
     if pipe then (
       (* we never want to break after the pipe. *)
-      S.pipe ^^ nbsp ^^ nest 2 without_pipe
+      S.pipe ^^ nbsp ^^ without_pipe
     ) else
       without_pipe
 

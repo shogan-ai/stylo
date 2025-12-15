@@ -20,6 +20,23 @@ let map_structure_item mapper _parent str_item =
   let parent_for_recursive_calls = Context.Str_item str_item.pstr_desc in
   super.structure_item mapper parent_for_recursive_calls str_item
 
+let map_constructor_decl mapper env cd =
+  let first_tok =
+    List.find (function
+      | { Tokens.desc = (Token _ | Opt_token _); _ } -> true
+      | _ -> false
+    ) cd.pcd_tokens
+  in
+  let cd =
+    match first_tok.desc with
+    | Token BAR
+    | Opt_token BAR -> cd
+    | _ ->
+      let bar = { first_tok with desc = Token BAR } in
+      { cd with pcd_tokens = bar :: cd.pcd_tokens }
+  in
+  super.constructor_declaration mapper env cd
+
 let map_structure mapper env (items, tokens) =
   let semisemi ~optional pos =
     let open Tokens in
@@ -90,6 +107,7 @@ let normalizer =
   ; function_body = Expression.map_function_body
   ; argument_desc = default_arg_passing_context
   ; value_binding = default_vb_passing_context
+  ; constructor_declaration = map_constructor_decl
   ; structure_item = map_structure_item
   ; structure = map_structure
   }
