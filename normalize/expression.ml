@@ -64,6 +64,12 @@ let map mapper (parent : Context.parent) exp =
       (* Force leading pipe *)
       let tokens = insert_pipe_if_missing ~after:WITH exp.pexp_tokens in
       { exp with pexp_tokens = tokens }
+    | Pexp_begin_end Some e ->
+      let pexp_desc = Pexp_parens { exp = e; optional = false } in
+      let pexp_tokens =
+        Utils.search_and_replace [BEGIN, LPAREN; END, RPAREN] exp.pexp_tokens
+      in
+      { exp with pexp_desc; pexp_tokens }
     | _ -> exp
   in
   (* context dependent changes *)
