@@ -56,6 +56,12 @@ let nb_semis =
     if tok.Tokens.desc = Token SEMI then nb + 1 else nb
   ) 0
 
+let remove_last_semi tokens =
+  let rev_tokens = List.rev tokens in
+  let before, last_semi_and_after = Utils.split ~on:SEMI rev_tokens in
+  let rev_tokens_without_last_semi = before @ List.tl last_semi_and_after in
+  List.rev rev_tokens_without_last_semi
+
 let exp_no_trailing e =
   match e.pexp_desc with
   | Pexp_seq_empty e ->
@@ -63,18 +69,15 @@ let exp_no_trailing e =
     assert (e.pexp_attributes = []);
     e
   | Pexp_record (_, fields)
-  | Pexp_record_unboxed_product (_, fields) ->
-    (* seems like the wrong level to do this at first glance, but the semis are
-       actually part of the expression tokens, not the [record_field] *)
-    let nb_semis = nb_semis e.pexp_tokens in
-    if List.compare_length_with fields nb_semis <> 0
-    then e (* semis are separators, not terminators, nothing to do *)
-    else
-      let rev_tokens = List.rev e.pexp_tokens in
-      let before, last_semi_and_after = Utils.split ~on:SEMI rev_tokens in
-      let rev_tokens_without_last_semi = before @ List.tl last_semi_and_after in
-      let pexp_tokens = List.rev rev_tokens_without_last_semi in
-      { e with pexp_tokens }
+  | Pexp_record_unboxed_product (_, fields)
+    when List.compare_length_with fields (nb_semis e.pexp_tokens) = 0 ->
+    (* at first glance seems like the wrong level to do this, but the semis are
+       actually part of the expression tokens, not the [record_field]. *)
+    { e with pexp_tokens = remove_last_semi e.pexp_tokens }
+  | Pexp_list (_ :: _ as elts)
+  | Pexp_array (_, (_ :: _ as elts))
+    when List.compare_length_with elts (nb_semis e.pexp_tokens) = 0 ->
+    { e with pexp_tokens = remove_last_semi e.pexp_tokens }
   | _ -> e
 
 let pat_no_trailing p =
