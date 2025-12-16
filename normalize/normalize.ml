@@ -24,22 +24,35 @@ let map_constructor_arguments mapper env ca =
   let ca = Semicolon.constructor_arguments ca in
   super.constructor_arguments mapper env ca
 
-let map_constructor_decl mapper env cd =
+let add_pipe_if_missing tokens =
   let first_tok =
     List.find (function
       | { Tokens.desc = (Token _ | Opt_token _); _ } -> true
       | _ -> false
-    ) cd.pcd_tokens
+    ) tokens
   in
-  let cd =
-    match first_tok.desc with
-    | Token BAR
-    | Opt_token BAR -> cd
-    | _ ->
-      let bar = { first_tok with desc = Token BAR } in
-      { cd with pcd_tokens = bar :: cd.pcd_tokens }
+  match first_tok.desc with
+  | Token BAR
+  | Opt_token BAR -> tokens
+  | _ ->
+    let bar = { first_tok with desc = Token BAR } in
+    bar :: tokens
+
+let remove_pipe_if_present = Utils.without ~token:BAR
+
+let map_type_kind mapper env tk =
+  let tk = Semicolon.type_kind_no_trailing tk in
+  let tk =
+    match tk with
+    | Ptype_variant [ cd ] ->
+      let pcd_tokens = remove_pipe_if_present cd.pcd_tokens in
+      Ptype_variant [ { cd with pcd_tokens } ]
+    | Ptype_variant (cd :: cds) ->
+      let pcd_tokens = add_pipe_if_missing cd.pcd_tokens in
+      Ptype_variant ({ cd with pcd_tokens } :: cds)
+    | _ -> tk
   in
-  super.constructor_declaration mapper env cd
+  super.type_kind mapper env tk
 
 let map_structure mapper env str =
   Semicolon.normalize_struct_semisemi str
@@ -53,10 +66,6 @@ let default_arg_passing_context mapper f _ arg =
   let parent_for_recursive_calls = Context.Fun_param_or_arg in
   super.argument_desc mapper f parent_for_recursive_calls arg
 
-let map_type_kind mapper env tk =
-  let tk = Semicolon.type_kind_no_trailing tk in
-  super.type_kind mapper env tk
-
 let normalizer =
   { super with
     attribute = map_attribute
@@ -68,7 +77,6 @@ let normalizer =
   ; argument_desc = default_arg_passing_context
   ; value_binding = default_vb_passing_context
   ; constructor_arguments = map_constructor_arguments
-  ; constructor_declaration = map_constructor_decl
   ; type_kind = map_type_kind
   ; structure_item = map_structure_item
   ; structure = map_structure
