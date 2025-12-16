@@ -37,57 +37,9 @@ let map_constructor_decl mapper env cd =
   in
   super.constructor_declaration mapper env cd
 
-let map_structure mapper env (items, tokens) =
-  let semisemi ~optional pos =
-    let open Tokens in
-    let desc =
-      if optional
-      then Opt_token SEMISEMI
-      else Token SEMISEMI
-    in
-    { desc; pos }
-  in
-  let tokens_no_semi =
-    List.filter (fun tok -> tok.Tokens.desc <> Token SEMISEMI) tokens
-  in
-  let rec walk_both items tokens =
-    match tokens with
-    | [] ->
-      let is_ds item =
-        match item.pstr_desc with
-        | Pstr_docstring _ -> true
-        | _ ->
-          let pos = item.pstr_loc.loc_start in
-          dprintf "unexpected item at %d:%d@."
-            pos.pos_lnum
-            (pos.pos_cnum - pos.pos_bol);
-          false
-      in
-      assert (List.for_all is_ds items); []
-    | t :: tokens ->
-      match t.Tokens.desc with
-      | Token EOF (* TODO: filter this out earlier in the pipeline... *)
-      | Comment _ ->
-        t :: walk_both items tokens
-      | Token _ | Opt_token _ ->
-        (* No tokens appart from SEMISEMI at this level, and we removed them
-           already. *)
-        assert false
-      | Child_node ->
-        match items with
-        | [] -> assert false
-        | item :: ({ pstr_desc = Pstr_eval _ ; _ } :: _ as items) ->
-          t :: semisemi ~optional:false item.pstr_loc.loc_end ::
-          walk_both items tokens
-        | item :: items ->
-          match item.pstr_desc with
-          | Pstr_value _ ->
-            t :: semisemi ~optional:true item.pstr_loc.loc_end ::
-            walk_both items tokens
-          | _ -> t :: walk_both items tokens
-  in
-  let tokens_with_minimal_semi = walk_both items tokens_no_semi in
-  super.structure mapper env (items, tokens_with_minimal_semi)
+let map_structure mapper env str =
+  Semicolon.normalize_struct_semisemi str
+  |> super.structure mapper env
 
 let default_vb_passing_context mapper _ vb =
   let parent_for_recursive_calls = Context.Value_binding in

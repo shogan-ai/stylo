@@ -1,11 +1,6 @@
 open Ocaml_syntax
 open Tokens
 
-let is_comment tok =
-  match tok.desc with
-  | Comment _ -> true
-  | _ -> false
-
 (** splits the list before the first element on which the predicate returns
     false. *)
 let list_split_at p l =
@@ -42,4 +37,12 @@ let search_and_replace pairs =
     | Token t -> { tok with desc = Token (replace t) }
     | Opt_token t -> { tok with desc = Opt_token (replace t) }
     | Comment _ | Child_node -> tok
+  )
+
+(** removes all occurences of [token] from the given list of tokens *)
+let without ~token =
+  List.filter (fun t ->
+    match t.desc with
+    | Token rt | Opt_token rt -> not (Raw.equals rt token)
+    | _ -> true
   )

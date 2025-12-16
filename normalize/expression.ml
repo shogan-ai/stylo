@@ -58,6 +58,7 @@ let map_function_body mapper ctxt fb =
 
 let map mapper (parent : Context.parent) exp =
   (* local changes first *)
+  let exp = Semicolon.exp_no_trailing exp in
   let exp =
     match exp.pexp_desc with
     | Pexp_match _ ->
