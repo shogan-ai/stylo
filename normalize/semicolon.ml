@@ -57,4 +57,21 @@ let exp_no_trailing e =
     (* Can't attach attrs without parens here *)
     assert (e.pexp_attributes = []);
     e
+  | Pexp_record (_, fields)
+  | Pexp_record_unboxed_product (_, fields) ->
+    (* seems like the wrong level to do this at first glance, but the semis are
+       actually part of the expression tokens, not the [record_field] *)
+    let nb_semis =
+      List.fold_left (fun nb tok ->
+        if tok.Tokens.desc = Token SEMI then nb + 1 else nb
+      ) 0 e.pexp_tokens
+    in
+    if List.compare_length_with fields nb_semis <> 0
+    then e (* semis are separators, not terminators, nothing to do *)
+    else
+      let rev_tokens = List.rev e.pexp_tokens in
+      let before, last_semi_and_after = Utils.split ~on:SEMI rev_tokens in
+      let rev_tokens_without_last_semi = before @ List.tl last_semi_and_after in
+      let pexp_tokens = List.rev rev_tokens_without_last_semi in
+      { e with pexp_tokens }
   | _ -> e
