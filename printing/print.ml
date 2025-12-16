@@ -2589,7 +2589,7 @@ end = struct
     in
     let without_pipe =
       Attribute.attach ~attrs:pcd_attributes ?post_doc:pcd_doc
-        constr
+        (group constr)
       |> group
     in
     if pipe then (
@@ -2606,7 +2606,7 @@ end = struct
       | [] -> cd
       | _ ->
         List.fold_left (fun doc cd ->
-          doc ^^ hardline ^^ constructor_declaration true cd
+          doc ^^ softest_line ^^ constructor_declaration true cd
         ) cd cds
 
   let type_kind = function
