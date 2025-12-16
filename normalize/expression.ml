@@ -76,10 +76,9 @@ let map mapper (parent : Context.parent) exp =
   (* context dependent changes *)
   let exp =
     match parent, exp.pexp_desc with
-    (* Nothing special to do if parent is parens. *)
+    (* Nothing special to do if parent is parens or Pstr_eval. *)
     | Expr Pexp_parens _, _
-    | (* Also don't parenthesize toplevel tuples *)
-      Str_item Pstr_eval _, Pexp_tuple _ -> exp
+    | Str_item Pstr_eval _, _ -> exp
     (* Add parens as necessary *)
     | _, Pexp_tuple _ ->
       parens_exp ~optional:true exp
