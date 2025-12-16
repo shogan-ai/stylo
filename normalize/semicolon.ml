@@ -51,6 +51,11 @@ let normalize_struct_semisemi (items, tokens) =
   let tokens_with_minimal_semi = walk_both items tokens_no_semi in
   items, tokens_with_minimal_semi
 
+let nb_semis =
+  List.fold_left (fun nb tok ->
+    if tok.Tokens.desc = Token SEMI then nb + 1 else nb
+  ) 0
+
 let exp_no_trailing e =
   match e.pexp_desc with
   | Pexp_seq_empty e ->
@@ -61,11 +66,7 @@ let exp_no_trailing e =
   | Pexp_record_unboxed_product (_, fields) ->
     (* seems like the wrong level to do this at first glance, but the semis are
        actually part of the expression tokens, not the [record_field] *)
-    let nb_semis =
-      List.fold_left (fun nb tok ->
-        if tok.Tokens.desc = Token SEMI then nb + 1 else nb
-      ) 0 e.pexp_tokens
-    in
+    let nb_semis = nb_semis e.pexp_tokens in
     if List.compare_length_with fields nb_semis <> 0
     then e (* semis are separators, not terminators, nothing to do *)
     else
@@ -75,6 +76,30 @@ let exp_no_trailing e =
       let pexp_tokens = List.rev rev_tokens_without_last_semi in
       { e with pexp_tokens }
   | _ -> e
+
+let pat_no_trailing p =
+  match p.ppat_desc with
+  | Ppat_record (fields, cf)
+  | Ppat_record_unboxed_product (fields, cf) ->
+    let nb_semis = nb_semis p.ppat_tokens in
+    let semi_as_term =
+      let nb_fields =
+        List.length fields +
+        if cf = Closed then 0 else 1 (* underscore as extra field *)
+      in
+      (* [;] is used as a terminator if there are as many as there are fields *)
+      nb_fields = nb_semis
+    in
+    if not semi_as_term
+    then p (* semis are separators, not terminators, nothing to do *)
+    else
+      let rev_tokens = List.rev p.ppat_tokens in
+      let before, last_semi_and_after = Utils.split ~on:SEMI rev_tokens in
+      let rev_tokens_without_last_semi = before @ List.tl last_semi_and_after in
+      let ppat_tokens = List.rev rev_tokens_without_last_semi in
+      { p with ppat_tokens }
+  | _ ->
+    p
 
 let strip_from_label_decl lbl =
   { lbl with pld_tokens = Utils.without ~token:SEMI lbl.pld_tokens }
