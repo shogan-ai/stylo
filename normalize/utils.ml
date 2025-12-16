@@ -12,6 +12,12 @@ let list_split_at p l =
   in
   aux l
 
+let rec list_map_last ~f = function
+  | [] -> []
+  | [ x ] -> [ f x ]
+  | x :: xs -> x :: list_map_last ~f xs
+
+
 let split ~on:target =
   list_split_at (fun tok ->
     match tok.desc with

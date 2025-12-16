@@ -75,3 +75,21 @@ let exp_no_trailing e =
       let pexp_tokens = List.rev rev_tokens_without_last_semi in
       { e with pexp_tokens }
   | _ -> e
+
+let strip_from_label_decl lbl =
+  { lbl with pld_tokens = Utils.without ~token:SEMI lbl.pld_tokens }
+
+let constructor_arguments = function
+  | Pcstr_tuple _ as tuple -> tuple
+  | Pcstr_record lbls ->
+    Pcstr_record (Utils.list_map_last ~f:strip_from_label_decl lbls)
+
+let type_kind_no_trailing = function
+  | Ptype_record lbls ->
+    Ptype_record (Utils.list_map_last ~f:strip_from_label_decl lbls)
+  | Ptype_record_unboxed_product lbls ->
+    Ptype_record_unboxed_product
+      (Utils.list_map_last ~f:strip_from_label_decl lbls)
+  | Ptype_variant _
+  | Ptype_abstract
+  | Ptype_open as kind -> kind

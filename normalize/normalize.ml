@@ -20,6 +20,10 @@ let map_structure_item mapper _parent str_item =
   let parent_for_recursive_calls = Context.Str_item str_item.pstr_desc in
   super.structure_item mapper parent_for_recursive_calls str_item
 
+let map_constructor_arguments mapper env ca =
+  let ca = Semicolon.constructor_arguments ca in
+  super.constructor_arguments mapper env ca
+
 let map_constructor_decl mapper env cd =
   let first_tok =
     List.find (function
@@ -49,6 +53,10 @@ let default_arg_passing_context mapper f _ arg =
   let parent_for_recursive_calls = Context.Fun_param_or_arg in
   super.argument_desc mapper f parent_for_recursive_calls arg
 
+let map_type_kind mapper env tk =
+  let tk = Semicolon.type_kind_no_trailing tk in
+  super.type_kind mapper env tk
+
 let normalizer =
   { super with
     attribute = map_attribute
@@ -59,7 +67,9 @@ let normalizer =
   ; function_body = Expression.map_function_body
   ; argument_desc = default_arg_passing_context
   ; value_binding = default_vb_passing_context
+  ; constructor_arguments = map_constructor_arguments
   ; constructor_declaration = map_constructor_decl
+  ; type_kind = map_type_kind
   ; structure_item = map_structure_item
   ; structure = map_structure
   }
