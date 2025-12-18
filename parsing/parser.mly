@@ -479,66 +479,6 @@ let empty_body_constraint =
 let mkfunction ~loc ~ext_attrs params body_constraint body =
   mkexp_attrs (Pexp_function (params, body_constraint, body)) ext_attrs ~loc
 
-(* Alternatively, we could keep the generic module type in the Parsetree
-   and extract the package type during type-checking. In that case,
-   the assertions below should be turned into explicit checks. *)
-let package_type_of_module_type pmty =
-  let err _loc _s =
-    let pos = _loc.Location.loc_start in
-    Printf.sprintf "%d:%d %s"
-      pos.pos_lnum (pos.pos_cnum - pos.pos_bol) _s
-    |> failwith
-  in
-  let map_cstr wc =
-    match wc.wc_desc with
-    | Pwith_type (params, lid, priv, ty, cstrs) ->
-        let loc = pmty.pmty_loc in
-        if params <> [] then
-          err loc "Syntaxerr.Parameterized_types";
-        if cstrs <> [] then
-          err loc "Syntaxerr.Constrained_types";
-        if priv <> Public then
-          err loc "Syntaxerr.Private_types";
-        (lid, ty, wc.wc_tokens)
-    | _ ->
-        err pmty.pmty_loc "Not_with_type"
-  in
-  let unwrap_constraints =
-    (* [map_cstr] makes a [with_constraint] node disappear, inlining its actual
-        subtrees in a way.
-        We need to retrieve the constraint's token and inline them as well. *)
-    let rec aux past_first_child simplified_cstrs_rev tokens_rev cstrs tokens =
-      match tokens, cstrs with
-      | [], [] -> List.rev simplified_cstrs_rev, List.rev tokens_rev
-      | Tokens.{ desc = Child_node; _ } as child :: tokens, c :: cs ->
-        if not past_first_child then
-          (* The first [Child_node] corresponds to the module type name, not to
-             a constraint. *)
-          aux true simplified_cstrs_rev (child :: tokens_rev) cstrs tokens
-        else
-          let lid, ty, children_tokens = map_cstr c in
-          aux past_first_child ((lid, ty) :: simplified_cstrs_rev)
-            (List.rev_append children_tokens tokens_rev)
-            cs tokens
-      | tok :: tokens, cs ->
-        aux past_first_child simplified_cstrs_rev (tok :: tokens_rev) cs tokens
-      | _ -> assert false
-    in
-    aux false [] []
-  in
-  match pmty with
-  | {pmty_desc = Pmty_ident lid} ->
-      (lid, [], pmty.pmty_attributes, pmty.pmty_tokens)
-  | {pmty_desc = Pmty_with({pmty_desc = Pmty_ident lid; pmty_attributes = inner_attributes}, cstrs)} ->
-      begin match inner_attributes with
-      | [] -> ()
-      | attr :: _ ->
-        err attr.attr_loc "Syntaxerr.Misplaced_attribute"
-      end;
-      let cstrs, tokens = unwrap_constraints cstrs pmty.pmty_tokens in
-      (lid, cstrs, pmty.pmty_attributes, tokens)
-  | _ ->
-      err pmty.pmty_loc "Neither_identifier_nor_with_type"
 
       (*
 (* There's no dedicated syntax for module instances. Functor application
@@ -4446,8 +4386,8 @@ tuple_type:
 delimited_type_supporting_local_open:
   | LPAREN type_ = core_type RPAREN
       { mktyp ~loc:$sloc (Ptyp_parens type_) }
-  | LPAREN MODULE attrs = ext_attributes package_type = package_type_ext_attr RPAREN
-      { package_type $sloc (Some attrs) }
+  | LPAREN MODULE attrs = ext_attributes package_type = package_type RPAREN
+      { mktyp ~loc:$sloc (Ptyp_package (attrs, package_type)) }
   | mktyp(
       LBRACKET field = tag_field RBRACKET
         { Ptyp_variant([ field ], Closed, None) }
@@ -4572,22 +4512,8 @@ atomic_type:
   | UNDERSCORE COLON jkind=jkind_annotation
     { mktyp ~loc:$sloc (Ptyp_any (Some jkind)) }
 
-%inline package_type_ext_attr: module_type
-    { fun loc ext_attr ->
-        let (lid, cstrs, attrs, tokens) = package_type_of_module_type $1 in
-        let pack_ty =
-          { ppt_ext_attr = ext_attr;
-            ppt_name = lid;
-            ppt_eqs = cstrs;
-            ppt_attrs = attrs;
-            ppt_loc = make_loc $sloc;
-            ppt_tokens = tokens; }
-        in
-        let descr = Ptyp_package pack_ty in
-        let tokens = Tokens.at loc in
-        Typ.mk ~loc:(make_loc loc) ~tokens descr }
-;
-%inline package_type: package_type_ext_attr { $1 $sloc None }
+%inline package_type: module_type
+    { $1 }
 ;
 %inline row_field_list:
   separated_nonempty_llist(BAR, row_field)

@@ -107,7 +107,7 @@ module Typ :
     val open_ : ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> core_type -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> core_type
 
-    val varify_constructors: str list -> core_type -> core_type
+(*     val varify_constructors: str list -> core_type -> core_type *)
     (** [varify_constructors newtypes te] is type expression [te], of which
         any of nullary type constructor [tc] is replaced by type variable of
         the same name, if [tc]'s name appears in [newtypes].
@@ -150,7 +150,7 @@ module Pat:
     val type_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> pattern
     val lazy_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern -> pattern
     val unpack: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str_opt ->
-      core_type option -> pattern
+      package_type option -> pattern
     val open_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq  -> lid -> pattern -> pattern
     val exception_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern -> pattern
     val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> pattern
@@ -216,8 +216,8 @@ module Exp:
     val assert_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> expression
     val lazy_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> expression
     val object_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> class_structure -> expression
-    val pack: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?pkg_type:core_type -> module_expr ->
-      expression
+    val pack: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
+      ?pkg_type:package_type -> module_expr -> expression
     val open_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
       lid -> expression -> expression
     val letop: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> binding_op
@@ -333,8 +333,8 @@ module Mod:
     val apply_unit: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_expr -> module_expr
     val constraint_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_type option -> modes ->
       module_expr -> module_expr
-    val unpack: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?constr:core_type ->
-      ?coerce:core_type -> expression -> module_expr
+    val unpack: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?constr:package_type ->
+      ?coerce:package_type -> expression -> module_expr
     val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> module_expr
 (*     val instance: ?loc:loc -> ?attrs:attrs -> module_instance -> module_expr
        *)

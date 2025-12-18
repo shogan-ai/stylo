@@ -759,7 +759,7 @@ end = struct
       let pre_nest = Preceeding.implied_nest preceeding in
       let pre_vars = pp_poly_bindings ?preceeding bound_vars in
       group (pre_vars ^^ break 0 ^^ pre_nest S.dot) ^/^ pre_nest (pp ct)
-    | Ptyp_package pkg -> package_type ?preceeding pkg
+    | Ptyp_package (ext_attrs, pkg) -> package_type ?preceeding ext_attrs pkg
     | Ptyp_open (lid, ct) ->
       let space =
         match ct.ptyp_desc with
@@ -881,31 +881,12 @@ end = struct
     in
     separate (break 1 ^^ pre_nest S.star ^^ break 1) elts
 
-  and package_type ?preceeding
-        { ppt_ext_attr; ppt_name = lid; ppt_eqs = constraints; ppt_attrs = attrs
-        ; ppt_loc = _;  ppt_tokens = _ } =
-    let with_ =
-      match constraints with
-      | [] -> empty
-      | _ ->
-        let one (lid, ct) =
-          S.type_ ^/^ longident lid.txt ^/^ S.equals ^/^ pp ct
-        in
-        break 1 ^^ S.with_ ^/^
-        separate_map (break 1 ^^ S.and_ ^^ break 1) one constraints
-        |> Attribute.attach ~attrs
-    in
-    let module_ =
-      match ppt_ext_attr with
-      | None -> S.module_
-      | Some ea -> Ext_attribute.decorate S.module_ ea
-    in
+  and package_type ?preceeding ext_attrs mty =
+    let module_ = Ext_attribute.decorate S.module_ ext_attrs in
     let pre_lparen_module, pre_nest =
       Preceeding.group_with preceeding (S.lparen ^^ module_)
     in
-    pre_lparen_module ^/^ pre_nest (
-      longident lid.txt ^^ with_ ^^ break 0 ^^ S.rparen
-    )
+    pre_lparen_module ^/^ pre_nest (Module_type.pp mty ^^ break 0 ^^ S.rparen)
 
   and pp_object ?preceeding fields closed =
     let lt, pre_nest = Preceeding.group_with preceeding S.lt in
@@ -1172,9 +1153,7 @@ end = struct
     in
     pre_lp_mod ^/^
     pre_nest (
-      nest 1
-        (path ^?^
-         optional (fun c -> S.colon ^/^ Module_expr.pp_package_type c) ty)
+      nest 1 (path ^?^ optional (fun c -> S.colon ^/^ Module_type.pp c) ty)
       ^^ break 0 ^^ S.rparen
     )
 
@@ -1725,7 +1704,7 @@ end = struct
     in
     let me_and_ty =
       Module_expr.pp me ^?^
-      optional (fun c -> S.colon ^/^ Module_expr.pp_package_type c) ty
+      optional (fun c -> S.colon ^/^ Module_type.pp c) ty
     in
     group (
       lparen_module ^/^ pre_nest (nest 2 me_and_ty ^^ S.rparen)
@@ -3308,28 +3287,7 @@ end
 and Module_expr : sig
   val pp : module_expr -> t
   val as_rhs : module_expr -> Layout_module_binding.rhs
-
-  (* TODO: not the most natural place for this. *)
-  val pp_package_type : core_type -> t
 end = struct
-  let pp_package_type ct =
-    match ct.ptyp_desc with
-    | Ptyp_package { ppt_ext_attr = None; ppt_name; ppt_eqs; ppt_attrs
-                   ; ppt_loc = _; ppt_tokens = _ } ->
-      let with_ =
-        match ppt_eqs with
-        | [] -> empty
-        | _ ->
-          let one (lid, ct) =
-            S.type_ ^/^ longident lid.txt ^/^ S.equals ^/^ Core_type.pp ct
-          in
-          S.with_ ^/^
-          separate_map (break 1 ^^ S.and_ ^^ break 1) one ppt_eqs
-      in
-      longident ppt_name.txt ^?^ with_
-      |> Attribute.attach ~attrs:ppt_attrs
-    | _ -> assert false
-
   let rec pp { pmod_desc; pmod_attributes; pmod_loc = _; pmod_tokens = _ } =
     pp_desc pmod_desc
     |> Attribute.attach ~attrs:pmod_attributes
@@ -3353,8 +3311,8 @@ end = struct
     | Pmod_unpack (e, ty1, ty2) ->
       parens (
         S.val_ ^/^ Expression.pp e ^?^
-        optional (fun c -> S.colon ^/^ pp_package_type c) ty1 ^?^
-        optional (fun c -> S.coerce ^/^ pp_package_type c) ty2
+        optional (fun c -> S.colon ^/^ Module_type.pp c) ty1 ^?^
+        optional (fun c -> S.coerce ^/^ Module_type.pp c) ty2
       )
     | Pmod_extension ext -> Extension.pp ext
     | Pmod_parens me -> parens (pp me)

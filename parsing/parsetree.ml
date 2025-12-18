@@ -228,7 +228,7 @@ and core_type_desc =
            - As the {{!value_description.pval_type}[pval_type]} field of a
            {!value_description}.
          *)
-  | Ptyp_package of package_type  (** [(module S)]. *)
+  | Ptyp_package of ext_attribute * package_type  (** [(module S)]. *)
   | Ptyp_open of Longident.t loc * core_type (** [M.(T)] *)
   | Ptyp_of_kind of jkind_annotation (** [(type : k)] *)
   | Ptyp_extension of extension  (** [[%id]]. *)
@@ -239,19 +239,7 @@ and arg_label = Asttypes.arg_label =
   | Labelled of string
   | Optional of string
 
-and package_type =
-  { ppt_ext_attr: ext_attribute option;
-    ppt_name: Longident.t loc;
-    ppt_eqs: (Longident.t loc * core_type) list;
-    ppt_attrs: attributes;
-    ppt_loc: Location.t;
-    ppt_tokens: Tokens.seq;
-  }
-(** As {!package_type} typed values:
-         - [(S, [])] represents [(module S)],
-         - [(S, [(t1, T1) ; ... ; (tn, Tn)])]
-          represents [(module S with type t1 = T1 and ... and tn = Tn)].
-       *)
+and package_type = module_type
 
 and row_field = {
   prf_desc : row_field_desc;
@@ -377,7 +365,7 @@ and pattern_desc =
          *)
   | Ppat_type of Longident.t loc  (** Pattern [#tconst] *)
   | Ppat_lazy of pattern  (** Pattern [lazy P] *)
-  | Ppat_unpack of string option loc * core_type option
+  | Ppat_unpack of string option loc * package_type option
       (** [Ppat_unpack(s)] represents:
             - [(module P)] when [s] is [Some "P"]
             - [(module _)] when [s] is [None] *)
@@ -531,7 +519,7 @@ and expression_desc =
            type-checker. *)
   | Pexp_lazy of expression  (** [lazy E] *)
   | Pexp_object of class_structure  (** [object ... end] *)
-  | Pexp_pack of module_expr * core_type option
+  | Pexp_pack of module_expr * package_type option
       (** [(module ME)].
 
            [(module ME : S)] is represented as
@@ -1393,7 +1381,7 @@ and module_expr_desc =
           - [(ME @ modes)]
           - [(ME : MT)]
       *)
-  | Pmod_unpack of expression * core_type option * core_type option
+  | Pmod_unpack of expression * package_type option * package_type option
       (** [(val E)] *)
   | Pmod_extension of extension  (** [[%id]] *)
   | Pmod_parens of module_expr

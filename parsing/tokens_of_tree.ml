@@ -62,11 +62,6 @@ let tokenizer =
     let node_toks = ct.ptyp_tokens in
     combine_children ~loc:ct.ptyp_loc node_toks sub_tokens
   in
-  let reduce_package_type reducer env p =
-    let sub_tokens = super.package_type reducer env p in
-    let node_toks = p.ppt_tokens in
-    combine_children ~loc:p.ppt_loc node_toks sub_tokens
-  in
   let reduce_row_field reducer env p =
     let sub_tokens = super.row_field reducer env p in
     let node_toks = p.prf_tokens in
@@ -233,7 +228,6 @@ let tokenizer =
   ; extension = reduce_extension
   ; arrow_arg = reduce_arrow_arg
   ; core_type = reduce_core_type
-  ; package_type = reduce_package_type
   ; row_field = reduce_row_field
   ; object_field = reduce_object_field
   ; pattern = reduce_pattern
