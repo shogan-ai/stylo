@@ -1137,58 +1137,85 @@ and skip_hash_bang = parse
     let current_line () = state.curr_tok
   end
 
-  type staged_comment = {
-    sc_loc: Location.t;
-    sc_str: string;
-    sc_inserted: bool ref;
-    sc_before: newline_state;
-    sc_indent: Line_indent.t;
-  }
+  module Staged_comments = struct
+    (* We delay the insertion of comments to [Tokens.Indexed_list.global] as we
+       want to decide their attachement before adding them to the list, which we
+       can only do we reach the next (non-comment) token. *)
 
-  let stage_comment sc_before sc_loc sc_str sc_inserted =
-    { sc_inserted; sc_loc; sc_str; sc_before; sc_indent = Line_indent.copy () }
+    type cmt_info = {
+      loc: Location.t;
+      txt: string;
+      inserted: bool ref;
+    }
 
-  let unstage_comment newline_after sc =
-    let attachement : Tokens.attachment =
-      match sc.sc_before, newline_after with
-      | NoLine, NoLine ->
-        dprintf "before (same on both side -> default)@.";
-        Before
-      | NoLine, _ ->
-        dprintf "before (same line)@.";
-        Before
-      | _, NoLine ->
-        dprintf "after (same line)@.";
-        After
-      | NewLine, BlankLine ->
-        dprintf "before (blank after)@.";
-        Before
-      | BlankLine, NewLine ->
-        dprintf "after (blank before)@.";
-        After
-      | BlankLine, BlankLine ->
-        dprintf "floating (really)@.";
-        Floating
-      | NewLine, NewLine ->
-        let cmt_indent = sc.sc_indent.curr_tok in
-        let next_indent = Line_indent.current_line () in
-        if cmt_indent = next_indent then (
-          dprintf "after (same indent)@.";
-          After
-        ) else (
-          dprintf "before (default)@.";
+    type t = {
+      rev_cmts: cmt_info list;
+      before: newline_state;
+      indent: Line_indent.t;
+    }
+
+    let init before loc txt inserted =
+      let info = { loc; txt; inserted } in
+      let indent = Line_indent.copy () in
+      { before; indent; rev_cmts = [ info ] }
+
+    let unstage newline_after t =
+      let attachement : Tokens.attachment =
+        match t.before, newline_after with
+        | NoLine, NoLine ->
+          dprintf "before (same on both side -> default)@.";
           Before
+        | NoLine, _ ->
+          dprintf "before (same line)@.";
+          Before
+        | _, NoLine ->
+          dprintf "after (same line)@.";
+          After
+        | NewLine, BlankLine ->
+          dprintf "before (blank after)@.";
+          Before
+        | BlankLine, NewLine ->
+          dprintf "after (blank before)@.";
+          After
+        | BlankLine, BlankLine ->
+          dprintf "floating (really)@.";
+          Floating
+        | NewLine, NewLine ->
+          let first_cmt_line_indent = t.indent.curr_tok in
+          let next_indent = Line_indent.current_line () in
+          if first_cmt_line_indent = next_indent then (
+            dprintf "after (same indent)@.";
+            After
+          ) else (
+            dprintf "before (default)@.";
+            Before
+          )
+      in
+      List.iter (fun {loc; txt; inserted} ->
+        let cmt =
+          { Tokens.explicitely_inserted = inserted
+          ; text = txt
+          ; attachement }
+        in
+        Tokens.Indexed_list.(append global ~pos:loc.loc_start (Comment cmt))
+      ) (List.rev t.rev_cmts)
+
+    let add t before loc txt inserted =
+      match t with
+      | None -> init before loc txt inserted
+      | Some t ->
+        (* If there is a blank line between the comment about to be staged and
+           the previous ones, we decide their attachement separately (and so we
+           have enough info the decide for the previous comments), otherwise we
+           keep accumulating and we'll decide for the whole block. *)
+        if before = BlankLine then (
+          unstage before t;
+          init before loc txt inserted
+        ) else (
+          let info = { loc; txt; inserted } in
+          { t with rev_cmts = info :: t.rev_cmts }
         )
-    in
-    let cmt =
-      { Tokens.explicitely_inserted = sc.sc_inserted
-      ; text = sc.sc_str
-      ; attachement }
-    in
-    Tokens.Indexed_list.append
-      Tokens.Indexed_list.global
-      ~pos:sc.sc_loc.loc_start
-      (Comment cmt)
+  end
 
   let previous_token = ref None
   let lines_init_state = function
@@ -1202,8 +1229,9 @@ and skip_hash_bang = parse
       | COMMENT (s, loc, inserted) ->
           Line_indent.new_info lines_for_comments loc.loc_start;
           add_comment (s, loc);
-          Option.iter (unstage_comment lines_for_comments) sc_opt;
-          let sc = stage_comment lines_for_comments loc s inserted in
+          let sc =
+            Staged_comments.add sc_opt lines_for_comments loc s inserted
+          in
           let lines_for_comments' = NoLine in
           let lines_for_docstrings' =
             match lines_for_docstrings with
@@ -1231,9 +1259,10 @@ and skip_hash_bang = parse
           Line_indent.new_info lines_for_comments doc_loc.loc_start;
           Docstrings.register doc;
           add_docstring_comment doc;
-          Option.iter (unstage_comment lines_for_comments) sc_opt;
+          (* docstrings don't get grouped like usual comments. *)
+          Option.iter (Staged_comments.unstage lines_for_comments) sc_opt;
           let sc =
-            stage_comment lines_for_comments doc_loc
+            Staged_comments.init lines_for_comments doc_loc
               (Docstrings.docstring_body doc)
               doc.ds_explicitely_inserted
           in
@@ -1243,7 +1272,7 @@ and skip_hash_bang = parse
           previous_token := Some tok;
           let start_pos = lexeme_start_p lexbuf in
           Line_indent.new_info lines_for_comments start_pos;
-          Option.iter (unstage_comment lines_for_comments) sc_opt;
+          Option.iter (Staged_comments.unstage lines_for_comments) sc_opt;
           attach lines_for_docstrings docs post_pos start_pos;
           Tokens.Indexed_list.append
             Tokens.Indexed_list.global
