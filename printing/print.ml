@@ -1399,21 +1399,12 @@ end = struct
       pre_nest @@ nest 2 (pp e)
     | Pexp_override fields ->
       pp_override ~preceeding (nb_semis exp.pexp_tokens) fields
-    | Pexp_letmodule (name, me, body) ->
-      let let_module, pre_nest =
-        Preceeding.group_with preceeding (group (S.let_ ^/^ !!S.module_))
-      in
-      let name =
-        match name.txt with
-        | None -> S.underscore
-        | Some s -> string s
-      in
-      let let_mod_eq =
-        let_module ^/^ pre_nest @@ nest 2 (group (name ^/^ S.equals))
-      in
+    | Pexp_letmodule (mb, body) ->
+      let pre_nest = Preceeding.implied_nest preceeding in
       let binding =
-        group let_mod_eq ^/^
-        pre_nest (nest 2 (Module_expr.pp me) ^/^ S.in_)
+        Module_binding.pp ~item:false ?preceeding
+          ~keywords:[ S.let_; S.module_ ] mb ^/^
+        S.in_
       in
       group binding ^^ hardline ^^ pre_nest (pp body)
     | Pexp_letexception (ec, body) ->
@@ -3769,7 +3760,12 @@ end = struct
 end
 
 and Module_binding : sig
-  val pp : ?item:bool -> keywords:t list -> module_binding -> t
+  val pp
+    :  ?item:bool
+    -> ?preceeding:Preceeding.t
+    -> keywords:t list
+    -> module_binding
+    -> t
 
   val pp_recmods : module_binding list -> t
 end = struct
@@ -3785,13 +3781,16 @@ end = struct
       ))
     | None, at_modes -> Some (Single_part (S.at ^/^ modes at_modes))
 
-  let pp ?item ~keywords
+  let pp ?item ?preceeding ~keywords
       { pmb_ext_attrs; pmb_name = (name, name_modes); pmb_params;
         pmb_constraint; pmb_modes; pmb_expr; pmb_attributes; pmb_pre_text;
         pmb_pre_doc; pmb_post_doc; pmb_loc = _; pmb_tokens = _ } =
     let kw =
-      Ext_attribute.decorate (List.hd keywords) pmb_ext_attrs ^?^
-        separate (break 1) (List.tl keywords)
+      separate_map (break 1) (fun kw ->
+        if kw = S.module_ || kw = S.and_
+        then Ext_attribute.decorate kw pmb_ext_attrs
+        else kw
+      ) keywords
     in
     let bound =
       let name =
@@ -3805,7 +3804,7 @@ end = struct
     in
     let params = List.map Functor_parameter.pp pmb_params in
     let constraint_ = modal_constraint pmb_constraint pmb_modes in
-    Layout_module_binding.pp ~pre_text:pmb_pre_text ?pre_doc:pmb_pre_doc
+    Layout_module_binding.pp ?preceeding ~pre_text:pmb_pre_text ?pre_doc:pmb_pre_doc
       ~keyword:kw bound
       ~params_indent:4 ~params
       ?constraint_

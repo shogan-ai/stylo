@@ -508,7 +508,7 @@ and expression_desc =
   | Pexp_setvar of string loc * expression  (** [x <- 2] *)
   | Pexp_override of (string loc * expression option) list
       (** [{< x1 = E1; ...; xn = En >}] *)
-  | Pexp_letmodule of string option loc * module_expr * expression
+  | Pexp_letmodule of module_binding * expression
       (** [let module M = ME in E] *)
   | Pexp_letexception of extension_constructor * expression
       (** [let exception C in E] *)

@@ -560,11 +560,6 @@ let unboxed_float ?sign (f, m) =
 let unboxed_type sloc lident tys =
   let loc = make_loc sloc in
   Ptyp_constr (tys, mkloc lident loc)
-
-let maybe_pmod_constraint mode expr =
-  match mode with
-  | [] -> expr
-  | _ :: _ -> Mod.constraint_ ~tokens:(failwith "TODO") None mode expr
 %}
 
 
@@ -2467,13 +2462,15 @@ fun_expr:
 %inline fun_expr_attrs:
   | LET MODULE ext_attributes module_name_modal(at_mode_expr) module_binding_body IN seq_expr
       {
-        let name, modes = $4 in
-        let body =
-          match $5 with
-          | [], None, [], me -> maybe_pmod_constraint modes me
-          | _ -> failwith "TODO: switch to Pexp_structure_item"
+        let params, mty_opt, modes, me = $5 in
+        let mb_loc = ($startpos($2), $endpos($5)) in
+        (* N.B. we attach the ext_attrs to the module binding instead of the
+           expr as wrt. the tokens they're part of the module binding. *)
+        let mb =
+          Mb.mk $4 params mty_opt modes me ~ext_attr:$3 ~loc:(make_loc mb_loc)
+            ~tokens:(Tokens.at mb_loc)
         in
-        Pexp_letmodule(name, body, $7), $3 }
+        Pexp_letmodule(mb, $7), { pea_ext = None; pea_attrs = [] } }
   | LET EXCEPTION ext_attributes let_exception_declaration IN seq_expr
       { Pexp_letexception($4, $6), $3 }
   | MATCH ext_attributes seq_expr WITH match_cases

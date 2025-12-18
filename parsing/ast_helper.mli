@@ -208,7 +208,7 @@ module Exp:
     val setinstvar: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str -> expression -> expression
     val override: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> (str * expression option) list
                   -> expression
-    val letmodule: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str_opt -> module_expr
+    val letmodule: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_binding
                    -> expression -> expression
     val letexception:
       ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension_constructor -> expression
