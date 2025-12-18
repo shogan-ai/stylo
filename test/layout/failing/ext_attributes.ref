@@ -13,17 +13,9 @@ module Str_items = struct
   module type%foo M
   module type [@bar] M
 
-  module%foo [@bar] M = struct
-
-  end
-
-  module%foo M = struct
-
-  end
-
-  module [@bar] M = struct
-
-  end
+  module%foo [@bar] M = struct end
+  module%foo M = struct end
+  module [@bar] M = struct end
 
   let%foo[@bar] x = 3
   let%foo x = 3
@@ -45,17 +37,17 @@ module Str_items = struct
   ;;
 
   let _ =
-    let module%foo [@bar] M = struct  end in
+    let module%foo [@bar] M = struct end in
     3
   ;;
 
   let _ =
-    let module%foo M = struct  end in
+    let module%foo M = struct end in
     3
   ;;
 
   let _ =
-    let module [@bar] M = struct  end in
+    let module [@bar] M = struct end in
     3
   ;;
 

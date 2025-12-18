@@ -2990,7 +2990,7 @@ end = struct
       group ~flatness (pp mty ^?^ cstrs)
     | Pmty_typeof (attrs, me) ->
       let kws = S.module_ ^/^ S.type_ ^/^ S.of_ in
-      Attribute.attach kws ~attrs ^/^ Module_expr.pp me
+      Attribute.attach (group kws) ~attrs ^/^ Module_expr.pp me
     | Pmty_extension ext -> Extension.pp ext
     | Pmty_alias lid -> longident lid.txt
     | Pmty_strengthen (mty, lid) ->
@@ -3009,9 +3009,10 @@ end = struct
       let stop = Attribute.attach stop ~attrs:pmty_attributes in
       Three_parts { start; main; stop }
     | Pmty_typeof (attrs, me) ->
-      let prefix = Attribute.attach ~attrs (S.module_ ^/^ S.type_ ^/^ S.of_) in
+      let kws = S.module_ ^/^ S.type_ ^/^ S.of_ in
+      let prefix = Attribute.attach ~attrs (group kws) in
       begin match Module_expr.as_rhs me with
-      | Single_part t -> Single_part (prefix ^/^ t)
+      | Single_part t -> Single_part (prefix ^/^ nest 2 t)
       | Three_parts rhs -> Three_parts { rhs with start = prefix ^/^ rhs.start }
       end
     | _ -> Single_part (pp mty)
@@ -3100,7 +3101,7 @@ end = struct
 
 
   let pp_parts sg =
-    with_modalities S.sig_ ~modalities:sg.psg_modalities,
+    group (with_modalities S.sig_ ~modalities:sg.psg_modalities),
     softest_line ^^ pp_keeping_semi sg,
     S.end_
 
@@ -3159,6 +3160,7 @@ end = struct
         [], equal_sign mty, rhs
     in
     Layout_module_binding.pp ~item:true
+      ~params_indent:4
       ~pre_text:pmd_pre_text ?pre_doc:pmd_pre_doc
       ~keyword:(separate (break 1) keywords)
       binding
@@ -3341,11 +3343,13 @@ end = struct
     | Pmod_apply (m1, m2) -> pp_apply m1 m2
     | Pmod_apply_unit me -> pp me ^^ S.lparen ^^ S.rparen
     | Pmod_constraint (me, mty_opt, modes) ->
-      parens (
-        pp me ^?^
-        optional (fun mty -> S.colon ^/^ Module_type.pp mty) mty_opt
-        |> with_modes ~modes
-      )
+      let me = pp me in
+      let with_mty =
+        match mty_opt with
+        | None -> me
+        | Some mty -> me ^^ group (break 1 ^^ S.colon) ^/^ Module_type.pp mty
+      in
+      parens (with_modes ~modes with_mty)
     | Pmod_unpack (e, ty1, ty2) ->
       parens (
         S.val_ ^/^ Expression.pp e ^?^
@@ -3447,15 +3451,18 @@ end = struct
   let pp ?(attrs=[]) str =
     let struct_ = Attribute.attach ~attrs S.struct_ in
     group (
-      struct_ ^/^
-      nest 2 (pp_keeping_semi str) ^/^
+      struct_ ^?^
+      nest 2 (pp_keeping_semi str) ^?^
       S.end_
     )
 
   let pp_parts attrs str =
-    Attribute.attach ~attrs S.struct_,
-    softest_line ^^ group (pp_keeping_semi str),
-    S.end_
+    let str_doc =
+      match pp_keeping_semi str with
+      | Empty -> empty
+      | doc -> softest_line ^^ group doc
+    in
+    Attribute.attach ~attrs S.struct_, str_doc, S.end_
 
   let pp_implementation str =
     group (pp_keeping_semi str)
@@ -3576,11 +3583,11 @@ end = struct
     | None, Some Three_parts { start; main; stop } ->
       let bindings_and_main =
         group
-          (bindings ^/^ pre_nest @@ group (nest 2 equal_sign ^/^ start)) ^/^
+          (bindings ^/^ pre_nest @@ group (nest 2 equal_sign ^/^ start)) ^?^
         pre_nest @@ nest 2 main
       in
       group (
-        group bindings_and_main ^/^
+        group bindings_and_main ^?^
         pre_nest stop
       )
     | Some Three_parts { start; main; stop }, None ->
