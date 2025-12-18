@@ -1693,13 +1693,27 @@ end = struct
       let module_ = Ext_attribute.decorate S.module_ ext_attr in
       Preceeding.group_with preceeding (group (S.lparen ^^ module_))
     in
-    let me_and_ty =
-      Module_expr.pp me ^?^
-      optional (fun c -> S.colon ^/^ Module_type.pp c) ty
+    let me_parts = Module_expr.as_rhs me in
+    let pack_parts =
+      match ty with
+      | None -> me_parts
+      | Some c ->
+        Layout_module_binding.map_rhs_end
+          (fun t -> group (t ^/^ nest 2 S.colon) ^/^ nest 2 (Module_type.pp c))
+          me_parts
     in
     group (
-      lparen_module ^/^ pre_nest (nest 2 me_and_ty ^^ S.rparen)
+      match pack_parts with
+      | Single_part me_and_ty ->
+        lparen_module ^/^ pre_nest (nest 2 me_and_ty ^^ S.rparen)
+      | Three_parts { start; main; stop } ->
+        let flatness = flatness_tracker () in
+        let single_line_start = Condition.flat flatness in
+        let opt_nest = nest ~vanish:single_line_start 2 in
+        group ~flatness (lparen_module ^/^ pre_nest @@ opt_nest start) ^/^
+        pre_nest (opt_nest (nest 2 main ^/^ stop) ^^ S.rparen)
     )
+
 
   and pp_constraint ~preceeding e ct_opt modes =
     let pre_lparen, pre_nest =
