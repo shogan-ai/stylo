@@ -229,6 +229,10 @@ let rec walk_both state seq doc =
     | _, Doc.Whitespace (_, _) -> seq, doc, no_space state
 
     (* Skip explicitely inserted comment *)
+    | T.Comment { explicitely_inserted; _ }, Doc.Comment _
+      when !explicitely_inserted ->
+      rest, doc, state
+
     | _, Doc.Comment _ -> seq, doc, state
 
     | T.Comment { explicitely_inserted; _ }, Doc.(Token _ | Optional _)
