@@ -148,7 +148,7 @@ let saw_leaf st =
 
 let is_comment_attaching_before elt =
   match elt.T.desc with
-  | Comment c -> c.attachement = Before
+  | Comment c -> c.attachement = Before && not !(c.explicitely_inserted)
   | _ -> false
 
 let attach_before_comments state tokens doc =
