@@ -597,12 +597,25 @@ and Core_type : sig
 
     val pp_arg_moded_ty : modes -> modes -> core_type -> printer
 
-    val collect_args :
-      core_type -> (arrow_arg list * (modes * modes * core_type)) option
+    val components
+      :  core_type
+      -> ((string loc * jkind_annotation option) list
+          * arrow_arg list
+          * (modes * modes * core_type)) option
 
-    val pp : ?preceeding:Preceeding.t -> arrow_arg list -> pp_rhs:printer -> t
+    val pp
+      :  ?preceeding:Preceeding.t
+      -> (string loc * jkind_annotation option) list
+      -> arrow_arg list
+      -> pp_rhs:printer
+      -> t
 
-    val pp_for_descr : flatness -> arrow_arg list -> pp_rhs:printer -> t
+    val pp_for_descr
+      :  flatness
+      -> (string loc * jkind_annotation option) list
+      -> arrow_arg list
+      -> pp_rhs:printer
+      -> t
   end
 
   val pp_poly_bindings
@@ -610,22 +623,63 @@ and Core_type : sig
     -> (string loc * jkind_annotation option) list
     -> t
 end = struct
+
+  let pp_var ?preceeding var_name jkind =
+    let var, pre_nest =
+      Preceeding.group_with preceeding (S.squote ^^ string var_name)
+    in
+    match jkind with
+    | None -> var
+    | Some k -> var ^/^ pre_nest (S.colon ^/^ Jkind_annotation.pp k)
+
+  let pp_poly_bindings ?preceeding bound_vars =
+    let pp_bound (var, jkind) =
+      let var_and_kind = pp_var var.Location.txt jkind in
+      match jkind with
+      | None -> var_and_kind
+      | Some _ -> parens var_and_kind
+    in
+    match bound_vars with
+    | [] -> assert false
+    | v :: vs ->
+      let v, pre_nest = Preceeding.group_with preceeding (pp_bound v) in
+      v ^?^ pre_nest (separate_map (break 1) pp_bound vs)
+
   module Arrow = struct
     type printer = ?preceeding:Preceeding.t -> unit -> t
 
-    let collect_args ct =
-      let rec aux rev_args = function
-        | [], [], { ptyp_desc = Ptyp_arrow arrow; _ } ->
-          (* there can't be attributes on Ptyp_arrow, they'd be on Ptyp_parens *)
-          aux (arrow.domain :: rev_args)
-            (arrow.codom_legacy_modes, arrow.codom_modes, arrow.codom_type)
-        | codom -> List.rev rev_args, codom
-      in
+    let rec collect_args rev_args = function
+      | [], [], { ptyp_desc = Ptyp_arrow arrow; _ } ->
+        (* there can't be attributes on Ptyp_arrow, they'd be on Ptyp_parens *)
+        collect_args (arrow.domain :: rev_args)
+          (arrow.codom_legacy_modes, arrow.codom_modes, arrow.codom_type)
+      | codom -> List.rev rev_args, codom
+
+    let components ct =
       match ct.ptyp_desc with
       | Ptyp_arrow { domain=dom; codom_legacy_modes; codom_type; codom_modes } ->
-        Some (aux [dom] (codom_legacy_modes, codom_modes, codom_type))
-      | _ -> None
+        let args, ret_ty =
+          collect_args [dom] (codom_legacy_modes, codom_modes, codom_type)
+        in
+        Some ([], args, ret_ty)
+      | Ptyp_poly (poly_params,
+                   { ptyp_desc =
+                       Ptyp_arrow
+                         { domain=dom; codom_legacy_modes
+                         ; codom_type; codom_modes }
+                   ; ptyp_attributes = [] ; _ }) ->
+        let args, ret_ty =
+          collect_args [dom] (codom_legacy_modes, codom_modes, codom_type)
+        in
+        Some (poly_params, args, ret_ty)
+      | _ ->
+        None
 
+    let collect_args ct =
+      match ct.ptyp_desc with
+      | Ptyp_arrow { domain=dom; codom_legacy_modes; codom_type; codom_modes } ->
+        Some (collect_args [dom] (codom_legacy_modes, codom_modes, codom_type))
+      | _ -> None
 
     let pp_arg_moded_ty pre_m post_m ty ?preceeding () =
       let pre_nest = Preceeding.implied_nest preceeding in
@@ -669,30 +723,38 @@ end = struct
       let arg = group arg ^?^ nest 2 @@ pre_nest @@ optional Doc.pp aa_doc in
       group arg
 
-    let pp ?preceeding ?(pre_nest=Fun.id) args ~(pp_rhs:printer) =
+    let pp ?preceeding ?(pre_nest=Fun.id) poly_params dot_pre args
+          ~(pp_rhs:printer) =
       let arrow_pre = Preceeding.mk (S.rarrow ^^ break 1) ~indent:3 in
+      let params, preceeding, first_pre_nest =
+        match poly_params with
+        | [] -> empty, preceeding, Fun.id
+        | _ -> pp_poly_bindings ?preceeding poly_params, Some dot_pre, pre_nest
+      in
       let args =
         List.mapi (fun i arg ->
           if i = 0
-          then pp_arg ?preceeding arg
+          then first_pre_nest @@ pp_arg ?preceeding arg
           else pre_nest @@ pp_arg ~preceeding:arrow_pre arg
         ) args
         |> separate (break 1)
       in
-      args ^/^ pre_nest @@ pp_rhs ~preceeding:arrow_pre ()
+      params ^?^ args ^/^ pre_nest @@ pp_rhs ~preceeding:arrow_pre ()
 
-    let pp_for_descr descr_flatness args ~pp_rhs =
-      let colon_pre =
-        group (
-          S.colon ^/^ vanishing_whitespace (Condition.flat descr_flatness) nbsp
-        )
+    let pp_for_descr descr_flatness poly_params args ~pp_rhs =
+      let vanishing_cond = Condition.flat descr_flatness in
+      let mk_pre token =
+        group (token ^/^ vanishing_whitespace vanishing_cond nbsp)
         |> Preceeding.mk ~indent:3
       in
-      pp ~preceeding:colon_pre args ~pp_rhs
+      let colon_pre = mk_pre S.colon in
+      let dot_pre = mk_pre S.dot in
+      pp ~preceeding:colon_pre poly_params dot_pre args ~pp_rhs
 
-    let pp ?preceeding args ~pp_rhs =
+    let pp ?preceeding poly_params args ~pp_rhs =
+      let dot_pre = Preceeding.mk (S.dot ^^ break 1) ~indent:3 in
       pp ?preceeding ~pre_nest:(Preceeding.implied_nest preceeding)
-        args ~pp_rhs
+        poly_params dot_pre args ~pp_rhs
   end
 
   let rec pp ?preceeding ?(in_parens=false)
@@ -722,7 +784,7 @@ end = struct
       let args, (codom_legacy_modes, codom_modes, codom_type) =
         Option.get (Arrow.collect_args ct)
       in
-      Arrow.pp ?preceeding args
+      Arrow.pp ?preceeding [] args
         ~pp_rhs:(Arrow.pp_arg_moded_ty codom_legacy_modes codom_modes codom_type)
     | Ptyp_tuple elts -> pp_tuple ?preceeding elts
     | Ptyp_unboxed_tuple elts ->
@@ -755,10 +817,18 @@ end = struct
       )
     | Ptyp_variant (fields, cf, lbls) ->
       pp_variant ?preceeding ~tokens fields cf lbls
-    | Ptyp_poly (bound_vars, ct) ->
-      let pre_nest = Preceeding.implied_nest preceeding in
-      let pre_vars = pp_poly_bindings ?preceeding bound_vars in
-      group (pre_vars ^^ break 0 ^^ pre_nest S.dot) ^/^ pre_nest (pp ct)
+    | Ptyp_poly (bound_vars, ty) ->
+      begin match Arrow.components ct with
+      | Some (poly_params, args, ret) ->
+        let codom_legacy_modes, codom_modes, codom_type = ret in
+        Arrow.pp ?preceeding poly_params args ~pp_rhs:(
+          Arrow.pp_arg_moded_ty codom_legacy_modes codom_modes codom_type
+        )
+      | None ->
+        let pre_nest = Preceeding.implied_nest preceeding in
+        let pre_vars = pp_poly_bindings ?preceeding bound_vars in
+        group (pre_vars ^^ break 0 ^^ pre_nest S.dot) ^/^ pre_nest (pp ty)
+      end
     | Ptyp_package (ext_attrs, pkg) -> package_type ?preceeding ext_attrs pkg
     | Ptyp_open (lid, ct) ->
       let space =
@@ -782,27 +852,6 @@ end = struct
   and pp_parens ?preceeding ct =
     let lparen, pre_nest = Preceeding.extend preceeding S.lparen ~indent:1 in
     pp ~in_parens:true ~preceeding:lparen ct ^^ pre_nest S.rparen
-
-  and pp_var ?preceeding var_name jkind =
-    let var, pre_nest =
-      Preceeding.group_with preceeding (S.squote ^^ string var_name)
-    in
-    match jkind with
-    | None -> var
-    | Some k -> var ^/^ pre_nest (S.colon ^/^ Jkind_annotation.pp k)
-
-  and pp_poly_bindings ?preceeding bound_vars =
-    let pp_bound (var, jkind) =
-      let var_and_kind = pp_var var.Location.txt jkind in
-      match jkind with
-      | None -> var_and_kind
-      | Some _ -> parens var_and_kind
-    in
-    match bound_vars with
-    | [] -> assert false
-    | v :: vs ->
-      let v, pre_nest = Preceeding.group_with preceeding (pp_bound v) in
-      v ^?^ pre_nest (separate_map (break 1) pp_bound vs)
 
   and pp_variant ?(compact=true) ?preceeding ~tokens fields
         (cf : Asttypes.closed_flag) lbls =
@@ -2402,12 +2451,12 @@ end = struct
   let pp_type flatness ct =
     (* FIXME: just pass the right preceeding to [Core_type] ... and ask it not
        to group. *)
-    match Core_type.Arrow.collect_args ct with
+    match Core_type.Arrow.components ct with
     | None ->
       let preceeding = Preceeding.mk (S.colon ^^ break 1) ~indent:2 in
       Core_type.pp ~preceeding ct
-    | Some (args, (legacy_modes, post_modes, ty)) ->
-      Core_type.Arrow.pp_for_descr flatness args
+    | Some (poly_params, args, (legacy_modes, post_modes, ty)) ->
+      Core_type.Arrow.pp_for_descr flatness poly_params args
         ~pp_rhs:(Core_type.Arrow.pp_arg_moded_ty legacy_modes post_modes ty)
       |> Attribute.attach ~attrs:ct.ptyp_attributes
 
@@ -2739,7 +2788,7 @@ end = struct
     | Pcty_signature cs -> pp_signature cs
     | Pcty_arrow (arrow_arg, rhs) ->
       let args, rhs = collect_arrow_args [arrow_arg] rhs in
-      Core_type.Arrow.pp args
+      Core_type.Arrow.pp [] args
         ~pp_rhs:(fun ?preceeding () ->
           (* FIXME! *)
           Preceeding.group_with preceeding (pp rhs)
