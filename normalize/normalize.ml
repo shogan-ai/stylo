@@ -24,28 +24,23 @@ let map_constructor_arguments mapper env ca =
   let ca = Semicolon.constructor_arguments ca in
   super.constructor_arguments mapper env ca
 
-let add_pipe_if_missing tokens =
-  let first_tok =
-    List.find (function
-      | { Tokens.desc = (Token _ | Opt_token _); _ } -> true
-      | _ -> false
-    ) tokens
-  in
-  match first_tok.desc with
-  | Token BAR
-  | Opt_token BAR -> tokens
-  | _ ->
-    let bar = { first_tok with desc = Token BAR } in
-    bar :: tokens
-
-let remove_pipe_if_present = Utils.without ~token:BAR
+let add_pipe_if_missing ?(mk_optional=false) tokens =
+  let open Tokens in
+  let desc = if mk_optional then Opt_token BAR else Token BAR in
+  match Utils.split ~on:BAR tokens with
+  | tokens, [] ->
+    (* no pipe was present, insert one at the front *)
+    { desc; pos = (List.hd tokens).pos } :: tokens
+  | leading_comments, pipe :: following_tokens ->
+    (* ensure the pipe is optional/mandatory as requested *)
+    leading_comments @ { pipe with desc } :: following_tokens
 
 let map_type_kind mapper env tk =
   let tk = Semicolon.type_kind_no_trailing tk in
   let tk =
     match tk with
     | Ptype_variant [ cd ] ->
-      let pcd_tokens = remove_pipe_if_present cd.pcd_tokens in
+      let pcd_tokens = add_pipe_if_missing ~mk_optional:true cd.pcd_tokens in
       Ptype_variant [ { cd with pcd_tokens } ]
     | Ptype_variant (cd :: cds) ->
       let pcd_tokens = add_pipe_if_missing cd.pcd_tokens in
@@ -83,3 +78,4 @@ let normalizer =
   }
 
 let structure = normalizer.structure normalizer Other
+let signature = normalizer.signature normalizer Other

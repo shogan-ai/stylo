@@ -7,6 +7,7 @@ let style_file fn =
   let doc, tokens =
     if Filename.check_suffix fn ".mli" then (
       let sg = Parse.interface lexbuf in
+      let sg = Normalize.signature sg in
       Print.Signature.pp_interface sg, Tokens_of_tree.signature sg
     ) else (
       let str = Parse.implementation lexbuf in

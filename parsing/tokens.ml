@@ -493,7 +493,13 @@ let rec replace_first_child ~subst = function
   | x :: xs -> x :: replace_first_child ~subst xs
 
 let is_child t = t.desc = Child_node
+
 let is_comment t =
   match t.desc with
   | Comment _ -> true
+  | _ -> false
+
+let is_token t =
+  match t.desc with
+  | Token _ | Opt_token _ -> true
   | _ -> false

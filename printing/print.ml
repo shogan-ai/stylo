@@ -2595,9 +2595,9 @@ and Type_declaration : sig
     ?subst:bool -> Asttypes.rec_flag -> type_declaration list -> t
 end = struct
 
-  let constructor_declaration pipe
+  let constructor_declaration td_flatness
       { pcd_name; pcd_vars; pcd_args; pcd_res; pcd_attributes;
-        pcd_doc; pcd_loc = _; pcd_tokens = _ } =
+        pcd_doc; pcd_loc = _; pcd_tokens } =
     let pcd_vars =
       match pcd_vars with
       | [] -> empty
@@ -2623,26 +2623,27 @@ end = struct
       |> group
       |> nest 2
     in
-    if pipe then (
-      (* we never want to break after the pipe. *)
-      S.pipe ^^ nbsp ^^ without_pipe
-    ) else
+    match List.find Tokens.is_token pcd_tokens with
+    | { desc = Token BAR; _ } -> S.pipe ^^ nbsp ^^ without_pipe
+    | { desc = Opt_token BAR; _ } ->
+      S.optional_pipe (Condition.flat td_flatness) ^^ without_pipe
+    | _ ->
       without_pipe
 
-  let pp_variant = function
+  let pp_variant td_flatness = function
     | [] -> S.pipe
     | cd :: cds ->
-      let cd = constructor_declaration (starts_with_pipe cd.pcd_tokens) cd in
+      let cd = constructor_declaration td_flatness cd in
       match cds with
       | [] -> cd
       | _ ->
         List.fold_left (fun doc cd ->
-          doc ^^ softest_line ^^ constructor_declaration true cd
+          doc ^^ softest_line ^^ constructor_declaration td_flatness cd
         ) cd cds
 
-  let type_kind = function
+  let type_kind td_flatness = function
     | Ptype_abstract -> empty
-    | Ptype_variant cds -> pp_variant cds
+    | Ptype_variant cds -> pp_variant td_flatness cds
     | Ptype_record lbls -> Record.pp_decl lbls
     | Ptype_record_unboxed_product lbls -> Record.pp_decl ~unboxed:true lbls
     | Ptype_open -> S.dotdot
@@ -2653,7 +2654,7 @@ end = struct
       Core_type.pp ct2
     )
 
-  let pp_rhs ?(subst=false) td =
+  let pp_rhs ?(subst=false) td_flatness td =
     let eq = group (break 1 ^^ if subst then S.colon_equals else S.equals) in
     match td.ptype_manifest, td.ptype_kind with
     | None, Ptype_abstract -> empty
@@ -2661,9 +2662,9 @@ end = struct
       eq ^?^ private_ td.ptype_private ^?^ Core_type.pp_for_decl ct
     | Some ct, kind ->
       eq ^/^ Core_type.pp_for_decl ct ^/^
-      S.equals ^?^ private_ td.ptype_private ^?^ type_kind kind
+      S.equals ^?^ private_ td.ptype_private ^?^ type_kind td_flatness kind
     | None, kind ->
-      group (eq ^?^ private_ td.ptype_private) ^?^ type_kind kind
+      group (eq ^?^ private_ td.ptype_private) ^?^ type_kind td_flatness kind
 
   let pp ~start ?subst td =
     let start =
@@ -2683,8 +2684,9 @@ end = struct
         | Some j -> S.colon ^/^ Jkind_annotation.pp j
       )
     in
+    let flatness = flatness_tracker () in
     prefix
-      (group (lhs ^^ nest 2 (group (pp_rhs ?subst td))))
+      (group ~flatness (lhs ^^ nest 2 (group (pp_rhs ?subst flatness td))))
       (pp_constraints td.ptype_cstrs)
     |> Attribute.attach ~item:true
       ~text:td.ptype_pre_text
