@@ -2668,22 +2668,26 @@ end = struct
       group (eq ^?^ private_ td.ptype_private) ^?^ type_kind td_flatness kind
 
   let pp ~start ?subst td =
-    let start =
-      match start with
-      | [] -> assert false
-      | first_kw :: other_kws ->
-        Ext_attribute.decorate first_kw td.ptype_ext_attrs
-          ^?^ separate (break 1) other_kws
-    in
     let lhs =
-      prefix start (
+      let kws =
+        match start with
+        | [] -> assert false
+        | first_kw :: other_kws ->
+          Ext_attribute.decorate first_kw td.ptype_ext_attrs
+          ^?^ separate (break 1) other_kws
+      in
+      let tconstr =
         Type_constructor.pp_decl td.ptype_tokens
           td.ptype_params (string td.ptype_name.txt)
-        ^?^
-        match td.ptype_jkind_annotation with
-        | None -> empty
-        | Some j -> S.colon ^/^ Jkind_annotation.pp j
-      )
+      in
+      let jkind =
+        optional (fun j ->
+          (* FIXME: pass colon as preceeding? *)
+          group (S.colon ^/^ Jkind_annotation.pp j)
+        ) td.ptype_jkind_annotation
+      in
+      group (kws ^/^ nest 2 tconstr) ^?^
+      nest 2 jkind
     in
     let flatness = flatness_tracker () in
     prefix
@@ -3902,7 +3906,7 @@ end = struct
       separate_map (break 1 ^^ S.ampersand ^^ break 1) Jkind_annotation.pp jks
     | Parens jkd -> parens (jkind_annotation_desc jkd)
 
-  let pp jk = jkind_annotation_desc jk.pjkind_desc
+  let pp jk = group (jkind_annotation_desc jk.pjkind_desc)
 end
 
 (* FIXME: TODO? *)
