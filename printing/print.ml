@@ -644,7 +644,8 @@ end = struct
     | [] -> assert false
     | v :: vs ->
       let v, pre_nest = Preceeding.group_with preceeding (pp_bound v) in
-      v ^?^ pre_nest (separate_map (break 1) pp_bound vs)
+      let vs = List.map (fun v -> pre_nest (pp_bound v)) vs in
+      flow (break 1) (v :: vs)
 
   module Arrow = struct
     type printer = ?preceeding:Preceeding.t -> unit -> t
