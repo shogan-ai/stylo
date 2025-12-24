@@ -270,7 +270,7 @@ end = struct
 end
 
 and Extension : sig
-  val pp : ?floating:bool -> extension -> t
+  val pp : ?preceeding:Preceeding.t -> ?floating:bool -> extension -> t
 
   val pp_toplevel : toplevel_extension -> t
 end = struct
@@ -279,24 +279,29 @@ end = struct
       2
     | PStr _ | PSig _ -> 0
 
-  let pp_classic ~floating names payload =
+  let pp_classic ?preceeding ~floating names payload =
     let name = Attribute.pp_attr_name names in
     let opn, indent =
       if floating
       then S.lbracket_percentpercent, payload_indent payload
       else S.lbracket_percent, 2
     in
-    opn ^^ name ^^ nest indent (Payload.pp payload ^^ S.rbracket)
+    let opn, pre_nest = Preceeding.group_with preceeding opn in
+    opn ^^ pre_nest (name ^^ nest indent (Payload.pp payload ^^ S.rbracket))
 
-  let pp ?(floating=false) (ext_name, ext_payload, _tokens) =
+  let pp ?preceeding ?(floating=false) (ext_name, ext_payload, _tokens) =
     match ext_payload with
     | PString (s, delim) ->
       let ext_name = String.concat "." ext_name.txt in
       (* Careful: single token! *)
       let percent = if floating then "%%" else "%" in
       let blank = if delim <> "" then " " else "" in
-      fancy_string "{%s%s%s%s|%s|%s}" percent ext_name blank delim s delim
-    | _ -> group (pp_classic ~floating ext_name ext_payload)
+      let s =
+        fancy_string "{%s%s%s%s|%s|%s}" percent ext_name blank delim s delim
+      in
+      Preceeding.group_with preceeding s
+      |> fst
+    | _ -> group (pp_classic ?preceeding ~floating ext_name ext_payload)
 
   let pp_toplevel { te_ext; te_attrs; te_pre_doc; te_post_doc } =
     pp ~floating:true te_ext
@@ -1470,11 +1475,7 @@ end = struct
     | Pexp_lazy e ->
       let lazy_, pre_nest = Preceeding.group_with preceeding !!S.lazy_ in
       group (lazy_ ^/^ pre_nest @@ nest 2 (pp e))
-    | Pexp_object cs ->
-      (* FIXME: pass forward the "preceeding"... *)
-      Preceeding.group_with preceeding @@
-      Class_expr.pp_structure exp.pexp_ext_attr cs
-      |> fst
+    | Pexp_object cs -> Class_expr.pp_structure ?preceeding exp.pexp_ext_attr cs
     | Pexp_pack (me, ty) ->
       pp_pack ~preceeding ~ext_attr:exp.pexp_ext_attr me ty
     | Pexp_dot_open (lid, e) -> pp_dot_open ~preceeding lid e
@@ -1486,25 +1487,15 @@ end = struct
         pre_nest (Open_declaration.pp ~item:false od ^/^ S.in_)
       in
       group let_open ^^ hardline ^^ pre_nest (pp e)
-    | Pexp_letop lo ->
-      (* FIXME: pass fwd. *)
-      Preceeding.group_with preceeding @@ Letop.pp lo
-      |> fst
-    | Pexp_extension ext ->
-      (* FIXME: pass fwd *)
-      Preceeding.group_with preceeding @@ Extension.pp ext
-      |> fst
+    | Pexp_letop lo -> Letop.pp ?preceeding lo
+    | Pexp_extension ext -> Extension.pp ?preceeding ext
     | Pexp_unreachable  ->
       let dot, _ = Preceeding.group_with preceeding S.dot in
       dot ^^ break 1 (* prevents unintentional conversion into DOTOP *)
     | Pexp_stack e ->
       let stack__, pre_nest = Preceeding.group_with preceeding S.stack__ in
       stack__ ^/^ pre_nest @@ nest 2 (pp e)
-    | Pexp_comprehension ce ->
-      (* FIXME: pass fwd *)
-      Preceeding.group_with preceeding @@
-      Comprehension.pp_expr ce
-      |> fst
+    | Pexp_comprehension ce -> Comprehension.pp_expr ?preceeding ce
     | Pexp_overwrite (e1, e2) ->
       let overwrite, pre_nest =
         Preceeding.group_with preceeding !!S.overwrite__
@@ -2201,24 +2192,25 @@ end = struct
 end
 
 and Letop : sig
-  val pp : letop -> t
+  val pp : ?preceeding:Preceeding.t -> letop -> t
 end = struct
-  let pp { let_; ands; body } =
-    Binding_op.pp_list (let_ :: ands) ^^ hardline ^^
-    Expression.pp body
+  let pp ?preceeding { let_; ands; body } =
+    let pre_nest = Preceeding.implied_nest preceeding in
+    Binding_op.pp_list ?preceeding (let_ :: ands) ^^ hardline ^^
+    pre_nest @@ Expression.pp body
 end
 
 and Binding_op : sig
-  val pp_list : binding_op list -> t
+  val pp_list : ?preceeding:Preceeding.t -> binding_op list -> t
 end = struct
-  let pp ?(add_in=false) { pbop_op; pbop_binding; pbop_loc = _ }=
-    Value_binding.pp ~item:false ~start:[string pbop_op.txt]
+  let pp ?(add_in=false) ?preceeding { pbop_op; pbop_binding; pbop_loc = _ } =
+    Value_binding.pp ~item:false ?preceeding ~start:[string pbop_op.txt]
       pbop_binding ~add_in
 
-  let rec pp_list = function
+  let rec pp_list ?preceeding = function
     | [] -> empty
-    | [ bop ] -> pp ~add_in:true bop
-    | bop :: bops -> pp bop ^/^ pp_list bops
+    | [ bop ] -> pp ?preceeding ~add_in:true bop
+    | bop :: bops -> pp ?preceeding bop ^/^ pp_list bops
 end
 
 and Argument : sig
@@ -2403,8 +2395,7 @@ end = struct
 end
 
 and Comprehension : sig
-  val pp : comprehension -> t
-  val pp_expr : comprehension_expression -> t
+  val pp_expr : ?preceeding:Preceeding.t -> comprehension_expression -> t
 end = struct
   let pp_iterator = function
     | Pcomp_range { start; stop; direction = dir } ->
@@ -2417,27 +2408,37 @@ end = struct
     ; pcomp_cb_iterator = it
     ; pcomp_cb_attributes = attrs
     } =
-    Attribute.pp_list attrs ^/^
+    Attribute.pp_list attrs ^?^
     optional (fun m -> mode_legacy m.txt ^^ break 1) m_opt ^^
     Pattern.pp p ^/^ pp_iterator it
 
   let pp_clause = function
     | Pcomp_for l ->
-      S.for_ ^/^
-      separate_map (break 1 ^^ S.and_ ^^ break 1)
-        pp_clause_binding l
+      group (
+        S.for_ ^/^
+        separate_map (break 1 ^^ S.and_ ^^ break 1)
+          pp_clause_binding l
+      )
     | Pcomp_when e ->
-      S.when_ ^/^ Expression.pp e
+      group (S.when_ ^/^ Expression.pp e)
 
-  let pp c =
-    Expression.pp c.pcomp_body ^/^
-    separate_map (break 1) pp_clause c.pcomp_clauses
+  let pp ?preceeding c =
+    let pre_nest = Preceeding.implied_nest preceeding in
+    Expression.pp ?preceeding c.pcomp_body ^/^
+    pre_nest (separate_map (break 1) pp_clause c.pcomp_clauses)
 
-  let pp_expr = function
-    | Pcomp_list_comprehension c -> S.lbracket ^/^ pp c ^/^ S.rbracket
-    | Pcomp_array_comprehension (mut, c) ->
-      let left, right = array_delimiters mut in
-      left ^/^ pp c ^/^ right
+  let pp_expr ?preceeding e =
+    let left, right, c =
+      match e with
+      | Pcomp_list_comprehension c -> S.lbracket, S.rbracket, c
+      | Pcomp_array_comprehension (mut, c) ->
+        let left, right = array_delimiters mut in
+        left, right, c
+    in
+    let left_pre, pre_nest =
+      Preceeding.extend preceeding (left ^^ break 1) ~indent:2
+    in
+    pp ~preceeding:left_pre c ^/^ pre_nest right
 end
 
 (** {2 Value descriptions} *)
@@ -2891,7 +2892,8 @@ end
 
 and Class_expr : sig
   val pp : class_expr -> t
-  val pp_structure : ext_attribute -> class_structure -> t
+  val pp_structure
+    : ?preceeding:Preceeding.t -> ext_attribute -> class_structure -> t
 end = struct
   let rec pp_desc ext_attr d =
     let (!!) kw = Ext_attribute.decorate kw ext_attr in
@@ -2920,16 +2922,21 @@ end = struct
       S.let_ ^/^ Open_description.pp od ^/^ S.in_ ^/^ pp ce
     | Pcl_parens ce -> parens (pp ce)
 
-  and pp_structure ext_attr { pcstr_self; pcstr_fields } =
+  and pp_structure ?preceeding ext_attr { pcstr_self; pcstr_fields } =
+    let pre_obj, pre_nest =
+      Ext_attribute.decorate S.object_ ext_attr
+      |> Preceeding.group_with preceeding
+    in
     let obj_with_self =
-      Ext_attribute.decorate S.object_ ext_attr ^^
-      match pcstr_self.ppat_desc with
+      pre_obj ^^
+      pre_nest @@ match pcstr_self.ppat_desc with
       | Ppat_any -> empty
       | _ -> Pattern.pp pcstr_self
     in
     prefix obj_with_self
-      (separate_map (hardline ^^ hardline) pp_field pcstr_fields) ^/^
-    S.end_
+      (pre_nest @@ separate_map (hardline ^^ hardline) pp_field pcstr_fields)
+    ^/^
+    pre_nest S.end_
 
   and pp_field { pcf_pre_doc; pcf_desc; pcf_attributes; pcf_post_doc;
                  pcf_loc = _; pcf_tokens = _ } =
