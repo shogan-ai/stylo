@@ -147,7 +147,14 @@ let flush_comments ~ws_before ~ws_after =
   cond, Comments_flushing_hint (inserted_comments, ws_before, ws_after)
 
 (* FIXME *)
-let comment s = Comment (Trivial (Req.of_int (strlen s), s))
+let comment s =
+  let req =
+    if String.contains s '\n'
+    then Req.infinity
+    else Req.of_int (strlen s)
+  in
+  Comment (Trivial (req, s))
+
 let docstring s = comment @@ "(**" ^ s ^ "*)"
 let comment s = comment @@ "(*" ^ s ^ "*)"
 
@@ -193,10 +200,12 @@ let pp_pseudo ppf pt =
   Format.pp_print_string ppf s
 
 let fancy_string s =
-  let leaf = Token (Trivial (Req.of_int (strlen s) ,s)) in
-  if String.contains s '\n'
-  then Token (Complex (Requirement.infinity, leaf))
-  else leaf
+  let req =
+    if String.contains s '\n'
+    then Req.infinity
+    else Req.of_int (strlen s)
+  in
+  Token (Trivial (req, s))
 
 let formatted_string t =
   Token (Complex (requirement t, t))

@@ -134,9 +134,9 @@ let constant = function
     optional string sign ^^ stringf "#%s" nb
   | Pconst_unboxed_float (sign, nb, Some suffix) ->
     optional string sign ^^ stringf "#%s%c" nb suffix
+  (* FIXME: keep source for char literals and print verbatim. *)
   | Pconst_char c -> stringf "'%s'" (Char.escaped c)
   | Pconst_untagged_char c -> stringf "#'%s'" (Char.escaped c)
-  (* FIXME: handling of string literals is not good enough. *)
   | Pconst_string (s, _, None) -> String_lit.pp s
   | Pconst_string (s, _, Some delim) -> fancy_string "{%s|%s|%s}" delim s delim
 
@@ -293,10 +293,9 @@ end = struct
     | PString (s, delim) ->
       let ext_name = String.concat "." ext_name.txt in
       (* Careful: single token! *)
-      (* FIXME: dedicated printer, same as string literals *)
       let percent = if floating then "%%" else "%" in
       let blank = if delim <> "" then " " else "" in
-      stringf "{%s%s%s%s|%s|%s}" percent ext_name blank delim s delim
+      fancy_string "{%s%s%s%s|%s|%s}" percent ext_name blank delim s delim
     | _ -> group (pp_classic ~floating ext_name ext_payload)
 
   let pp_toplevel { te_ext; te_attrs; te_pre_doc; te_post_doc } =
@@ -2447,8 +2446,6 @@ and Value_description : sig
   val pp : value_description -> t
 end = struct
   let pp_type flatness ct =
-    (* FIXME: just pass the right preceeding to [Core_type] ... and ask it not
-       to group. *)
     match Core_type.Arrow.components ct with
     | None ->
       let preceeding = Preceeding.mk (S.colon ^^ break 1) ~indent:2 in
@@ -2489,9 +2486,6 @@ end
 and Record : sig
   val pp_decl: ?unboxed:bool -> label_declaration list -> t
 end = struct
-
-  (* FIXME: use Preceeding here? *)
-
   let pp_field ?preceeding
         { pld_name; pld_mutable; pld_global;
           pld_modalities; pld_type; pld_attributes;
