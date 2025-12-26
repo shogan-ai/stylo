@@ -977,20 +977,12 @@ end
 (** {2 Patterns} *)
 
 and Pattern : sig
-  val pp : ?pipe:bool -> ?preceeding:Preceeding.t -> pattern -> t
+  val pp : ?preceeding:Preceeding.t -> pattern -> t
 end = struct
-  let rec pp ?(pipe=false) ?preceeding p =
-    let without_pipe =
-      let pat_lvl = flatness_tracker () in
-      group ~flatness:pat_lvl (pp_desc ~preceeding pat_lvl p)
-      |> Attribute.attach ~attrs:p.ppat_attributes
-    in
-    if pipe then (
-      assert (Option.is_none preceeding);
-      (* we never want to break after the pipe. *)
-      S.pipe ^^ nbsp ^^ nest 2 without_pipe
-    ) else
-      without_pipe
+  let rec pp ?preceeding p =
+    let pat_lvl = flatness_tracker () in
+    group ~flatness:pat_lvl (pp_desc ~preceeding pat_lvl p)
+    |> Attribute.attach ~attrs:p.ppat_attributes
 
   and pp_desc ~preceeding pat_flatness p =
     let (!!) kw = Ext_attribute.decorate kw p.ppat_ext_attr in
@@ -1028,10 +1020,9 @@ end = struct
       pp_array ~preceeding (nb_semis p.ppat_tokens) mut ps
     | Ppat_or (p1, p2) ->
       let pre_nest = Preceeding.implied_nest preceeding in
+      let pipe_pre = Preceeding.mk (S.pipe ^^ break 1) ~indent:2 in
       pp ?preceeding p1 ^/^
-      (* TODO: [pp ~pipe:true p2] or pass pipe as preceeding instead of the
-         following? *)
-      pre_nest (group (S.pipe ^/^ pp p2))
+      pre_nest (pp ~preceeding:pipe_pre p2)
     | Ppat_constraint (p, ty, modes) ->
       pp_constraint ~preceeding p ty modes
     | Ppat_type lid ->
@@ -1045,14 +1036,8 @@ end = struct
     | Ppat_exception p ->
       let exn, pre_nest = Preceeding.group_with preceeding !!S.exception_ in
       exn ^/^ pre_nest @@ nest 2 (pp p)
-    | Ppat_extension ext ->
-      (* TODO: pass fwd *)
-      Preceeding.group_with preceeding (Extension.pp ext)
-      |> fst
-    | Ppat_open (lid, p) ->
-      (* TODO: pass fwd? *)
-      Preceeding.group_with preceeding (pp_open lid p)
-      |> fst
+    | Ppat_extension ext -> Extension.pp ?preceeding ext
+    | Ppat_open (lid, p) -> pp_open ~preceeding lid p
     | Ppat_parens { pat; optional } ->
       pp_parens ~preceeding ~optional pat_flatness pat
     | Ppat_list elts -> pp_list ~preceeding (nb_semis p.ppat_tokens) elts
@@ -1121,10 +1106,9 @@ end = struct
     let join a b = a ^^ break 0 ^^ pre_nest b in
     let pats =
       foldli (fun i acc pat ->
-        if i = 0 then
-          Argument.pp_preceeded ~preceeding:lparen (pp ~pipe:false) pat
-        else
-          join acc (Argument.pp_preceeded ~preceeding:comma (pp ~pipe:false) pat)
+        if i = 0
+        then Argument.pp_preceeded ~preceeding:lparen pp pat
+        else join acc (Argument.pp_preceeded ~preceeding:comma pp pat)
       ) empty pats
     in
     let pats =
@@ -1135,14 +1119,16 @@ end = struct
     (* FIXME: attributes indent! *)
     Attribute.attach ~attrs pats ^^ pre_nest (group rparen)
 
-  and pp_open lid p =
+  and pp_open ~preceeding lid p =
     let space =
       match p.ppat_desc with
       | Ppat_unboxed_tuple _
       | Ppat_record_unboxed_product _ -> break 1
       | _ -> empty
     in
-    longident lid.txt ^^ S.dot ^^ space ^^ pp p
+    let lid = longident lid.txt in
+    let pre_lid, pre_nest = Preceeding.group_with preceeding lid in
+    pre_lid ^^ pre_nest (S.dot ^^ space ^^ pp p)
 
   and pp_delimited_seq ~preceeding (opn, cls) nb_semis = function
     | [] ->
@@ -1214,7 +1200,7 @@ end = struct
     let pats =
       foldli (fun i acc pat ->
         if i = 0
-        then Argument.pp_preceeded ?preceeding (pp ~pipe:false) pat
+        then Argument.pp_preceeded ?preceeding pp pat
         else comma_join acc (Argument.pp pp pat)
       ) empty pats
     in
@@ -1480,7 +1466,6 @@ end = struct
       pp_pack ~preceeding ~ext_attr:exp.pexp_ext_attr me ty
     | Pexp_dot_open (lid, e) -> pp_dot_open ~preceeding lid e
     | Pexp_let_open (od, e) ->
-      (* TODO: pass forward the "preceeding" ... *)
       let pre_let, pre_nest = Preceeding.group_with preceeding S.let_ in
       let let_open =
         pre_let ^/^
@@ -2161,11 +2146,13 @@ end = struct
         split_top_or p1 @ split_top_or p2
       | _ -> [ p ]
     in
+    let pipe_pre = Some (Preceeding.mk (S.pipe ^^ break 1) ~indent:2) in
+    let first_pre = if pipe then pipe_pre else None in
     split_top_or p
-    |> List.fold_left (fun (acc, pipe) pat ->
-      let p = Pattern.pp ~pipe pat in
-      acc ^?^ p, true
-    ) (empty, pipe)
+    |> List.fold_left (fun (acc, preceeding) pat ->
+      let p = Pattern.pp ?preceeding pat in
+      acc ^?^ p, pipe_pre
+    ) (empty, first_pre)
     |> fst
 
   let pp pipe { pc_lhs; pc_guard; pc_rhs } =
