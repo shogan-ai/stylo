@@ -4594,7 +4594,7 @@ meth_list:
 
 value_constant:
   | INT               { let (n, m) = $1 in Pconst_integer (None, n, m) }
-  | CHAR              { Pconst_char $1 }
+  | CHAR              { let (c, s) = $1 in Pconst_char (c, s) }
   | STRING            { let (s, strloc, d) = $1 in
                         Pconst_string (s, strloc, d) }
   | FLOAT             { let (f, m) = $1 in Pconst_float (None, f, m) }
@@ -4602,7 +4602,7 @@ value_constant:
 unboxed_constant:
   | HASH_INT          { unboxed_int $sloc $sloc $1 }
   | HASH_FLOAT        { unboxed_float $1 }
-  | HASH_CHAR         { Pconst_untagged_char $1 }
+  | HASH_CHAR         { let (c, s) = $1 in Pconst_untagged_char (c, s) }
 ;
 constant:
     value_constant    { $1 }

@@ -20,8 +20,9 @@
 %token BARBAR                 "||"
 %token BARRBRACKET            "|]"
 %token BEGIN                  "begin"
-%token <char> CHAR            "'a'" (* just an example *)
-%token <char> HASH_CHAR       "#'a'" (* just an example *)
+%token <char * string> CHAR  "'a'" (* just an example *)
+%token <char * string>
+       HASH_CHAR              "#'a'" (* just an example *)
 %token CLASS                  "class"
 %token COLON                  ":"
 %token COLONCOLON             "::"

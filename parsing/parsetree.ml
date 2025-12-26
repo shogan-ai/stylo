@@ -38,8 +38,8 @@ type constant =
           A suffix [[g-z][G-Z]] is required by the parser.
           Suffixes except ['l'], ['L'] and ['n'] are rejected by the typechecker
       *)
-  | Pconst_char of char  (** Character such as ['c']. *)
-  | Pconst_untagged_char of char  (** Character such as [#'c']. *)
+  | Pconst_char of char * string (** Character such as ['c']. *)
+  | Pconst_untagged_char of char * string  (** Character such as [#'c']. *)
   | Pconst_string of string * Location.t * string option
       (** Constant string such as ["constant"] or
           [{delim|other constant|delim}].

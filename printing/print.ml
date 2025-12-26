@@ -134,9 +134,8 @@ let constant = function
     optional string sign ^^ stringf "#%s" nb
   | Pconst_unboxed_float (sign, nb, Some suffix) ->
     optional string sign ^^ stringf "#%s%c" nb suffix
-  (* FIXME: keep source for char literals and print verbatim. *)
-  | Pconst_char c -> stringf "'%s'" (Char.escaped c)
-  | Pconst_untagged_char c -> stringf "#'%s'" (Char.escaped c)
+  | Pconst_char (_, src) -> stringf "%s" src
+  | Pconst_untagged_char (_, src) -> stringf "%s" src
   | Pconst_string (s, _, None) -> String_lit.pp s
   | Pconst_string (s, _, Some delim) -> fancy_string "{%s|%s|%s}" delim s delim
 

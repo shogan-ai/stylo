@@ -464,10 +464,10 @@ let produce_and_backtrack lexbuf token back =
   lexbuf.lex_curr_p <- { curpos with pos_cnum = curpos.pos_cnum - back };
   token
 
-let char ~maybe_hash lit =
+let char ~maybe_hash lit src =
   match maybe_hash with
-  | "#" -> HASH_CHAR (lit)
-  | "" -> CHAR (lit)
+  | "#" -> HASH_CHAR (lit, src)
+  | "" -> CHAR (lit, src)
   | unexpected -> fatal_error ("expected # or empty string: " ^ unexpected)
 
 let skip_hash ~maybe_hash =
@@ -644,28 +644,28 @@ rule token = parse
         let idloc = compute_quoted_string_idloc orig_loc 3 id in
         QUOTED_STRING_ITEM (id, idloc, s, loc, delim) }
   | ('#'? as maybe_hash)
-    "\'" newline "\'"
+    "\'" newline "\'" as src
       { update_loc lexbuf None 1 false 1;
         (* newline is ('\013'* '\010') *)
-        char ~maybe_hash '\n' }
+        char ~maybe_hash '\n' src }
   | ('#'? as maybe_hash)
-    "\'" ([^ '\\' '\'' '\010' '\013'] as c) "\'"
-      { char ~maybe_hash c }
+    "\'" ([^ '\\' '\'' '\010' '\013'] as c) "\'" as src
+      { char ~maybe_hash c src }
   | ('#'? as maybe_hash)
-    "\'\\" (['\\' '\'' '\"' 'n' 't' 'b' 'r' ' '] as c) "\'"
-      { char ~maybe_hash (char_for_backslash c) }
+    "\'\\" (['\\' '\'' '\"' 'n' 't' 'b' 'r' ' '] as c) "\'" as src
+      { char ~maybe_hash (char_for_backslash c) src }
   | ('#'? as maybe_hash)
-    "\'\\" ['0'-'9'] ['0'-'9'] ['0'-'9'] "\'"
+    "\'\\" ['0'-'9'] ['0'-'9'] ['0'-'9'] "\'" as src
       { char ~maybe_hash
-          (char_for_decimal_code lexbuf (2 + skip_hash ~maybe_hash)) }
+          (char_for_decimal_code lexbuf (2 + skip_hash ~maybe_hash)) src }
   | ('#'? as maybe_hash)
-    "\'\\" 'o' ['0'-'7'] ['0'-'7'] ['0'-'7'] "\'"
+    "\'\\" 'o' ['0'-'7'] ['0'-'7'] ['0'-'7'] "\'" as src
       { char ~maybe_hash
-          (char_for_octal_code lexbuf (3 + skip_hash ~maybe_hash)) }
+          (char_for_octal_code lexbuf (3 + skip_hash ~maybe_hash)) src }
   | ('#'? as maybe_hash)
-    "\'\\" 'x' ['0'-'9' 'a'-'f' 'A'-'F'] ['0'-'9' 'a'-'f' 'A'-'F'] "\'"
+    "\'\\" 'x' ['0'-'9' 'a'-'f' 'A'-'F'] ['0'-'9' 'a'-'f' 'A'-'F'] "\'" as src
       { char ~maybe_hash
-          (char_for_hexadecimal_code lexbuf (3 + skip_hash ~maybe_hash)) }
+          (char_for_hexadecimal_code lexbuf (3 + skip_hash ~maybe_hash)) src }
   | '#'? "\'" ("\\" [^ '#'] as esc)
       { error lexbuf (Illegal_escape (esc, None)) }
   | '#'? "\'\'"
