@@ -90,6 +90,7 @@ type t =
 
 and pseudo_token =
   | Trivial of Req.t * string
+  | Verbatim of Req.t * string * int
   | Complex of Req.t * t
 
 let ws_req = function
@@ -111,6 +112,7 @@ let strlen s =
 
 let pseudo_token_req = function
   | Trivial (req, _)
+  | Verbatim (req, _, _)
   | Complex (req, _) -> req
 
 let requirement = function
@@ -145,18 +147,6 @@ let flush_comments ~ws_before ~ws_after =
   let inserted_comments = ref false in
   let cond : Condition.t = lazy !inserted_comments in
   cond, Comments_flushing_hint (inserted_comments, ws_before, ws_after)
-
-(* FIXME *)
-let comment s =
-  let req =
-    if String.contains s '\n'
-    then Req.infinity
-    else Req.of_int (strlen s)
-  in
-  Comment (Trivial (req, s))
-
-let docstring s = comment @@ "(**" ^ s ^ "*)"
-let comment s = comment @@ "(*" ^ s ^ "*)"
 
 let (^^) t1 t2 =
   match t1, t2 with
@@ -194,20 +184,31 @@ let flatness_tracker () = ref false
 let pp_pseudo ppf pt =
   let s =
     match pt with
-    | Trivial (_, s) -> s
+    | Trivial (_, s)
+    | Verbatim (_, s, _) -> s
     | Complex _ -> "<complex>"
   in
   Format.pp_print_string ppf s
 
-let fancy_string s =
-  let req =
-    if String.contains s '\n'
-    then Req.infinity
-    else Req.of_int (strlen s)
-  in
-  Token (Trivial (req, s))
+let pseudo_of_string s =
+  if String.contains s '\n'
+  then
+    let lines = String.split_on_char '\n' s in
+    let last = List.hd @@ List.rev lines in
+    Verbatim (Req.infinity, s, String.length last)
+  else
+    Trivial (Req.of_int (strlen s), s)
+
+
+let fancy_string s = Token (pseudo_of_string s)
 
 let formatted_string t =
   Token (Complex (requirement t, t))
+
+(* FIXME *)
+let comment s = Comment (pseudo_of_string s)
+let docstring s = comment @@ "(**" ^ s ^ "*)"
+let comment s = comment @@ "(*" ^ s ^ "*)"
+
 
 let is_empty = function Empty -> true | _ -> false

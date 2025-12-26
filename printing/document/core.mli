@@ -53,6 +53,7 @@ type t = private
 
 and pseudo_token = private
   | Trivial of Requirement.t * string
+  | Verbatim of Requirement.t * string * int
   | Complex of Requirement.t * t
 
 val requirement : t -> Requirement.t
