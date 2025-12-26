@@ -1670,7 +1670,8 @@ end = struct
       ; pexp_desc = Pexp_parens { exp = e; optional = false }
       ; _ } ->
       group (kw ^/^ S.lparen) ^^ nest 2 (group (break 0 ^^ pp e ^^ S.rparen))
-    | exp -> kw ^^ nest 2 (group (break 1 ^^ pp exp))
+    | exp ->
+      group (kw ^/^ nest 2 (pp exp))
 
   and pp_delimited_seq ~preceeding (opn, cls) nb_semis = function
     | [] ->
@@ -2156,16 +2157,14 @@ end = struct
     |> fst
 
   let pp pipe { pc_lhs; pc_guard; pc_rhs } =
-    group (
+    let guarded_pat =
       prefix (group (pp_pattern pipe pc_lhs))
-        (pp_guard pc_guard) ^^
-      nest 2 (
-        (* always try to put things on the same line as what preceeds if they
-           fit. *)
-        group (break 1 ^^ S.rarrow) ^^
-        group (break 1 ^^ Expression.pp pc_rhs)
-      )
-    )
+        (pp_guard pc_guard)
+    in
+    let body = Expression.pp pc_rhs in
+    (* try to put things on the same line as what preceeds if they fit. *)
+    flow (break 1) [ guarded_pat; nest 2 S.rarrow; nest 2 body ]
+    |> group
 
   let pp_cases ~has_leading_pipe =
     foldli (fun i accu x ->

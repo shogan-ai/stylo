@@ -104,9 +104,10 @@ let first_is_flushhint d = first_is_flushhint d = `yes
 
 let rec nest_before_leaf = function
   | Doc.Nest _ -> `yes
-  | Token _ | Optional _ | Comment _ | Whitespace _ -> `no
+  | Token _ | Optional _ | Comment _ -> `no
   | Group (_, _, _, d) -> nest_before_leaf d
   | Empty
+  | Whitespace _
   | Comments_flushing_hint _ -> `maybe
   | Cat (_, d1, d2) ->
     match nest_before_leaf d1 with
