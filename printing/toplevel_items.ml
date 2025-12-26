@@ -29,7 +29,7 @@ type cont =
   | Done
 
 let opt_semisemi_doc vanishing_level =
-  Document.opt_token ~ws_before:(Line_break Softest) vanishing_level ";;"
+  Document.opt_token ~ws_before:softest_line vanishing_level ";;"
 
 let rec advance_tokens = function
   | [] -> Done

@@ -160,9 +160,9 @@ let opt_token ?ws_before ?ws_after vanishing_cond tok =
   match ws_before, ws_after with
   | Some _, Some _ -> invalid_arg "Document.opt_token"
   | _ ->
-    let ws = function
-      | None -> empty
-      | Some ws -> Whitespace (Some vanishing_cond, ws)
+    let ws ws =
+      Option.map (vanishing_whitespace vanishing_cond) ws
+      |> Option.value ~default:empty
     in
     ws ws_before ^^
     Optional

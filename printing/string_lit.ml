@@ -40,7 +40,7 @@ let pp_words ?(last_line=false) words =
       sentence ^^ group ~margin ~flatness (
         (* If we are flat, then the backslash disappears, otherwise it stays and
            will be followed a linebreak. *)
-        opt_token ~ws_before:Non_breakable fits "\\" ^^
+        opt_token ~ws_before:nbsp fits "\\" ^^
         break 1 ^^
         word
       )

@@ -5,6 +5,8 @@
 
     In particular it doesn't expose an equivalent PPrint's [IfFlat] operator, as
     that is in general not well behaved wrt. automatic comment insertion.
+    Instead it provides extra primitives which build such choices in but only at
+    the level of leaves.
    *)
 
 include Core

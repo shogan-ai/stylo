@@ -1090,9 +1090,8 @@ end = struct
       if optional
       then
         let cond = Condition.flat flatness in
-        let break = Break (1, Hard (* doesn't make a difference *)) in
-        opt_token cond "(" ~ws_after:break,
-        opt_token cond ~ws_before:break ")"
+        opt_token cond "(" ~ws_after:(break 1),
+        opt_token cond ~ws_before:(break 1) ")"
       else
         let pat_is_flat = Condition.flat flatness in
         let space_when_multiline =
@@ -1829,9 +1828,8 @@ end = struct
       if optional
       then
         let cond = Condition.flat flatness in
-        let break = Break (1, Hard (* doesn't make a difference *)) in
-        opt_token cond "(" ~ws_after:break,
-        opt_token cond ~ws_before:break ")"
+        opt_token cond "(" ~ws_after:(break 1),
+        opt_token cond ~ws_before:(break 1) ")"
       else
         let pat_is_flat = Condition.flat flatness in
         let space_when_multiline =

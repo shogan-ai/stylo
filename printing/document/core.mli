@@ -61,8 +61,7 @@ val requirement : t -> Requirement.t
 val empty : t
 val string : string -> t
 
-val opt_token
-  : ?ws_before:whitespace -> ?ws_after:whitespace -> Condition.t -> string -> t
+val opt_token : ?ws_before:t -> ?ws_after:t -> Condition.t -> string -> t
 
 val break : int -> t
 val soft_break : int -> t
