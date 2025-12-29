@@ -1917,7 +1917,7 @@ end = struct
           group (op ^^ pp arg)
         | _ ->
           let indent = Requirement.to_int (requirement op) in
-          let op_pre = Preceeding.mk op ~indent in
+          let op_pre = Preceeding.mk (group op) ~indent in
           pp ~preceeding:op_pre arg
     in
     match arg.pexp_desc with
