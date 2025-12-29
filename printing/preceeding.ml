@@ -23,7 +23,8 @@ let extend t_opt doc ~indent =
   match t_opt with
   | None -> suf, Fun.id
   | Some (preceeding, previous_nest) ->
-    (preceeding ^^ doc, Fun.compose nest previous_nest), previous_nest
+    (preceeding ^^ previous_nest doc, Fun.compose nest previous_nest),
+    previous_nest
 
 let group_with t doc =
   match t with
