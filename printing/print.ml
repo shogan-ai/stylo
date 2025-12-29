@@ -1469,10 +1469,9 @@ end = struct
       pp_pack ~preceeding ~ext_attr:exp.pexp_ext_attr me ty
     | Pexp_dot_open (lid, e) -> pp_dot_open ~preceeding lid e
     | Pexp_let_open (od, e) ->
-      let pre_let, pre_nest = Preceeding.group_with preceeding S.let_ in
+      let pre_nest = Preceeding.implied_nest preceeding in
       let let_open =
-        pre_let ^/^
-        pre_nest (Open_declaration.pp ~item:false od ^/^ S.in_)
+        Open_declaration.pp ~item:false ?preceeding od ^/^ pre_nest S.in_
       in
       group let_open ^^ hardline ^^ pre_nest (pp e)
     | Pexp_letop lo -> Letop.pp ?preceeding lo
@@ -3261,29 +3260,49 @@ end = struct
 end
 
 and Open_infos : sig
-  val pp : 'a. ?item:bool -> ('a -> t) -> 'a open_infos -> t
+  val pp
+    :  'a
+    .  ?item:bool
+    -> ?preceeding:Preceeding.t
+    -> ('a -> Layout_module_binding.rhs) -> 'a open_infos -> t
 end = struct
-  let pp ?(item=true) pp_expr
+  let pp ?(item=true) ?preceeding pp_expr
       { popen_expr; popen_override; popen_attributes; popen_ext_attrs;
         popen_pre_doc; popen_post_doc; popen_loc = _; popen_tokens = _ } =
-    Ext_attribute.decorate_optional_override S.open_ popen_override
-      popen_ext_attrs ^/^
-    pp_expr popen_expr
-    |> Attribute.attach ~item ~attrs:popen_attributes
+    let open_kw =
+      Ext_attribute.decorate_optional_override S.open_ popen_override
+        popen_ext_attrs
+    in
+    let keywords, pre_nest =
+      (if not item then group (S.let_ ^/^ open_kw) else open_kw)
+      |> Preceeding.group_with preceeding
+    in
+    let open_ =
+      match pp_expr popen_expr with
+      | Layout_module_binding.Single_part doc ->
+        group (keywords ^/^ pre_nest @@ nest 2 doc)
+      | Three_parts { start; main; stop } ->
+        group (keywords ^/^ pre_nest start) ^/^ pre_nest (
+          nest 2 main ^/^
+          stop
+        )
+    in
+    (* FIXME: indent ot attrs! *)
+    Attribute.attach ~item ~attrs:popen_attributes
       ?pre_doc:popen_pre_doc ?post_doc:popen_post_doc
-    |> group
+      open_
 end
 
 and Open_description : sig
   val pp : open_description -> t
 end = struct
-  let pp = Open_infos.pp (fun lid -> longident lid.txt)
+  let pp = Open_infos.pp (fun lid -> Single_part (longident lid.txt))
 end
 
 and Open_declaration : sig
-  val pp : ?item:bool -> open_declaration -> t
+  val pp : ?item:bool -> ?preceeding:Preceeding.t -> open_declaration -> t
 end = struct
-  let pp ?item = Open_infos.pp ?item Module_expr.pp
+  let pp ?item ?preceeding = Open_infos.pp ?item ?preceeding Module_expr.as_rhs
 end
 
 and Include_infos : sig
