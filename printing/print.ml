@@ -2475,19 +2475,21 @@ end = struct
     in
     let kw = Ext_attribute.decorate kw pval_ext_attrs in
     let flatness = flatness_tracker () in
-    group (kw ^/^ str_or_op pval_name.txt) ^/^ nest 2 (
-      with_modalities ~modalities:pval_modalities
-        (pp_type flatness pval_type)
-      ^?^
-      begin match pval_prim with
+    group ~flatness (
+      group (kw ^/^ str_or_op pval_name.txt) ^/^ nest 2 (
+        with_modalities ~modalities:pval_modalities
+          (pp_type flatness pval_type)
+        ^?^
+        begin match pval_prim with
         | [] -> empty
         | ps ->
           group (
             S.equals ^/^ separate_map (break 1) (fun s -> stringf "%S" s) ps
           )
-      end
+        end
+      )
     )
-    |> Attribute.attach ~item:true ~flatness
+    |> Attribute.attach ~item:true
          ?pre_doc:pval_pre_doc ?post_doc:pval_post_doc ~attrs:pval_attributes
 end
 
