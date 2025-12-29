@@ -2539,7 +2539,7 @@ end = struct
         next_tok, group (pp_field ~preceeding lbl)
       ) (if unboxed then S.hash_lbrace else S.lbrace) lbls
     in
-    separate hardline lbls ^?^ maybe_trailing_semi ^?^ S.rbrace
+    group (separate hardline lbls ^?^ maybe_trailing_semi ^?^ S.rbrace)
 end
 
 and Constructor_argument : sig
@@ -2660,43 +2660,48 @@ end = struct
       Core_type.pp ct2
     )
 
-  let pp_rhs ?(subst=false) td_flatness td =
-    let eq = group (break 1 ^^ if subst then S.colon_equals else S.equals) in
+  let rhs_parts ?(subst=false) td_flatness td =
+    let eq = if subst then S.colon_equals else S.equals in
     match td.ptype_manifest, td.ptype_kind with
-    | None, Ptype_abstract -> empty
+    | None, Ptype_abstract -> []
     | Some ct, Ptype_abstract ->
-      eq ^?^ private_ td.ptype_private ^?^ Core_type.pp_for_decl ct
+      [eq; private_ td.ptype_private ^?^ Core_type.pp_for_decl ct]
     | Some ct, kind ->
-      eq ^/^ Core_type.pp_for_decl ct ^/^
-      S.equals ^?^ private_ td.ptype_private ^?^ type_kind td_flatness kind
+      [ eq
+      ; Core_type.pp_for_decl ct
+      ; S.equals; private_ td.ptype_private ^?^ type_kind td_flatness kind
+      ]
     | None, kind ->
-      group (eq ^?^ private_ td.ptype_private) ^?^ type_kind td_flatness kind
+      [ eq
+      ; private_ td.ptype_private
+      ; type_kind td_flatness kind
+      ]
 
   let pp ~start ?subst td =
-    let lhs =
-      let kws =
-        match start with
-        | [] -> assert false
-        | first_kw :: other_kws ->
-          Ext_attribute.decorate first_kw td.ptype_ext_attrs
-          ^?^ separate (break 1) other_kws
-      in
-      let tconstr =
-        Type_constructor.pp_decl td.ptype_tokens
-          td.ptype_params (string td.ptype_name.txt)
-      in
-      let jkind =
-        optional (fun j ->
-          (* FIXME: pass colon as preceeding? *)
-          group (S.colon ^/^ Jkind_annotation.pp j)
-        ) td.ptype_jkind_annotation
-      in
-      group (kws ^/^ nest 2 tconstr) ^?^
-      nest 2 jkind
-    in
     let flatness = flatness_tracker () in
+    let kws =
+      match start with
+      | [] -> assert false
+      | first_kw :: other_kws ->
+        Ext_attribute.decorate first_kw td.ptype_ext_attrs
+        ^?^ separate (break 1) other_kws
+    in
+    let tconstr =
+      Type_constructor.pp_decl td.ptype_tokens
+        td.ptype_params (string td.ptype_name.txt)
+    in
+    let jkind_parts =
+      match td.ptype_jkind_annotation with
+      | None -> []
+      | Some j -> [S.colon; Jkind_annotation.pp j]
+    in
+    let without_constraint =
+      flow (break 1)
+        (group kws :: List.map (nest 2)
+                  (tconstr :: jkind_parts @ rhs_parts ?subst flatness td))
+    in
     prefix
-      (group ~flatness (lhs ^^ nest 2 (group (pp_rhs ?subst flatness td))))
+      (group ~flatness without_constraint)
       (pp_constraints td.ptype_cstrs)
     |> Attribute.attach ~item:true
       ~text:td.ptype_pre_text
