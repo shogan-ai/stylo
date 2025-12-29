@@ -807,9 +807,7 @@ end = struct
       Type_constructor.pp_core_type ?preceeding tokens args lid.txt
     | Ptyp_object (fields, closed) -> pp_object ?preceeding fields closed
     | Ptyp_class (lid, args) ->
-      Type_constructor.pp_core_type ~class_:true tokens args lid.txt
-      |> Preceeding.group_with preceeding
-      |> fst
+      Type_constructor.pp_core_type ?preceeding ~class_:true tokens args lid.txt
     | Ptyp_alias (ct, name, None) ->
       let pre_nest = Preceeding.implied_nest preceeding in
       pp ?preceeding ct ^/^ pre_nest (
