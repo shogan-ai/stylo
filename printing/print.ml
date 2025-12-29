@@ -254,7 +254,11 @@ end = struct
         separate_map (group (S.dot ^^ break 0)) string lst_loc.txt
     in
     let (++) = if space then (^?^) else (^^) in
-    kw_with_ext ++ nest 2 (Attribute.pp_list pea_attrs)
+    let indent =
+      (* align attrs *)
+      if space then 2 else Requirement.to_int (requirement kw_with_ext)
+    in
+    kw_with_ext ++ nest indent (Attribute.pp_list pea_attrs)
 
   let decorate_optional_override kw ovr =
     let kw, between =
