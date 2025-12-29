@@ -3925,19 +3925,26 @@ end
 and Jkind_annotation : sig
   val pp : jkind_annotation -> t
 end = struct
-  let rec jkind_annotation_desc = function
+  let rec pp_desc = function
     | Default -> S.underscore
     | Abbreviation s -> string s
-    | Mod (jk, ms) -> Jkind_annotation.pp jk ^/^ S.mod_ ^/^ modes ms
+    | Mod (jk, ms) -> pp jk ^/^ S.mod_ ^/^ modes ms
     | With (jk, ct, modalities) ->
-      Jkind_annotation.pp jk ^/^ S.with_ ^/^ Core_type.pp ct
-      |> with_modalities ~modalities
+      pp jk ^/^
+      group (
+        S.with_ ^/^ nest 2 (
+          Core_type.pp ct
+          |> with_modalities ~modalities
+        )
+      )
     | Kind_of ct -> S.kind_of__ ^/^ Core_type.pp ct
     | Product jks ->
-      separate_map (break 1 ^^ S.ampersand ^^ break 1) Jkind_annotation.pp jks
-    | Parens jkd -> parens (jkind_annotation_desc jkd)
+      separate_map (break 1 ^^ S.ampersand ^^ break 1) pp jks
+    | Parens jkd -> parens (pp_desc jkd)
 
-  let pp jk = group (jkind_annotation_desc jk.pjkind_desc)
+  and pp jk = pp_desc jk.pjkind_desc
+
+  let pp jk = group (pp jk)
 end
 
 (* FIXME: TODO? *)
