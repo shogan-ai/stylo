@@ -1907,9 +1907,18 @@ end = struct
       | Some op ->
         assert (Option.is_none preceeding);
         let op = pp_op op ^^ break 1 in
-        let indent = Requirement.to_int (requirement op) in
-        let op_pre = Preceeding.mk op ~indent in
-        pp ~preceeding:op_pre arg
+        match arg.pexp_desc with
+        | Pexp_letop _ | Pexp_letexception _ | Pexp_letmodule _
+        | Pexp_ifthenelse _ | Pexp_let _ | Pexp_match _
+        | Pexp_sequence _ | Pexp_try _ | Pexp_let_open _ ->
+          (* These are the last elements of the chain (otherwise they'd be under
+             parens), we reproduce ocamlformat's choice of not indenting in
+             those case. *)
+          group (op ^^ pp arg)
+        | _ ->
+          let indent = Requirement.to_int (requirement op) in
+          let op_pre = Preceeding.mk op ~indent in
+          pp ~preceeding:op_pre arg
     in
     match arg.pexp_desc with
     | Pexp_apply (f, args) when on_right ->
@@ -1931,7 +1940,7 @@ end = struct
       let op = pp_op (Option.get op) ^^ break 1 in
       let op_pre = Preceeding.mk op ~indent:0 (* ! *) in
       let kw_and_params, body = pp_function_parts ~preceeding:op_pre arg in
-      kw_and_params ^/^ body
+      group (kw_and_params ^/^ body)
       |> Attribute.attach ~attrs:arg.pexp_attributes
     | Pexp_infix_apply { op = next_op; arg1; arg2 } ->
       let next_op_prec = Precedence.of_infix_op next_op in
