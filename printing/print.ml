@@ -1361,11 +1361,9 @@ end = struct
         e cases
     | Pexp_tuple elts -> pp_tuple ?preceeding elts
     | Pexp_unboxed_tuple elts ->
-      let hash_lparen, pre_nest =
-        Preceeding.extend preceeding S.hash_lparen ~indent:3
-      in
-      pp_tuple ~preceeding:hash_lparen ~pre_nest_override:pre_nest elts
-      ^^ pre_nest S.rparen
+      let flatness = flatness_tracker () in
+      group ~flatness @@
+      pp_parens_tuple ~preceeding ~kind:`Unboxed ~attrs:[] flatness elts
     | Pexp_construct (lid, arg) ->
       let lid, pre_nest =
         Preceeding.group_with preceeding @@ constr_longident lid.txt
@@ -1810,13 +1808,17 @@ end = struct
       ) unboxed_accesses
     )
 
-  and pp_tuple ?preceeding ?pre_nest_override elts =
+  and pp_tuple ?preceeding ?(comma_aligner=empty) ?pre_nest_override elts =
     let pre_nest =
       match pre_nest_override with
       | None -> Preceeding.implied_nest preceeding
       | Some nest -> nest
     in
-    let comma = Preceeding.mk (S.comma ^^ break 1) ~indent:2 in
+    let comma =
+      let comma = comma_aligner ^^ S.comma ^^ break 1 in
+      let indent = if is_empty comma_aligner then 2 else 3 in
+      Preceeding.mk comma ~indent
+    in
     foldli (fun i acc exp ->
       if i = 0 then
         Argument.pp_preceeded ?preceeding pp exp
@@ -1825,23 +1827,39 @@ end = struct
         pre_nest @@ Argument.pp_preceeded ~preceeding:comma pp exp
     ) empty elts
 
-  and pp_parens_tuple ~preceeding ~attrs ~optional flatness elts =
-    let lparen, rparen =
-      if optional
-      then
+  and pp_parens_tuple ~preceeding ~attrs ~kind flatness elts =
+    let lparen, comma_aligner, rparen =
+      match kind with
+      | `Optional ->
         let cond = Condition.flat flatness in
         opt_token cond "(" ~ws_after:(break 1),
+        None,
         opt_token cond ~ws_before:(break 1) ")"
-      else
+      | `Regular ->
         let pat_is_flat = Condition.flat flatness in
         let space_when_multiline =
           group (vanishing_whitespace pat_is_flat nbsp)
         in
         S.lparen ^^ space_when_multiline ^^ break 0,
+        None,
+        space_when_multiline ^^ break 0 ^^ S.rparen
+      | `Unboxed ->
+        let pat_is_flat = Condition.flat flatness in
+        let space_when_multiline =
+          group (vanishing_whitespace pat_is_flat nbsp)
+        in
+        S.hash_lparen ^^ space_when_multiline ^^ break 0,
+        Some space_when_multiline,
         space_when_multiline ^^ break 0 ^^ S.rparen
     in
-    let lparen, pre_nest = Preceeding.extend preceeding lparen ~indent:2 in
-    let elts = pp_tuple ~preceeding:lparen ~pre_nest_override:pre_nest elts in
+    let lparen, pre_nest =
+      let indent = if kind = `Unboxed then 3 else 2 in
+      Preceeding.extend preceeding lparen ~indent
+    in
+    let elts =
+      pp_tuple ~preceeding:lparen ~pre_nest_override:pre_nest elts
+        ?comma_aligner
+    in
     (* FIXME: indent of attrs! *)
     Attribute.attach ~attrs elts ^^ pre_nest (group rparen)
 
@@ -1850,7 +1868,8 @@ end = struct
     group ~flatness @@
     match exp.pexp_desc with
     | Pexp_tuple elts ->
-      pp_parens_tuple ~preceeding ~optional flatness ~attrs:exp.pexp_attributes elts
+      let kind = if optional then `Optional else `Regular in
+      pp_parens_tuple ~preceeding ~kind flatness ~attrs:exp.pexp_attributes elts
     | _ ->
       let before, after =
         (* No break? *)
