@@ -992,8 +992,13 @@ end = struct
       |> fst
     | Ppat_alias (p, alias) ->
       let pre_nest = Preceeding.implied_nest preceeding in
-      pp ?preceeding p ^/^
-      pre_nest @@ nest 2 (group (S.as_ ^/^ str_or_op alias.txt))
+      pp ?preceeding p ^^
+      (* try to fit the alias at the end of the current line, but prioritize
+         keeping the [as alias] together over filling the line. *)
+      group (
+        break 1 ^^
+        pre_nest @@ nest 2 (group (S.as_ ^/^ str_or_op alias.txt))
+      )
     | Ppat_constant c ->
       Preceeding.group_with preceeding (constant c)
       |> fst
