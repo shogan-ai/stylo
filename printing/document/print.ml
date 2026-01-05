@@ -120,22 +120,13 @@ let whitespace buf state indent flat = function
 let rec pretty buf state indent flat = function
   | Empty
   | Comments_flushing_hint _ -> state
-  | Token Trivial (len, s)
-  | Comment Trivial (len, s) -> text buf state indent (`Full len) s
-  | Token Verbatim (_, s, len)
-  | Comment Verbatim (_, s, len) -> text buf state indent (`Last len) s
-  | Token Complex (_, t)
-  | Comment Complex (_, t) ->
-    pretty buf state indent flat t
+  | Token pseudo
+  | Comment pseudo -> pp_pseudo buf state indent flat pseudo
   | Optional { vanishing_cond; token } ->
     if Condition.check (Some vanishing_cond) then
       state
     else
-      begin match token with
-      | Trivial (len, s) -> text buf state indent (`Full len) s
-      | Verbatim (_, s, len) -> text buf state indent (`Last len) s
-      | Complex (_, t) -> pretty buf state indent flat t
-      end
+      pp_pseudo buf state indent flat token
   | Whitespace (vanishing_cond, ws) ->
     if Condition.check vanishing_cond then
       state
@@ -165,6 +156,11 @@ let rec pretty buf state indent flat = function
       (flatness : flatness :> bool ref) := flat
     ) flat_track_opt;
     pretty buf state indent flat t
+
+and pp_pseudo buf state indent flat = function
+  | Trivial (len, s) -> text buf state indent (`Full len) s
+  | Verbatim (_, s, len) -> text buf state indent (`Last len) s
+  | Complex (_, t) -> pretty buf state indent flat t
 
 let to_string ~width d =
   let sz = min (1024 * 1024) (Requirement.to_int @@ requirement d) in
