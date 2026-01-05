@@ -74,16 +74,17 @@ type whitespace =
   | Break of int * softness
   | Non_breakable
 
+type 'a can_vanish = {
+  vanishing_cond: Condition.t option;
+  value: 'a;
+}
+
 type t =
   | Empty
-  | Token of pseudo_token
-  | Optional of {
-      vanishing_cond: Condition.t;
-      token: pseudo_token;
-    }
+  | Token of pseudo_token can_vanish
   | Comment of pseudo_token
   | Comments_flushing_hint of bool ref * t * t
-  | Whitespace of Condition.t option * whitespace
+  | Whitespace of whitespace can_vanish
   | Cat of Req.t * t * t
   | Nest of Req.t * int * Condition.t option * t
   | Group of Req.t * int * flatness option * t
@@ -117,20 +118,23 @@ let pseudo_token_req = function
 
 let requirement = function
   | Empty -> Req.of_int 0
-  | Token pt
+  | Token { vanishing_cond = None; value = pt }
   | Comment pt -> pseudo_token_req pt
-  | Optional _ -> Req.of_int 0 (* vanishes if flat so ... *)
-  | Comments_flushing_hint _ -> Req.of_int 0
-  | Whitespace (Some _, _) -> Req.of_int 0
-  | Whitespace (_, ws) -> ws_req ws
+  | Whitespace { vanishing_cond = None; value = ws } -> ws_req ws
+  | Token _
+  | Comments_flushing_hint _
+  | Whitespace _ -> Req.of_int 0
   | Cat (r, _, _)
   | Nest (r, _, _, _)
   | Group (r, _, _, _) -> r
 
-let ws ws = Whitespace (None, ws)
+let ws value = Whitespace { vanishing_cond = None; value }
 
 let empty = Empty
-let string s = Token (Trivial (Req.of_int (strlen s), s))
+let string s =
+  let value = Trivial (Req.of_int (strlen s), s) in
+  Token { vanishing_cond = None; value }
+
 let break spaces = ws (Break (spaces, Hard))
 let soft_break spaces = ws (Break (spaces, Soft))
 let hardline = ws (Line_break Hard)
@@ -140,7 +144,8 @@ let softest_break = ws (Break (1, Softest))
 
 let nbsp = ws Non_breakable
 let vanishing_whitespace cond = function
-  | Whitespace (None, ws) -> Whitespace (Some cond, ws)
+  | Whitespace { vanishing_cond = None; value } ->
+    Whitespace { vanishing_cond = Some cond; value }
   | _ -> invalid_arg "Document.vanishing_whitespace"
 
 let flush_comments ~ws_before ~ws_after =
@@ -156,18 +161,16 @@ let (^^) t1 t2 =
     let req = Req.(requirement t1 + requirement t2) in
     Cat (req, t1, t2)
 
-let opt_token ?ws_before ?ws_after vanishing_cond tok =
+let opt_token ?ws_before ?ws_after cond tok =
   match ws_before, ws_after with
   | Some _, Some _ -> invalid_arg "Document.opt_token"
   | _ ->
     let ws ws =
-      Option.map (vanishing_whitespace vanishing_cond) ws
+      Option.map (vanishing_whitespace cond) ws
       |> Option.value ~default:empty
     in
-    ws ws_before ^^
-    Optional
-      { vanishing_cond; token = Trivial (Req.of_int (strlen tok), tok) } ^^
-    ws ws_after
+    let value = Trivial (Req.of_int (strlen tok), tok) in
+    ws ws_before ^^ Token { vanishing_cond = Some cond; value } ^^ ws ws_after
 
 let nest ?vanish i t =
   match i, t with
@@ -200,10 +203,10 @@ let pseudo_of_string s =
     Trivial (Req.of_int (strlen s), s)
 
 
-let fancy_string s = Token (pseudo_of_string s)
+let fancy_string s = Token { vanishing_cond = None; value = pseudo_of_string s }
 
 let formatted_string t =
-  Token (Complex (requirement t, t))
+  Token { vanishing_cond = None; value = Complex (requirement t, t) }
 
 (* FIXME *)
 let comment s = Comment (pseudo_of_string s)

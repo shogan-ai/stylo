@@ -120,18 +120,13 @@ let whitespace buf state indent flat = function
 let rec pretty buf state indent flat = function
   | Empty
   | Comments_flushing_hint _ -> state
-  | Token pseudo
+  | Token { vanishing_cond = Some cond; _ }
+  | Whitespace { vanishing_cond = Some cond; _ }
+    when Condition.check (Some cond) ->
+    state
+  | Token { value = pseudo; _ }
   | Comment pseudo -> pp_pseudo buf state indent flat pseudo
-  | Optional { vanishing_cond; token } ->
-    if Condition.check (Some vanishing_cond) then
-      state
-    else
-      pp_pseudo buf state indent flat token
-  | Whitespace (vanishing_cond, ws) ->
-    if Condition.check vanishing_cond then
-      state
-    else
-      whitespace buf state indent flat ws
+  | Whitespace { value = ws; _ } -> whitespace buf state indent flat ws
   | Cat (_, t1, t2) ->
     let state' = pretty buf state indent flat t1 in
     pretty buf state' indent flat t2

@@ -77,7 +77,7 @@ let consume_leading_comments =
 
 let rec first_is_space = function
   | Doc.Whitespace _ -> `yes
-  | Token _ | Comment _ | Optional _ -> `no
+  | Token _ | Comment _  -> `no
   | Group (_, _, _, d) | Nest (_, _, _, d) ->
     first_is_space d
   | Empty
@@ -91,7 +91,7 @@ let first_is_space d = first_is_space d = `yes
 
 let rec first_is_flushhint = function
   | Doc.Comments_flushing_hint _ -> `yes
-  | Token _ | Comment _ | Optional _ | Whitespace _ -> `no
+  | Token _ | Comment _ | Whitespace _ -> `no
   | Group (_, _, _, d) | Nest (_, _, _, d) ->
     first_is_flushhint d
   | Empty -> `maybe
@@ -104,7 +104,7 @@ let first_is_flushhint d = first_is_flushhint d = `yes
 
 let rec nest_before_leaf = function
   | Doc.Nest _ -> `yes
-  | Token _ | Optional _ | Comment _ -> `no
+  | Token _ | Comment _ -> `no
   | Group (_, _, _, d) -> nest_before_leaf d
   | Empty
   | Whitespace _
@@ -215,8 +215,8 @@ let rec walk_both state seq doc =
   | first :: rest ->
     match first.T.desc, doc with
     (* Synchronized, advance *)
-    | T.Token _, Doc.Token p
-    | T.Opt_token _, Doc.Optional { token = p; _ } ->
+    | T.Token _, Doc.Token { vanishing_cond = None; value = p }
+    | T.Opt_token _, Doc.Token { vanishing_cond = Some _; value = p } ->
       dprintf "assume %a synced at %d:%d with << %a >>@."
         Tokens.pp_elt first
         first.pos.pos_lnum
@@ -227,7 +227,7 @@ let rec walk_both state seq doc =
 
     (* Whitespace: don't consume token *)
     | _, Doc.Empty -> seq, doc, state
-    | _, Doc.Whitespace (_, _) -> seq, doc, no_space state
+    | _, Doc.Whitespace _ -> seq, doc, no_space state
 
     (* Skip explicitely inserted comment *)
     | T.Comment { explicitely_inserted; _ }, Doc.Comment _
@@ -236,7 +236,7 @@ let rec walk_both state seq doc =
 
     | _, Doc.Comment _ -> seq, doc, state
 
-    | T.Comment { explicitely_inserted; _ }, Doc.(Token _ | Optional _)
+    | T.Comment { explicitely_inserted; _ }, Doc.Token _
       when !explicitely_inserted ->
       walk_both state rest doc
 
@@ -251,7 +251,7 @@ let rec walk_both state seq doc =
       seq, Doc.empty, state
 
     (* Comments missing in the doc, insert them *)
-    | T.Comment _, Doc.(Token _ | Optional _) ->
+    | T.Comment _, Doc.Token _ ->
       insert_comments_before_subtree seq state doc
 
     | T.Comment { explicitely_inserted; _ }, Doc.Group (_, _, _, d)
@@ -281,8 +281,8 @@ let rec walk_both state seq doc =
     | _, Doc.Group (_, margin, flatness, doc) ->
       traverse_group seq state margin flatness doc
 
-    | T.Token _, Doc.Optional { token = p; _ }
-    | T.Opt_token _, Doc.Token p ->
+    | T.Token _, Doc.Token { vanishing_cond = Some _; value = p }
+    | T.Opt_token _, Doc.Token { vanishing_cond = None; value = p } ->
       dprintf "OPTIONAL MISMATCH %a with %a@."
         T.pp_elt first
         Doc.pp_pseudo p;

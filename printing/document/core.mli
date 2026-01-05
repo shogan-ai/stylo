@@ -37,16 +37,17 @@ type whitespace =
       as a [Line_break softness] otherwise. *)
   | Non_breakable (** a simple space. *)
 
+type 'a can_vanish = {
+  vanishing_cond: Condition.t option;
+  value: 'a;
+}
+
 type t = private
   | Empty
-  | Token of pseudo_token
-  | Optional of {
-      vanishing_cond: Condition.t;
-      token: pseudo_token;
-    }
+  | Token of pseudo_token can_vanish
   | Comment of pseudo_token
   | Comments_flushing_hint of bool ref * t * t
-  | Whitespace of Condition.t option * whitespace
+  | Whitespace of whitespace can_vanish
   | Cat of Requirement.t * t * t
   | Nest of Requirement.t * int * Condition.t option * t
   | Group of Requirement.t * int * flatness option * t
