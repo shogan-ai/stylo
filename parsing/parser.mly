@@ -67,6 +67,9 @@ let mkpat ~loc ?attrs d =
 let mkexp ~loc ?attrs d =
   let tokens = Tokens.at loc in
   Exp.mk ~loc:(make_loc loc) ~tokens ?attrs d
+let mkcase sloc pat ?guard exp =
+  let tokens = Tokens.at sloc in
+  Exp.case ~tokens pat ?guard exp
 let mkmty ~loc ?attrs d =
   let tokens = Tokens.at loc in
   Mty.mk ~loc:(make_loc loc) ?attrs ~tokens d
@@ -3034,16 +3037,16 @@ fun_body:
         ; pfb_tokens = Tokens.at $sloc } }
 ;
 %inline match_cases:
-  xs = preceded_or_separated_nonempty_llist(BAR, match_case)
+  xs = bar_llist(match_case)
     { xs }
 ;
-match_case:
-    pattern MINUSGREATER seq_expr
-      { Exp.case $1 $3 }
-  | pattern WHEN seq_expr MINUSGREATER seq_expr
-      { Exp.case $1 ~guard:$3 $5 }
-  | pattern MINUSGREATER exp_unreachable
-      { Exp.case $1 $3 }
+match_case(opening):
+    opening pattern MINUSGREATER seq_expr
+      { mkcase $sloc $2 $4 }
+  | opening pattern WHEN seq_expr MINUSGREATER seq_expr
+      { mkcase $sloc $2 ~guard:$4 $6 }
+  | opening pattern MINUSGREATER exp_unreachable
+      { mkcase $sloc $2 $4 }
 ;
 exp_unreachable:
   | DOT { mkexp ~loc:$sloc Pexp_unreachable }

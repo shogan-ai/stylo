@@ -1358,11 +1358,9 @@ end = struct
       )
     | Pexp_apply (e, args) -> pp_apply ~preceeding e args
     | Pexp_match (e, cases) ->
-      pp_match ~preceeding ~ext_attrs:exp.pexp_ext_attr
-        ~tokens:exp.pexp_tokens e cases
+      pp_match ~preceeding ~ext_attrs:exp.pexp_ext_attr e cases
     | Pexp_try (e, cases) ->
-      pp_try ~preceeding ~ext_attrs:exp.pexp_ext_attr ~tokens:exp.pexp_tokens
-        e cases
+      pp_try ~preceeding ~ext_attrs:exp.pexp_ext_attr e cases
     | Pexp_tuple elts -> pp_tuple ?preceeding elts
     | Pexp_unboxed_tuple elts ->
       let flatness = flatness_tracker () in
@@ -1571,28 +1569,22 @@ end = struct
     let (fun_and_params, body) = pp_function_parts ?preceeding exp in
     group (fun_and_params ^/^ nest indent body)
 
-  and pp_match ~preceeding ~ext_attrs ~tokens e cases =
+  and pp_match ~preceeding ~ext_attrs e cases =
     let match_, pre_nest =
       Ext_attribute.decorate S.match_ ext_attrs
       |> Preceeding.group_with preceeding
     in
-    let cases =
-      Case.pp_cases cases
-        ~has_leading_pipe:(has_leading_pipe ~after:WITH tokens)
-    in
+    let cases = Case.pp_cases cases in
     group (match_ ^/^ pre_nest (nest 2 (group (pp e)) ^/^ S.with_)) ^^
     hardline ^^
     pre_nest cases
 
-  and pp_try ~preceeding ~ext_attrs ~tokens e cases =
+  and pp_try ~preceeding ~ext_attrs e cases =
     let try_, pre_nest =
       Ext_attribute.decorate S.try_ ext_attrs
       |> Preceeding.group_with preceeding
     in
-    let cases =
-      Case.pp_cases cases
-        ~has_leading_pipe:(has_leading_pipe ~after:WITH tokens)
-    in
+    let cases = Case.pp_cases cases in
     group (
       try_ ^/^
       pre_nest (nest 2 (pp e)) ^/^
@@ -2156,7 +2148,7 @@ end
 and Case : sig
   val pp : case -> t
 
-  val pp_cases : has_leading_pipe:bool -> case list -> t
+  val pp_cases : case list -> t
 end = struct
   let pp_guard = function
     | None -> empty
@@ -2187,7 +2179,8 @@ end = struct
     ) (empty, first_pre)
     |> fst
 
-  let pp pipe { pc_lhs; pc_guard; pc_rhs } =
+  let pp { pc_lhs; pc_guard; pc_rhs; pc_tokens } =
+    let pipe = starts_with_pipe pc_tokens in
     let guarded_pat =
       prefix (group (pp_pattern pipe pc_lhs))
         (pp_guard pc_guard)
@@ -2197,15 +2190,7 @@ end = struct
     flow (break 1) [ guarded_pat; nest 2 S.rarrow; nest 2 body ]
     |> group
 
-  let pp_cases ~has_leading_pipe =
-    foldli (fun i accu x ->
-      if i = 0 then
-        pp has_leading_pipe x
-      else
-        accu ^/^ pp true x
-    ) empty
-
-  let pp = pp false
+  let pp_cases = separate_map (break 1) pp
 end
 
 and Letop : sig
@@ -2365,30 +2350,27 @@ and Function_body : sig
 
   val as_rhs : function_body -> Layout_module_binding.rhs
 end = struct
-  let pp_cases ?preceeding ~tokens cases ext_attrs =
+  let pp_cases ?preceeding cases ext_attrs =
     let pre_function_, pre_nest =
       Preceeding.group_with preceeding
         (Ext_attribute.decorate S.function_ ext_attrs)
     in
     pre_function_,
-    pre_nest (
-      softest_line ^^
-      Case.pp_cases cases
-        ~has_leading_pipe:(has_leading_pipe ~after:FUNCTION tokens)
-    )
+    pre_nest (softest_line ^^ Case.pp_cases cases)
 
   let pp_parts ?preceeding fb =
     match fb.pfb_desc with
     | Pfunction_body e -> empty, Expression.pp ?preceeding e
     | Pfunction_cases (cases, ext_attrs) ->
-      pp_cases ?preceeding ~tokens:fb.pfb_tokens cases ext_attrs
+      pp_cases ?preceeding cases ext_attrs
 
   let as_rhs fb =
     match fb.pfb_desc with
     | Pfunction_body _ -> assert false (* can't be on value binding rhs *)
     | Pfunction_cases (cases, ext_attrs) ->
-      let kw, cases = pp_cases ~tokens:fb.pfb_tokens cases ext_attrs in
-      Layout_module_binding.Three_parts { start = kw; main = cases; stop = empty}
+      let kw, cases = pp_cases cases ext_attrs in
+      Layout_module_binding.Three_parts
+        { start = kw; main = cases; stop = empty }
 end
 
 and Type_constraint : sig

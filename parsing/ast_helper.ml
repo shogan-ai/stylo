@@ -205,11 +205,12 @@ module Exp = struct
   let overwrite ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_overwrite (a, b))
   let hole ?loc ?attrs ~tokens () = mk ?loc ?attrs ~tokens Pexp_hole
 
-  let case lhs ?guard rhs =
+  let case ~tokens lhs ?guard rhs =
     {
      pc_lhs = lhs;
      pc_guard = guard;
      pc_rhs = rhs;
+     pc_tokens = tokens;
     }
 
   let binding_op op vb loc =

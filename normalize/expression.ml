@@ -45,26 +45,11 @@ let insert_pipe_if_missing ~after:kw =
   in
   seek
 
-let map_function_body mapper ctxt fb =
-  let fb =
-    match fb.pfb_desc with
-    | Pfunction_cases _ ->
-      (* Force leading pipe *)
-      let tokens = insert_pipe_if_missing ~after:FUNCTION fb.pfb_tokens in
-      { fb with pfb_tokens = tokens }
-    | _ -> fb
-  in
-  super.function_body mapper ctxt fb
-
 let map mapper (parent : Context.parent) exp =
   (* local changes first *)
   let exp = Semicolon.exp_no_trailing exp in
   let exp =
     match exp.pexp_desc with
-    | Pexp_match _ ->
-      (* Force leading pipe *)
-      let tokens = insert_pipe_if_missing ~after:WITH exp.pexp_tokens in
-      { exp with pexp_tokens = tokens }
     | Pexp_begin_end Some e ->
       let pexp_desc = Pexp_parens { exp = e; optional = false } in
       let pexp_tokens =

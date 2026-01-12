@@ -35,6 +35,10 @@ let add_pipe_if_missing ?(mk_optional=false) tokens =
     (* ensure the pipe is optional/mandatory as requested *)
     leading_comments @ { pipe with desc } :: following_tokens
 
+let map_case mapper env case =
+  let pc_tokens = add_pipe_if_missing case.pc_tokens in
+  super.case mapper env { case with pc_tokens }
+
 let map_type_kind mapper env tk =
   let tk = Semicolon.type_kind_no_trailing tk in
   let tk =
@@ -68,9 +72,9 @@ let normalizer =
   ; pattern_desc = Pattern.map_desc
   ; expression = Expression.map
   ; expression_desc = Expression.map_desc
-  ; function_body = Expression.map_function_body
   ; argument_desc = default_arg_passing_context
   ; value_binding = default_vb_passing_context
+  ; case = map_case
   ; constructor_arguments = map_constructor_arguments
   ; type_kind = map_type_kind
   ; structure_item = map_structure_item

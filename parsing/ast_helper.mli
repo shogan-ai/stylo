@@ -230,7 +230,8 @@ module Exp:
     val overwrite : ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> expression -> expression
     val hole : ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> unit -> expression
 
-    val case: pattern -> ?guard:expression -> expression -> case
+    val case: tokens:Tokens.seq -> pattern -> ?guard:expression -> expression ->
+      case
     val binding_op: str -> value_binding -> loc -> binding_op
   end
 

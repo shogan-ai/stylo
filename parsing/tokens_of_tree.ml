@@ -36,6 +36,7 @@ let combine_children ~loc top children =
       pp_children children;
     raise exn
 
+(* TODO: should be generated. *)
 let tokenizer =
   let super = Ast_reduce.mk_default_reducer [] (@) in
   let reduce_longident reducer env l =
@@ -81,6 +82,11 @@ let tokenizer =
     let sub_tokens = super.expression reducer env e in
     let node_toks = e.pexp_tokens in
     combine_children ~loc:e.pexp_loc node_toks sub_tokens
+  in
+  let reduce_case reducer env c =
+    let sub_tokens = super.case reducer env c in
+    let node_toks = c.pc_tokens in
+    combine_children ~loc:Location.none node_toks sub_tokens
   in
   let reduce_argument reducer visit_elt env a =
     let sub_tokens = super.argument reducer visit_elt env a in
@@ -232,6 +238,7 @@ let tokenizer =
   ; object_field = reduce_object_field
   ; pattern = reduce_pattern
   ; expression = reduce_expression
+  ; case = reduce_case
   ; argument = reduce_argument
   ; function_body = reduce_function_body
   ; value_description = reduce_value_description
