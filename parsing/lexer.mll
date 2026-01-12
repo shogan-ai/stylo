@@ -1205,9 +1205,9 @@ and skip_hash_bang = parse
   end
 
   module Staged_comments = struct
-    (* We delay the insertion of comments to [Tokens.Indexed_list.global] as we
-       want to decide their attachement before adding them to the list, which we
-       can only do we reach the next (non-comment) token. *)
+    (* We delay calls to [Tokens.add] for comments as we want to decide their
+       attachement before adding them to the list, which we can only do we reach
+       the next (non-comment) token. *)
 
     type cmt_info = {
       loc: Location.t;
@@ -1264,7 +1264,7 @@ and skip_hash_bang = parse
           ; text = txt
           ; attachement }
         in
-        Tokens.Indexed_list.(append global ~pos:loc.loc_start (Comment cmt))
+        Tokens.add ~pos:loc.loc_start (Comment cmt)
       ) (List.rev t.rev_cmts)
 
     let add t before loc txt inserted =
@@ -1341,10 +1341,7 @@ and skip_hash_bang = parse
           Line_indent.new_info lines_for_comments start_pos;
           Option.iter (Staged_comments.unstage lines_for_comments) sc_opt;
           attach lines_for_docstrings docs post_pos start_pos;
-          Tokens.Indexed_list.append
-            Tokens.Indexed_list.global
-            ~pos:start_pos
-            (Token tok);
+          Tokens.add ~pos:start_pos (Token tok);
           tok
     in
       loop (lines_init_state !previous_token) NoLine Initial None lexbuf

@@ -1,6 +1,3 @@
-
-type token = Parser_tokens.token
-
 module Raw = struct
   let to_string = function
   | Parser_tokens.AMPERAMPER  -> "AMPERAMPER"
@@ -311,8 +308,8 @@ type comment = {
 }
 
 type desc =
-  | Token of token
-  | Opt_token of token
+  | Token of Parser_tokens.token
+  | Opt_token of Parser_tokens.token
   | Comment of comment
   | Child_node
 
@@ -344,20 +341,8 @@ let pp_seq =
   pp_print_list
     ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
     pp_elt
-module Indexed_list : sig
-  type t
 
-  val create : unit -> t
-  val append : t -> pos:Lexing.position -> desc -> unit
-  val consume : t -> Lexing.position -> Lexing.position -> seq
-
-  (* use on parser entry points to collect comments lying outside the parsed
-     symbol's position. *)
-  val consume_all : t -> seq
-
-  val global : t
-  val reset_global : unit -> unit
-end = struct
+module Indexed_list = struct
   open Lexing
 
   type cell =
@@ -484,13 +469,19 @@ end = struct
     global.last <- Empty
 end
 
-let at (startpos,endpos) =
-  Indexed_list.(consume global startpos endpos)
+let add ~pos desc = Indexed_list.(append global ~pos desc)
+let at (startpos,endpos) = Indexed_list.(consume global startpos endpos)
 
 let rec replace_first_child ~subst = function
   | [] -> invalid_arg "Tokens.replace_first_child: never saw a child"
   | { desc = Child_node; _ } :: xs -> subst @ xs
   | x :: xs -> x :: replace_first_child ~subst xs
+
+let attach_leading_and_trailing tokens =
+  let all_tokens = Indexed_list.(consume_all global) in
+  replace_first_child ~subst:tokens all_tokens
+
+let reset = Indexed_list.reset_global
 
 let is_child t = t.desc = Child_node
 
