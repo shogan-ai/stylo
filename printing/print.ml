@@ -1927,6 +1927,7 @@ end = struct
         let op_pre = Preceeding.mk op ~indent in
         let f = pp ~preceeding:op_pre f in
         Application.pp ~indent:(indent + 2) f args
+        |> Attribute.attach ~attrs:arg.pexp_attributes
       end
     | Pexp_function _ when on_right ->
       let op = pp_op (Option.get op) ^^ break 1 in
