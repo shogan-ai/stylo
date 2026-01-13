@@ -18,19 +18,17 @@ let optional f v_opt =
   | None -> empty
   | Some v -> f v
 
-let nb_semis =
-  List.fold_left (fun nb tok ->
-    if tok.Tokens.desc = Token SEMI then nb + 1 else nb
-  ) 0
+let is_semi = Tokens.is_token ~which:SEMI
+let nb_semis = List.fold_left (fun nb t -> if is_semi t then nb + 1 else nb) 0
 
 let rec starts_with tok = function
-  | Tokens.{ desc = Token t; _ } :: _ -> t = tok
+  | Tokens.{ desc = Token (t, _); _ } :: _ -> t = tok
   | Tokens.{ desc = Comment _; _ } :: rest -> starts_with tok rest
   | _ -> false
 
 let rec has_leading tok ~after:after_kw = function
   | [] -> false
-  | Tokens.{ desc = Token t; _ } :: rest when t = after_kw ->
+  | Tokens.{ desc = Token (t, _); _ } :: rest when t = after_kw ->
     starts_with tok rest
   | _ :: rest -> has_leading tok ~after:after_kw rest
 
@@ -40,13 +38,13 @@ let has_leading_pipe ~after = has_leading BAR ~after
 let rec pipe_before_child = function
   | []
   | Tokens.{ desc = Child_node; _ } :: _ -> false
-  | Tokens.{ desc = Token BAR; _ } :: _ -> true
+  | Tokens.{ desc = Token (BAR, _); _ } :: _ -> true
   | _ :: rest -> pipe_before_child rest
 
 let rec lparen_before_child = function
   | []
   | Tokens.{ desc = Child_node; _ } :: _ -> false
-  | Tokens.{ desc = Token LPAREN; _ } :: _ -> true
+  | Tokens.{ desc = Token (LPAREN, _); _ } :: _ -> true
   | _ :: rest -> lparen_before_child rest
 
 type 'a loc = 'a Location.loc = { txt: 'a; loc: Location.t }
@@ -729,7 +727,7 @@ end = struct
           let lbl =
             if
               List.exists (function
-                | Tokens.{ desc = Token OPTLABEL _; _ } -> true
+                | Tokens.{ desc = Token (OPTLABEL _, _); _ } -> true
                 | _ -> false
               ) aa_tokens
             then stringf "?%s:" s
@@ -983,7 +981,7 @@ end = struct
 
   and object_field { pof_desc; pof_attributes; pof_doc; pof_tokens;
                      pof_loc = _ } =
-    let semi = List.exists (fun t -> t.Tokens.desc = Token SEMI) pof_tokens in
+    let semi = List.exists is_semi pof_tokens in
     prefix (group (object_field_desc pof_desc)) (
       Attribute.pp_list pof_attributes
       ^?^ optional Doc.pp pof_doc
@@ -2281,13 +2279,14 @@ and Argument : sig
     -> t
 end = struct
   let had_parens arg =
-    List.exists (fun elt -> elt.Tokens.desc = Token LPAREN) arg.parg_tokens
+    List.exists (Tokens.is_token ~which:LPAREN) arg.parg_tokens
 
   let single_or_multi_token tokens ~optional name =
     match
       List.find_map (function
-        | Tokens.{ desc = Token LABEL _; _ } -> Some (stringf "~%s:" name)
-        | Tokens.{ desc = Token OPTLABEL _; _ } -> Some (stringf "?%s:" name)
+        | Tokens.{ desc = Token (LABEL _, _); _ } -> Some (stringf "~%s:" name)
+        | Tokens.{ desc = Token (OPTLABEL _, _); _ } ->
+          Some (stringf "?%s:" name)
         | _ -> None
       ) tokens
     with
@@ -2578,9 +2577,7 @@ end = struct
     let maybe_trailing_semi, lbls =
       List.fold_left_map (fun preceding_tok lbl ->
         let next_tok =
-          if List.exists (fun t -> t.Tokens.desc = Token SEMI) lbl.pld_tokens
-          then S.semi
-          else empty
+          if List.exists is_semi lbl.pld_tokens then S.semi else empty
         in
         let preceeding = Preceeding.mk (preceding_tok ^^ break 1) ~indent:2 in
         next_tok, group (pp_field ~preceeding lbl)
@@ -2611,7 +2608,7 @@ end = struct
   let var_inj_as_single_token =
     (* C.f. rule [type_variance] in the grammar. *)
     List.exists (function
-      | Tokens.{ desc = Token (PREFIXOP _ | INFIXOP2 _); _ } -> true
+      | Tokens.{ desc = Token ((PREFIXOP _ | INFIXOP2 _), _); _ } -> true
       | _ -> false
     )
 
@@ -2677,9 +2674,10 @@ end = struct
       |> nest 2
     in
     match List.find Tokens.is_token pcd_tokens with
-    | { desc = Token BAR; _ } -> S.pipe ^^ nbsp ^^ without_pipe
-    | { desc = Opt_token BAR; _ } ->
-      S.optional_pipe (Condition.flat td_flatness) ^^ without_pipe
+    | { desc = Token (BAR, opt); _ } ->
+      if not opt
+      then S.pipe ^^ nbsp ^^ without_pipe
+      else S.optional_pipe (Condition.flat td_flatness) ^^ without_pipe
     | _ ->
       without_pipe
 
@@ -3192,7 +3190,7 @@ end = struct
     let items_tokens =
       List.drop_while (fun tok ->
         match tok.Tokens.desc with
-        | Token (ATAT | LIDENT _) (* modality tokens *)
+        | Token ((ATAT | LIDENT _), _) (* modality tokens *)
         | Comment _ (* comments might appear before/inside the modalities *) ->
           true
         | _ -> false

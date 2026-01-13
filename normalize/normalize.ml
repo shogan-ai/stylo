@@ -26,7 +26,7 @@ let map_constructor_arguments mapper env ca =
 
 let add_pipe_if_missing ?(mk_optional=false) tokens =
   let open Tokens in
-  let desc = if mk_optional then Opt_token BAR else Token BAR in
+  let desc = Token (BAR, mk_optional) in
   match Utils.split ~on:BAR tokens with
   | tokens, [] ->
     (* no pipe was present, insert one at the front *)

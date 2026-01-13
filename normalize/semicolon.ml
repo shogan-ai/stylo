@@ -2,13 +2,7 @@ open Ocaml_syntax
 open Parsetree
 
 let semisemi ~optional pos =
-  let open Tokens in
-  let desc =
-    if optional
-    then Opt_token SEMISEMI
-    else Token SEMISEMI
-  in
-  { desc; pos }
+  Tokens.{ pos; desc = Token (SEMISEMI, optional)}
 
 let normalize_struct_semisemi (items, tokens) =
   let rec walk_both items tokens =
@@ -27,10 +21,10 @@ let normalize_struct_semisemi (items, tokens) =
       assert (List.for_all is_ds items); []
     | t :: tokens ->
       match t.Tokens.desc with
-      | Token EOF (* TODO: filter this out earlier in the pipeline... *)
+      | Token (EOF, _) (* TODO: filter this out earlier in the pipeline... *)
       | Comment _ ->
         t :: walk_both items tokens
-      | Token _ | Opt_token _ ->
+      | Token _ ->
         (* No tokens appart from SEMISEMI at this level, and we removed them
            already. *)
         assert false
@@ -53,7 +47,7 @@ let normalize_struct_semisemi (items, tokens) =
 
 let nb_semis =
   List.fold_left (fun nb tok ->
-    if tok.Tokens.desc = Token SEMI then nb + 1 else nb
+    if Tokens.is_token ~which:SEMI tok then nb + 1 else nb
   ) 0
 
 let remove_last_semi tokens =

@@ -1341,7 +1341,7 @@ and skip_hash_bang = parse
           Line_indent.new_info lines_for_comments start_pos;
           Option.iter (Staged_comments.unstage lines_for_comments) sc_opt;
           attach lines_for_docstrings docs post_pos start_pos;
-          Tokens.add ~pos:start_pos (Token tok);
+          Tokens.add ~pos:start_pos (Token (tok, false));
           tok
     in
       loop (lines_init_state !previous_token) NoLine Initial None lexbuf

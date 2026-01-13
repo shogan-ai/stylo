@@ -28,7 +28,7 @@ exception Error of error
 let append_trailing_comments (tokens, doc, _) =
   let rec aux doc = function
     | []
-    | [ T.{ desc = Token EOF; _ } ] -> doc
+    | [ T.{ desc = Token (EOF, _); _ } ] -> doc
     | tok :: toks ->
       match tok.T.desc with
       | Comment c ->
@@ -38,8 +38,7 @@ let append_trailing_comments (tokens, doc, _) =
           else Doc.Utils.(doc ^?^ Doc.comment c.text)
         in
         aux doc toks
-      | Token _
-      | Opt_token _ -> raise (Error (Missing_token tok.pos))
+      | Token _ -> raise (Error (Missing_token tok.pos))
       | Child_node -> assert false
   in
   aux doc tokens
@@ -70,8 +69,7 @@ let consume_leading_comments =
         in
         aux acc rest
       | Comment _
-      | Token _
-      | Opt_token _ -> acc, first :: rest
+      | Token _ -> acc, first :: rest
   in
   aux Doc.(empty, empty)
 
@@ -215,8 +213,8 @@ let rec walk_both state seq doc =
   | first :: rest ->
     match first.T.desc, doc with
     (* Synchronized, advance *)
-    | T.Token _, Doc.Token { vanishing_cond = None; value = p }
-    | T.Opt_token _, Doc.Token { vanishing_cond = Some _; value = p } ->
+    | T.Token (_, false), Doc.Token { vanishing_cond = None; value = p }
+    | T.Token (_, true),  Doc.Token { vanishing_cond = Some _; value = p } ->
       dprintf "assume %a synced at %d:%d with << %a >>@."
         Tokens.pp_elt first
         first.pos.pos_lnum
@@ -281,8 +279,8 @@ let rec walk_both state seq doc =
     | _, Doc.Group (_, margin, flatness, doc) ->
       traverse_group seq state margin flatness doc
 
-    | T.Token _, Doc.Token { vanishing_cond = Some _; value = p }
-    | T.Opt_token _, Doc.Token { vanishing_cond = None; value = p } ->
+    | T.Token (_, false), Doc.Token { vanishing_cond = Some _; value = p }
+    | T.Token (_, true),  Doc.Token { vanishing_cond = None; value = p } ->
       dprintf "OPTIONAL MISMATCH %a with %a@."
         T.pp_elt first
         Doc.pp_pseudo p;

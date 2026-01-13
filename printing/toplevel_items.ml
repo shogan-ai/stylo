@@ -23,8 +23,7 @@ let add_item ?flatness last_in_group doc item =
     )
 
 type cont =
-  | Semi_followed_by of seq
-  | Opt_semi_followed_by of seq
+  | Semi_followed_by of bool * seq
   | Child_followed_by of seq
   | Done
 
@@ -36,10 +35,9 @@ let rec advance_tokens = function
   | tok :: tokens ->
     match tok.desc with
     | Child_node -> Child_followed_by tokens
-    | Token EOF -> assert (tokens = []); Done
-    | Token SEMISEMI -> Semi_followed_by tokens
-    | Opt_token SEMISEMI -> Opt_semi_followed_by tokens
-    | Opt_token _ | Token _ -> assert false
+    | Token (EOF, _) -> assert (tokens = []); Done
+    | Token (SEMISEMI, optional) -> Semi_followed_by (optional, tokens)
+    | Token _ -> assert false
     | Comment _ -> advance_tokens tokens
 
 (* We keep the list of items in sync with the list of "tokens" of the
@@ -48,9 +46,9 @@ let rec advance_tokens = function
 let pp_keeping_semi pp_item =
   let rec perhaps_semi doc items tokens =
     match advance_tokens tokens with
-    | Semi_followed_by tokens ->
+    | Semi_followed_by (false, tokens) ->
       perhaps_semi (doc ^?^ Syntax.semisemi) items tokens
-    | Opt_semi_followed_by tokens ->
+    | Semi_followed_by (true, tokens) ->
       (* This one is optional, and will always disappear since we are not
          actually tracking the flatness of any group.
          Pretty sure this branch is dead code, and we could [assert false] here,
@@ -66,10 +64,10 @@ let pp_keeping_semi pp_item =
       let item = pp_item item in
       let last = items = [] in
       begin match advance_tokens tokens with
-      | Semi_followed_by tokens ->
+      | Semi_followed_by (false, tokens) ->
         let item = item ^/^ Syntax.semisemi in
         perhaps_semi (add_item last doc item) items tokens
-      | Opt_semi_followed_by tokens ->
+      | Semi_followed_by (true, tokens) ->
         let flatness = flatness_tracker () in
         let item = item ^^ opt_semisemi_doc (Condition.flat flatness) in
         perhaps_semi (add_item ~flatness last doc item) items tokens
@@ -93,10 +91,8 @@ let pp_grouped_keeping_semi pp_item groups tokens =
     (* Meh. *)
     function
     | Done -> []
-    | Semi_followed_by tokens ->
-      { desc = Token SEMISEMI; pos = Lexing.dummy_pos } :: tokens
-    | Opt_semi_followed_by tokens ->
-      { desc = Opt_token SEMISEMI; pos = Lexing.dummy_pos } :: tokens
+    | Semi_followed_by (optional, tokens) ->
+      { desc = Token (SEMISEMI, optional); pos = Lexing.dummy_pos } :: tokens
     | Child_followed_by tokens ->
       { desc = Child_node; pos = Lexing.dummy_pos } :: tokens
   in

@@ -21,8 +21,7 @@ let rec list_map_last ~f = function
 let split ~on:target =
   list_split_at (fun tok ->
     match tok.desc with
-    | Token t
-    | Opt_token t when Raw.equals t target -> false
+    | Token (t, _) when Raw.equals t target -> false
     | _ -> true
   )
 
@@ -40,8 +39,7 @@ let search_and_replace pairs =
   in
   List.map (fun tok ->
     match tok.desc with
-    | Token t -> { tok with desc = Token (replace t) }
-    | Opt_token t -> { tok with desc = Opt_token (replace t) }
+    | Token (t, opt) -> { tok with desc = Token (replace t, opt) }
     | Comment _ | Child_node -> tok
   )
 
@@ -49,6 +47,6 @@ let search_and_replace pairs =
 let without ~token =
   List.filter (fun t ->
     match t.desc with
-    | Token rt | Opt_token rt -> not (Raw.equals rt token)
+    | Token (rt, _opt) -> not (Raw.equals rt token)
     | _ -> true
   )

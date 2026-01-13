@@ -5,7 +5,7 @@ open Ast_mapper
 let lparen_child_rparen ~optional:opt pos =
   let open Tokens in
   let mk desc = { pos; desc } in
-  let mk_tok tok = { pos; desc = if opt then Opt_token tok else Token tok } in
+  let mk_tok tok = { pos; desc = Token (tok, opt) } in
   [ mk_tok LPAREN
   ; mk Child_node
   ; mk_tok RPAREN ]
@@ -30,8 +30,8 @@ let insert_pipe_if_missing ~after:kw =
     | tok :: toks ->
       match tok.desc with
       | Child_node ->
-        { tok with desc = Token BAR } :: tok :: toks
-      | Token BAR -> tok :: toks
+        { tok with desc = Token (BAR, false) } :: tok :: toks
+      | Token (BAR, _) -> tok :: toks
       | _ -> tok :: insert_before_child toks
   in
   let rec seek = function
@@ -39,8 +39,7 @@ let insert_pipe_if_missing ~after:kw =
     | tok :: toks ->
       tok ::
       (match tok.desc with
-       | Opt_token t
-       | Token t when Tokens.Raw.equals t kw -> insert_before_child toks
+       | Token (t, _) when Tokens.Raw.equals t kw -> insert_before_child toks
        | _ -> seek toks)
   in
   seek

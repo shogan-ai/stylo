@@ -4,7 +4,7 @@ open Parsetree
 let lparen_child_rparen ~optional:opt pos =
   let open Tokens in
   let mk desc = { pos; desc } in
-  let mk_tok tok = { pos; desc = if opt then Opt_token tok else Token tok } in
+  let mk_tok tok = { pos; desc = Token (tok, opt) } in
   [ mk_tok LPAREN
   ; mk Child_node
   ; mk_tok RPAREN ]
@@ -65,8 +65,8 @@ let make_parens_optional p =
   | Ppat_parens { pat; optional = false } ->
     let tokens =
       List.map Tokens.(function
-        | { pos; desc = Token (LPAREN | RPAREN as tok)} ->
-          { pos; desc = Opt_token tok }
+        | { pos; desc = Token (LPAREN | RPAREN as tok, false)} ->
+          { pos; desc = Token (tok, true) }
         | token -> token
       ) p.ppat_tokens
     in

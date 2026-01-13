@@ -28,8 +28,14 @@ type comment = {
 }
 
 type desc =
-  | Token of token
-  | Opt_token of token
+  | Token of token * bool
+  (** the bool marks whether the token is optional or not.
+      Fresh from the lexer the value will always be [false], but this can be
+      changed by a "normalisation" function (which can also just synthesize such
+      optional nodes).
+
+      This optional status is matched by a twin flag on document leaves (cf
+      [../print/document/core.mli]). *)
   | Comment of comment
   | Child_node
 
@@ -42,7 +48,8 @@ type seq = elt list
 
 val is_child : elt -> bool
 val is_comment : elt -> bool
-val is_token : elt -> bool
+val is_token : ?which:token -> elt -> bool
+
 
 (** {1 Attaching to the Parsetree} *)
 

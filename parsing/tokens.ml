@@ -308,8 +308,7 @@ type comment = {
 }
 
 type desc =
-  | Token of Parser_tokens.token
-  | Opt_token of Parser_tokens.token
+  | Token of Parser_tokens.token * bool
   | Comment of comment
   | Child_node
 
@@ -321,12 +320,12 @@ type elt = {
 type seq = elt list
 
 let desc_as_string = function
-  | Token t ->
+  | Token (t, false) ->
     if Dbg_print.dbg then
       Raw.to_string t
     else
       "tok"
-  | Opt_token t ->
+  | Token (t, true) ->
     if Dbg_print.dbg then
       "optional(" ^ Raw.to_string t ^ ")"
     else
@@ -490,7 +489,11 @@ let is_comment t =
   | Comment _ -> true
   | _ -> false
 
-let is_token t =
+let is_token ?which t =
   match t.desc with
-  | Token _ | Opt_token _ -> true
+  | Token (tok, _) ->
+    begin match which with
+    | None -> true
+    | Some t -> tok = t
+    end
   | _ -> false
