@@ -227,9 +227,14 @@ and core_type_desc =
 
            - As the {{!value_description.pval_type}[pval_type]} field of a
            {!value_description}.
+
+           - As the {!core_type} of a
+           {{!function_param_desc.Pparam_val}[Param_val]}.
          *)
   | Ptyp_package of ext_attribute * package_type  (** [(module S)]. *)
   | Ptyp_open of Longident.t loc * core_type (** [M.(T)] *)
+  | Ptyp_quote of core_type (** [<[T]>] *)
+  | Ptyp_splice of core_type (** [$T] *)
   | Ptyp_of_kind of jkind_annotation (** [(type : k)] *)
   | Ptyp_extension of extension  (** [[%id]]. *)
   | Ptyp_parens of core_type
@@ -542,6 +547,8 @@ and expression_desc =
           - [CLAUSES] is a series of [comprehension_clause].
     *)
   | Pexp_overwrite of expression * expression (** overwrite_ exp with exp *)
+  | Pexp_quote of expression (** runtime metaprogramming quotations <[E]> *)
+  | Pexp_splice of expression (** runtime metaprogramming splicing $(E) *)
   | Pexp_hole (** _ *)
   | Pexp_index_op of {
       kind: paren_kind;
@@ -1495,15 +1502,15 @@ and module_binding =
 (** Values of type [module_binding] represents [module X = ME] *)
 
 and jkind_annotation_desc =
-  | Default
-  | Abbreviation of string
+  | Pjk_default
+  | Pjk_abbreviation of string
   (* CR layouts v2.8: [mod] can have only layouts on the left, not
      full kind annotations. We may want to narrow this type some. *)
-  | Mod of jkind_annotation * modes
-  | With of jkind_annotation * core_type * modalities
-  | Kind_of of core_type
-  | Product of jkind_annotation list
-  | Parens of jkind_annotation_desc
+  | Pjk_mod of jkind_annotation * modes
+  | Pjk_with of jkind_annotation * core_type * modalities
+  | Pjk_kind_of of core_type
+  | Pjk_product of jkind_annotation list
+  | Pjk_parens of jkind_annotation_desc
 
 and jkind_annotation =
   { pjkind_loc : Location.t

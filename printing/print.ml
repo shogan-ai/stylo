@@ -316,6 +316,14 @@ and Payload : sig
   val pp : payload -> t
 end = struct
   module Ends_in_obj_type = struct
+    (* We need to be careful in payload to add an extra space before the closing
+       ']' if the payload ends with and object type, otherwise the lexer will
+       parse '>]' as a single token.
+
+       While oxcaml's quotations also end with a '>' we do need to check for
+       them as ']>' will have be recognized as a token already and the following
+       ']' will be lexed independently. *)
+
     let rec core_type ct =
       ct.ptyp_attributes = [] &&
       match ct.ptyp_desc with
@@ -337,22 +345,24 @@ end = struct
       | Ptyp_extension _
       | Ptyp_arrow _
       | Ptyp_of_kind _
+      | Ptyp_quote _
+      | Ptyp_splice _
         ->
         false
 
     let rec jkind_annotation jk =
       match jk.pjkind_desc with
-      | With (_, ct, [])
-      | Kind_of ct ->
+      | Pjk_with (_, ct, [])
+      | Pjk_kind_of ct ->
         core_type ct
-      | Product (_ :: _ as jks) ->
+      | Pjk_product (_ :: _ as jks) ->
         jkind_annotation List.(hd @@ rev jks)
-      | Default
-      | Abbreviation _
-      | Mod _
-      | With (_, _, _ :: _)
-      | Product []
-      | Parens _ ->
+      | Pjk_default
+      | Pjk_abbreviation _
+      | Pjk_mod _
+      | Pjk_with (_, _, _ :: _)
+      | Pjk_product []
+      | Pjk_parens _ ->
         false
 
     let constructor_argument ca =
@@ -570,23 +580,27 @@ end = struct
     in
     pp ~pp_arg:Type_param.pp delims params name
 
-  let starts_or_ends_with_obj = function
+  (* '[' followed by '<' will be parsed as LBRACKETGREATER without a space
+     between the two symbols.
+     A similar thing happens for '>' followed by ']' *)
+  let would_lex_differently = function
     | [] -> false
     | first :: rest ->
-      let is_obj ct =
+      let is_obj_or_quote ct =
         match ct.ptyp_desc with
-        | Ptyp_object _ -> true
+        | Ptyp_object _
+        | Ptyp_quote _ -> true
         | _ -> false
       in
-      let rec is_obj_last = function
+      let rec last_is_obj_or_quote = function
         | [] -> false
-        | [ x ] -> is_obj x
-        | _ :: xs -> is_obj_last xs
+        | [ x ] -> is_obj_or_quote x
+        | _ :: xs -> last_is_obj_or_quote xs
       in
-      is_obj first || is_obj_last rest
+      is_obj_or_quote first || last_is_obj_or_quote rest
 
   let pp_class_constr args lid =
-    let delims = Brackets { spaces_required = starts_or_ends_with_obj args } in
+    let delims = Brackets { spaces_required = would_lex_differently args } in
     let lid = longident lid in
     pp ~pp_arg:Core_type.pp delims args lid
 
@@ -845,6 +859,21 @@ end = struct
         Preceeding.group_with preceeding (longident lid.txt ^^ S.dot)
       in
       pre_lid ^^ pre_nest (space ^^ pp ct)
+    | Ptyp_quote ct ->
+      let preceeding, pre_nest =
+        Preceeding.extend preceeding (S.lt_lbracket ^^ break 1) ~indent:3
+      in
+      pp ~preceeding ct ^/^ pre_nest S.rbracket_gt
+    | Ptyp_splice ct ->
+      let spaces, indent =
+        match ct.ptyp_desc with
+        | Ptyp_quote _ -> 1, 2
+        | _ -> 0, 1
+      in
+      let preceeding, _ =
+        Preceeding.extend preceeding (S.dollar ^^ break spaces) ~indent
+      in
+      pp ~preceeding ct
     | Ptyp_of_kind jkind ->
       let pre_type, pre_nest = Preceeding.group_with preceeding S.type_ in
       pre_type ^/^ pre_nest (S.colon ^/^ Jkind_annotation.pp jkind)
@@ -1300,36 +1329,39 @@ end = struct
       string s
     | _ -> assert false
 
+  let rec needs_space_if_prefixed e =
+    match e.pexp_desc with
+    (* We force a space before # *)
+    | Pexp_unboxed_tuple _
+    | Pexp_record_unboxed_product _
+    | Pexp_constant
+        ( Pconst_unboxed_float _
+        | Pconst_unboxed_integer _
+        | Pconst_untagged_char _)
+    (* And before < or $ *)
+    | Pexp_quote _
+    | Pexp_splice _
+    (* As well as before other operators *)
+    | Pexp_prefix_apply _
+    | Pexp_add_or_sub _
+    (* Or when the next token is a tilde *)
+    | Pexp_tuple ({ parg_desc = Parg_labelled _ ; _ } :: _) ->
+      true
+    (* Need to check rhs of "infix applications" *)
+    | Pexp_infix_apply { arg1 = lhs; _ }
+    | Pexp_send (lhs, _)
+    | Pexp_field (lhs, _)
+    | Pexp_index_op { seq = lhs; _ } ->
+      needs_space_if_prefixed lhs
+    | _ -> false
+
   let rec pp ?preceeding e =
     pp_desc ~preceeding e
     |> Attribute.attach ~attrs:e.pexp_attributes
 
   and opt_space_then_pp ~extra_nest e =
-    let rec needs_space e =
-      match e.pexp_desc with
-      (* we force a space before # *)
-      | Pexp_unboxed_tuple _
-      | Pexp_record_unboxed_product _
-      | Pexp_constant
-          ( Pconst_unboxed_float _
-          | Pconst_unboxed_integer _
-          | Pconst_untagged_char _)
-      (* As well as before other operators *)
-      | Pexp_prefix_apply _
-      | Pexp_add_or_sub _
-      (* Or when the next token is a tilde *)
-      | Pexp_tuple ({ parg_desc = Parg_labelled _ ; _ } :: _) ->
-        true
-      (* Need to check rhs of "infix applications" *)
-      | Pexp_infix_apply { arg1 = lhs; _ }
-      | Pexp_send (lhs, _)
-      | Pexp_field (lhs, _)
-      | Pexp_index_op { seq = lhs; _ } ->
-        needs_space lhs
-      | _ -> false
-    in
     extra_nest (
-      (if needs_space e then break 1 else empty) ^^ pp e
+      (if needs_space_if_prefixed e then break 1 else empty) ^^ pp e
     )
 
   and pp_desc ~preceeding exp =
@@ -1493,6 +1525,18 @@ end = struct
         S.with_ ^/^
         nest 2 (pp e2)
       )
+    | Pexp_quote e ->
+      let preceeding, pre_nest =
+        Preceeding.extend preceeding (S.lt_lbracket ^^ break 1)
+          ~indent:3
+      in
+      pp ~preceeding e ^/^ pre_nest S.rbracket_gt
+    | Pexp_splice e ->
+      let space = if needs_space_if_prefixed e then 1 else 0 in
+      let preceeding, _ =
+        Preceeding.extend preceeding (S.dollar ^^ break space) ~indent:1
+      in
+      pp ~preceeding e
     | Pexp_hole ->
       Preceeding.group_with preceeding S.underscore
       |> fst
@@ -1593,11 +1637,22 @@ end = struct
     pre_nest cases
 
   and pp_index_op ~preceeding nb_semis kind seq op indices assign =
-    let open_, close =
+    let open_, close, spaces_around_indices =
+      let has_quotation =
+        (* Over-approximation: quotations are only problematic in the first and
+           last position (because without spaces they change the way the
+           opening/closing is lexed).
+           But ... whatever. *)
+        List.exists (function
+          | { pexp_desc = Pexp_quote _; _ } -> true
+          | _ -> false
+        )
+      in
       match kind with
-      | Paren -> S.lparen, S.rparen
-      | Brace -> S.lbrace, S.rbrace
-      | Bracket -> S.lbracket, S.rbracket
+      | Paren -> S.lparen, S.rparen, 0
+      | Brace -> S.lbrace, S.rbrace, if has_quotation indices then 1 else 0
+      | Bracket ->
+        S.lbracket, S.rbracket, if has_quotation indices then 1 else 0
     in
     let indices =
       let semi_as_term = List.compare_length_with indices nb_semis = 0 in
@@ -1617,9 +1672,9 @@ end = struct
         pp ?preceeding seq ^^ break 0 ^^
         pre_nest (group dotop ^^ open_)
       ) ^^
-      break 0 ^^
+      break spaces_around_indices ^^
       pre_nest (nest 2 indices) ^^
-      break 0 ^^
+      break spaces_around_indices ^^
       pre_nest close
     in
     match assign with
@@ -3923,10 +3978,10 @@ and Jkind_annotation : sig
   val pp : jkind_annotation -> t
 end = struct
   let rec pp_desc = function
-    | Default -> S.underscore
-    | Abbreviation s -> string s
-    | Mod (jk, ms) -> pp jk ^/^ S.mod_ ^/^ modes ms
-    | With (jk, ct, modalities) ->
+    | Pjk_default -> S.underscore
+    | Pjk_abbreviation s -> string s
+    | Pjk_mod (jk, ms) -> pp jk ^/^ S.mod_ ^/^ modes ms
+    | Pjk_with (jk, ct, modalities) ->
       pp jk ^/^
       group (
         S.with_ ^/^ nest 2 (
@@ -3934,10 +3989,10 @@ end = struct
           |> with_modalities ~modalities
         )
       )
-    | Kind_of ct -> S.kind_of__ ^/^ Core_type.pp ct
-    | Product jks ->
+    | Pjk_kind_of ct -> S.kind_of__ ^/^ Core_type.pp ct
+    | Pjk_product jks ->
       separate_map (break 1 ^^ S.ampersand ^^ break 1) pp jks
-    | Parens jkd -> parens (pp_desc jkd)
+    | Pjk_parens jkd -> parens (pp_desc jkd)
 
   and pp jk = pp_desc jk.pjkind_desc
 
