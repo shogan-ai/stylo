@@ -1,0 +1,4 @@
+(library
+  (name comments)
+  (libraries dbg_print document ocaml_syntax)
+  (flags :standard -open Dbg_print))

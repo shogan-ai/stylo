@@ -1,5 +1,4 @@
 open Ocaml_syntax
-open Dbg_print
 
 module T = Tokens
 module Doc = Document
@@ -13,7 +12,7 @@ let pp_error ppf = function
   | Output_longer_than_input doc ->
     Format.fprintf ppf "Output longer than the input.";
     dprintf "remaining doc: << %s >>@."
-      (Document.Print.to_string ~width:80 doc)
+      (Doc.Print.to_string ~width:80 doc)
   | Missing_token pos ->
     Format.fprintf ppf
       "token at position %d:%d absent from the output."

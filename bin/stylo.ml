@@ -16,7 +16,7 @@ let style_file fn =
     )
   in
   Dbg_print.dprintf "%a@." Tokens.pp_seq tokens;
-  Insert_comments.from_tokens tokens doc
+  Comments.Insert.from_tokens tokens doc
 
 let width = ref 90
 
@@ -76,10 +76,10 @@ let fuzzer_batch fn =
         (* we stop at the first error in the batch
            Eventually we might want to go further, but while we try to fix the
            errors, there's not much point. *)
-        begin match Insert_comments.from_tokens tokens doc with
-        | exception Insert_comments.Error e ->
+        begin match Comments.Insert.from_tokens tokens doc with
+        | exception Comments.Insert.Error e ->
           Format.eprintf "%s, line %d: ERROR: %a@\n@\n%s@\n@."
-            fn i Insert_comments.pp_error e entrypoint_and_src;
+            fn i Comments.Insert.pp_error e entrypoint_and_src;
           has_errors := true
 
         | exception exn ->
@@ -134,8 +134,8 @@ let () =
   ) else
     List.iter (fun fn ->
       match style_file fn with
-      | exception Insert_comments.Error e ->
-        Format.eprintf "%s: ERROR: %a@." fn Insert_comments.pp_error e;
+      | exception Comments.Insert.Error e ->
+        Format.eprintf "%s: ERROR: %a@." fn Comments.Insert.pp_error e;
         has_error := true
       | exception exn ->
         let bt = Printexc.get_backtrace () in
