@@ -3,44 +3,28 @@ open Ocaml_syntax
 module T = Tokens
 module Doc = Document
 
-type error =
-  | Output_longer_than_input of Doc.t
-  | Missing_token of Lexing.position
-  | Optional_mismatch of Lexing.position
+module Error = struct
+  type t =
+    | Output_longer_than_input of Doc.t
+    | Missing_token of Lexing.position
+    | Optional_mismatch of Lexing.position
 
-let pp_error ppf = function
-  | Output_longer_than_input doc ->
-    Format.fprintf ppf "Output longer than the input.";
-    dprintf "remaining doc: << %s >>@."
-      (Doc.Print.to_string ~width:80 doc)
-  | Missing_token pos ->
-    Format.fprintf ppf
-      "token at position %d:%d absent from the output."
-      pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
-  | Optional_mismatch pos ->
-    Format.fprintf ppf
-      "printer changed optional status of token at position %d:%d."
-      pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
+  let pp ppf = function
+    | Output_longer_than_input doc ->
+      Format.fprintf ppf "Output longer than the input.";
+      dprintf "remaining doc: << %s >>@."
+        (Doc.Print.to_string ~width:80 doc)
+    | Missing_token pos ->
+      Format.fprintf ppf
+        "token at position %d:%d absent from the output."
+        pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
+    | Optional_mismatch pos ->
+      Format.fprintf ppf
+        "printer changed optional status of token at position %d:%d."
+        pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
+end
 
-exception Error of error
-
-let append_trailing_comments (tokens, doc, _) =
-  let rec aux doc = function
-    | []
-    | [ T.{ desc = Token (EOF, _); _ } ] -> doc
-    | tok :: toks ->
-      match tok.T.desc with
-      | Comment c ->
-        let doc =
-          if !(c.explicitely_inserted)
-          then doc
-          else Doc.Utils.(doc ^?^ Doc.comment c.text)
-        in
-        aux doc toks
-      | Token _ -> raise (Error (Missing_token tok.pos))
-      | Child_node -> assert false
-  in
-  aux doc tokens
+exception Error of Error.t
 
 let consume_leading_comments =
   let rec aux (floating, attached_after as acc) = function
@@ -202,7 +186,25 @@ let flush_comments tokens ~before:ws_b ~after:ws_a state =
   let doc = insert_space_if_required ~inserting_comment:true state doc in
   rest, doc, { state with space_handling = Nothing_special }
 
+(** Traverse the document and sequence of tokens simultaneously, extending the
+    document's structure with a subdocument for any comment that might be
+    missing.
 
+    We take some care to make these insertions fit in a nice way in the whole
+    document:
+    - we add some spacing so they aren't just spliced before/after the token
+    they attach to, while being careful to not add spaces where there are
+    already some
+    - we try to insert the comments outside of [Doc.Group]s, as this often
+    negatively impacts the layout of the code.
+
+    However, we also try to respect comment's "attachement" (cf.
+    [Tokens.attachement]), which roughly means having them on the same line or
+    at the same indentation level as the token they attach to.
+    This sometimes implies that we will insert comments inside a group, so we
+    can reach the correct indentation/nesting level.
+    Refer to the lexer the actual rules regarding attachement.
+*)
 let rec walk_both state seq doc =
   match seq with
   | [] ->
@@ -226,7 +228,7 @@ let rec walk_both state seq doc =
     | _, Doc.Empty -> seq, doc, state
     | _, Doc.Whitespace _ -> seq, doc, no_space state
 
-    (* Skip explicitely inserted comment *)
+    (* Skip explicitely inserted comments *)
     | T.Comment { explicitely_inserted; _ }, Doc.Comment _
       when !explicitely_inserted ->
       rest, doc, state
@@ -237,6 +239,8 @@ let rec walk_both state seq doc =
       when !explicitely_inserted ->
       walk_both state rest doc
 
+    (* Comments flushing hint take precedence over attachement and nesting
+       considerations. *)
     | T.Comment { explicitely_inserted; _ },
       Doc.Comments_flushing_hint (inserted, before, after)
       when not !explicitely_inserted ->
@@ -310,6 +314,24 @@ and insert_comments_before_subtree tokens state doc =
   let rest, doc, state' = walk_both (no_space state) rest doc in
   let doc = prepend_comments_to_doc state to_prepend doc in
   attach_before_comments state' rest doc
+
+let append_trailing_comments (tokens, doc, _) =
+  let rec aux doc = function
+    | []
+    | [ T.{ desc = Token (EOF, _); _ } ] -> doc
+    | tok :: toks ->
+      match tok.T.desc with
+      | Comment c ->
+        let doc =
+          if !(c.explicitely_inserted)
+          then doc
+          else Doc.Utils.(doc ^?^ Doc.comment c.text)
+        in
+        aux doc toks
+      | Token _ -> raise (Error (Missing_token tok.pos))
+      | Child_node -> assert false
+  in
+  aux doc tokens
 
 let from_tokens tokens doc =
   walk_both init_state tokens doc

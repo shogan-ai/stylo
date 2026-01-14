@@ -79,7 +79,7 @@ let fuzzer_batch fn =
         begin match Comments.Insert.from_tokens tokens doc with
         | exception Comments.Insert.Error e ->
           Format.eprintf "%s, line %d: ERROR: %a@\n@\n%s@\n@."
-            fn i Comments.Insert.pp_error e entrypoint_and_src;
+            fn i Comments.Insert.Error.pp e entrypoint_and_src;
           has_errors := true
 
         | exception exn ->
@@ -135,7 +135,7 @@ let () =
     List.iter (fun fn ->
       match style_file fn with
       | exception Comments.Insert.Error e ->
-        Format.eprintf "%s: ERROR: %a@." fn Comments.Insert.pp_error e;
+        Format.eprintf "%s: ERROR: %a@." fn Comments.Insert.Error.pp e;
         has_error := true
       | exception exn ->
         let bt = Printexc.get_backtrace () in
