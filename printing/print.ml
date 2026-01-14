@@ -5,13 +5,8 @@ open Parsetree
 
 module S = Syntax
 
-let enclose l r d = group (l ^^ break 0 ^^ d ^^ break 0 ^^ r)
-
 let parens d = (* fixme: nest 1?? *)
   group (S.lparen ^^ nest 1 d ^^ S.rparen)
-let brackets = enclose S.lbracket S.rbracket
-
-let dquotes d = S.dquote ^^ d ^^ S.dquote
 
 let optional f v_opt =
   match v_opt with
@@ -33,7 +28,6 @@ let rec has_leading tok ~after:after_kw = function
   | _ :: rest -> has_leading tok ~after:after_kw rest
 
 let starts_with_pipe = starts_with BAR
-let has_leading_pipe ~after = has_leading BAR ~after
 
 let rec pipe_before_child = function
   | []
@@ -94,10 +88,6 @@ let private_ = function
   | Asttypes.Private -> S.private_
   | Public -> empty
 
-let rec_ = function
-  | Asttypes.Recursive -> S.rec_
-  | Nonrecursive -> empty
-
 let nonrec_ = function
   | Asttypes.Recursive -> empty
   | Nonrecursive -> S.nonrec_
@@ -118,7 +108,7 @@ let array_delimiters = function
   | Asttypes.Immutable -> S.lbracket_colon, S.colon_rbracket
   | Mutable -> S.lbracket_pipe, S.pipe_rbracket
 
-(* N.B. stringf is important here: suffixed number come out of the lexer as a
+(* N.B. [stringf] is important here: suffixed number come out of the lexer as a
    single token. We can't use ^^ here. *)
 let constant = function
   | Pconst_float (sign, nb, None)
@@ -188,7 +178,6 @@ module rec Attribute : sig
 
   val attach
     :  ?item:bool
-    -> ?flatness:flatness
     -> ?text:string list
     -> ?pre_doc:string
     -> ?post_doc:string
@@ -214,14 +203,11 @@ end = struct
 
   let pp_list ?item l = group @@ separate_map (break 1) (pp ?item) l
 
-  let attach ?item ?flatness ?(text = []) ?pre_doc ?post_doc ~attrs t =
+  let attach ?item ?(text = []) ?pre_doc ?post_doc ~attrs t =
     let with_attrs =
-      match attrs, flatness with
-      | [], None -> t
-      | _ ->
-        (* we care about the flatness of the group, so we introduce it even in
-           the absence of attributes. *)
-        group ?flatness (t ^?^ pp_list ?item attrs)
+      match attrs with
+      | [] -> t
+      | _ -> group (t ^?^ pp_list ?item attrs)
     in
     begin match text with
     | [] -> empty
