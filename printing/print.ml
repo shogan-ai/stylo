@@ -167,6 +167,21 @@ module Doc = struct
   let pp = docstring
   let pp_floating s =
     softline ^^ pp s ^^ softline
+
+  let attach ?(extra_nest=Fun.id) ?(text = []) ?pre_doc ?post_doc t =
+    extra_nest (
+      begin match text with
+      | [] -> empty
+      | text ->
+        softline ^^ softline ^^
+        separate_map (break 1) pp text ^^
+        softline ^^ softline
+      end ^^
+      optional pp pre_doc
+    ) ^?/^
+    match post_doc with
+    | None -> t
+    | Some s -> group (t ^^ softest_break ^^ extra_nest (pp s)) ^^ softline
 end
 
 module rec Attribute : sig
@@ -176,14 +191,7 @@ module rec Attribute : sig
 
   val pp_attr_name : string list loc -> t
 
-  val attach
-    :  ?item:bool
-    -> ?text:string list
-    -> ?pre_doc:string
-    -> ?post_doc:string
-    -> attrs:attributes
-    -> t
-    -> t
+  val attach : ?extra_nest:(t -> t) -> ?item:bool -> attrs:attributes -> t -> t
 end = struct
   let pp_attr_name ids =
     separate_map S.dot string ids.txt
@@ -203,24 +211,10 @@ end = struct
 
   let pp_list ?item l = group @@ separate_map (break 1) (pp ?item) l
 
-  let attach ?item ?(text = []) ?pre_doc ?post_doc ~attrs t =
-    let with_attrs =
-      match attrs with
-      | [] -> t
-      | _ -> group (t ^?^ pp_list ?item attrs)
-    in
-    begin match text with
-    | [] -> empty
-    | text ->
-      softline ^^ softline ^^
-      separate_map (break 1) Doc.pp text ^^
-      softline ^^ softline
-    end ^^
-    optional Doc.pp pre_doc ^?/^
-    match post_doc with
-    | None -> with_attrs
-    | Some s ->
-      group (with_attrs ^^ softest_break ^^ Doc.pp s) ^^ softline
+  let attach ?(extra_nest=Fun.id) ?item ~attrs t =
+    match attrs with
+    | [] -> t
+    | _ -> group (t ^?^ extra_nest (pp_list ?item attrs))
 end
 
 and Ext_attribute : sig
@@ -292,8 +286,8 @@ end = struct
 
   let pp_toplevel { te_ext; te_attrs; te_pre_doc; te_post_doc } =
     pp ~floating:true te_ext
-    |> Attribute.attach ~item:true ?pre_doc:te_pre_doc ~attrs:te_attrs
-         ?post_doc:te_post_doc
+    |> Attribute.attach ~item:true ~attrs:te_attrs
+    |> Doc.attach ?pre_doc:te_pre_doc ?post_doc:te_post_doc
 end
 
 and Payload : sig
@@ -904,8 +898,10 @@ end = struct
   and row_field preceeding { prf_desc; prf_attributes; prf_doc;
                                  prf_loc = _; prf_tokens = _ } =
     let pre_nest = Preceeding.implied_nest (Some preceeding) in
-    prefix (row_field_desc preceeding prf_desc)
-      (pre_nest @@ Attribute.pp_list prf_attributes ^?^ optional Doc.pp prf_doc)
+    let extra_nest x = nest 2 (pre_nest x) in
+    row_field_desc preceeding prf_desc
+    |> Attribute.attach ~extra_nest ~attrs:prf_attributes
+    |> Doc.attach ~extra_nest ?post_doc:prf_doc
 
   and row_field_desc preceeding = function
     | Rinherit ct -> pp ~preceeding ct
@@ -1134,8 +1130,7 @@ end = struct
       | Asttypes.Closed -> pats
       | Open -> join pats (S.comma ^/^ S.dotdot)
     in
-    (* FIXME: attributes indent! *)
-    Attribute.attach ~attrs pats ^^ pre_nest (group rparen)
+    Attribute.attach ~extra_nest:pre_nest ~attrs pats ^^ pre_nest (group rparen)
 
   and pp_open ~preceeding lid p =
     let space =
@@ -1894,8 +1889,7 @@ end = struct
       pp_tuple ~preceeding:lparen ~pre_nest_override:pre_nest elts
         ?comma_aligner
     in
-    (* FIXME: indent of attrs! *)
-    Attribute.attach ~attrs elts ^^ pre_nest (group rparen)
+    Attribute.attach ~extra_nest:pre_nest ~attrs elts ^^ pre_nest (group rparen)
 
   and pp_parens ~preceeding ~optional exp =
     let flatness = flatness_tracker () in
@@ -2520,8 +2514,8 @@ end = struct
         end
       )
     )
-    |> Attribute.attach ~item:true
-         ?pre_doc:pval_pre_doc ?post_doc:pval_post_doc ~attrs:pval_attributes
+    |> Attribute.attach ~item:true ~attrs:pval_attributes
+    |> Doc.attach ?pre_doc:pval_pre_doc ?post_doc:pval_post_doc
 end
 
 (** {2 Type declarations} *)
@@ -2654,8 +2648,9 @@ end = struct
         )
     in
     let without_pipe =
-      Attribute.attach ~attrs:pcd_attributes ?post_doc:pcd_doc
+      Attribute.attach ~attrs:pcd_attributes
         (group constr)
+      |> Doc.attach ?post_doc:pcd_doc
       |> group
       |> nest 2
     in
@@ -2734,11 +2729,9 @@ end = struct
     prefix
       (group ~flatness without_constraint)
       (pp_constraints td.ptype_cstrs)
-    |> Attribute.attach ~item:true
-      ~text:td.ptype_pre_text
-      ?pre_doc:td.ptype_pre_doc
-      ~attrs:td.ptype_attributes
-      ?post_doc:td.ptype_post_doc
+    |> Attribute.attach ~item:true ~attrs:td.ptype_attributes
+    |> Doc.attach ~text:td.ptype_pre_text ?pre_doc:td.ptype_pre_doc
+         ?post_doc:td.ptype_post_doc
 
   let rec pp_list ?subst start = function
     | [] -> empty
@@ -2764,8 +2757,7 @@ end = struct
     separate_map (break 1)
       Extension_constructor.pp ptyext_constructors
     |> Attribute.attach ~item:true ~attrs:ptyext_attributes
-      ?pre_doc:ptyext_pre_doc
-      ?post_doc:ptyext_post_doc
+    |> Doc.attach ?pre_doc:ptyext_pre_doc ?post_doc:ptyext_post_doc
     |> group
 end
 
@@ -2801,7 +2793,8 @@ end = struct
            pext_loc = _; pext_tokens } =
     (if starts_with_pipe pext_tokens then S.pipe else empty) ^?^
     constr_ident pext_name.txt ^/^ pp_kind pext_kind
-    |> Attribute.attach ~attrs:pext_attributes ?post_doc:pext_doc
+    |> Attribute.attach ~attrs:pext_attributes
+    |> Doc.attach ?post_doc:pext_doc
 end
 
 and Type_exception : sig
@@ -2812,8 +2805,7 @@ end = struct
     Ext_attribute.decorate S.exception_ ptyexn_ext_attrs ^/^
     Extension_constructor.pp ptyexn_constructor
     |> Attribute.attach ~item:true ~attrs:ptyexn_attributes
-      ?pre_doc:ptyexn_pre_doc
-      ?post_doc:ptyexn_post_doc
+    |> Doc.attach ?pre_doc:ptyexn_pre_doc ?post_doc:ptyexn_post_doc
     |> group
 end
 
@@ -2858,7 +2850,7 @@ end = struct
                  pctf_loc = _; pctf_tokens = _ } =
     group (pp_field_desc pctf_desc)
     |> Attribute.attach ~item:true ~attrs:pctf_attributes
-      ?pre_doc:pctf_pre_doc ?post_doc:pctf_post_doc
+    |> Doc.attach ?pre_doc:pctf_pre_doc ?post_doc:pctf_post_doc
 
   and pp_field_desc = function
     | Pctf_inherit ct -> S.inherit_ ^/^ pp ct
@@ -2988,7 +2980,7 @@ end = struct
                  pcf_loc = _; pcf_tokens = _ } =
     group (pp_field_desc pcf_desc)
     |> Attribute.attach ~item:true ~attrs:pcf_attributes
-      ?pre_doc:pcf_pre_doc ?post_doc:pcf_post_doc
+    |> Doc.attach ?pre_doc:pcf_pre_doc ?post_doc:pcf_post_doc
 
   and pp_field_desc = function
     | Pcf_inherit (override, ce, alias) ->
@@ -3323,10 +3315,9 @@ end = struct
           stop
         )
     in
-    (* FIXME: indent ot attrs! *)
-    Attribute.attach ~item ~attrs:popen_attributes
-      ?pre_doc:popen_pre_doc ?post_doc:popen_post_doc
-      open_
+    let extra_nest = pre_nest in
+    Attribute.attach ~extra_nest ~item ~attrs:popen_attributes open_
+    |> Doc.attach ~extra_nest ?pre_doc:popen_pre_doc ?post_doc:popen_post_doc
 end
 
 and Open_description : sig
@@ -3361,9 +3352,8 @@ end = struct
         nest 2 main ^/^
         stop
     in
-    Attribute.attach ~item:true ~attrs:pincl_attributes
-      ?pre_doc:pincl_pre_doc ?post_doc:pincl_post_doc
-      include_
+    Attribute.attach ~item:true ~attrs:pincl_attributes include_
+    |> Doc.attach ?pre_doc:pincl_pre_doc ?post_doc:pincl_post_doc
 end
 
 and Include_description : sig
@@ -3730,8 +3720,10 @@ end = struct
         ?(params=[]) ?constraint_ ?rhs ?(attrs=[]) ?post_doc bound =
     (* Here we assume that [preceeding] cannot be [Some _] at the same time as
        [pre_text] or [pre_doc]. *)
-    pp ?preceeding ?params_indent ~equal_sign ~keyword ~params ?constraint_ ?rhs bound
-    |> Attribute.attach ?item ?text:pre_text ?pre_doc ?post_doc ~attrs
+    pp ?preceeding ?params_indent ~equal_sign ~keyword ~params ?constraint_ ?rhs
+      bound
+    |> Attribute.attach ?item ~attrs
+    |> Doc.attach ?text:pre_text ?pre_doc ?post_doc
 end
 
 and Value_binding : sig
@@ -3868,8 +3860,8 @@ end = struct
       pat ~params ?constraint_
       ?rhs:(Option.map rhs pvb_expr)
       in_kw
-    |> Attribute.attach ~item ~text:pvb_pre_text ?pre_doc:pvb_pre_doc
-      ~attrs ?post_doc:pvb_post_doc
+    |> Attribute.attach ~item ~attrs
+    |> Doc.attach ~text:pvb_pre_text ?pre_doc:pvb_pre_doc ?post_doc:pvb_post_doc
 
   let pp_ands ?(extra_nest=Fun.id) ~add_in ~item ~sep bindings =
     let rec aux = function
