@@ -147,8 +147,8 @@ let () =
         has_error := true
       | doc ->
         let width = !width in
+        let reprinted = Document.Print.to_string ~width doc in
         if !ast_check &&
-          let reprinted = Document.Print.to_string ~width doc in
           let source = In_channel.(with_open_text fn input_all) in
           not @@
           Ast_checker.Oxcaml_checker.check_same_ast fn 0
@@ -158,7 +158,6 @@ let () =
           Format.eprintf "%s: ast changed@." fn
         else (
           let pp oc =
-            let reprinted = Document.Print.to_string ~width doc in
             output_string oc reprinted;
             output_char oc '\n';
             flush oc
