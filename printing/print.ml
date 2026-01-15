@@ -1597,7 +1597,7 @@ end = struct
       Ext_attribute.decorate S.match_ ext_attrs
       |> Preceeding.group_with preceeding
     in
-    let cases = Case.pp_cases cases in
+    let cases = Case.pp_list cases in
     group (match_ ^/^ pre_nest (nest 2 (group (pp e)) ^/^ S.with_)) ^^
     hardline ^^
     pre_nest cases
@@ -1607,7 +1607,7 @@ end = struct
       Ext_attribute.decorate S.try_ ext_attrs
       |> Preceeding.group_with preceeding
     in
-    let cases = Case.pp_cases cases in
+    let cases = Case.pp_list cases in
     group (
       try_ ^/^
       pre_nest (nest 2 (pp e)) ^/^
@@ -2180,9 +2180,7 @@ end = struct
 end
 
 and Case : sig
-  val pp : case -> t
-
-  val pp_cases : case list -> t
+  val pp_list : case list -> t
 end = struct
   let pp_guard = function
     | None -> empty
@@ -2224,7 +2222,7 @@ end = struct
     flow (break 1) [ guarded_pat; nest 2 S.rarrow; nest 2 body ]
     |> group
 
-  let pp_cases = separate_map (break 1) pp
+  let pp_list = separate_map (break 1) pp
 end
 
 and Letop : sig
@@ -2391,7 +2389,7 @@ end = struct
         (Ext_attribute.decorate S.function_ ext_attrs)
     in
     pre_function_,
-    pre_nest (softest_line ^^ Case.pp_cases cases)
+    pre_nest (softest_line ^^ Case.pp_list cases)
 
   let pp_parts ?preceeding fb =
     match fb.pfb_desc with
