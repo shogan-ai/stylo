@@ -2638,11 +2638,13 @@ end = struct
       match pcd_args, pcd_res with
       | Pcstr_tuple [], None -> name
       | args, None ->
-        group (name ^/^ nest 2 S.of_) ^/^ nest 2 @@ Constructor_argument.pp_args args
+        group (name ^/^ alignment_point ^^ nest 2 S.of_) ^/^
+        nest 2 @@ Constructor_argument.pp_args args
       | Pcstr_tuple [], Some ct ->
-        group (name ^/^ nest 2 S.colon) ^?^ nest 2 (pcd_vars ^?^ Core_type.pp ct)
+        group (name ^/^ alignment_point ^^ nest 2 S.colon) ^?^
+        nest 2 (pcd_vars ^?^ Core_type.pp ct)
       | args, Some ct ->
-        group (name ^/^ nest 2 S.colon) ^?^ nest 2 (
+        group (name ^/^ alignment_point ^^ nest 2 S.colon) ^?^ nest 2 (
           pcd_vars ^?^
           Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct
         )
@@ -2665,13 +2667,16 @@ end = struct
   let pp_variant td_flatness = function
     | [] -> S.pipe
     | cd :: cds ->
-      let cd = constructor_declaration td_flatness cd in
-      match cds with
-      | [] -> cd
-      | _ ->
-        List.fold_left (fun doc cd ->
-          doc ^^ softest_line ^^ constructor_declaration td_flatness cd
-        ) cd cds
+      vertically_aligned (
+        let cd = constructor_declaration td_flatness cd in
+        match cds with
+        | [] -> cd
+        | _ ->
+          List.fold_left (fun doc cd ->
+            doc ^^ softest_line ^^
+            constructor_declaration td_flatness cd
+          ) cd cds
+      )
 
   let type_kind td_flatness = function
     | Ptype_abstract -> empty
