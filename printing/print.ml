@@ -2633,26 +2633,27 @@ end = struct
       | [] -> empty
       | vars -> Core_type.pp_poly_bindings vars ^^ S.dot
     in
-    let name = group (constr_ident pcd_name.txt) in
+    let name = group (constr_ident pcd_name.txt) ^^ alignment_point in
     let constr =
       match pcd_args, pcd_res with
-      | Pcstr_tuple [], None -> name
+      | Pcstr_tuple [], None -> name ^^ alignment_point
       | args, None ->
-        group (name ^/^ alignment_point ^^ nest 2 S.of_) ^/^
-        nest 2 @@ Constructor_argument.pp_args args
+        group (name ^/^ nest 2 S.of_) ^/^
+        nest 2 (Constructor_argument.pp_args args) ^^ alignment_point
       | Pcstr_tuple [], Some ct ->
         group (name ^/^ alignment_point ^^ nest 2 S.colon) ^?^
         nest 2 (pcd_vars ^?^ Core_type.pp ct)
       | args, Some ct ->
-        group (name ^/^ alignment_point ^^ nest 2 S.colon) ^?^ nest 2 (
+        group (name ^/^ nest 2 S.colon) ^?^ nest 2 (
           pcd_vars ^?^
-          Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct
+          Constructor_argument.pp_args args ^/^ alignment_point ^^
+          S.rarrow ^/^ Core_type.pp ct
         )
     in
     let without_pipe =
-      Attribute.attach ~attrs:pcd_attributes
-        (group constr)
-      |> Doc.attach ?post_doc:pcd_doc
+      let with_attrs = Attribute.attach ~attrs:pcd_attributes (group constr) in
+      (* Add an extra column to align docstrings. *)
+      Doc.attach ?post_doc:pcd_doc (with_attrs ^^ alignment_point)
       |> group
       |> nest 2
     in
