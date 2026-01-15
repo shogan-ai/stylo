@@ -58,6 +58,8 @@ type t = private
   | Cat of Requirement.t * t * t
   | Nest of Requirement.t * int * Condition.t option * t
   | Group of Requirement.t * int * flatness option * t
+  | Alignement_context of Requirement.t * t
+  | Alignement_point
 
 and pseudo_token = private
   | Trivial of Requirement.t * string
@@ -162,6 +164,12 @@ val group : ?margin:int -> ?flatness:flatness -> t -> t
     group and can then be part of a [Condition.t].
     N.B. if the condition is checked before the group is traversed, it will be
     assumed to be non-flat. *)
+
+(** {2 Vertical alignment} *)
+
+val vertically_aligned : t -> t
+
+val alignment_point : t
 
 (**/**)
 

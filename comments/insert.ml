@@ -59,10 +59,11 @@ let consume_leading_comments =
 let rec first_is_space = function
   | Doc.Whitespace _ -> `yes
   | Token _ | Comment _  -> `no
-  | Group (_, _, _, d) | Nest (_, _, _, d) ->
+  | Group (_, _, _, d) | Nest (_, _, _, d) | Alignement_context (_, d) ->
     first_is_space d
   | Empty
-  | Comments_flushing_hint _ -> `maybe
+  | Comments_flushing_hint _
+  | Alignement_point -> `maybe
   | Cat (_, d1, d2) ->
     match first_is_space d1 with
     | `maybe -> first_is_space d2
@@ -73,9 +74,9 @@ let first_is_space d = first_is_space d = `yes
 let rec first_is_flushhint = function
   | Doc.Comments_flushing_hint _ -> `yes
   | Token _ | Comment _ | Whitespace _ -> `no
-  | Group (_, _, _, d) | Nest (_, _, _, d) ->
+  | Group (_, _, _, d) | Nest (_, _, _, d) | Alignement_context (_, d)->
     first_is_flushhint d
-  | Empty -> `maybe
+  | Empty | Alignement_point -> `maybe
   | Cat (_, d1, d2) ->
     match first_is_flushhint d1 with
     | `maybe -> first_is_flushhint d2
@@ -86,10 +87,11 @@ let first_is_flushhint d = first_is_flushhint d = `yes
 let rec nest_before_leaf = function
   | Doc.Nest _ -> `yes
   | Token _ | Comment _ -> `no
-  | Group (_, _, _, d) -> nest_before_leaf d
+  | Group (_, _, _, d) | Alignement_context (_, d)-> nest_before_leaf d
   | Empty
   | Whitespace _
-  | Comments_flushing_hint _ -> `maybe
+  | Comments_flushing_hint _
+  | Alignement_point -> `maybe
   | Cat (_, d1, d2) ->
     match nest_before_leaf d1 with
     | `maybe -> nest_before_leaf d2
@@ -225,7 +227,8 @@ let rec walk_both state seq doc =
       attach_before_comments (saw_leaf state) rest doc
 
     (* Whitespace: don't consume token *)
-    | _, Doc.Empty -> seq, doc, state
+    | _, Doc.Empty
+    | _, Doc.Alignement_point -> seq, doc, state
     | _, Doc.Whitespace _ -> seq, doc, no_space state
 
     (* Skip explicitely inserted comments *)
@@ -274,6 +277,10 @@ let rec walk_both state seq doc =
           restl right
       in
       restr, Doc.(left ^^ right), final_state
+
+    | _, Doc.Alignement_context (_, doc) ->
+      let rest, doc, state' = walk_both state seq doc in
+      rest, Doc.vertically_aligned doc, state'
 
     | _, Doc.Nest (_, i, vanish, doc) ->
       let rest, doc, state' = walk_both (under_nest state) seq doc in

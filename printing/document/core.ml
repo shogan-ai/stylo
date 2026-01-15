@@ -88,6 +88,8 @@ type t =
   | Cat of Req.t * t * t
   | Nest of Req.t * int * Condition.t option * t
   | Group of Req.t * int * flatness option * t
+  | Alignement_context of Req.t * t
+  | Alignement_point
 
 and pseudo_token =
   | Trivial of Req.t * string
@@ -117,7 +119,8 @@ let pseudo_token_req = function
   | Complex (req, _) -> req
 
 let requirement = function
-  | Empty -> Req.of_int 0
+  | Empty
+  | Alignement_point -> Req.of_int 0
   | Token { vanishing_cond = None; value = pt }
   | Comment pt -> pseudo_token_req pt
   | Whitespace { vanishing_cond = None; value = ws } -> ws_req ws
@@ -126,7 +129,8 @@ let requirement = function
   | Whitespace _ -> Req.of_int 0
   | Cat (r, _, _)
   | Nest (r, _, _, _)
-  | Group (r, _, _, _) -> r
+  | Group (r, _, _, _)
+  | Alignement_context (r, _) -> r
 
 let ws value = Whitespace { vanishing_cond = None; value }
 
@@ -207,6 +211,11 @@ let fancy_string s = Token { vanishing_cond = None; value = pseudo_of_string s }
 
 let formatted_string t =
   Token { vanishing_cond = None; value = Complex (requirement t, t) }
+
+let vertically_aligned doc =
+  Alignement_context (requirement doc, doc)
+
+let alignment_point = Alignement_point
 
 (* FIXME *)
 let comment s = Comment (pseudo_of_string s)

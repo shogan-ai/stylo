@@ -119,6 +119,7 @@ let whitespace buf state indent flat = function
 
 let rec pretty buf state indent flat = function
   | Empty
+  | Alignement_point
   | Comments_flushing_hint _ -> state
   | Token { vanishing_cond = Some cond; _ }
   | Whitespace { vanishing_cond = Some cond; _ }
@@ -150,6 +151,8 @@ let rec pretty buf state indent flat = function
     Option.iter (fun flatness ->
       (flatness : flatness :> bool ref) := flat
     ) flat_track_opt;
+    pretty buf state indent flat t
+  | Alignement_context (_, t) ->
     pretty buf state indent flat t
 
 and pp_pseudo buf state indent flat = function
