@@ -345,4 +345,7 @@ module Regular = Printer(Regular_buffer)
 
 module Vertically_aligned = Printer(Column_based_buffer)
 
-let to_string = Regular.to_string
+let to_string ?(vertically_aligned=false) ~width d =
+  if vertically_aligned
+  then Vertically_aligned.to_string ~width d
+  else Regular.to_string ~width d

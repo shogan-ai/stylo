@@ -115,6 +115,7 @@ let inputs = ref []
 let ast_check = ref false
 let fuzzing = ref false
 let inplace = ref false
+let vert_align = ref false
 
 let () =
   Arg.parse
@@ -122,6 +123,7 @@ let () =
      "Check the formatted code parses back to the same AST"
     ;"-fuzzing", Arg.Set fuzzing, "-ast-check on each line separately"
     ;"-i", Arg.Set inplace, "style file in place"
+    ;"-vertically-aligned", Arg.Set vert_align, "vertically align some elements"
     ;"-width", Arg.Set_int width, ""]
     (fun fn -> inputs := fn :: !inputs)
     "stylo.exe [-ast-check] [-i] FILENAME*"
@@ -147,7 +149,10 @@ let () =
         has_error := true
       | doc ->
         let width = !width in
-        let reprinted = Document.Print.to_string ~width doc in
+        let vertically_aligned = !vert_align in
+        let reprinted =
+          Document.Print.to_string ~vertically_aligned ~width doc
+        in
         if !ast_check &&
           let source = In_channel.(with_open_text fn input_all) in
           not @@
