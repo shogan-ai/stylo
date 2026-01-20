@@ -238,6 +238,11 @@ let tokenizer =
     let node_toks = mb.pmb_tokens in
     combine_children ~loc:mb.pmb_loc node_toks sub_tokens
   in
+  let reduce_jkind_annotation reducer env jk =
+    let sub_tokens = super.jkind_annotation reducer env jk in
+    let node_toks = jk.pjkind_tokens in
+    combine_children ~loc:Location.none node_toks sub_tokens
+  in
   { super with
     longident = reduce_longident
   ; attribute = reduce_attribute
@@ -279,6 +284,7 @@ let tokenizer =
   ; structure_item = reduce_structure_item
   ; value_binding = reduce_value_binding
   ; module_binding = reduce_module_binding
+  ; jkind_annotation = reduce_jkind_annotation
   }
 
 let structure str =
