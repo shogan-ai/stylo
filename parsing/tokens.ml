@@ -418,7 +418,7 @@ module Indexed_list = struct
     let rec aux ~replaced_by = function
       | Empty -> invalid_arg "Tokens.consume"
       | Node n as curr ->
-        if n.pos >= stop then (
+        if n.pos > stop then (
           (* Stop is an endpos, and we index by startpos *)
           [], curr
         ) else (
