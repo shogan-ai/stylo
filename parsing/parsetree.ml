@@ -725,7 +725,8 @@ and comprehension_clause_binding =
   { pcomp_cb_mode: mode loc option;
     pcomp_cb_pattern : pattern;
     pcomp_cb_iterator : comprehension_iterator;
-    pcomp_cb_attributes : attributes
+    pcomp_cb_attributes : attributes;
+    pcomp_cb_tokens : Tokens.seq;
   }
 
 and comprehension_clause =
@@ -738,6 +739,7 @@ and comprehension =
       (** The body/generator of the comprehension *)
     pcomp_clauses : comprehension_clause list;
       (** The clauses of the comprehension; must be nonempty *)
+    pcomp_tokens : Tokens.seq;
   }
 
 and comprehension_expression =
@@ -1515,6 +1517,7 @@ and jkind_annotation_desc =
 and jkind_annotation =
   { pjkind_loc : Location.t
   ; pjkind_desc : jkind_annotation_desc
+  ; pjkind_tokens : Tokens.seq
   }
 
 (** {1 Toplevel} *)

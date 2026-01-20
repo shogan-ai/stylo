@@ -2607,7 +2607,12 @@ comprehension_iterator:
 
 comprehension_clause_binding:
   | attributes pattern comprehension_iterator
-      { { pcomp_cb_mode = None; pcomp_cb_pattern = $2 ; pcomp_cb_iterator = $3 ; pcomp_cb_attributes = $1 } }
+      { { pcomp_cb_mode = None
+        ; pcomp_cb_pattern = $2
+        ; pcomp_cb_iterator = $3
+        ; pcomp_cb_attributes = $1
+        ; pcomp_cb_tokens = Tokens.at $sloc
+        } }
 ;
 
 comprehension_clause:
@@ -2618,7 +2623,7 @@ comprehension_clause:
 
 %inline comprehension(lbracket, rbracket):
   lbracket expr nonempty_llist(comprehension_clause) rbracket
-    { { pcomp_body = $2; pcomp_clauses = $3 } }
+    { { pcomp_body = $2; pcomp_clauses = $3; pcomp_tokens = Tokens.at $sloc } }
 ;
 
 %inline comprehension_ext_expr:
@@ -3679,7 +3684,9 @@ reverse_product_jkind :
     { jkind :: jkinds }
 
 jkind_annotation: (* : jkind_annotation *)
-  jkind_desc { { pjkind_loc = make_loc $sloc; pjkind_desc = $1 } }
+  jkind_desc {
+    { pjkind_loc = make_loc $sloc; pjkind_desc = $1; pjkind_tokens = Tokens.at $sloc }
+  }
 ;
 
 jkind_constraint:

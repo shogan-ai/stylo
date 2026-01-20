@@ -2441,6 +2441,7 @@ end = struct
     ; pcomp_cb_pattern = p
     ; pcomp_cb_iterator = it
     ; pcomp_cb_attributes = attrs
+    ; pcomp_cb_tokens = _
     } =
     Attribute.pp_list attrs ^?^
     optional (fun m -> mode_legacy m.txt ^^ break 1) m_opt ^^

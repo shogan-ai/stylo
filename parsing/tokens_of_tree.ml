@@ -98,6 +98,16 @@ let tokenizer =
     let node_toks = fb.pfb_tokens in
     combine_children ~loc:fb.pfb_loc node_toks sub_tokens
   in
+  let reduce_comprehension_clause_binding reducer env cb =
+    let sub_tokens = super.comprehension_clause_binding reducer env cb in
+    let node_toks = cb.pcomp_cb_tokens in
+    combine_children ~loc:Location.none node_toks sub_tokens
+  in
+  let reduce_comprehension reducer env c =
+    let sub_tokens = super.comprehension reducer env c in
+    let node_toks = c.pcomp_tokens in
+    combine_children ~loc:Location.none node_toks sub_tokens
+  in
   let reduce_value_description reducer env vd =
     let sub_tokens = super.value_description reducer env vd in
     let node_toks = vd.pval_tokens in
@@ -241,6 +251,8 @@ let tokenizer =
   ; case = reduce_case
   ; argument = reduce_argument
   ; function_body = reduce_function_body
+  ; comprehension_clause_binding = reduce_comprehension_clause_binding
+  ; comprehension = reduce_comprehension
   ; value_description = reduce_value_description
   ; ptype_param = reduce_ptype_param
   ; type_declaration = reduce_type_declaration
