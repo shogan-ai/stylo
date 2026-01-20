@@ -348,6 +348,7 @@ module Indexed_list = struct
     | Empty
     | Node of {
         pos: position;
+        synthesized: bool;
         mutable value: elt;
         mutable prev: cell;
         mutable next: cell;
@@ -367,8 +368,9 @@ module Indexed_list = struct
   let create () : t = { tbl = Tbl.create 42; last = Empty }
 
   let append t ~pos desc =
+    let synthesized = false in
     let elt = { desc; pos } in
-    let node = Node { pos; value = elt; prev = t.last; next = Empty } in
+    let node = Node { pos; synthesized; value = elt; prev = t.last; next = Empty } in
     Tbl.add t.tbl pos node;
     begin match t.last with
     | Empty -> ()
@@ -381,7 +383,7 @@ module Indexed_list = struct
       pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
     let[@warning "-8"] (Node node) as cell =
       let value = { desc = Child_node; pos } in
-      Node { pos; value; prev = Empty; next = Empty }
+      Node { pos; synthesized = true; value; prev = Empty; next = Empty }
     in
     Tbl.add t.tbl pos cell;
     match t.last with
@@ -418,8 +420,15 @@ module Indexed_list = struct
     let rec aux ~replaced_by = function
       | Empty -> invalid_arg "Tokens.consume"
       | Node n as curr ->
-        if n.pos > stop then (
-          (* Stop is an endpos, and we index by startpos *)
+        if n.pos > stop || (n.pos = stop && not n.synthesized) then (
+          (* Stop is an endpos, and we index by startpos.
+
+             Caveat: if [n.synthesized] it means we generated it when consuming the tokens 
+             of an empty reduction. In cases like this startpos == endpos and things are
+             weird. 
+
+             FIXME: this is incorrect, if multiple synthesized nodes follow each other it 
+             will consume too much. *)
           [], curr
         ) else (
           Tbl.replace t.tbl n.pos replaced_by;

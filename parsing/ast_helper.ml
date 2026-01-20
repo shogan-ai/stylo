@@ -89,6 +89,14 @@ module Attr = struct
       attr_tokens = tokens; }
 end
 
+let tokens_in_range ~after ~up_to =
+  (* Ideally we'd have called [Tokens.at (after.loc_end, up_to), but tokens are
+     indexed by startpos and loc_end will likely result in a Not_found exception.
+     So we actually fetch a bit more than we want, and drop the extra [Child_node]. *)
+  match Tokens.at (after.Location.loc_start, up_to) with
+  | { desc = Child_node; _ } :: tail -> tail
+  | _ -> assert false
+
 module Typ = struct
   let mk ?(loc = !default_loc) ?(attrs = no_attrs) ~tokens d =
     {ptyp_desc = d;
@@ -97,7 +105,7 @@ module Typ = struct
      ptyp_tokens = tokens;}
 
   let attr d (attr, attr_loc) = 
-    let tokens_tail = Tokens.at (d.ptyp_loc.loc_start, snd attr_loc) in
+    let tokens_tail = tokens_in_range ~after:d.ptyp_loc ~up_to:(snd attr_loc) in
     let attrs, attrs_tokens = d.ptyp_attributes in
     {d with ptyp_attributes = (attrs @ [attr], attrs_tokens @ tokens_tail) }
 
@@ -132,7 +140,7 @@ module Pat = struct
      ppat_tokens = tokens}
 
   let attr d (attr, attr_loc) = 
-    let tokens_tail = Tokens.at (d.ppat_loc.loc_start, snd attr_loc) in
+    let tokens_tail = tokens_in_range ~after:d.ppat_loc ~up_to:(snd attr_loc) in
     let attrs, attrs_tokens = d.ppat_attributes in
     {d with ppat_attributes = (attrs @ [attr], attrs_tokens @ tokens_tail) }
 
@@ -239,7 +247,7 @@ module Mty = struct
     {pmty_desc = d; pmty_loc = loc; pmty_attributes = attrs;
      pmty_tokens = tokens}
   let attr d (attr, attr_loc) = 
-    let tokens_tail = Tokens.at (d.pmty_loc.loc_start, snd attr_loc) in
+    let tokens_tail = tokens_in_range ~after:d.pmty_loc ~up_to:(snd attr_loc) in
     let attrs, attrs_tokens = d.pmty_attributes in
     {d with pmty_attributes = (attrs @ [attr], attrs_tokens @ tokens_tail) }
 
@@ -260,7 +268,7 @@ module Mod = struct
     {pmod_desc = d; pmod_loc = loc; pmod_attributes = attrs;
      pmod_tokens = tokens}
   let attr d (attr, attr_loc) = 
-    let tokens_tail = Tokens.at (d.pmod_loc.loc_start, snd attr_loc) in
+    let tokens_tail = tokens_in_range ~after:d.pmod_loc ~up_to:(snd attr_loc) in
     let attrs, attrs_tokens = d.pmod_attributes in
     {d with pmod_attributes = (attrs @ [attr], attrs_tokens @ tokens_tail) }
 
@@ -359,7 +367,7 @@ module Cl = struct
      pcl_attributes = attrs;
     }
   let attr d (attr, attr_loc) = 
-    let tokens_tail = Tokens.at (d.pcl_loc.loc_start, snd attr_loc) in
+    let tokens_tail = tokens_in_range ~after:d.pcl_loc ~up_to:(snd attr_loc) in
     let attrs, attrs_tokens = d.pcl_attributes in
     {d with pcl_attributes = (attrs @ [attr], attrs_tokens @ tokens_tail) }
 
@@ -383,7 +391,7 @@ module Cty = struct
      pcty_tokens = tokens;
     }
   let attr d (attr, attr_loc) = 
-    let tokens_tail = Tokens.at (d.pcty_loc.loc_start, snd attr_loc) in
+    let tokens_tail = tokens_in_range ~after:d.pcty_loc ~up_to:(snd attr_loc) in
     let attrs, attrs_tokens = d.pcty_attributes in
     {d with pcty_attributes = (attrs @ [attr], attrs_tokens @ tokens_tail) }
 

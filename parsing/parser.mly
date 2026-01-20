@@ -3825,7 +3825,9 @@ sig_exception_declaration:
       (* If a docstring is present before attrs1, it will be in the [decl_toks]
          but it also will remain unattached, so there will be no conflict with
          [docs] and the parent tokens. *)
+      dprintf "decl_toks:@ ";
       let decl_toks = Tokens.at decl_loc in
+      dprintf "@ done@.";
       let docs, sloc = symbol_docs $sloc in
       Te.mk_exception ~attrs ~loc:(make_loc $sloc) ~docs
         (Te.decl id ~vars ~args ?res ~attrs:attrs1 ~loc:(make_loc decl_loc)
@@ -4050,7 +4052,8 @@ core_type:
     core_type_no_attr
       { $1 }
   | ty = core_type attribute
-      { Typ.attr ty ($2, $loc($2)) }
+      { dprintf "ici@.";
+        Typ.attr ty ($2, $loc($2)) }
 ;
 
 %inline core_type_with_optional_modes:

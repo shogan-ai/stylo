@@ -2,8 +2,16 @@
 
 let rec combine_children (top : Tokens.seq) children =
   match top, children with
-  | [], [] -> [] (* done *)
-  | [], _ -> assert false (* children left behind *)
+  | [], children -> 
+    (* There sometimes are trailing children, because attributes are sometimes backpatched
+       into a cst node, so the "attributes" field will include some tokens (the children), 
+       whereas the parent's tokens field doesn't have a [Child_node] for attributes
+       (because there were none when parsing the node).
+
+       We should aim to have a more principled handling of attributes of the parser, 
+       because this code here might hide bugs in other parts of the pipeline (e.g. during 
+       normalisation). *)
+    List.flatten children 
   | { desc = Child_node; _ } :: _, [] -> assert false (* missing child *)
   | { desc = Child_node; _ } :: tokens, child :: children ->
     child @ combine_children tokens children
@@ -66,6 +74,18 @@ let tokenizer =
   let reduce_core_type reducer env ct =
     let sub_tokens = super.core_type reducer env ct in
     let node_toks = ct.ptyp_tokens in
+    let () =
+      let start_pos = ct.ptyp_loc.loc_start in
+      let stop_pos = ct.ptyp_loc.loc_end in
+      dprintf
+        "CORE TYPE: @[<h>loc:@ %d:%d - %d:%d@]@\n\
+         node tokens:@[<hov 2>@ %a@]@\n\
+         sub tokens:@[<v 2>@ {%a}@]@."
+        start_pos.pos_lnum (start_pos.pos_cnum - start_pos.pos_bol)
+        stop_pos.pos_lnum (stop_pos.pos_cnum - stop_pos.pos_bol)
+        Tokens.pp_seq node_toks
+        pp_children sub_tokens
+    in
     combine_children ~loc:ct.ptyp_loc node_toks sub_tokens
   in
   let reduce_row_field reducer env p =
