@@ -94,7 +94,7 @@ and toplevel_extension =
   ; te_post_doc: string option }
 (** [[%%id]] (** docstrings *) *)
 
-and attributes = attribute list
+and attributes = attribute list * Tokens.seq
 
 and payload =
   | PStr of structure

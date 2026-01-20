@@ -44,9 +44,14 @@ let tokenizer =
     let node_toks = l.tokens in
     combine_children ~loc:Location.none node_toks sub_tokens
   in
-  let reduce_attribute reducer env (a : Parsetree.attribute) =
+  let reduce_attribute reducer env a =
     let sub_tokens = super.attribute reducer env a in
     combine_children ~loc:a.attr_loc a.attr_tokens sub_tokens
+  in
+  let reduce_attributes reducer env attrs =
+    let sub_tokens = super.attributes reducer env attrs in
+    let node_toks = snd attrs in
+    combine_children ~loc:Location.none node_toks sub_tokens
   in
   let reduce_extension reducer env e =
     let sub_tokens = super.extension reducer env e in
@@ -231,6 +236,7 @@ let tokenizer =
   { super with
     longident = reduce_longident
   ; attribute = reduce_attribute
+  ; attributes = reduce_attributes
   ; extension = reduce_extension
   ; arrow_arg = reduce_arrow_arg
   ; core_type = reduce_core_type

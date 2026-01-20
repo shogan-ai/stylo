@@ -5,6 +5,10 @@ open Parsetree
 
 module S = Syntax
 
+let no_attrs = function
+  | [], [] -> true
+  | _ -> false
+
 let parens d = (* fixme: nest 1?? *)
   group (S.lparen ^^ nest 1 d ^^ S.rparen)
 
@@ -209,10 +213,10 @@ end = struct
     pp (if item then S.lbracket_atat else S.lbracket_at) attr_name
       attr_payload
 
-  let pp_list ?item l = group @@ separate_map (break 1) (pp ?item) l
+  let pp_list ?item (l, _) = group @@ separate_map (break 1) (pp ?item) l
 
   let attach ?(extra_nest=Fun.id) ?item ~attrs t =
-    match attrs with
+    match fst attrs with
     | [] -> t
     | _ -> group (t ^?^ extra_nest (pp_list ?item attrs))
 end
@@ -303,7 +307,7 @@ end = struct
        ']' will be lexed independently. *)
 
     let rec core_type ct =
-      ct.ptyp_attributes = [] &&
+      no_attrs ct.ptyp_attributes  &&
       match ct.ptyp_desc with
       | Ptyp_object (_, _) -> true
       | Ptyp_arrow { codom_type = rhs; codom_modes = []; _ }
@@ -347,7 +351,7 @@ end = struct
       ca.pca_modalities = [] && core_type ca.pca_type
 
     let constructor_decl cd =
-      cd.pcd_attributes = [] &&
+      no_attrs cd.pcd_attributes &&
       match cd with
       | { pcd_res = Some ct; _ } -> core_type ct
       | { pcd_args = Pcstr_tuple (_ :: _ as args); _ } ->
@@ -355,7 +359,7 @@ end = struct
       | _ -> false
 
     let type_declaration td =
-      td.ptype_attributes = [] &&
+      no_attrs td.ptype_attributes &&
       match td with
       | { ptype_cstrs = (_ :: _ as cstrs); _ } ->
         let _, ct, _ = List.hd (List.rev cstrs) in
@@ -372,7 +376,7 @@ end = struct
       | _ :: tds -> type_declarations tds
 
     let extension_constructor ec =
-      ec.pext_attributes = [] &&
+      no_attrs ec.pext_attributes &&
       match ec.pext_kind with
       | Pext_decl (_, _, Some ret_ct) -> core_type ret_ct
       | Pext_decl (_, Pcstr_tuple (_ :: _ as args), None) ->
@@ -380,11 +384,11 @@ end = struct
       | _ -> false
 
     let type_extension te =
-      te.ptyext_attributes = [] &&
+      no_attrs te.ptyext_attributes &&
       extension_constructor List.(hd (rev te.ptyext_constructors))
 
     let type_exception exn =
-      exn.ptyexn_attributes = [] &&
+      no_attrs exn.ptyexn_attributes &&
       extension_constructor exn.ptyexn_constructor
 
     let structure_item it =
@@ -410,7 +414,7 @@ end = struct
         false
 
     let value_description vd =
-      vd.pval_attributes = [] &&
+      no_attrs vd.pval_attributes &&
       vd.pval_prim = [] &&
       vd.pval_modalities = [] &&
       core_type vd.pval_type
@@ -668,7 +672,7 @@ end = struct
                        Ptyp_arrow
                          { domain=dom; codom_legacy_modes
                          ; codom_type; codom_modes }
-                   ; ptyp_attributes = [] ; _ }) ->
+                   ; ptyp_attributes = [], [] ; _ }) ->
         let args, ret_ty =
           collect_args [dom] (codom_legacy_modes, codom_modes, codom_type)
         in
@@ -1376,7 +1380,7 @@ end = struct
     | Pexp_unboxed_tuple elts ->
       let flatness = flatness_tracker () in
       group ~flatness @@
-      pp_parens_tuple ~preceeding ~kind:`Unboxed ~attrs:[] flatness elts
+      pp_parens_tuple ~preceeding ~kind:`Unboxed ~attrs:([], []) flatness elts
     | Pexp_construct (lid, arg) ->
       let lid, pre_nest =
         Preceeding.group_with preceeding @@ constr_longident lid.txt
@@ -1681,7 +1685,7 @@ end = struct
 
   and pp_else_branch = function
     | { pexp_ext_attr = ext_attrs
-      ; pexp_attributes = [] (* we'd need to be under parens to have attrs *)
+      ; pexp_attributes = [], [] (* we'd need to be under parens to have attrs *)
       ; pexp_desc = Pexp_ifthenelse (e1, e2, e3)
       ; _ } ->
       pp_ite ~kw:(S.else_ ^/^ S.if_) ext_attrs e1 e2 e3
@@ -1693,8 +1697,8 @@ end = struct
       (* we print parenthesized branches specially, but tuples do not count as
          parenthesized branches! *)
       kw ^^ nest 2 (group (break 1 ^^ pp exp))
-    | { pexp_ext_attr = { pea_attrs = []; pea_ext = None }
-      ; pexp_attributes = []
+    | { pexp_ext_attr = { pea_attrs = [], []; pea_ext = None }
+      ; pexp_attributes = [], []
       ; pexp_desc = Pexp_parens { exp = e; optional = false }
       ; _ } ->
       group (kw ^/^ S.lparen) ^^ nest 2 (group (break 0 ^^ pp e ^^ S.rparen))
@@ -1729,8 +1733,8 @@ end = struct
   and pp_dot_open ~preceeding lid e =
     let lid, pre_nest = Preceeding.group_with preceeding (longident lid.txt) in
     group @@ match e with
-    | { pexp_ext_attr = { pea_attrs = []; pea_ext = None }
-      ; pexp_attributes = []
+    | { pexp_ext_attr = { pea_attrs = [], []; pea_ext = None }
+      ; pexp_attributes = [], []
       ; pexp_desc = Pexp_parens { exp = e; optional = false }
       ; _ } ->
       lid ^^ S.dot ^^ S.lparen ^^ break 0 ^^
@@ -3436,7 +3440,7 @@ end = struct
   and pp_apply m1 m2 =
     let m1 = pp m1 in
     match m2 with
-    | { pmod_attributes = []
+    | { pmod_attributes = [], []
       ; pmod_desc =
           Pmod_parens
             { pmod_attributes = attrs2
@@ -3462,7 +3466,7 @@ end = struct
       let stop = Attribute.attach stop ~attrs:pmod_attributes in
       Three_parts { start; main; stop }
     | Pmod_apply
-        (m1, { pmod_attributes = []
+        (m1, { pmod_attributes = [], []
              ; pmod_desc =
                  Pmod_parens
                    { pmod_attributes = attrs2
@@ -3522,7 +3526,7 @@ end = struct
 
   let pp_keeping_semi = Toplevel_items.Struct.pp_grouped_keeping_semi pp_item
 
-  let pp ?(attrs=[]) str =
+  let pp ?(attrs=[],[]) str =
     let struct_ = Attribute.attach ~attrs S.struct_ in
     group (
       struct_ ^?^
@@ -3717,7 +3721,7 @@ end = struct
 
 
   let pp ?preceeding ?params_indent ?item ?(equal_sign = S.equals) ?pre_text ?pre_doc ~keyword
-        ?(params=[]) ?constraint_ ?rhs ?(attrs=[]) ?post_doc bound =
+        ?(params=[]) ?constraint_ ?rhs ?(attrs=[],[]) ?post_doc bound =
     (* Here we assume that [preceeding] cannot be [Some _] at the same time as
        [pre_text] or [pre_doc]. *)
     pp ?preceeding ?params_indent ~equal_sign ~keyword ~params ?constraint_ ?rhs
@@ -3853,7 +3857,7 @@ end = struct
            noop.
            But I'd rather leave it than have two separate code paths depending
            on whether we're adding [in] or not. *)
-        [], Attribute.pp_list ~item pvb_attributes ^?^ S.in_
+        ([], []), Attribute.pp_list ~item pvb_attributes ^?^ S.in_
     in
     layout ?preceeding
       ~keyword:kw_and_modes

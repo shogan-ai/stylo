@@ -1,7 +1,8 @@
 open Ocaml_syntax
 open Parsetree
 
-let sort_attributes : attributes -> attributes = List.sort compare
+let sort_attributes : attributes -> attributes = fun (attrs, toks) ->
+  List.sort compare attrs, toks
 
 let normalize_cmt_spaces doc =
   String.split_on_char ' ' doc
@@ -29,7 +30,7 @@ let cleaner =
           pstr_desc =
             Pstr_eval
               ({ pexp_desc= Pexp_constant Pconst_string (doc, loc, None)
-               ; _ } as inner_exp,[]);
+               ; _ } as inner_exp, ([], []));
           _
         } as str ], tokens) ->
           let doc = normalize_cmt_spaces doc in
@@ -39,7 +40,7 @@ let cleaner =
             }
           in
           PStr (
-            [ { str with pstr_desc = Pstr_eval (inner', []) }],
+            [ { str with pstr_desc = Pstr_eval (inner', ([], [])) }],
             mapper.tokens_seq mapper env tokens
           )
         | _ -> assert false
@@ -50,7 +51,12 @@ let cleaner =
     let attrs =
       if not !ignore_docstrings
       then attrs
-      else List.filter (fun a -> not (from_docstring a)) attrs
+      else 
+        let attrs, tokens = attrs in
+        let filtered = List.filter (fun a -> not (from_docstring a)) attrs in
+        (* We are not removing tokens corresponding to dropped attributes... but the
+           tokens are all going to be dropped anyway, so it doesn't matter *)
+        filtered, tokens
     in
     super.attributes mapper env ((* FIXME: why? *) sort_attributes attrs)
   in

@@ -1,6 +1,8 @@
 open Ocaml_syntax
 open Tokens
 
+let no_attrs = [], []
+
 (** splits the list before the first element on which the predicate returns
     false. *)
 let list_split_at p l =

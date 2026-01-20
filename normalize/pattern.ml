@@ -13,11 +13,11 @@ let parens_pat ?(optional=false) pat =
   { ppat_desc = Ppat_parens { pat; optional }
   ; ppat_tokens = lparen_child_rparen ~optional pat.ppat_loc.loc_start
   ; ppat_loc = pat.ppat_loc
-  ; ppat_attributes = []
-  ; ppat_ext_attr = { pea_ext = None; pea_attrs = [] } }
+  ; ppat_attributes = Utils.no_attrs
+  ; ppat_ext_attr = { pea_ext = None; pea_attrs = Utils.no_attrs } }
 
 let simple_pattern p =
-  p.ppat_attributes = [] &&
+  p.ppat_attributes = Utils.no_attrs &&
   match p.ppat_desc with
   | Ppat_var _
   | Ppat_parens _
@@ -77,7 +77,7 @@ let make_parens_optional p =
 
 let try_removing_parens parent p =
   match p with
-  | { ppat_attributes = _ :: _; _ } ->
+  | { ppat_attributes = (_ :: _, _); _ } ->
     (* let's assume parens are necessary.
        TODO: push to child when possible. *)
     p
@@ -124,7 +124,7 @@ let map mapper (parent : Context.parent) pat =
       | _ -> pat
       end
     | Expr _, Ppat_parens { pat = { ppat_desc = Ppat_or _; _ }; _ }
-      when pat.ppat_attributes = [] ->
+      when pat.ppat_attributes = Utils.no_attrs ->
       remove_parens pat
     (* Nothing special to do if parent is parens. *)
     | Pat Ppat_parens _, _ -> pat

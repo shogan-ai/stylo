@@ -14,8 +14,8 @@ let parens_exp ?(optional=false) exp =
   { pexp_desc = Pexp_parens { exp; optional }
   ; pexp_tokens = lparen_child_rparen ~optional exp.pexp_loc.loc_start
   ; pexp_loc = exp.pexp_loc
-  ; pexp_attributes = []
-  ; pexp_ext_attr = { pea_ext = None; pea_attrs = [] } }
+  ; pexp_attributes = Utils.no_attrs
+  ; pexp_ext_attr = { pea_ext = None; pea_attrs = Utils.no_attrs } }
 
 let super = default_mapper
 
