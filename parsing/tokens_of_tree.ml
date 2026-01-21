@@ -2,16 +2,8 @@
 
 let rec combine_children (top : Tokens.seq) children =
   match top, children with
-  | [], children -> 
-    (* There sometimes are trailing children, because attributes are sometimes backpatched
-       into a cst node, so the "attributes" field will include some tokens (the children), 
-       whereas the parent's tokens field doesn't have a [Child_node] for attributes
-       (because there were none when parsing the node).
-
-       We should aim to have a more principled handling of attributes of the parser, 
-       because this code here might hide bugs in other parts of the pipeline (e.g. during 
-       normalisation). *)
-    List.flatten children 
+  | [], [] ->  [] (* done *)
+  | [], _ -> assert false
   | { desc = Child_node; _ } :: _, [] -> assert false (* missing child *)
   | { desc = Child_node; _ } :: tokens, child :: children ->
     child @ combine_children tokens children

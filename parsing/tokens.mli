@@ -55,7 +55,7 @@ val is_token : ?which:token -> elt -> bool
 
 val add : pos:Lexing.position -> desc -> unit
 
-val at : Lexing.position * Lexing.position -> seq
+val at : ?consume_synthesized:bool -> Lexing.position * Lexing.position -> seq
 (** returns all the tokens whose position falls in the given range *)
 
 val attach_leading_and_trailing : seq -> seq

@@ -413,28 +413,36 @@ module Indexed_list = struct
       in
       aux last
 
-  let consume t start stop =
+  let consume synthesized t start stop =
     dprintf "consume %d:%d -> %d:%d@."
       start.pos_lnum (start.pos_cnum - start.pos_bol)
       stop.pos_lnum (stop.pos_cnum - stop.pos_bol);
-    let rec aux ~replaced_by = function
+    let rec aux consume_trailing_synthesized ~replaced_by = function
       | Empty -> invalid_arg "Tokens.consume"
       | Node n as curr ->
-        if n.pos > stop || (n.pos = stop && not n.synthesized) then (
-          (* Stop is an endpos, and we index by startpos.
-
-             Caveat: if [n.synthesized] it means we generated it when consuming the tokens 
-             of an empty reduction. In cases like this startpos == endpos and things are
-             weird. 
-
-             FIXME: this is incorrect, if multiple synthesized nodes follow each other it 
-             will consume too much. *)
-          [], curr
-        ) else (
+        if n.pos < stop then (
           Tbl.replace t.tbl n.pos replaced_by;
-          let seq, after = aux ~replaced_by n.next in
+          let seq, after = aux consume_trailing_synthesized ~replaced_by n.next in
           n.value :: seq, after
-        )
+        ) else if n.pos = stop && n.synthesized && consume_trailing_synthesized then (
+          (* Corner case: stop is an endpos, and we index by startpos. So in general we'd
+             stop here.
+             However on symbols 'produced' by an empty reduction, startpos and endpos are 
+             the same and we synthesize a child node for them (c.f. below).
+
+             When those synthesized child nodes correspond to empty symbols in the middle 
+             of the production they are consumed transparently, but when they are at the 
+             end (as is often the case for attributes) [stop] will actually match their 
+             position and we want to consume them as well.
+
+             But we only allow ourselves one such synthesized node (because of %inline 
+             rules there might be several such nodes in our list, and we don't want to 
+             consume nodes of other productions). *)
+          Tbl.replace t.tbl n.pos replaced_by;
+          let seq, after = aux false ~replaced_by n.next in
+          n.value :: seq, after
+        ) else
+          [], curr
     in
     if start = stop then (
       (* empty rule / epsilon reduction
@@ -447,7 +455,7 @@ module Indexed_list = struct
       match Tbl.find t.tbl start with
       | Empty -> invalid_arg "Tokens.consume"
       | Node start_node as cell ->
-        let seq, after = aux ~replaced_by:cell cell in
+        let seq, after = aux synthesized ~replaced_by:cell cell in
         start_node.value <- { start_node.value with desc = Child_node };
         start_node.next <- after;
         begin match after with
@@ -456,8 +464,8 @@ module Indexed_list = struct
         end;
         seq
 
-  let consume t start stop =
-    let res = consume t start stop in
+  let consume synthesized t start stop =
+    let res = consume synthesized t start stop in
     dprintf "consumed: @[<h 2>%a@]@." pp_seq res;
     res
 
@@ -478,7 +486,8 @@ module Indexed_list = struct
 end
 
 let add ~pos desc = Indexed_list.(append global ~pos desc)
-let at (startpos,endpos) = Indexed_list.(consume global startpos endpos)
+let at ?(consume_synthesized=true) (startpos,endpos) = 
+  Indexed_list.(consume consume_synthesized global startpos endpos)
 
 let rec replace_first_child ~subst = function
   | [] -> invalid_arg "Tokens.replace_first_child: never saw a child"

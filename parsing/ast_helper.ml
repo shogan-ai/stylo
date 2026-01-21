@@ -97,12 +97,15 @@ let tokens_in_range ~after ~up_to =
   | { desc = Child_node; _ } :: tail -> tail
   | _ -> assert false
 
+let extra_child_for_attributes loc tokens =
+  tokens @ [{ Tokens.desc = Child_node; pos = loc.Location.loc_end }]
+
 module Typ = struct
   let mk ?(loc = !default_loc) ?(attrs = no_attrs) ~tokens d =
     {ptyp_desc = d;
      ptyp_loc = loc;
      ptyp_attributes = attrs;
-     ptyp_tokens = tokens;}
+     ptyp_tokens = extra_child_for_attributes loc tokens;}
 
   let attr d (attr, attr_loc) = 
     let tokens_tail = tokens_in_range ~after:d.ptyp_loc ~up_to:(snd attr_loc) in
@@ -137,7 +140,7 @@ module Pat = struct
      ppat_desc = d;
      ppat_loc = loc;
      ppat_attributes = attrs;
-     ppat_tokens = tokens}
+     ppat_tokens = extra_child_for_attributes loc tokens}
 
   let attr d (attr, attr_loc) = 
     let tokens_tail = tokens_in_range ~after:d.ppat_loc ~up_to:(snd attr_loc) in
@@ -174,7 +177,7 @@ module Exp = struct
      pexp_desc = d;
      pexp_loc = loc;
      pexp_attributes = attrs;
-     pexp_tokens = tokens}
+     pexp_tokens = extra_child_for_attributes loc tokens}
 
   let attr d (attr, attr_loc) = 
     let tokens_tail = Tokens.at (d.pexp_loc.loc_start, snd attr_loc) in
@@ -245,7 +248,7 @@ end
 module Mty = struct
   let mk ?(loc = !default_loc) ?(attrs = no_attrs) ~tokens d =
     {pmty_desc = d; pmty_loc = loc; pmty_attributes = attrs;
-     pmty_tokens = tokens}
+     pmty_tokens = extra_child_for_attributes loc tokens}
   let attr d (attr, attr_loc) = 
     let tokens_tail = tokens_in_range ~after:d.pmty_loc ~up_to:(snd attr_loc) in
     let attrs, attrs_tokens = d.pmty_attributes in
@@ -266,7 +269,7 @@ end
 module Mod = struct
   let mk ?(loc = !default_loc) ?(attrs = no_attrs) ~tokens d =
     {pmod_desc = d; pmod_loc = loc; pmod_attributes = attrs;
-     pmod_tokens = tokens}
+     pmod_tokens = extra_child_for_attributes loc tokens}
   let attr d (attr, attr_loc) = 
     let tokens_tail = tokens_in_range ~after:d.pmod_loc ~up_to:(snd attr_loc) in
     let attrs, attrs_tokens = d.pmod_attributes in
@@ -388,7 +391,7 @@ module Cty = struct
      pcty_desc = d;
      pcty_loc = loc;
      pcty_attributes = attrs;
-     pcty_tokens = tokens;
+     pcty_tokens = extra_child_for_attributes loc tokens;
     }
   let attr d (attr, attr_loc) = 
     let tokens_tail = tokens_in_range ~after:d.pcty_loc ~up_to:(snd attr_loc) in

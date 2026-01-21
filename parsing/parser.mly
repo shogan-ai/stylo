@@ -3825,9 +3825,10 @@ sig_exception_declaration:
       (* If a docstring is present before attrs1, it will be in the [decl_toks]
          but it also will remain unattached, so there will be no conflict with
          [docs] and the parent tokens. *)
-      dprintf "decl_toks:@ ";
-      let decl_toks = Tokens.at decl_loc in
-      dprintf "@ done@.";
+      let decl_toks =
+        let consume_synthesized = attrs1 = ([], []) in
+        Tokens.at ~consume_synthesized decl_loc 
+      in
       let docs, sloc = symbol_docs $sloc in
       Te.mk_exception ~attrs ~loc:(make_loc $sloc) ~docs
         (Te.decl id ~vars ~args ?res ~attrs:attrs1 ~loc:(make_loc decl_loc)
@@ -4994,11 +4995,11 @@ floating_attribute:
 ;
 %inline post_item_attributes:
   post_item_attribute*
-    { $1, Tokens.at $sloc }
+    { $1, Tokens.at ~consume_synthesized:false $sloc }
 ;
 %inline attributes:
   attribute*
-    { $1, Tokens.at $sloc }
+    { $1, Tokens.at ~consume_synthesized:false $sloc }
 ;
 ext:
   | /* empty */   { None }
