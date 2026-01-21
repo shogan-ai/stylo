@@ -3,6 +3,7 @@
 let rec combine_children (top : Tokens.seq) children =
   match top, children with
   | [], [] ->  [] (* done *)
+  | [], [[]] ->  [] (* done *)
   | [], _ -> assert false
   | { desc = Child_node; _ } :: _, [] -> assert false (* missing child *)
   | { desc = Child_node; _ } :: tokens, child :: children ->
