@@ -11,11 +11,10 @@ let lparen_child_rparen ~optional:opt pos =
   ; mk_tok RPAREN ]
 
 let parens_exp ?(optional=false) exp =
-  { pexp_desc = Pexp_parens { exp; optional }
-  ; pexp_tokens = lparen_child_rparen ~optional exp.pexp_loc.loc_start
-  ; pexp_loc = exp.pexp_loc
-  ; pexp_attributes = Utils.no_attrs
-  ; pexp_ext_attr = { pea_ext = None; pea_attrs = Utils.no_attrs } }
+  Ast_helper.Exp.mk
+    ~loc:exp.pexp_loc
+    ~tokens:(lparen_child_rparen ~optional exp.pexp_loc.loc_start)
+    (Pexp_parens { exp; optional })
 
 let super = default_mapper
 

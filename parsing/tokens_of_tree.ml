@@ -59,6 +59,11 @@ let tokenizer =
     let (name,_,node_toks) = e in
     combine_children ~loc:name.loc node_toks sub_tokens
   in
+  let reduce_ext_attribute reducer env ea =
+    let sub_tokens = super.ext_attribute reducer env ea in
+    let node_toks = ea.pea_tokens in
+    combine_children ~loc:Location.none node_toks sub_tokens
+  in
   let reduce_arrow_arg reducer env aa =
     let sub_tokens = super.arrow_arg reducer env aa in
     let node_toks = aa.aa_tokens in
@@ -67,18 +72,6 @@ let tokenizer =
   let reduce_core_type reducer env ct =
     let sub_tokens = super.core_type reducer env ct in
     let node_toks = ct.ptyp_tokens in
-    let () =
-      let start_pos = ct.ptyp_loc.loc_start in
-      let stop_pos = ct.ptyp_loc.loc_end in
-      dprintf
-        "CORE TYPE: @[<h>loc:@ %d:%d - %d:%d@]@\n\
-         node tokens:@[<hov 2>@ %a@]@\n\
-         sub tokens:@[<v 2>@ {%a}@]@."
-        start_pos.pos_lnum (start_pos.pos_cnum - start_pos.pos_bol)
-        stop_pos.pos_lnum (stop_pos.pos_cnum - stop_pos.pos_bol)
-        Tokens.pp_seq node_toks
-        pp_children sub_tokens
-    in
     combine_children ~loc:ct.ptyp_loc node_toks sub_tokens
   in
   let reduce_row_field reducer env p =
@@ -94,6 +87,18 @@ let tokenizer =
   let reduce_pattern reducer env p =
     let sub_tokens = super.pattern reducer env p in
     let node_toks = p.ppat_tokens in
+    let () =
+      let start_pos = p.ppat_loc.loc_start in
+      let stop_pos = p.ppat_loc.loc_end in
+      dprintf
+        "PATTERN: @[<h>loc:@ %d:%d - %d:%d@]@\n\
+         node tokens:@[<hov 2>@ %a@]@\n\
+         sub tokens:@[<v 2>@ {%a}@]@."
+        start_pos.pos_lnum (start_pos.pos_cnum - start_pos.pos_bol)
+        stop_pos.pos_lnum (stop_pos.pos_cnum - stop_pos.pos_bol)
+        Tokens.pp_seq node_toks
+        pp_children sub_tokens
+    in
     combine_children ~loc:p.ppat_loc node_toks sub_tokens
   in
   let reduce_expression reducer env e =
@@ -251,6 +256,7 @@ let tokenizer =
   ; attribute = reduce_attribute
   ; attributes = reduce_attributes
   ; extension = reduce_extension
+  ; ext_attribute = reduce_ext_attribute
   ; arrow_arg = reduce_arrow_arg
   ; core_type = reduce_core_type
   ; row_field = reduce_row_field

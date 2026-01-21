@@ -10,11 +10,10 @@ let lparen_child_rparen ~optional:opt pos =
   ; mk_tok RPAREN ]
 
 let parens_pat ?(optional=false) pat =
-  { ppat_desc = Ppat_parens { pat; optional }
-  ; ppat_tokens = lparen_child_rparen ~optional pat.ppat_loc.loc_start
-  ; ppat_loc = pat.ppat_loc
-  ; ppat_attributes = Utils.no_attrs
-  ; ppat_ext_attr = { pea_ext = None; pea_attrs = Utils.no_attrs } }
+  Ast_helper.Pat.mk
+    ~loc:pat.ppat_loc
+    ~tokens:(lparen_child_rparen ~optional pat.ppat_loc.loc_start)
+    (Ppat_parens { pat; optional })
 
 let simple_pattern p =
   p.ppat_attributes = Utils.no_attrs &&

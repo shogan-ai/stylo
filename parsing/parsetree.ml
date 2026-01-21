@@ -107,6 +107,7 @@ and payload =
 and ext_attribute = {
   pea_ext: string list loc option;
   pea_attrs: attributes;
+  pea_tokens: Tokens.seq;
 }
 
 (** {1 Core language} *)

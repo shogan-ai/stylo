@@ -143,9 +143,9 @@ let mkinfix arg1 op arg2 =
   Pexp_infix_apply {op; arg1; arg2}
 
 let no_attrs = [], []
-let mkuminus ~oploc:_ name arg =
+let mkuminus ~oploc:loc name arg =
   Pexp_add_or_sub (name, arg),
-  { pea_ext = None; pea_attrs = no_attrs }
+  empty_ext_attr (make_loc loc)
 
 let mkuplus = mkuminus
 
@@ -480,8 +480,11 @@ let class_of_let_bindings ~loc lbs body =
 let empty_body_constraint =
   { ret_type_constraint = None; ret_mode_annotations = []}
 
-let mkfunction ~loc ~ext_attrs params body_constraint body =
-  mkexp_attrs (Pexp_function (params, body_constraint, body)) ext_attrs ~loc
+let mkfunction ~loc ?ext_attrs params body_constraint body =
+  let desc = Pexp_function (params, body_constraint, body) in
+  match ext_attrs with
+  | None -> mkexp ~loc desc
+  | Some ext_attrs -> mkexp_attrs desc ext_attrs ~loc
 
 
       (*
@@ -2239,7 +2242,6 @@ class_type_declarations:
           ; pfb_tokens = Tokens.at $sloc }
         in
         mkfunction [] empty_body_constraint body ~loc:$sloc
-            ~ext_attrs:{ pea_ext = None; pea_attrs = no_attrs}
       }
     )
     { $1 }
@@ -2432,6 +2434,17 @@ fun_expr:
             ~tokens:(Tokens.at open_loc)
         in
         mkexp ~loc:$sloc (Pexp_let_open(od, $7)) }
+  | LET MODULE ext_attributes module_name_modal(at_mode_expr) module_binding_body IN seq_expr
+      { (* FIXME: as above *)
+        let params, mty_opt, modes, me = $5 in
+        let mb_loc = ($startpos($2), $endpos($5)) in
+        (* N.B. we attach the ext_attrs to the module binding instead of the
+           expr as wrt. the tokens they're part of the module binding. *)
+        let mb =
+          Mb.mk $4 params mty_opt modes me ~ext_attr:$3 ~loc:(make_loc mb_loc)
+            ~tokens:(Tokens.at mb_loc)
+        in
+        mkexp ~loc:$sloc (Pexp_letmodule(mb, $7)) }
   | fun_
       { $1 }
   | expr_
@@ -2465,17 +2478,6 @@ fun_expr:
   | or_function(fun_expr) { $1 }
 ;
 %inline fun_expr_attrs:
-  | LET MODULE ext_attributes module_name_modal(at_mode_expr) module_binding_body IN seq_expr
-      {
-        let params, mty_opt, modes, me = $5 in
-        let mb_loc = ($startpos($2), $endpos($5)) in
-        (* N.B. we attach the ext_attrs to the module binding instead of the
-           expr as wrt. the tokens they're part of the module binding. *)
-        let mb =
-          Mb.mk $4 params mty_opt modes me ~ext_attr:$3 ~loc:(make_loc mb_loc)
-            ~tokens:(Tokens.at mb_loc)
-        in
-        Pexp_letmodule(mb, $7), { pea_ext = None; pea_attrs = no_attrs } }
   | LET EXCEPTION ext_attributes let_exception_declaration IN seq_expr
       { Pexp_letexception($4, $6), $3 }
   | MATCH ext_attributes seq_expr WITH match_cases
@@ -3029,7 +3031,6 @@ strict_binding_modes:
         | Pfunction_body e -> e
         | Pfunction_cases _ ->
             mkfunction [] empty_body_constraint fb ~loc:$loc($4)
-            ~ext_attrs:{ pea_ext = None; pea_attrs = no_attrs}
       in
       $1, typ, ret_mode_annotations, expr
     }
@@ -5013,15 +5014,15 @@ ext:
 ;
 %inline ext_attributes:
   ext attributes
-  { { pea_ext = $1; pea_attrs = $2 } }
+  { { pea_ext = $1; pea_attrs = $2; pea_tokens = Tokens.at $sloc } }
 ;
 %inline ext_noattrs:
   | PERCENT attr_id
-    { { pea_ext = Some $2; pea_attrs = no_attrs } }
+    { { pea_ext = Some $2; pea_attrs = no_attrs; pea_tokens = Tokens.at $sloc } }
 ;
 %inline noext_attributes:
   no_ext attributes
-  { { pea_ext = $1; pea_attrs = $2 } }
+  { { pea_ext = $1; pea_attrs = $2; pea_tokens = Tokens.at $sloc } }
 ;
 extension:
   | LBRACKETPERCENT attr_id payload RBRACKET { ($2, $3, Tokens.at $sloc) }

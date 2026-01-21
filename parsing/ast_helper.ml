@@ -40,7 +40,11 @@ let with_default_loc l f =
   Fun.protect ~finally:(fun () -> default_loc := orig) f
 
 let no_attrs = [], []
-let empty_ext_attr = { pea_ext = None; pea_attrs = no_attrs }
+let extra_child_for_ext_attr loc tokens =
+  { Tokens.desc = Child_node ; pos = loc.Location.loc_start } :: tokens
+let empty_ext_attr loc = 
+  let pea_tokens = extra_child_for_ext_attr loc [] in
+  { pea_ext = None; pea_attrs = no_attrs; pea_tokens }
 
 module Docs = struct
   let text =
@@ -136,11 +140,11 @@ end
 
 module Pat = struct
   let mk ?(loc = !default_loc) ?(attrs = no_attrs) ~tokens d =
-    {ppat_ext_attr = empty_ext_attr;
+    {ppat_ext_attr = empty_ext_attr loc;
      ppat_desc = d;
      ppat_loc = loc;
      ppat_attributes = attrs;
-     ppat_tokens = extra_child_for_attributes loc tokens}
+     ppat_tokens = extra_child_for_ext_attr loc @@ extra_child_for_attributes loc tokens}
 
   let attr d (attr, attr_loc) = 
     let tokens_tail = tokens_in_range ~after:d.ppat_loc ~up_to:(snd attr_loc) in
@@ -173,11 +177,11 @@ end
 
 module Exp = struct
   let mk ?(loc = !default_loc) ?(attrs = no_attrs) ~tokens d =
-    {pexp_ext_attr = empty_ext_attr;
+    {pexp_ext_attr = empty_ext_attr loc;
      pexp_desc = d;
      pexp_loc = loc;
      pexp_attributes = attrs;
-     pexp_tokens = extra_child_for_attributes loc tokens}
+     pexp_tokens = extra_child_for_ext_attr loc @@ extra_child_for_attributes loc tokens}
 
   let attr d (attr, attr_loc) = 
     let tokens_tail = Tokens.at (d.pexp_loc.loc_start, snd attr_loc) in
@@ -362,7 +366,7 @@ module Str = struct
 end
 
 module Cl = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = no_attrs) d =
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr loc) ?(attrs = no_attrs) d =
     {
      pcl_ext_attrs = ext_attrs;
      pcl_desc = d;
@@ -478,9 +482,14 @@ module Cf = struct
 end
 
 module Val = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = no_attrs)
+  let mk ?(loc = !default_loc) ?ext_attrs ?(attrs = no_attrs)
       ~tokens ?(docs = empty_docs) ?(prim = []) ?(modalities=[]) name typ =
     let pre_doc, post_doc = Docs.pre_post docs in
+    let ext_attrs, tokens =
+      match ext_attrs with
+      | Some ea -> ea, tokens
+      | None -> empty_ext_attr loc, extra_child_for_ext_attr loc tokens
+    in
     {
      pval_pre_doc = pre_doc;
      pval_ext_attrs = ext_attrs;
@@ -496,9 +505,14 @@ module Val = struct
 end
 
 module Md = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = no_attrs)
+  let mk ?(loc = !default_loc) ?ext_attrs ?(attrs = no_attrs)
         ~tokens ?(docs = empty_docs) ?(text = []) name body =
     let pre_doc, post_doc = Docs.pre_post docs in
+    let ext_attrs, tokens =
+      match ext_attrs with
+      | Some ea -> ea, tokens
+      | None -> empty_ext_attr loc, extra_child_for_ext_attr loc tokens
+    in
     {
      pmd_pre_text = Docs.text text;
      pmd_pre_doc = pre_doc;
@@ -513,9 +527,14 @@ module Md = struct
 end
 
 module Ms = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = no_attrs)
+  let mk ?(loc = !default_loc) ?ext_attrs ?(attrs = no_attrs)
         ~tokens ?(docs = empty_docs) name syn =
     let pre_doc, post_doc = Docs.pre_post docs in
+    let ext_attrs, tokens =
+      match ext_attrs with
+      | Some ea -> ea, tokens
+      | None -> empty_ext_attr loc, extra_child_for_ext_attr loc tokens
+    in
     {
      pms_pre_doc = pre_doc;
      pms_ext_attrs = ext_attrs;
@@ -529,9 +548,14 @@ module Ms = struct
 end
 
 module Mtd = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = no_attrs)
+  let mk ?(loc = !default_loc) ?ext_attrs ?(attrs = no_attrs)
         ~tokens ?(docs = empty_docs) ?typ name =
     let pre_doc, post_doc = Docs.pre_post docs in
+    let ext_attrs, tokens =
+      match ext_attrs with
+      | Some ea -> ea, tokens
+      | None -> empty_ext_attr loc, extra_child_for_ext_attr loc tokens
+    in
     {
      pmtd_pre_doc = pre_doc;
      pmtd_ext_attrs = ext_attrs;
@@ -545,9 +569,14 @@ module Mtd = struct
 end
 
 module Mb = struct
-  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) ?(attrs = no_attrs) ~tokens
+  let mk ?(loc = !default_loc) ?ext_attr ?(attrs = no_attrs) ~tokens
         ?(docs = empty_docs) ?(text = []) name params mty_opt modes expr =
     let pmb_pre_doc, pmb_post_doc = Docs.pre_post docs in
+    let ext_attr, tokens =
+      match ext_attr with
+      | Some ea -> ea, tokens
+      | None -> empty_ext_attr loc, extra_child_for_ext_attr loc tokens
+    in
     {
      pmb_pre_text = Docs.text text;
      pmb_pre_doc;
@@ -565,9 +594,14 @@ module Mb = struct
 end
 
 module Opn = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = no_attrs)
+  let mk ?(loc = !default_loc) ?ext_attrs ?(attrs = no_attrs)
       ~tokens ?(docs = empty_docs) ?(override = Fresh) expr =
     let pre_doc, post_doc = Docs.pre_post docs in
+    let ext_attrs, tokens =
+      match ext_attrs with
+      | Some ea -> ea, tokens
+      | None -> empty_ext_attr loc, extra_child_for_ext_attr loc tokens
+    in
     {
      popen_pre_doc = pre_doc;
      popen_ext_attrs = ext_attrs;
@@ -581,10 +615,15 @@ module Opn = struct
 end
 
 module Incl = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = no_attrs)
+  let mk ?(loc = !default_loc) ?ext_attrs ?(attrs = no_attrs)
       ~tokens ?(docs = empty_docs)
     ?(kind = Structure) mexpr =
     let pre_doc, post_doc = Docs.pre_post docs in
+    let ext_attrs, tokens =
+      match ext_attrs with
+      | Some ea -> ea, tokens
+      | None -> empty_ext_attr loc, extra_child_for_ext_attr loc tokens
+    in
     {
      pincl_pre_doc = pre_doc;
      pincl_ext_attrs = ext_attrs;
@@ -599,11 +638,16 @@ module Incl = struct
 end
 
 module Vb = struct
-  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr)
+  let mk ?(loc = !default_loc) ?ext_attr
         ?(attrs = no_attrs) ~tokens ?(docs = empty_docs)
         ?(text = []) ?(params = []) ?(legacy_modes = []) ?(modes = [])
         ?value_constraint ?(ret_modes = []) pat expr =
     let pre_doc, post_doc = Docs.pre_post docs in
+    let ext_attr, tokens =
+      match ext_attr with
+      | Some ea -> ea, tokens
+      | None -> empty_ext_attr loc, extra_child_for_ext_attr loc tokens
+    in
     {
      pvb_pre_text = Docs.text text;
      pvb_pre_doc = pre_doc;
@@ -623,11 +667,16 @@ module Vb = struct
 end
 
 module Ci = struct
-  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) ?(attrs = no_attrs) ~tokens
+  let mk ?(loc = !default_loc) ?ext_attr ?(attrs = no_attrs) ~tokens
         ?(docs = empty_docs) ?(text = [])
         ?(virt = Concrete) ?(params = []) name ?(value_params=[])
         ?constraint_ expr =
     let pre_doc, post_doc = Docs.pre_post docs in
+    let ext_attr, tokens =
+      match ext_attr with
+      | Some ea -> ea, tokens
+      | None -> empty_ext_attr loc, extra_child_for_ext_attr loc tokens
+    in
     {
      pci_pre_text = Docs.text text;
      pci_pre_doc = pre_doc;
@@ -646,7 +695,7 @@ module Ci = struct
 end
 
 module Type = struct
-  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) ?(attrs = no_attrs)
+  let mk ?(loc = !default_loc) ?ext_attr ?(attrs = no_attrs)
         ~tokens ?(docs = empty_docs) ?(text = [])
       ?(params = [])
       ?(cstrs = [])
@@ -656,6 +705,11 @@ module Type = struct
       ?jkind_annotation
       name =
     let pre_doc, post_doc = Docs.pre_post docs in
+    let ext_attr, tokens =
+      match ext_attr with
+      | Some ea -> ea, tokens
+      | None -> empty_ext_attr loc, extra_child_for_ext_attr loc tokens
+    in
     {
      ptype_pre_text = Docs.text text;
      ptype_pre_doc = pre_doc;
@@ -714,10 +768,15 @@ end
 
 (** Type extensions *)
 module Te = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = no_attrs)
+  let mk ?(loc = !default_loc) ?ext_attrs ?(attrs = no_attrs)
       ~tokens ?(docs = empty_docs) ?(params = []) ?(priv = Public) path
       constructors =
     let pre_doc, post_doc = Docs.pre_post docs in
+    let ext_attrs, tokens =
+      match ext_attrs with
+      | Some ea -> ea, tokens
+      | None -> empty_ext_attr loc, extra_child_for_ext_attr loc tokens
+    in
     {
      ptyext_pre_doc = pre_doc;
      ptyext_ext_attrs = ext_attrs;
@@ -731,9 +790,14 @@ module Te = struct
      ptyext_tokens = tokens;
     }
 
-  let mk_exception ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr)
+  let mk_exception ?(loc = !default_loc) ?ext_attrs
       ?(attrs = no_attrs) ~tokens ?(docs = empty_docs) constructor =
     let pre_doc, post_doc = Docs.pre_post docs in
+    let ext_attrs, tokens =
+      match ext_attrs with
+      | Some ea -> ea, tokens
+      | None -> empty_ext_attr loc, extra_child_for_ext_attr loc tokens
+    in
     {
      ptyexn_pre_doc = pre_doc;
      ptyexn_ext_attrs = ext_attrs;

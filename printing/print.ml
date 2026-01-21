@@ -227,7 +227,7 @@ and Ext_attribute : sig
   val decorate_optional_override :
     t -> Asttypes.override_flag -> ext_attribute -> t
 end = struct
-  let decorate ?(space=true) ~between kw { pea_ext; pea_attrs } =
+  let decorate ?(space=true) ~between kw { pea_ext; pea_attrs; pea_tokens = _ } =
     let kw_with_ext =
       match pea_ext with
       | None -> kw
@@ -1697,7 +1697,7 @@ end = struct
       (* we print parenthesized branches specially, but tuples do not count as
          parenthesized branches! *)
       kw ^^ nest 2 (group (break 1 ^^ pp exp))
-    | { pexp_ext_attr = { pea_attrs = [], []; pea_ext = None }
+    | { pexp_ext_attr = { pea_attrs = [], []; pea_ext = None; pea_tokens = _ }
       ; pexp_attributes = [], []
       ; pexp_desc = Pexp_parens { exp = e; optional = false }
       ; _ } ->
@@ -1733,7 +1733,7 @@ end = struct
   and pp_dot_open ~preceeding lid e =
     let lid, pre_nest = Preceeding.group_with preceeding (longident lid.txt) in
     group @@ match e with
-    | { pexp_ext_attr = { pea_attrs = [], []; pea_ext = None }
+    | { pexp_ext_attr = { pea_attrs = [], []; pea_ext = None; pea_tokens = _ }
       ; pexp_attributes = [], []
       ; pexp_desc = Pexp_parens { exp = e; optional = false }
       ; _ } ->

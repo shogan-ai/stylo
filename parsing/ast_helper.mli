@@ -70,6 +70,8 @@ module Ext : sig
   val mk: ?docs:docs -> extension -> attributes -> toplevel_extension
 end
 
+val empty_ext_attr : Location.t -> ext_attribute
+
 (** {1 Core language} *)
 
 (** Type expressions *)
