@@ -136,7 +136,7 @@ let ghexp ~loc d =
   let tokens = Tokens.at loc in
   Exp.mk ~tokens ~loc:(ghost_loc loc) d
 let ghpat ~loc d =
-  let tokens = Tokens.at loc in
+  let tokens = Tokens.at ~consume_synthesized:false loc in
   Pat.mk ~tokens ~loc:(ghost_loc loc) d
 
 let mkinfix arg1 op arg2 =
@@ -1236,7 +1236,7 @@ structure:
              *)
           min $symbolstartpos startp, max $endpos endp
     in
-    str, Tokens.at (startp, endp) }
+    str, Tokens.at ~consume_synthesized:false (startp, endp) }
 ;
 
 (* An optional standalone expression is just an expression with attributes
@@ -1561,7 +1561,7 @@ signature:
       { psg_modalities = $1;
         psg_items = $2;
         psg_loc = make_loc loc;
-        psg_tokens = Tokens.at loc } }
+        psg_tokens = Tokens.at ~consume_synthesized:false loc } }
 ;
 
 (* A signature element is one of the following:
@@ -4054,8 +4054,7 @@ core_type:
     core_type_no_attr
       { $1 }
   | ty = core_type attribute
-      { dprintf "ici@.";
-        Typ.attr ty ($2, $loc($2)) }
+      { Typ.attr ty ($2, $loc($2)) }
 ;
 
 %inline core_type_with_optional_modes:
@@ -5014,7 +5013,11 @@ ext:
 ;
 %inline ext_attributes:
   ext attributes
-  { { pea_ext = $1; pea_attrs = $2; pea_tokens = Tokens.at $sloc } }
+  { (* both symbols can be empty, but there are no child node for ext, so we would only
+       consume the one for attributes... if we were consuming.
+       But since the loc covers and empty region, we don't ... we instead add an extra
+       child_node *)
+    { pea_ext = $1; pea_attrs = $2; pea_tokens = Tokens.at $sloc } }
 ;
 %inline ext_noattrs:
   | PERCENT attr_id

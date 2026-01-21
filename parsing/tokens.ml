@@ -444,7 +444,7 @@ module Indexed_list = struct
         ) else
           [], curr
     in
-    if start = stop then (
+    if start = stop && not synthesized then (
       (* empty rule / epsilon reduction
          We will return an empty list of tokens, but we must remember to insert
          a [Child_node] entry at that position, because the parent node in the
