@@ -85,16 +85,15 @@ let try_removing_parens parent p =
     (* let's assume parens are necessary. TODO: push to child when possible. *)
     p
   | { ppat_desc = Ppat_parens { pat = p'; optional = _ }; _ } ->
-    (match parent with
-     | Ppat_open _ | Ppat_list _ -> p
-     | Ppat_exception _
-     | Ppat_alias _
-     | Ppat_lazy _
-     | Ppat_tuple _
-     | Ppat_construct _
-     | Ppat_variant _
-     | Ppat_cons _
+    (match parent, p'.ppat_desc with
+     | (Ppat_open _ | Ppat_list _), _ -> p
+     | ( (Ppat_exception _ | Ppat_alias _ | Ppat_lazy _ | Ppat_tuple _
+          | Ppat_construct _
+          | Ppat_variant _
+          | Ppat_cons _)
+       , _ )
        when not (simple_pattern p') -> p
+     | Ppat_or _, Ppat_alias _ -> p
      | _ ->
        (* parens are not mandatory but we might still optionally keep them. Removing them
           and letting recursive calls reintroduce them would be correct, but might move
@@ -133,6 +132,7 @@ let map mapper (parent : Context.parent) pat =
     (* Add parens as necessary *)
     | Pat (Ppat_construct _), Ppat_construct (_, Some _)
     | Pat (Ppat_alias _), (Ppat_or _ | Ppat_tuple _) -> parens_pat pat
+    | Pat (Ppat_or _), Ppat_alias _ -> parens_pat pat
     | _, Ppat_tuple _ -> parens_pat ~optional:true pat
     (* Nothing to do in the general case. *)
     | _ -> pat
