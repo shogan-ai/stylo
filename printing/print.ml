@@ -2518,6 +2518,12 @@ end = struct
       |> Attribute.attach ~attrs:ct.ptyp_attributes
   ;;
 
+  let pp_prim_name s =
+    if List.exists (String.contains s) [ ' '; '\n' ]
+    then fancy_string "{|%s|}" s
+    else stringf "%S" s
+  ;;
+
   let pp
     { pval_pre_doc
     ; pval_ext_attrs
@@ -2550,9 +2556,7 @@ end = struct
               match pval_prim with
               | [] -> empty
               | ps ->
-                group
-                  (S.equals
-                   ^/^ separate_map (break 1) (fun s -> stringf "%S" s) ps)))
+                group (S.equals ^/^ separate_map (break 1) pp_prim_name ps)))
     |> Attribute.attach ~item:true ~attrs:pval_attributes
     |> Doc.attach ?pre_doc:pval_pre_doc ?post_doc:pval_post_doc
   ;;
