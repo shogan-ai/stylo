@@ -1399,7 +1399,7 @@ and jkind_annotation =
 and toplevel_phrase =
   | Ptop_def of structure
   | Ptop_dir of toplevel_directive (** [#use], [#load] ... *)
-
+  | Ptop_lex of lexer_directive
 and toplevel_directive =
   { pdir_name : string loc
   ; pdir_arg : directive_argument option
@@ -1414,6 +1414,16 @@ and directive_argument_desc =
   | Pdir_int of string * char option
   | Pdir_ident of longident
   | Pdir_bool of bool
+(** Lexer directives: ugly hack to avoid their deletion *)
+and syntax_directive =
+  { psyn_mode : string loc (* which syntax feature e.g. quotations *)
+  ; psyn_toggle : bool (* on/off *)
+  }
+and lexer_directive_desc = Plex_syntax of syntax_directive
+and lexer_directive =
+  { plex_desc : lexer_directive_desc
+  ; plex_loc : location
+  }
 [@@deriving_inline traverse]
 
 class virtual map =
@@ -3714,6 +3724,9 @@ class virtual map =
       | Ptop_dir a ->
         let a = self#toplevel_directive a in
         Ptop_dir a
+      | Ptop_lex a ->
+        let a = self#lexer_directive a in
+        Ptop_lex a
 
     method toplevel_directive : toplevel_directive -> toplevel_directive =
       fun { pdir_name; pdir_arg; pdir_loc } ->
@@ -3746,6 +3759,25 @@ class virtual map =
       | Pdir_bool a ->
         let a = self#bool a in
         Pdir_bool a
+
+    method syntax_directive : syntax_directive -> syntax_directive =
+      fun { psyn_mode; psyn_toggle } ->
+      let psyn_mode = self#loc self#string psyn_mode in
+      let psyn_toggle = self#bool psyn_toggle in
+      { psyn_mode; psyn_toggle }
+
+    method lexer_directive_desc : lexer_directive_desc -> lexer_directive_desc =
+      fun x ->
+      match x with
+      | Plex_syntax a ->
+        let a = self#syntax_directive a in
+        Plex_syntax a
+
+    method lexer_directive : lexer_directive -> lexer_directive =
+      fun { plex_desc; plex_loc } ->
+      let plex_desc = self#lexer_directive_desc plex_desc in
+      let plex_loc = self#location plex_loc in
+      { plex_desc; plex_loc }
   end
 
 class virtual iter =
@@ -5353,6 +5385,7 @@ class virtual iter =
       match x with
       | Ptop_def a -> self#structure a
       | Ptop_dir a -> self#toplevel_directive a
+      | Ptop_lex a -> self#lexer_directive a
 
     method toplevel_directive : toplevel_directive -> unit =
       fun { pdir_name; pdir_arg; pdir_loc } ->
@@ -5374,6 +5407,21 @@ class virtual iter =
         self#option self#char b
       | Pdir_ident a -> self#longident a
       | Pdir_bool a -> self#bool a
+
+    method syntax_directive : syntax_directive -> unit =
+      fun { psyn_mode; psyn_toggle } ->
+      self#loc self#string psyn_mode;
+      self#bool psyn_toggle
+
+    method lexer_directive_desc : lexer_directive_desc -> unit =
+      fun x ->
+      match x with
+      | Plex_syntax a -> self#syntax_directive a
+
+    method lexer_directive : lexer_directive -> unit =
+      fun { plex_desc; plex_loc } ->
+      self#lexer_directive_desc plex_desc;
+      self#location plex_loc
   end
 
 class virtual ['acc] fold =
@@ -7249,6 +7297,7 @@ class virtual ['acc] fold =
       match x with
       | Ptop_def a -> self#structure a acc
       | Ptop_dir a -> self#toplevel_directive a acc
+      | Ptop_lex a -> self#lexer_directive a acc
 
     method toplevel_directive : toplevel_directive -> 'acc -> 'acc =
       fun { pdir_name; pdir_arg; pdir_loc } acc ->
@@ -7273,6 +7322,23 @@ class virtual ['acc] fold =
         acc
       | Pdir_ident a -> self#longident a acc
       | Pdir_bool a -> self#bool a acc
+
+    method syntax_directive : syntax_directive -> 'acc -> 'acc =
+      fun { psyn_mode; psyn_toggle } acc ->
+      let acc = self#loc self#string psyn_mode acc in
+      let acc = self#bool psyn_toggle acc in
+      acc
+
+    method lexer_directive_desc : lexer_directive_desc -> 'acc -> 'acc =
+      fun x acc ->
+      match x with
+      | Plex_syntax a -> self#syntax_directive a acc
+
+    method lexer_directive : lexer_directive -> 'acc -> 'acc =
+      fun { plex_desc; plex_loc } acc ->
+      let acc = self#lexer_directive_desc plex_desc acc in
+      let acc = self#location plex_loc acc in
+      acc
   end
 
 class virtual ['acc] fold_map =
@@ -9783,6 +9849,9 @@ class virtual ['acc] fold_map =
       | Ptop_dir a ->
         let a, acc = self#toplevel_directive a acc in
         Ptop_dir a, acc
+      | Ptop_lex a ->
+        let a, acc = self#lexer_directive a acc in
+        Ptop_lex a, acc
 
     method toplevel_directive
       : toplevel_directive -> 'acc -> toplevel_directive * 'acc
@@ -9819,6 +9888,29 @@ class virtual ['acc] fold_map =
       | Pdir_bool a ->
         let a, acc = self#bool a acc in
         Pdir_bool a, acc
+
+    method syntax_directive
+      : syntax_directive -> 'acc -> syntax_directive * 'acc
+      =
+      fun { psyn_mode; psyn_toggle } acc ->
+      let psyn_mode, acc = self#loc self#string psyn_mode acc in
+      let psyn_toggle, acc = self#bool psyn_toggle acc in
+      { psyn_mode; psyn_toggle }, acc
+
+    method lexer_directive_desc
+      : lexer_directive_desc -> 'acc -> lexer_directive_desc * 'acc
+      =
+      fun x acc ->
+      match x with
+      | Plex_syntax a ->
+        let a, acc = self#syntax_directive a acc in
+        Plex_syntax a, acc
+
+    method lexer_directive : lexer_directive -> 'acc -> lexer_directive * 'acc =
+      fun { plex_desc; plex_loc } acc ->
+      let plex_desc, acc = self#lexer_directive_desc plex_desc acc in
+      let plex_loc, acc = self#location plex_loc acc in
+      { plex_desc; plex_loc }, acc
   end
 
 class virtual ['ctx] map_with_context =
@@ -12215,6 +12307,9 @@ class virtual ['ctx] map_with_context =
       | Ptop_dir a ->
         let a = self#toplevel_directive ctx a in
         Ptop_dir a
+      | Ptop_lex a ->
+        let a = self#lexer_directive ctx a in
+        Ptop_lex a
 
     method toplevel_directive : 'ctx -> toplevel_directive -> toplevel_directive
       =
@@ -12249,6 +12344,27 @@ class virtual ['ctx] map_with_context =
       | Pdir_bool a ->
         let a = self#bool ctx a in
         Pdir_bool a
+
+    method syntax_directive : 'ctx -> syntax_directive -> syntax_directive =
+      fun ctx { psyn_mode; psyn_toggle } ->
+      let psyn_mode = self#loc self#string ctx psyn_mode in
+      let psyn_toggle = self#bool ctx psyn_toggle in
+      { psyn_mode; psyn_toggle }
+
+    method lexer_directive_desc
+      : 'ctx -> lexer_directive_desc -> lexer_directive_desc
+      =
+      fun ctx x ->
+      match x with
+      | Plex_syntax a ->
+        let a = self#syntax_directive ctx a in
+        Plex_syntax a
+
+    method lexer_directive : 'ctx -> lexer_directive -> lexer_directive =
+      fun ctx { plex_desc; plex_loc } ->
+      let plex_desc = self#lexer_directive_desc ctx plex_desc in
+      let plex_loc = self#location ctx plex_loc in
+      { plex_desc; plex_loc }
   end
 
 class virtual ['res] lift =
@@ -14905,6 +15021,9 @@ class virtual ['res] lift =
       | Ptop_dir a ->
         let a = self#toplevel_directive a in
         self#constr "Ptop_dir" [ a ]
+      | Ptop_lex a ->
+        let a = self#lexer_directive a in
+        self#constr "Ptop_lex" [ a ]
 
     method toplevel_directive : toplevel_directive -> 'res =
       fun { pdir_name; pdir_arg; pdir_loc } ->
@@ -14941,6 +15060,25 @@ class virtual ['res] lift =
       | Pdir_bool a ->
         let a = self#bool a in
         self#constr "Pdir_bool" [ a ]
+
+    method syntax_directive : syntax_directive -> 'res =
+      fun { psyn_mode; psyn_toggle } ->
+      let psyn_mode = self#loc self#string psyn_mode in
+      let psyn_toggle = self#bool psyn_toggle in
+      self#record [ "psyn_mode", psyn_mode; "psyn_toggle", psyn_toggle ]
+
+    method lexer_directive_desc : lexer_directive_desc -> 'res =
+      fun x ->
+      match x with
+      | Plex_syntax a ->
+        let a = self#syntax_directive a in
+        self#constr "Plex_syntax" [ a ]
+
+    method lexer_directive : lexer_directive -> 'res =
+      fun { plex_desc; plex_loc } ->
+      let plex_desc = self#lexer_directive_desc plex_desc in
+      let plex_loc = self#location plex_loc in
+      self#record [ "plex_desc", plex_desc; "plex_loc", plex_loc ]
   end
 
 class virtual ['ctx, 'res] lift_map_with_context =
@@ -18699,6 +18837,9 @@ class virtual ['ctx, 'res] lift_map_with_context =
       | Ptop_dir a ->
         let a = self#toplevel_directive ctx a in
         Ptop_dir (Stdlib.fst a), self#constr ctx "Ptop_dir" [ Stdlib.snd a ]
+      | Ptop_lex a ->
+        let a = self#lexer_directive ctx a in
+        Ptop_lex (Stdlib.fst a), self#constr ctx "Ptop_lex" [ Stdlib.snd a ]
 
     method toplevel_directive
       : 'ctx -> toplevel_directive -> toplevel_directive * 'res
@@ -18756,6 +18897,46 @@ class virtual ['ctx, 'res] lift_map_with_context =
       | Pdir_bool a ->
         let a = self#bool ctx a in
         Pdir_bool (Stdlib.fst a), self#constr ctx "Pdir_bool" [ Stdlib.snd a ]
+
+    method syntax_directive
+      : 'ctx -> syntax_directive -> syntax_directive * 'res
+      =
+      fun ctx { psyn_mode; psyn_toggle } ->
+      let psyn_mode = self#loc self#string ctx psyn_mode in
+      let psyn_toggle = self#bool ctx psyn_toggle in
+      ( { psyn_mode = Stdlib.fst psyn_mode
+        ; psyn_toggle = Stdlib.fst psyn_toggle
+        }
+      , self
+        #
+        record
+          ctx
+          [ "psyn_mode", Stdlib.snd psyn_mode
+          ; "psyn_toggle", Stdlib.snd psyn_toggle
+          ] )
+
+    method lexer_directive_desc
+      : 'ctx -> lexer_directive_desc -> lexer_directive_desc * 'res
+      =
+      fun ctx x ->
+      match x with
+      | Plex_syntax a ->
+        let a = self#syntax_directive ctx a in
+        ( Plex_syntax (Stdlib.fst a)
+        , self#constr ctx "Plex_syntax" [ Stdlib.snd a ] )
+
+    method lexer_directive : 'ctx -> lexer_directive -> lexer_directive * 'res =
+      fun ctx { plex_desc; plex_loc } ->
+      let plex_desc = self#lexer_directive_desc ctx plex_desc in
+      let plex_loc = self#location ctx plex_loc in
+      ( { plex_desc = Stdlib.fst plex_desc; plex_loc = Stdlib.fst plex_loc }
+      , self
+        #
+        record
+          ctx
+          [ "plex_desc", Stdlib.snd plex_desc
+          ; "plex_loc", Stdlib.snd plex_loc
+          ] )
   end
 
 [@@@end]

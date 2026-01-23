@@ -146,6 +146,7 @@ module Raw = struct
     | WITH -> "WITH"
     | COMMENT _ -> "COMMENT"
     | DOCSTRING _ -> "DOCSTRING"
+    | HASH_SYNTAX _ -> "HASH_SYNTAX"
     | EOL -> "EOL"
   ;;
 
@@ -298,6 +299,7 @@ module Raw = struct
     | COMMENT _, COMMENT _ -> true
     | DOCSTRING _, DOCSTRING _ -> true
     | EOL, EOL -> true
+    | HASH_SYNTAX _, HASH_SYNTAX _ -> true
     | _ -> false
   ;;
 end

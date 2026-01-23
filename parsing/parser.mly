@@ -524,6 +524,16 @@ let pmod_instance : module_expr -> module_expr_desc =
 ;;
 *)
 
+let mk_hashsyntax ~loc mode toggle =
+  Ptop_lex {
+      plex_desc =
+        Plex_syntax {
+             psyn_mode = mode;
+             psyn_toggle = toggle;
+        };
+      plex_loc = make_loc loc;
+    }
+
 let mk_directive_arg ~loc k =
   { pdira_desc = k;
     pdira_loc = make_loc loc;
@@ -4795,9 +4805,12 @@ any_longident:
 /* Toplevel directives */
 
 toplevel_directive:
-  hash dir = mkrhs(ident)
-  arg = ioption(mk_directive_arg(toplevel_directive_argument))
-    { mk_directive ~loc:$sloc dir arg }
+  | HASH_SYNTAX
+      { let mode, toggle = $1 in
+        mk_hashsyntax ~loc:$sloc (mkloc mode (make_loc $sloc)) toggle }
+  | hash dir = mkrhs(ident)
+    arg = ioption(mk_directive_arg(toplevel_directive_argument))
+      { mk_directive ~loc:$sloc dir arg }
 ;
 
 %inline toplevel_directive_argument:

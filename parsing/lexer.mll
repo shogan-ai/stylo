@@ -167,16 +167,17 @@ let print_warnings = ref true
 
 let at_beginning_of_line pos = (pos.pos_cnum = pos.pos_bol)
 
-(* CR dvulakh: In general, we'd prefer to avoid cosmetic changes in this file
+(* XCR dvulakh: In general, we'd prefer to avoid cosmetic changes in this file
    (e.g. change to comments) to make it easier to keep in sync with the version from the
    compiler . *)
 
+(* Syntax mode configuration for the #syntax directive *)
 module Syntax_mode = struct
-  let quotations = ref true
+  let quotations = ref false
 end
 
 let reset_syntax_mode () =
-  Syntax_mode.quotations := true
+  Syntax_mode.quotations := false
 
 (* See the comment on the [directive] lexer. *)
 type directive_lexing_already_consumed =
@@ -846,31 +847,13 @@ rule token = parse
    this isn't the case.
 *)
 and directive already_consumed = parse
-  | ([' ' '\t']* (['0'-'9']+? as line_num_opt) [' ' '\t']*
-     ("\"" ([^ '\010' '\013' '\"' ] * as name) "\"") as directive)
+  | ([' ' '\t']* (['0'-'9']+?) [' ' '\t']*
+     ("\"" ([^ '\010' '\013' '\"' ] *) "\"") as directive)
         [^ '\010' '\013'] *
-      { let num =
-          match already_consumed, line_num_opt with
-          | Hash_and_line_num { line_num }, "" -> line_num
-          | Hash, "" ->
-              directive_error lexbuf "expected line number"
-                ~already_consumed ~directive
-          | Hash_and_line_num _, _ ->
-              directive_error lexbuf "expected just one line number"
-                ~already_consumed ~directive
-          | Hash, num -> num
-        in
-        match int_of_string num with
-        | exception _ ->
-            (* PR#7165 *)
-            directive_error lexbuf "line number out of range"
-              ~already_consumed ~directive
-        | line_num ->
-           (* Documentation says that the line number should be
-              positive, but we have never guarded against this and it
-              might have useful hackish uses. *)
-            update_loc lexbuf (Some name) (line_num - 1) true 0;
-            token lexbuf
+      {
+        (* Line directives are not preserved by the lexer so we error out. *)
+        let explanation = "line directives are not supported" in
+        directive_error lexbuf explanation ~already_consumed ~directive
       }
   | "syntax" [' ' '\t']+ (lowercase identchar* as mode) [' ' '\t']+
     (lowercase identchar* as toggle) [^ '\010' '\013']*
@@ -883,14 +866,15 @@ and directive already_consumed = parse
                 ("syntax directive can only be toggled on or off; "
                  ^ toggle ^ " not recognized")
                 ~already_consumed ~directive:"syntax"
-        in
-        match mode with
-        | "quotations" ->
+        in (
+          match mode with
+          | "quotations" ->
             Syntax_mode.quotations := toggle;
-            token lexbuf
-        | _ ->
+          | _ ->
             directive_error lexbuf ("unknown syntax mode " ^ mode)
               ~already_consumed ~directive:"syntax"
+        );
+        HASH_SYNTAX(mode, toggle)
       }
 and comment = parse
     "(*"
