@@ -54,11 +54,26 @@ let cleaner =
     in
     super.attributes mapper env ((* FIXME: why? *) sort_attributes attrs)
   in
+  let map_pattern mapper env p =
+    match p.ppat_desc with
+    | Ppat_or
+        (p1, { ppat_desc = Ppat_or (p2, p3); ppat_attributes; ppat_loc; _ }) ->
+      let rewritten =
+        Ast_helper.Pat.or_
+          ~loc:p.ppat_loc
+          ~attrs:p.ppat_attributes
+          (Ast_helper.Pat.or_ ~loc:ppat_loc ~attrs:ppat_attributes p1 p2)
+          p3
+      in
+      mapper.Ast_mapper.pattern mapper env rewritten
+    | _ -> super.pattern mapper env p
+  in
   { super with
     attribute = map_attribute
   ; attributes = map_attributes
   ; location = map_location
   ; location_stack = map_location_stack
+  ; pattern = map_pattern
   }
 ;;
 

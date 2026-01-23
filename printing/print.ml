@@ -331,174 +331,6 @@ end
 and Payload : sig
   val pp : payload -> t
 end = struct
-  module Ends_in_obj_type = struct
-    (* We need to be careful in payload to add an extra space before the closing
-       ']' if the payload ends with and object type, otherwise the lexer will
-       parse '>]' as a single token.
-
-       While oxcaml's quotations also end with a '>' we do need to check for
-       them as ']>' will have be recognized as a token already and the following
-       ']' will be lexed independently. *)
-
-    let rec core_type ct =
-      ct.ptyp_attributes = []
-      &&
-      match ct.ptyp_desc with
-      | Ptyp_object (_, _) -> true
-      | Ptyp_arrow { codom_type = rhs; codom_modes = []; _ }
-      | Ptyp_poly (_, rhs) -> core_type rhs
-      | Ptyp_tuple lst -> core_type (snd (List.hd (List.rev lst)))
-      | Ptyp_any _
-      | Ptyp_var _
-      | Ptyp_parens _
-      | Ptyp_unboxed_tuple _
-      | Ptyp_constr (_, _)
-      | Ptyp_class (_, _)
-      | Ptyp_alias _
-      | Ptyp_variant (_, _, _)
-      | Ptyp_package _
-      | Ptyp_open _
-      | Ptyp_extension _
-      | Ptyp_arrow _
-      | Ptyp_of_kind _
-      | Ptyp_quote _
-      | Ptyp_splice _ -> false
-    ;;
-
-    let rec jkind_annotation jk =
-      match jk.pjkind_desc with
-      | Pjk_with (_, ct, []) | Pjk_kind_of ct -> core_type ct
-      | Pjk_product (_ :: _ as jks) -> jkind_annotation List.(hd @@ rev jks)
-      | Pjk_default
-      | Pjk_abbreviation _
-      | Pjk_mod _
-      | Pjk_with (_, _, _ :: _)
-      | Pjk_product []
-      | Pjk_parens _ -> false
-    ;;
-
-    let constructor_argument ca =
-      ca.pca_modalities = [] && core_type ca.pca_type
-    ;;
-
-    let constructor_decl cd =
-      cd.pcd_attributes = []
-      &&
-      match cd with
-      | { pcd_res = Some ct; _ } -> core_type ct
-      | { pcd_args = Pcstr_tuple (_ :: _ as args); _ } ->
-        constructor_argument (List.hd @@ List.rev args)
-      | _ -> false
-    ;;
-
-    let type_declaration td =
-      td.ptype_attributes = []
-      &&
-      match td with
-      | { ptype_cstrs = _ :: _ as cstrs; _ } ->
-        let _, ct, _ = List.hd (List.rev cstrs) in
-        core_type ct
-      | { ptype_manifest = Some ct; ptype_kind = Ptype_abstract; _ } ->
-        core_type ct
-      | { ptype_kind = Ptype_variant (_ :: _ as cds); _ } ->
-        constructor_decl List.(hd (rev cds))
-      | _ -> false
-    ;;
-
-    let rec type_declarations = function
-      | [] -> false
-      | [ td ] -> type_declaration td
-      | _ :: tds -> type_declarations tds
-    ;;
-
-    let extension_constructor ec =
-      ec.pext_attributes = []
-      &&
-      match ec.pext_kind with
-      | Pext_decl (_, _, Some ret_ct) -> core_type ret_ct
-      | Pext_decl (_, Pcstr_tuple (_ :: _ as args), None) ->
-        constructor_argument List.(hd (rev args))
-      | _ -> false
-    ;;
-
-    let type_extension te =
-      te.ptyext_attributes = []
-      && extension_constructor List.(hd (rev te.ptyext_constructors))
-    ;;
-
-    let type_exception exn =
-      exn.ptyexn_attributes = [] && extension_constructor exn.ptyexn_constructor
-    ;;
-
-    let structure_item it =
-      match it.pstr_desc with
-      | Pstr_type (_, tds) -> type_declarations tds
-      | Pstr_typext te -> type_extension te
-      | Pstr_exception exn -> type_exception exn
-      | Pstr_kind_abbrev (_, jk) -> jkind_annotation jk
-      | Pstr_eval _
-      | Pstr_value _
-      | Pstr_primitive _
-      | Pstr_module _
-      | Pstr_recmodule _
-      | Pstr_modtype _
-      | Pstr_open _
-      | Pstr_include _
-      | Pstr_attribute _
-      | Pstr_extension _
-      | Pstr_class _
-      | Pstr_class_type _
-      | Pstr_docstring _ -> false
-    ;;
-
-    let value_description vd =
-      vd.pval_attributes = []
-      && vd.pval_prim = []
-      && vd.pval_modalities = []
-      && core_type vd.pval_type
-    ;;
-
-    let signature_item si =
-      match si.psig_desc with
-      | Psig_value vd -> value_description vd
-      | Psig_type (_, decls) | Psig_typesubst decls -> type_declarations decls
-      | Psig_typext te -> type_extension te
-      | Psig_exception exn -> type_exception exn
-      | Psig_kind_abbrev (_, jk) -> jkind_annotation jk
-      | Psig_attribute _
-      | Psig_extension _
-      | Psig_docstring _
-      | Psig_class _
-      | Psig_class_type _
-      (* FIXME: any of the following could have a with constraint. *)
-      | Psig_module _
-      | Psig_recmodule _
-      | Psig_modsubst _
-      | Psig_modtype _
-      | Psig_modtypesubst _
-      | Psig_open _
-      | Psig_include _ -> false
-    ;;
-
-    let structure (items, _tokens) =
-      let rec last = function
-        | [] -> false
-        | [ item ] -> structure_item item
-        | _ :: items -> last items
-      in
-      last items
-    ;;
-
-    let signature sg =
-      let rec last = function
-        | [] -> false
-        | [ item ] -> signature_item item
-        | _ :: items -> last items
-      in
-      last sg.psg_items
-    ;;
-  end
-
   let pp = function
     | PString _ -> assert false (* handled in Extension *)
     | PStr s ->
@@ -508,15 +340,15 @@ end = struct
        | _ ->
          break 1
          ^^ doc
-         ^^ if Ends_in_obj_type.structure s then break 1 else empty)
+         ^^ if Object_type_at.End.of_structure s then break 1 else empty)
     | PSig s ->
       S.colon
       ^/^ Signature.pp_interface s
-      ^^ if Ends_in_obj_type.signature s then break 1 else empty
+      ^^ if Object_type_at.End.of_signature s then break 1 else empty
     | PTyp c ->
       S.colon
       ^/^ Core_type.pp c
-      ^^ if Ends_in_obj_type.core_type c then break 1 else empty
+      ^^ if Object_type_at.End.of_core_type c then break 1 else empty
     | PPat (p, eo) ->
       S.qmark
       ^/^ Pattern.pp p
@@ -613,17 +445,12 @@ end = struct
   let would_lex_differently = function
     | [] -> false
     | first :: rest ->
-      let is_obj_or_quote ct =
-        match ct.ptyp_desc with
-        | Ptyp_object _ | Ptyp_quote _ -> true
-        | _ -> false
-      in
       let rec last_is_obj_or_quote = function
         | [] -> false
-        | [ x ] -> is_obj_or_quote x
+        | [ x ] -> Object_type_at.End.of_core_type x
         | _ :: xs -> last_is_obj_or_quote xs
       in
-      is_obj_or_quote first || last_is_obj_or_quote rest
+      Object_type_at.Start.of_core_type first || last_is_obj_or_quote rest
   ;;
 
   let pp_class_constr args lid =
@@ -677,13 +504,30 @@ and Core_type : sig
     -> (string loc * jkind_annotation option) list
     -> t
 end = struct
-  let pp_var ?preceeding var_name jkind =
-    let var, pre_nest =
-      Preceeding.group_with preceeding (S.squote ^^ string var_name)
+  let squote var_name =
+    let opt_space =
+      if String.length var_name >= 2 && String.get var_name 1 = '\''
+      then break 1
+      else empty
     in
+    group (S.squote ^^ opt_space ^^ string var_name)
+  ;;
+
+  let pp_var ?preceeding ?(attrs = []) var_name jkind =
+    let quote_var = squote var_name in
+    let var, pre_nest = Preceeding.group_with preceeding quote_var in
+    let var = Attribute.attach ~extra_nest:pre_nest ~attrs var in
     match jkind with
     | None -> var
     | Some k -> var ^/^ pre_nest (S.colon ^/^ Jkind_annotation.pp k)
+  ;;
+
+  let pp_any ?preceeding ?(attrs = []) jkind =
+    let any, pre_nest = Preceeding.group_with preceeding S.underscore in
+    let any = Attribute.attach ~extra_nest:pre_nest ~attrs any in
+    match jkind with
+    | None -> any
+    | Some k -> any ^/^ pre_nest (S.colon ^/^ Jkind_annotation.pp k)
   ;;
 
   let pp_poly_bindings ?preceeding bound_vars =
@@ -852,37 +696,35 @@ end = struct
     ?(in_parens = false)
     ({ ptyp_desc = _; ptyp_attributes; ptyp_tokens = _; ptyp_loc = _ } as ct)
     =
-    let attach_attrs doc =
-      if in_parens
-      then doc ^^ Attribute.pp_list ptyp_attributes
-      else doc ^?^ Attribute.pp_list ptyp_attributes
-    in
-    let desc_doc =
-      match Arrow.components ct with
-      | None -> group (pp_desc ?preceeding ct)
-      | Some (poly_params, args, ret) ->
-        let flatness = flatness_tracker () in
-        Arrow.pp
-          ?preceeding
-          flatness
-          poly_params
-          args
-          ~pp_rhs:(Arrow.pp_ret_ty ret)
-        |> group ~flatness
-    in
-    attach_attrs desc_doc
+    match ct.ptyp_desc with
+    | Ptyp_any jk -> pp_any ?preceeding ~attrs:ptyp_attributes jk
+    | Ptyp_var (s, jk) -> pp_var ?preceeding s ~attrs:ptyp_attributes jk
+    | _ ->
+      let attach_attrs doc =
+        if in_parens
+        then doc ^^ Attribute.pp_list ptyp_attributes
+        else doc ^?^ Attribute.pp_list ptyp_attributes
+      in
+      let desc_doc =
+        match Arrow.components ct with
+        | None -> group (pp_desc ?preceeding ct)
+        | Some (poly_params, args, ret) ->
+          let flatness = flatness_tracker () in
+          Arrow.pp
+            ?preceeding
+            flatness
+            poly_params
+            args
+            ~pp_rhs:(Arrow.pp_ret_ty ret)
+          |> group ~flatness
+      in
+      attach_attrs desc_doc
 
   and pp_desc ?preceeding ct =
     let tokens = ct.ptyp_tokens in
     match ct.ptyp_desc with
-    | Ptyp_arrow _ -> assert false (* handled in [pp] *)
-    | Ptyp_any None -> Preceeding.group_with preceeding S.underscore |> fst
-    | Ptyp_any (Some k) ->
-      let underscore, pre_nest =
-        Preceeding.group_with preceeding S.underscore
-      in
-      underscore ^/^ pre_nest (S.colon ^/^ Jkind_annotation.pp k)
-    | Ptyp_var (s, ko) -> pp_var ?preceeding s ko
+    | Ptyp_any _ | Ptyp_var _ | Ptyp_arrow _ ->
+      assert false (* handled in [pp] *)
     | Ptyp_tuple elts -> pp_tuple ?preceeding elts
     | Ptyp_unboxed_tuple elts ->
       let hlparen, pre_nest = Preceeding.group_with preceeding S.hash_lparen in
@@ -894,8 +736,7 @@ end = struct
       Type_constructor.pp_core_type ?preceeding ~class_:true tokens args lid.txt
     | Ptyp_alias (ct, name, None) ->
       let pre_nest = Preceeding.implied_nest preceeding in
-      pp ?preceeding ct
-      ^/^ pre_nest (S.as_ ^/^ S.squote ^^ string (Option.get name).txt)
+      pp ?preceeding ct ^/^ pre_nest (S.as_ ^/^ squote (Option.get name).txt)
     | Ptyp_alias (ct, name_o, Some jkind) ->
       let pre_nest = Preceeding.implied_nest preceeding in
       pp ?preceeding ct
@@ -3639,7 +3480,8 @@ end = struct
     Layout_module_binding.pp
       ~item:true
       ?pre_doc:pmtd_pre_doc
-      ~keyword:(S.module_ ^/^ Ext_attribute.decorate S.type_ pmtd_ext_attrs)
+      ~keyword:
+        (Ext_attribute.decorate (group (S.module_ ^/^ S.type_)) pmtd_ext_attrs)
       (string pmtd_name.txt)
       ~equal_sign:(if subst then S.colon_equals else S.equals)
       ?rhs:(Option.map Module_type.as_rhs pmtd_type)

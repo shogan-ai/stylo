@@ -62,7 +62,7 @@ let map_structure mapper env str =
 ;;
 
 let default_vb_passing_context mapper _ vb =
-  let parent_for_recursive_calls = Context.Value_binding in
+  let parent_for_recursive_calls = Context.Value_binding vb in
   super.value_binding mapper parent_for_recursive_calls vb
 ;;
 
