@@ -4285,6 +4285,71 @@ end = struct
 
   let pp jk = group (pp jk)
 end
+
+and Toplevel_phrase : sig
+  val pp : toplevel_phrase -> t
+  val pp_use_file : use_file -> t
+end = struct
+  let rec pp phrase =
+    match phrase with
+    | Ptop_def str -> Structure.pp_implementation str
+    | Ptop_dir dir -> pp_toplevel_directive dir
+    | Ptop_lex lex -> pp_lexer_directive lex
+
+  and pp_toplevel_directive
+    { pdir_name; pdir_arg; pdir_loc = _; pdir_tokens = _ }
+    =
+    S.hash
+    ^^ S.str pdir_name.txt
+    ^^ nbsp
+    ^^ optional pp_directive_argument pdir_arg
+
+  and pp_directive_argument { pdira_desc; pdira_loc = _ } =
+    match pdira_desc with
+    | Pdir_string str -> fancy_string {|"%s"|} str
+    | Pdir_int (str, suffix) -> constant (Pconst_integer (None, str, suffix))
+    | Pdir_ident lident -> longident lident
+    | Pdir_bool bool -> if bool then string "true" else string "false"
+
+  and pp_lexer_directive { plex_desc; plex_loc = _; plex_tokens } =
+    let maybe_semisemi =
+      if List.exists
+           (function
+             | { desc = Token (SEMISEMI, _); _ } -> true
+             | _ -> false)
+           plex_tokens
+      then hardline ^^ S.semisemi
+      else empty
+    in
+    (match plex_desc with
+     | Plex_syntax dir -> pp_syntax_directive dir)
+    ^^ maybe_semisemi
+
+  and pp_syntax_directive { psyn_mode; psyn_toggle } =
+    fancy_string
+      "#syntax %s %s"
+      psyn_mode.txt
+      (if psyn_toggle then "on" else "off")
+  ;;
+
+  let pp_keeping_semi = Toplevel_items.Use_file.pp_grouped_keeping_semi pp
+
+  (* let pp ?(attrs = []) str =
+   *   let struct_ = Attribute.attach ~attrs S.struct_ in
+   *   group (struct_ ^?^ nest 2 (pp_keeping_semi str) ^?^ S.end_)
+   * ;;
+   *
+   * let pp_parts attrs str =
+   *   let str_doc =
+   *     match pp_keeping_semi str with
+   *     | Empty -> empty
+   *     | doc -> softest_line ^^ group doc
+   *   in
+   *   Attribute.attach ~attrs S.struct_, str_doc, S.end_
+   * ;; *)
+
+  let pp_use_file use = group (pp_keeping_semi use)
+end
 (* FIXME: TODO? *)
 (* (**
    {1 Toplevel}

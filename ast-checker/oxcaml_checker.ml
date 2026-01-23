@@ -99,8 +99,9 @@ let cleaner =
 
 let struct_or_error lex = Parse.implementation lex |> cleaner#structure
 let sig_or_error lex = Parse.interface lex |> cleaner#signature
+let use_or_error lex = Parse.use_file lex |> List.map cleaner#toplevel_phrase
 
-let check_same_ast fn line ~impl s1 s2 =
+let check_same_ast fn line s1 s2 parse_or_error =
   let pos =
     { Lexing.pos_fname = fn; pos_lnum = line; pos_bol = 0; pos_cnum = 0 }
   in
@@ -110,15 +111,17 @@ let check_same_ast fn line ~impl s1 s2 =
   Lexing.set_position lex2 pos;
   Lexing.set_filename lex2 (fn ^ ".out");
   Location.input_name := fn;
-  if impl
-  then (
-    let ast1 = struct_or_error lex1 in
-    Location.input_name := fn ^ ".out";
-    let ast2 = struct_or_error lex2 in
-    ast1 = ast2)
-  else (
-    let ast1 = sig_or_error lex1 in
-    Location.input_name := fn ^ ".out";
-    let ast2 = sig_or_error lex2 in
-    ast1 = ast2)
+  let ast1 = parse_or_error lex1 in
+  Location.input_name := fn ^ ".out";
+  let ast2 = parse_or_error lex2 in
+  ast1 = ast2
 ;;
+
+module Check_same_ast = struct
+  let implementation fn line s1 s2 =
+    check_same_ast fn line s1 s2 struct_or_error
+  ;;
+
+  let interface fn line s1 s2 = check_same_ast fn line s1 s2 sig_or_error
+  let use_file fn line s1 s2 = check_same_ast fn line s1 s2 use_or_error
+end

@@ -240,6 +240,13 @@ module Sig = struct
   ;;
 end
 
+module Use_file = struct
+  let pp_grouped_keeping_semi pp_item (items, tokens) =
+    let groups = List.map (fun x -> [ x ]) items in
+    pp_grouped_keeping_semi pp_item groups tokens
+  ;;
+end
+
 let pp_keeping_semi pp (items, tokens) =
   match pp_keeping_semi pp empty items tokens with
   | t, Done -> t

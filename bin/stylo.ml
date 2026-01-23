@@ -1,20 +1,19 @@
 open Ocaml_syntax
 
-let style_file contents ~filename =
+let style_file file_type contents ~filename =
   let lexbuf = Lexing.from_string contents in
   Location.init lexbuf filename;
   let doc, tokens =
-    if Filename.check_suffix filename ".mli"
-    then (
-      let sg = Parse.interface lexbuf in
-      let sg = Normalize.signature sg in
-      Print.Signature.pp_interface sg, Tokens_of_tree.signature sg)
-    else (
-      let str = Parse.implementation lexbuf in
-      let str = Normalize.structure str in
-      Print.Structure.pp_implementation str, Tokens_of_tree.structure str)
+    let parsed = File_type.parse file_type lexbuf in
+    let normalized = File_type.normalize file_type parsed in
+    ( File_type.pp file_type normalized
+    , File_type.tokens_of_tree file_type normalized )
   in
-  Dbg_print.dprintf "%a@." Tokens.pp_seq tokens;
+  Dbg_print.dprintf "Tokens:\n%a@." Tokens.pp_seq tokens;
+  Dbg_print.dprintf
+    "Doc:\n%a\n%!"
+    Sexplib0.Sexp.pp_hum
+    (Document.Utils.sexp_of_t doc);
   Comments.Insert.from_tokens tokens doc
 ;;
 
@@ -137,8 +136,8 @@ let command_fuzz =
      fun () -> if fuzzer_batch input ~width then exit 1)
 ;;
 
-let format_one contents ~filename ~width ~ast_check ~in_place =
-  match style_file contents ~filename with
+let format_one file_type contents ~filename ~width ~ast_check ~in_place =
+  match style_file file_type contents ~filename with
   | exception Comments.Insert.Error e ->
     Format.eprintf "%s: ERROR: %a@." filename Comments.Insert.Error.pp e;
     Error ()
@@ -152,13 +151,7 @@ let format_one contents ~filename ~width ~ast_check ~in_place =
     if ast_check
        &&
        let source = contents in
-       not
-       @@ Ast_checker.Oxcaml_checker.check_same_ast
-            filename
-            0
-            ~impl:(Filename.check_suffix filename ".ml")
-            source
-            reprinted
+       not @@ File_type.check_same_ast file_type filename 0 source reprinted
     then (
       (* TODO: location, etc *)
       Format.eprintf "%s: ast changed@." filename;
@@ -226,8 +219,15 @@ let command_format =
            List.map
              (fun input ->
                let filename = Input.filename input in
+               let (File_type.P file_type) = File_type.of_filename filename in
                let contents = Input.load input in
-               format_one contents ~filename ~width ~ast_check ~in_place)
+               format_one
+                 file_type
+                 contents
+                 ~filename
+                 ~width
+                 ~ast_check
+                 ~in_place)
              inputs
          in
          if List.exists Result.is_error results then exit 1)

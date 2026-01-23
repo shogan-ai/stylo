@@ -58,6 +58,7 @@ type t = private
   | Cat of Requirement.t * t * t
   | Nest of Requirement.t * int * Condition.t option * t
   | Group of Requirement.t * int * flatness option * t
+[@@deriving sexp_of]
 and pseudo_token = private
   | Trivial of Requirement.t * string
   | Verbatim of Requirement.t * string * int

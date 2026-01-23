@@ -1,3 +1,5 @@
+open Sexplib0.Sexp_conv
+
 module Requirement : sig
   type t
 
@@ -47,7 +49,7 @@ module Req = Requirement
 
 (* TODO: currently the tracker could be associated with several groups, we could add a
    dynamic check to prevent that. *)
-type flatness = bool ref
+type flatness = bool ref [@@deriving sexp_of]
 
 module Condition = struct
   type t = bool lazy_t
@@ -69,16 +71,20 @@ type softness =
   | Soft (** Vanishes after blank lines, adds a break otherwise *)
   | Softest (** Vanishes after a line break *)
 
+[@@deriving sexp_of]
+
 type whitespace =
   | Line_break of softness
   | Break of int * softness
   | Non_breakable
+[@@deriving sexp_of]
 
 type 'a can_vanish =
-  { vanishing_cond : Condition.t option
+  { vanishing_cond : (Condition.t[@sexp.opaque]) option
   ; value : 'a
   ; assume_present : bool
   }
+[@@deriving sexp_of]
 
 type t =
   | Empty
@@ -91,13 +97,14 @@ type t =
       ; ws_after : t
       }
   | Whitespace of whitespace can_vanish
-  | Cat of Req.t * t * t
-  | Nest of Req.t * int * Condition.t option * t
-  | Group of Req.t * int * flatness option * t
+  | Cat of (Req.t[@sexp.opaque]) * t * t
+  | Nest of (Req.t[@sexp.opaque]) * int * (Condition.t[@sexp.opaque]) option * t
+  | Group of (Req.t[@sexp.opaque]) * int * flatness option * t
 and pseudo_token =
-  | Trivial of Req.t * string
-  | Verbatim of Req.t * string * int
-  | Complex of Req.t * t
+  | Trivial of (Req.t[@sexp.opaque]) * string
+  | Verbatim of (Req.t[@sexp.opaque]) * string * int
+  | Complex of (Req.t[@sexp.opaque]) * t
+[@@deriving sexp_of]
 
 let ws_req = function
   | Break (spaces, _) -> Req.of_int spaces

@@ -1,5 +1,7 @@
 open Core
 
+type nonrec t = t [@@deriving sexp_of]
+
 let foldli f init l =
   snd
   @@ List.fold_left

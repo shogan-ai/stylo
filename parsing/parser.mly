@@ -524,7 +524,7 @@ let pmod_instance : module_expr -> module_expr_desc =
 ;;
 *)
 
-let mk_hashsyntax ~loc mode toggle =
+let mk_hashsyntax ~loc mode toggle tokens =
   Ptop_lex {
       plex_desc =
         Plex_syntax {
@@ -532,6 +532,7 @@ let mk_hashsyntax ~loc mode toggle =
              psyn_toggle = toggle;
         };
       plex_loc = make_loc loc;
+      plex_tokens = tokens;
     }
 
 let mk_directive_arg ~loc k =
@@ -539,11 +540,12 @@ let mk_directive_arg ~loc k =
     pdira_loc = make_loc loc;
   }
 
-let mk_directive ~loc name arg =
+let mk_directive ~loc name arg tokens =
   Ptop_dir {
       pdir_name = name;
       pdir_arg = arg;
       pdir_loc = make_loc loc;
+      pdir_tokens = tokens;
     }
 
 (* Unboxed literals *)
@@ -661,7 +663,7 @@ The precedences must be listed from low to high.
 %start toplevel_phrase                  /* for interactive use */
 %type <Parsetree.toplevel_phrase> toplevel_phrase
 %start use_file                         /* for the #use directive */
-%type <Parsetree.toplevel_phrase list> use_file
+%type <Parsetree.use_file> use_file
 /* BEGIN AVOID */
 %start parse_module_type
 %type <Parsetree.module_type> parse_module_type
@@ -1019,7 +1021,7 @@ use_file:
     flatten(use_file_element*)
   ))
   EOF
-    { $1 }
+    { $1, Tokens.at $sloc }
 ;
 
 (* An optional standalone expression is just an expression with attributes
@@ -4807,10 +4809,10 @@ any_longident:
 toplevel_directive:
   | HASH_SYNTAX
       { let mode, toggle = $1 in
-        mk_hashsyntax ~loc:$sloc (mkloc mode (make_loc $sloc)) toggle }
+        mk_hashsyntax ~loc:$sloc (mkloc mode (make_loc $sloc)) toggle (Tokens.at $sloc) }
   | hash dir = mkrhs(ident)
     arg = ioption(mk_directive_arg(toplevel_directive_argument))
-      { mk_directive ~loc:$sloc dir arg }
+      { mk_directive ~loc:$sloc dir arg (Tokens.at $sloc) }
 ;
 
 %inline toplevel_directive_argument:

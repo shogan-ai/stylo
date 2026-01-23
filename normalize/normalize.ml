@@ -71,8 +71,12 @@ let normalizer =
     method! argument_desc f _ arg =
       let parent_for_recursive_calls = Context.Fun_param_or_arg in
       super#argument_desc f parent_for_recursive_calls arg
+
+    method! use_file env use =
+      Semicolon.normalize_use_file_semisemi use |> super#use_file env
   end
 ;;
 
 let structure = normalizer#structure Other
 let signature = normalizer#signature Other
+let use_file = normalizer#use_file Other

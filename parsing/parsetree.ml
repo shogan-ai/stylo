@@ -1396,6 +1396,7 @@ and jkind_annotation =
 (** {2 Toplevel phrases} *)
 
 
+and use_file = toplevel_phrase list * token_seq
 and toplevel_phrase =
   | Ptop_def of structure
   | Ptop_dir of toplevel_directive (** [#use], [#load] ... *)
@@ -1404,6 +1405,7 @@ and toplevel_directive =
   { pdir_name : string loc
   ; pdir_arg : directive_argument option
   ; pdir_loc : location
+  ; pdir_tokens : token_seq
   }
 and directive_argument =
   { pdira_desc : directive_argument_desc
@@ -1423,6 +1425,7 @@ and lexer_directive_desc = Plex_syntax of syntax_directive
 and lexer_directive =
   { plex_desc : lexer_directive_desc
   ; plex_loc : location
+  ; plex_tokens : token_seq
   }
 [@@deriving_inline traverse]
 
@@ -3715,6 +3718,12 @@ class virtual map =
       let pjkind_tokens = self#token_seq pjkind_tokens in
       { pjkind_loc; pjkind_desc; pjkind_tokens }
 
+    method use_file : use_file -> use_file =
+      fun (a, b) ->
+      let a = self#list self#toplevel_phrase a in
+      let b = self#token_seq b in
+      a, b
+
     method toplevel_phrase : toplevel_phrase -> toplevel_phrase =
       fun x ->
       match x with
@@ -3729,11 +3738,12 @@ class virtual map =
         Ptop_lex a
 
     method toplevel_directive : toplevel_directive -> toplevel_directive =
-      fun { pdir_name; pdir_arg; pdir_loc } ->
+      fun { pdir_name; pdir_arg; pdir_loc; pdir_tokens } ->
       let pdir_name = self#loc self#string pdir_name in
       let pdir_arg = self#option self#directive_argument pdir_arg in
       let pdir_loc = self#location pdir_loc in
-      { pdir_name; pdir_arg; pdir_loc }
+      let pdir_tokens = self#token_seq pdir_tokens in
+      { pdir_name; pdir_arg; pdir_loc; pdir_tokens }
 
     method directive_argument : directive_argument -> directive_argument =
       fun { pdira_desc; pdira_loc } ->
@@ -3774,10 +3784,11 @@ class virtual map =
         Plex_syntax a
 
     method lexer_directive : lexer_directive -> lexer_directive =
-      fun { plex_desc; plex_loc } ->
+      fun { plex_desc; plex_loc; plex_tokens } ->
       let plex_desc = self#lexer_directive_desc plex_desc in
       let plex_loc = self#location plex_loc in
-      { plex_desc; plex_loc }
+      let plex_tokens = self#token_seq plex_tokens in
+      { plex_desc; plex_loc; plex_tokens }
   end
 
 class virtual iter =
@@ -5380,6 +5391,11 @@ class virtual iter =
       self#jkind_annotation_desc pjkind_desc;
       self#token_seq pjkind_tokens
 
+    method use_file : use_file -> unit =
+      fun (a, b) ->
+      self#list self#toplevel_phrase a;
+      self#token_seq b
+
     method toplevel_phrase : toplevel_phrase -> unit =
       fun x ->
       match x with
@@ -5388,10 +5404,11 @@ class virtual iter =
       | Ptop_lex a -> self#lexer_directive a
 
     method toplevel_directive : toplevel_directive -> unit =
-      fun { pdir_name; pdir_arg; pdir_loc } ->
+      fun { pdir_name; pdir_arg; pdir_loc; pdir_tokens } ->
       self#loc self#string pdir_name;
       self#option self#directive_argument pdir_arg;
-      self#location pdir_loc
+      self#location pdir_loc;
+      self#token_seq pdir_tokens
 
     method directive_argument : directive_argument -> unit =
       fun { pdira_desc; pdira_loc } ->
@@ -5419,9 +5436,10 @@ class virtual iter =
       | Plex_syntax a -> self#syntax_directive a
 
     method lexer_directive : lexer_directive -> unit =
-      fun { plex_desc; plex_loc } ->
+      fun { plex_desc; plex_loc; plex_tokens } ->
       self#lexer_directive_desc plex_desc;
-      self#location plex_loc
+      self#location plex_loc;
+      self#token_seq plex_tokens
   end
 
 class virtual ['acc] fold =
@@ -7292,6 +7310,12 @@ class virtual ['acc] fold =
       let acc = self#token_seq pjkind_tokens acc in
       acc
 
+    method use_file : use_file -> 'acc -> 'acc =
+      fun (a, b) acc ->
+      let acc = self#list self#toplevel_phrase a acc in
+      let acc = self#token_seq b acc in
+      acc
+
     method toplevel_phrase : toplevel_phrase -> 'acc -> 'acc =
       fun x acc ->
       match x with
@@ -7300,10 +7324,11 @@ class virtual ['acc] fold =
       | Ptop_lex a -> self#lexer_directive a acc
 
     method toplevel_directive : toplevel_directive -> 'acc -> 'acc =
-      fun { pdir_name; pdir_arg; pdir_loc } acc ->
+      fun { pdir_name; pdir_arg; pdir_loc; pdir_tokens } acc ->
       let acc = self#loc self#string pdir_name acc in
       let acc = self#option self#directive_argument pdir_arg acc in
       let acc = self#location pdir_loc acc in
+      let acc = self#token_seq pdir_tokens acc in
       acc
 
     method directive_argument : directive_argument -> 'acc -> 'acc =
@@ -7335,9 +7360,10 @@ class virtual ['acc] fold =
       | Plex_syntax a -> self#syntax_directive a acc
 
     method lexer_directive : lexer_directive -> 'acc -> 'acc =
-      fun { plex_desc; plex_loc } acc ->
+      fun { plex_desc; plex_loc; plex_tokens } acc ->
       let acc = self#lexer_directive_desc plex_desc acc in
       let acc = self#location plex_loc acc in
+      let acc = self#token_seq plex_tokens acc in
       acc
   end
 
@@ -9840,6 +9866,12 @@ class virtual ['acc] fold_map =
       let pjkind_tokens, acc = self#token_seq pjkind_tokens acc in
       { pjkind_loc; pjkind_desc; pjkind_tokens }, acc
 
+    method use_file : use_file -> 'acc -> use_file * 'acc =
+      fun (a, b) acc ->
+      let a, acc = self#list self#toplevel_phrase a acc in
+      let b, acc = self#token_seq b acc in
+      (a, b), acc
+
     method toplevel_phrase : toplevel_phrase -> 'acc -> toplevel_phrase * 'acc =
       fun x acc ->
       match x with
@@ -9856,11 +9888,12 @@ class virtual ['acc] fold_map =
     method toplevel_directive
       : toplevel_directive -> 'acc -> toplevel_directive * 'acc
       =
-      fun { pdir_name; pdir_arg; pdir_loc } acc ->
+      fun { pdir_name; pdir_arg; pdir_loc; pdir_tokens } acc ->
       let pdir_name, acc = self#loc self#string pdir_name acc in
       let pdir_arg, acc = self#option self#directive_argument pdir_arg acc in
       let pdir_loc, acc = self#location pdir_loc acc in
-      { pdir_name; pdir_arg; pdir_loc }, acc
+      let pdir_tokens, acc = self#token_seq pdir_tokens acc in
+      { pdir_name; pdir_arg; pdir_loc; pdir_tokens }, acc
 
     method directive_argument
       : directive_argument -> 'acc -> directive_argument * 'acc
@@ -9907,10 +9940,11 @@ class virtual ['acc] fold_map =
         Plex_syntax a, acc
 
     method lexer_directive : lexer_directive -> 'acc -> lexer_directive * 'acc =
-      fun { plex_desc; plex_loc } acc ->
+      fun { plex_desc; plex_loc; plex_tokens } acc ->
       let plex_desc, acc = self#lexer_directive_desc plex_desc acc in
       let plex_loc, acc = self#location plex_loc acc in
-      { plex_desc; plex_loc }, acc
+      let plex_tokens, acc = self#token_seq plex_tokens acc in
+      { plex_desc; plex_loc; plex_tokens }, acc
   end
 
 class virtual ['ctx] map_with_context =
@@ -12298,6 +12332,12 @@ class virtual ['ctx] map_with_context =
       let pjkind_tokens = self#token_seq ctx pjkind_tokens in
       { pjkind_loc; pjkind_desc; pjkind_tokens }
 
+    method use_file : 'ctx -> use_file -> use_file =
+      fun ctx (a, b) ->
+      let a = self#list self#toplevel_phrase ctx a in
+      let b = self#token_seq ctx b in
+      a, b
+
     method toplevel_phrase : 'ctx -> toplevel_phrase -> toplevel_phrase =
       fun ctx x ->
       match x with
@@ -12313,11 +12353,12 @@ class virtual ['ctx] map_with_context =
 
     method toplevel_directive : 'ctx -> toplevel_directive -> toplevel_directive
       =
-      fun ctx { pdir_name; pdir_arg; pdir_loc } ->
+      fun ctx { pdir_name; pdir_arg; pdir_loc; pdir_tokens } ->
       let pdir_name = self#loc self#string ctx pdir_name in
       let pdir_arg = self#option self#directive_argument ctx pdir_arg in
       let pdir_loc = self#location ctx pdir_loc in
-      { pdir_name; pdir_arg; pdir_loc }
+      let pdir_tokens = self#token_seq ctx pdir_tokens in
+      { pdir_name; pdir_arg; pdir_loc; pdir_tokens }
 
     method directive_argument : 'ctx -> directive_argument -> directive_argument
       =
@@ -12361,10 +12402,11 @@ class virtual ['ctx] map_with_context =
         Plex_syntax a
 
     method lexer_directive : 'ctx -> lexer_directive -> lexer_directive =
-      fun ctx { plex_desc; plex_loc } ->
+      fun ctx { plex_desc; plex_loc; plex_tokens } ->
       let plex_desc = self#lexer_directive_desc ctx plex_desc in
       let plex_loc = self#location ctx plex_loc in
-      { plex_desc; plex_loc }
+      let plex_tokens = self#token_seq ctx plex_tokens in
+      { plex_desc; plex_loc; plex_tokens }
   end
 
 class virtual ['res] lift =
@@ -15012,6 +15054,12 @@ class virtual ['res] lift =
         ; "pjkind_tokens", pjkind_tokens
         ]
 
+    method use_file : use_file -> 'res =
+      fun (a, b) ->
+      let a = self#list self#toplevel_phrase a in
+      let b = self#token_seq b in
+      self#tuple [ a; b ]
+
     method toplevel_phrase : toplevel_phrase -> 'res =
       fun x ->
       match x with
@@ -15026,16 +15074,18 @@ class virtual ['res] lift =
         self#constr "Ptop_lex" [ a ]
 
     method toplevel_directive : toplevel_directive -> 'res =
-      fun { pdir_name; pdir_arg; pdir_loc } ->
+      fun { pdir_name; pdir_arg; pdir_loc; pdir_tokens } ->
       let pdir_name = self#loc self#string pdir_name in
       let pdir_arg = self#option self#directive_argument pdir_arg in
       let pdir_loc = self#location pdir_loc in
+      let pdir_tokens = self#token_seq pdir_tokens in
       self
       #
       record
         [ "pdir_name", pdir_name
         ; "pdir_arg", pdir_arg
         ; "pdir_loc", pdir_loc
+        ; "pdir_tokens", pdir_tokens
         ]
 
     method directive_argument : directive_argument -> 'res =
@@ -15075,10 +15125,17 @@ class virtual ['res] lift =
         self#constr "Plex_syntax" [ a ]
 
     method lexer_directive : lexer_directive -> 'res =
-      fun { plex_desc; plex_loc } ->
+      fun { plex_desc; plex_loc; plex_tokens } ->
       let plex_desc = self#lexer_directive_desc plex_desc in
       let plex_loc = self#location plex_loc in
-      self#record [ "plex_desc", plex_desc; "plex_loc", plex_loc ]
+      let plex_tokens = self#token_seq plex_tokens in
+      self
+      #
+      record
+        [ "plex_desc", plex_desc
+        ; "plex_loc", plex_loc
+        ; "plex_tokens", plex_tokens
+        ]
   end
 
 class virtual ['ctx, 'res] lift_map_with_context =
@@ -18828,6 +18885,13 @@ class virtual ['ctx, 'res] lift_map_with_context =
           ; "pjkind_tokens", Stdlib.snd pjkind_tokens
           ] )
 
+    method use_file : 'ctx -> use_file -> use_file * 'res =
+      fun ctx (a, b) ->
+      let a = self#list self#toplevel_phrase ctx a in
+      let b = self#token_seq ctx b in
+      ( (Stdlib.fst a, Stdlib.fst b)
+      , self#tuple ctx [ Stdlib.snd a; Stdlib.snd b ] )
+
     method toplevel_phrase : 'ctx -> toplevel_phrase -> toplevel_phrase * 'res =
       fun ctx x ->
       match x with
@@ -18844,13 +18908,15 @@ class virtual ['ctx, 'res] lift_map_with_context =
     method toplevel_directive
       : 'ctx -> toplevel_directive -> toplevel_directive * 'res
       =
-      fun ctx { pdir_name; pdir_arg; pdir_loc } ->
+      fun ctx { pdir_name; pdir_arg; pdir_loc; pdir_tokens } ->
       let pdir_name = self#loc self#string ctx pdir_name in
       let pdir_arg = self#option self#directive_argument ctx pdir_arg in
       let pdir_loc = self#location ctx pdir_loc in
+      let pdir_tokens = self#token_seq ctx pdir_tokens in
       ( { pdir_name = Stdlib.fst pdir_name
         ; pdir_arg = Stdlib.fst pdir_arg
         ; pdir_loc = Stdlib.fst pdir_loc
+        ; pdir_tokens = Stdlib.fst pdir_tokens
         }
       , self
         #
@@ -18859,6 +18925,7 @@ class virtual ['ctx, 'res] lift_map_with_context =
           [ "pdir_name", Stdlib.snd pdir_name
           ; "pdir_arg", Stdlib.snd pdir_arg
           ; "pdir_loc", Stdlib.snd pdir_loc
+          ; "pdir_tokens", Stdlib.snd pdir_tokens
           ] )
 
     method directive_argument
@@ -18926,16 +18993,21 @@ class virtual ['ctx, 'res] lift_map_with_context =
         , self#constr ctx "Plex_syntax" [ Stdlib.snd a ] )
 
     method lexer_directive : 'ctx -> lexer_directive -> lexer_directive * 'res =
-      fun ctx { plex_desc; plex_loc } ->
+      fun ctx { plex_desc; plex_loc; plex_tokens } ->
       let plex_desc = self#lexer_directive_desc ctx plex_desc in
       let plex_loc = self#location ctx plex_loc in
-      ( { plex_desc = Stdlib.fst plex_desc; plex_loc = Stdlib.fst plex_loc }
+      let plex_tokens = self#token_seq ctx plex_tokens in
+      ( { plex_desc = Stdlib.fst plex_desc
+        ; plex_loc = Stdlib.fst plex_loc
+        ; plex_tokens = Stdlib.fst plex_tokens
+        }
       , self
         #
         record
           ctx
           [ "plex_desc", Stdlib.snd plex_desc
           ; "plex_loc", Stdlib.snd plex_loc
+          ; "plex_tokens", Stdlib.snd plex_tokens
           ] )
   end
 
