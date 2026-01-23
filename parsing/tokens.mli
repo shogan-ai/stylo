@@ -48,6 +48,7 @@ type seq = elt list
 val is_child : elt -> bool
 val is_comment : elt -> bool
 val is_token : ?which:token -> elt -> bool
+val to_string : elt -> string
 
 (** {1 Attaching to the Parsetree} *)
 

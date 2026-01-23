@@ -504,3 +504,10 @@ let is_token ?which t =
      | Some t -> tok = t)
   | _ -> false
 ;;
+
+let to_string t =
+  match t.desc with
+  | Token (tok, _) -> Raw.to_string tok
+  | Child_node -> "<child>"
+  | Comment comment -> Printf.sprintf "(*%s*)" comment.text
+;;

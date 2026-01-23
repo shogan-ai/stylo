@@ -3,7 +3,6 @@
    interface refers to the result type of each parsing rule, so the types need to be
    available outside of just parser.ml. *)
 
-open Asttypes
 open Parsetree
 open Docstrings
 

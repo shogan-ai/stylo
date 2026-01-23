@@ -17,7 +17,6 @@
 
     {b Warning} This module is unstable and part of {{!Compiler_libs} compiler-libs}. *)
 
-open Asttypes
 open Docstrings
 open Parsetree
 

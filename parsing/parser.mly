@@ -31,8 +31,6 @@ module Str = Ast_helper.Str (* For ocamldep *)
 
 let failwith s = raise (Parser_types.Failwith s)
 
-open Asttypes
-open Longident
 open Parsetree
 open Ast_helper
 open Docstrings

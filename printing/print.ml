@@ -91,37 +91,37 @@ let constr_longident (cstr : Longident.t) =
 ;;
 
 let direction = function
-  | Asttypes.Upto -> S.to_
+  | Upto -> S.to_
   | Downto -> S.downto_
 ;;
 
 let private_ = function
-  | Asttypes.Private -> S.private_
+  | Private -> S.private_
   | Public -> empty
 ;;
 
 let nonrec_ = function
-  | Asttypes.Recursive -> empty
+  | Recursive -> empty
   | Nonrecursive -> S.nonrec_
 ;;
 
 let mutable_ = function
-  | Asttypes.Mutable -> S.mutable_
+  | Mutable -> S.mutable_
   | Immutable -> empty
 ;;
 
 let virtual_ = function
-  | Asttypes.Virtual -> S.virtual_
+  | Virtual -> S.virtual_
   | Concrete -> empty
 ;;
 
 let override_ = function
-  | Asttypes.Fresh -> empty
+  | Fresh -> empty
   | Override -> S.bang
 ;;
 
 let array_delimiters = function
-  | Asttypes.Immutable -> S.lbracket_colon, S.colon_rbracket
+  | Immutable -> S.lbracket_colon, S.colon_rbracket
   | Mutable -> S.lbracket_pipe, S.pipe_rbracket
 ;;
 
@@ -245,12 +245,7 @@ end
 and Ext_attribute : sig
   val decorate : t -> ext_attribute -> t
   val decorate_value_binding : t -> ext_attribute -> t
-
-  val decorate_optional_override
-    :  t
-    -> Asttypes.override_flag
-    -> ext_attribute
-    -> t
+  val decorate_optional_override : t -> override_flag -> ext_attribute -> t
 end = struct
   let decorate ?(space = true) ~between kw { pea_ext; pea_attrs } =
     let kw_with_ext =
@@ -273,7 +268,7 @@ end = struct
   let decorate_optional_override kw ovr =
     let kw, between =
       match ovr with
-      | Asttypes.Fresh -> kw, empty
+      | Fresh -> kw, empty
       | Override -> kw ^^ S.bang, break 1
     in
     decorate kw ~between
@@ -799,7 +794,7 @@ end = struct
     ?preceeding
     ~tokens
     fields
-    (cf : Asttypes.closed_flag)
+    (cf : closed_flag)
     lbls
     =
     let pre_nest = Preceeding.implied_nest preceeding in
@@ -890,7 +885,7 @@ end = struct
     let fields_doc = separate_map (break 1) object_field fields in
     let fields_and_dotdot =
       match fields, closed with
-      | _, Asttypes.Closed -> fields_doc
+      | _, Closed -> fields_doc
       | _, Open -> fields_doc ^?^ S.dotdot
     in
     lt ^/^ pre_nest (nest 2 fields_and_dotdot ^/^ S.gt)
@@ -1061,7 +1056,7 @@ end = struct
     in
     let pats =
       match closed with
-      | Asttypes.Closed -> pats
+      | Closed -> pats
       | Open -> join pats (S.comma ^/^ S.dotdot)
     in
     Attribute.attach ~extra_nest:pre_nest ~attrs pats ^^ pre_nest (group rparen)
@@ -1228,7 +1223,7 @@ end = struct
          fields
        ^^ pre_nest
             ((match closed_flag with
-              | Asttypes.Open -> break 0 ^^ group (S.semi ^/^ S.underscore)
+              | Open -> break 0 ^^ group (S.semi ^/^ S.underscore)
               | Closed -> empty)
              ^^ (if semi_as_term then break 0 ^^ S.semi else empty)
              ^/^ S.rbrace))
@@ -2632,21 +2627,17 @@ end = struct
       | _ -> false)
   ;;
 
-  let pp_infos tokens =
-    Asttypes.(
-      function
-      | NoVariance, NoInjectivity -> empty
-      | Covariant, NoInjectivity -> S.plus
-      | Contravariant, NoInjectivity -> S.minus
-      | NoVariance, Injective -> S.bang
-      | Covariant, Injective ->
-        (* N.B. we're normalizing here, in practice the order between variance and
-           injectivity is not fixed. *)
-        if var_inj_as_single_token tokens then string "!+" else S.plus ^^ S.bang
-      | Contravariant, Injective ->
-        if var_inj_as_single_token tokens
-        then string "!-"
-        else S.minus ^^ S.bang)
+  let pp_infos tokens = function
+    | NoVariance, NoInjectivity -> empty
+    | Covariant, NoInjectivity -> S.plus
+    | Contravariant, NoInjectivity -> S.minus
+    | NoVariance, Injective -> S.bang
+    | Covariant, Injective ->
+      (* N.B. we're normalizing here, in practice the order between variance and
+         injectivity is not fixed. *)
+      if var_inj_as_single_token tokens then string "!+" else S.plus ^^ S.bang
+    | Contravariant, Injective ->
+      if var_inj_as_single_token tokens then string "!-" else S.minus ^^ S.bang
   ;;
 
   let pp ?preceeding { ptp_typ; ptp_infos; ptp_tokens } =
@@ -2660,7 +2651,7 @@ end
 
 and Type_declaration : sig
   val pp_constraints : ptype_constraint list -> t
-  val pp_list : ?subst:bool -> Asttypes.rec_flag -> type_declaration list -> t
+  val pp_list : ?subst:bool -> rec_flag -> type_declaration list -> t
 end = struct
   let constructor_declaration
     td_flatness

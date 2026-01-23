@@ -134,6 +134,16 @@ let merge ?(ghost = true) locs =
     tl
 ;;
 
+let to_string t =
+  Printf.sprintf
+    "File %S, lines %i-%i, characters %i-%i"
+    t.loc_start.pos_fname
+    t.loc_start.pos_lnum
+    t.loc_end.pos_lnum
+    (t.loc_start.pos_cnum - t.loc_start.pos_bol)
+    (t.loc_end.pos_cnum - t.loc_end.pos_bol)
+;;
+
 type 'a loc =
   { txt : 'a
   ; loc : t

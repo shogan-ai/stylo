@@ -15,7 +15,6 @@
 
 (** Helpers to produce Parsetree fragments *)
 
-open Asttypes
 open Parsetree
 open Docstrings
 

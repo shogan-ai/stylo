@@ -1,13 +1,13 @@
 open Ocaml_syntax
 
 val map_desc
-  :  Context.parent Ast_mapper.mapper
+  :  recur:(Context.parent -> Parsetree.pattern_desc -> Parsetree.pattern_desc)
   -> Context.parent
   -> Parsetree.pattern_desc
   -> Parsetree.pattern_desc
 
 val map
-  :  Context.parent Ast_mapper.mapper
+  :  recur:(Context.parent -> Parsetree.pattern -> Parsetree.pattern)
   -> Context.parent
   -> Parsetree.pattern
   -> Parsetree.pattern

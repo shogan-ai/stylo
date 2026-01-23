@@ -1,6 +1,5 @@
 open Ocaml_syntax
 open Parsetree
-open Ast_mapper
 
 let lparen_child_rparen ~optional:opt pos =
   let open Tokens in
@@ -18,11 +17,9 @@ let parens_exp ?(optional = false) exp =
   }
 ;;
 
-let super = default_mapper
-
-let map_desc mapper _ desc =
+let map_desc ~recur _ desc =
   let parent_for_recursive_calls = Context.Expr desc in
-  super.expression_desc mapper parent_for_recursive_calls desc
+  recur parent_for_recursive_calls desc
 ;;
 
 let insert_pipe_if_missing ~after:kw =
@@ -46,7 +43,7 @@ let insert_pipe_if_missing ~after:kw =
   seek
 ;;
 
-let map mapper (parent : Context.parent) exp =
+let map ~recur (parent : Context.parent) exp =
   (* local changes first *)
   let exp = Semicolon.exp_no_trailing exp in
   let exp =
@@ -71,5 +68,5 @@ let map mapper (parent : Context.parent) exp =
     (* Nothing to do in the general case. *)
     | _ -> exp
   in
-  super.expression mapper parent exp
+  recur parent exp
 ;;

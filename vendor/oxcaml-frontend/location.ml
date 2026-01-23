@@ -354,6 +354,11 @@ let print_loc ~capitalize_first ppf loc =
 let print_loc_in_lowercase = print_loc ~capitalize_first:false
 let print_loc = print_loc ~capitalize_first:true
 
+let to_string t =
+  print_loc Format.str_formatter t;
+  Format.flush_str_formatter ()
+;;
+
 (* Print a comma-separated list of locations *)
 let print_locs ppf locs =
   Format.pp_print_list

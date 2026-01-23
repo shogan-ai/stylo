@@ -48,6 +48,8 @@ type t =
     order, but which one is unspecified. *)
 val compare : t -> t -> int
 
+val to_string : t -> string
+
 (** An arbitrary value of type [t]; describes an empty ghost range. *)
 val none : t
 

@@ -29,8 +29,6 @@ module Oxcaml_frontend = struct end (* https://github.com/ocaml/dune/issues/2450
 module Str = Ast_helper.Str (* For ocamldep *)
 [@@@ocaml.warning "+60"]
 
-open Asttypes
-open Longident
 open Parsetree
 open Ast_helper
 open Docstrings
