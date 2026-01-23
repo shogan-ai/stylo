@@ -56,6 +56,7 @@ module Condition = struct
   let ( !! ) = Lazy.force
   let flat r = lazy !r
   let ( && ) t1 t2 = lazy (!!t1 && !!t2)
+  let ( || ) t1 t2 = lazy (!!t1 || !!t2)
 
   let check = function
     | None -> false
@@ -76,13 +77,19 @@ type whitespace =
 type 'a can_vanish =
   { vanishing_cond : Condition.t option
   ; value : 'a
+  ; assume_present : bool
   }
 
 type t =
   | Empty
   | Token of pseudo_token can_vanish
   | Comment of pseudo_token
-  | Comments_flushing_hint of bool ref * t * t
+  | Comments_flushing_hint of
+      { cmts_were_flushed : bool ref
+      ; floating_cmts_allowed : bool
+      ; ws_before : t
+      ; ws_after : t
+      }
   | Whitespace of whitespace can_vanish
   | Cat of Req.t * t * t
   | Nest of Req.t * int * Condition.t option * t
@@ -117,19 +124,22 @@ let pseudo_token_req = function
 
 let requirement = function
   | Empty -> Req.of_int 0
-  | Token { vanishing_cond = None; value = pt } | Comment pt ->
+  | Token { assume_present = true; value = pt; _ } | Comment pt ->
     pseudo_token_req pt
-  | Whitespace { vanishing_cond = None; value = ws } -> ws_req ws
+  | Whitespace { assume_present = true; value = ws; _ } -> ws_req ws
   | Token _ | Comments_flushing_hint _ | Whitespace _ -> Req.of_int 0
   | Cat (r, _, _) | Nest (r, _, _, _) | Group (r, _, _, _) -> r
 ;;
 
-let ws value = Whitespace { vanishing_cond = None; value }
+let ws value =
+  Whitespace { vanishing_cond = None; value; assume_present = true }
+;;
+
 let empty = Empty
 
 let string s =
   let value = Trivial (Req.of_int (strlen s), s) in
-  Token { vanishing_cond = None; value }
+  Token { vanishing_cond = None; value; assume_present = true }
 ;;
 
 let break spaces = ws (Break (spaces, Hard))
@@ -140,16 +150,24 @@ let softest_line = ws (Line_break Softest)
 let softest_break = ws (Break (1, Softest))
 let nbsp = ws Non_breakable
 
-let vanishing_whitespace cond = function
-  | Whitespace { vanishing_cond = None; value } ->
-    Whitespace { vanishing_cond = Some cond; value }
+let vanishing_whitespace ?(assume_present = false) cond = function
+  | Whitespace { vanishing_cond = None; value; _ } ->
+    Whitespace { vanishing_cond = Some cond; value; assume_present }
+  | Whitespace { vanishing_cond = Some c; value; _ } ->
+    Whitespace
+      { vanishing_cond = Some Condition.(c || cond); value; assume_present }
+  | Empty -> Empty
   | _ -> invalid_arg "Document.vanishing_whitespace"
 ;;
 
-let flush_comments ~ws_before ~ws_after =
-  let inserted_comments = ref false in
-  let cond : Condition.t = lazy !inserted_comments in
-  cond, Comments_flushing_hint (inserted_comments, ws_before, ws_after)
+let flush_comments ?(floating_cmts_allowed = false) ~ws_before ~ws_after () =
+  let cmts_were_flushed = ref false in
+  let cond : Condition.t = lazy !cmts_were_flushed in
+  let hint =
+    Comments_flushing_hint
+      { cmts_were_flushed; floating_cmts_allowed; ws_before; ws_after }
+  in
+  cond, hint
 ;;
 
 let ( ^^ ) t1 t2 =
@@ -168,7 +186,9 @@ let opt_token ?ws_before ?ws_after cond tok =
       Option.map (vanishing_whitespace cond) ws |> Option.value ~default:empty
     in
     let value = Trivial (Req.of_int (strlen tok), tok) in
-    ws ws_before ^^ Token { vanishing_cond = Some cond; value } ^^ ws ws_after
+    ws ws_before
+    ^^ Token { vanishing_cond = Some cond; value; assume_present = false }
+    ^^ ws ws_after
 ;;
 
 let nest ?vanish i t =
@@ -202,10 +222,17 @@ let pseudo_of_string s =
   else Trivial (Req.of_int (strlen s), s)
 ;;
 
-let fancy_string s = Token { vanishing_cond = None; value = pseudo_of_string s }
+let fancy_string s =
+  Token
+    { vanishing_cond = None; value = pseudo_of_string s; assume_present = true }
+;;
 
 let formatted_string t =
-  Token { vanishing_cond = None; value = Complex (requirement t, t) }
+  Token
+    { vanishing_cond = None
+    ; value = Complex (requirement t, t)
+    ; assume_present = true
+    }
 ;;
 
 (* FIXME *)

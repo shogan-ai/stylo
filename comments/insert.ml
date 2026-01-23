@@ -72,8 +72,11 @@ let rec first_is_space = function
 
 let first_is_space d = first_is_space d = `yes
 
-let rec first_is_flushhint = function
-  | Doc.Comments_flushing_hint _ -> `yes
+let rec first_is_flushhint ?floating_allowed = function
+  | Doc.Comments_flushing_hint fh ->
+    (match floating_allowed with
+     | Some value when value <> fh.floating_cmts_allowed -> `no
+     | _ -> `yes)
   | Token _ | Comment _ | Whitespace _ -> `no
   | Group (_, _, _, d) | Nest (_, _, _, d) -> first_is_flushhint d
   | Empty -> `maybe
@@ -83,7 +86,9 @@ let rec first_is_flushhint = function
      | res -> res)
 ;;
 
-let first_is_flushhint d = first_is_flushhint d = `yes
+let first_is_flushhint ?floating_allowed d =
+  first_is_flushhint ?floating_allowed d = `yes
+;;
 
 let rec nest_before_leaf = function
   | Doc.Nest _ -> `yes
@@ -112,9 +117,16 @@ type state =
   ; at_end_of_a_group : bool
        (** This is [true] for the rightmost branch under a [Group] node. In that situation we
       delay comment insertion: appending at the end of a group might make it non flat. *)
+  ; next_is_flush_hint : bool
   }
 
-let init_state = { space_handling = Nothing_special; at_end_of_a_group = false }
+let init_state =
+  { space_handling = Nothing_special
+  ; at_end_of_a_group = false
+  ; next_is_flush_hint = false
+  }
+;;
+
 let under_nest st = { st with at_end_of_a_group = false }
 let exit_nest prev st = { st with at_end_of_a_group = prev.at_end_of_a_group }
 let no_space st = { st with space_handling = Nothing_special }
@@ -127,7 +139,7 @@ let is_comment_attaching_before elt =
 ;;
 
 let attach_before_comments state tokens doc =
-  if state.at_end_of_a_group
+  if state.at_end_of_a_group || state.next_is_flush_hint
   then (* delay until outside the group. *) tokens, doc, state
   else (
     match Base.List.take_while ~f:is_comment_attaching_before tokens with
@@ -171,15 +183,16 @@ let prepend_comments_to_doc state (floating, attached_after) doc =
   insert_space_if_required ~inserting_comment:true state doc
 ;;
 
-let flush_comments tokens ~before:ws_b ~after:ws_a state =
+let flush_comments tokens floating_allowed ~before:ws_b ~after:ws_a state =
   let to_prepend, rest = consume_leading_comments tokens in
+  let after_floating = Doc.(if floating_allowed then ws_a ^^ ws_a else ws_a) in
   let doc =
     match to_prepend with
     | Empty, after -> Doc.(ws_b ^^ after ^^ ws_a)
-    | floating, Empty -> Doc.(ws_b ^^ floating ^^ ws_a ^^ ws_a)
-    | floating, after -> Doc.(ws_b ^^ floating ^^ ws_a ^^ ws_a ^^ after ^^ ws_a)
+    | floating, Empty -> Doc.(ws_b ^^ floating ^^ after_floating)
+    | floating, after ->
+      Doc.(ws_b ^^ floating ^^ after_floating ^^ after ^^ ws_a)
   in
-  let doc = insert_space_if_required ~inserting_comment:true state doc in
   rest, doc, { state with space_handling = Nothing_special }
 ;;
 
@@ -205,8 +218,8 @@ let rec walk_both state seq doc =
   | first :: rest ->
     (match first.T.desc, doc with
      (* Synchronized, advance *)
-     | T.Token (_, false), Doc.Token { vanishing_cond = None; value = p }
-     | T.Token (_, true), Doc.Token { vanishing_cond = Some _; value = p } ->
+     | T.Token (_, false), Doc.Token { vanishing_cond = None; value = p; _ }
+     | T.Token (_, true), Doc.Token { vanishing_cond = Some _; value = p; _ } ->
        dprintf
          "assume %a synced at %d:%d with << %a >>@."
          Tokens.pp_elt
@@ -229,10 +242,15 @@ let rec walk_both state seq doc =
      (* Comments flushing hint take precedence over attachement and nesting
         considerations. *)
      | ( T.Comment { explicitely_inserted; _ }
-       , Doc.Comments_flushing_hint (inserted, before, after) )
+       , Doc.Comments_flushing_hint
+           { cmts_were_flushed
+           ; floating_cmts_allowed
+           ; ws_before = before
+           ; ws_after = after
+           } )
        when not !explicitely_inserted ->
-       inserted := true;
-       flush_comments seq ~before ~after state
+       cmts_were_flushed := true;
+       flush_comments seq floating_cmts_allowed ~before ~after state
      | _, Doc.Comments_flushing_hint _ ->
        (* No comments to insert, the hint vanishes. *)
        seq, Doc.empty, state
@@ -247,8 +265,14 @@ let rec walk_both state seq doc =
        insert_comments_before_subtree seq state doc
      (* Traverse document structure *)
      | _, Doc.Cat (_, left, right) ->
+       let next_is_flush_hint =
+         first_is_flushhint ~floating_allowed:false right
+       in
        let restl, left, mid_state =
-         walk_both { state with at_end_of_a_group = false } seq left
+         walk_both
+           { state with at_end_of_a_group = false; next_is_flush_hint }
+           seq
+           left
        in
        let restr, right, final_state =
          walk_both
@@ -262,8 +286,8 @@ let rec walk_both state seq doc =
        rest, Doc.nest ?vanish i doc, exit_nest state state'
      | _, Doc.Group (_, margin, flatness, doc) ->
        traverse_group seq state margin flatness doc
-     | T.Token (_, false), Doc.Token { vanishing_cond = Some _; value = p }
-     | T.Token (_, true), Doc.Token { vanishing_cond = None; value = p } ->
+     | T.Token (_, false), Doc.Token { vanishing_cond = Some _; value = p; _ }
+     | T.Token (_, true), Doc.Token { vanishing_cond = None; value = p; _ } ->
        dprintf "OPTIONAL MISMATCH %a with %a@." T.pp_elt first Doc.pp_pseudo p;
        raise (Error (Optional_mismatch first.pos))
      (* [Child_node] doesn't appear in linearized token stream *)
@@ -272,7 +296,7 @@ let rec walk_both state seq doc =
 and traverse_group tokens state margin flatness grouped_doc =
   let rest, d, state' =
     walk_both
-      { space_handling = Nothing_special; at_end_of_a_group = true }
+      { state with space_handling = Nothing_special; at_end_of_a_group = true }
       tokens
       grouped_doc
   in

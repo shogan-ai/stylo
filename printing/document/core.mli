@@ -39,6 +39,7 @@ type whitespace =
 type 'a can_vanish =
   { vanishing_cond : Condition.t option
   ; value : 'a
+  ; assume_present : bool
   }
 
 type t = private
@@ -47,7 +48,12 @@ type t = private
     (** N.B. if the [vanishing_cond] is not [None], then [Token] must correspond to an
       "optional" token. *)
   | Comment of pseudo_token
-  | Comments_flushing_hint of bool ref * t * t
+  | Comments_flushing_hint of
+      { cmts_were_flushed : bool ref
+      ; floating_cmts_allowed : bool
+      ; ws_before : t
+      ; ws_after : t
+      }
   | Whitespace of whitespace can_vanish
   | Cat of Requirement.t * t * t
   | Nest of Requirement.t * int * Condition.t option * t
@@ -93,7 +99,7 @@ val softest_break : t (* used between docstrings. *)
 
 (** Expects a non vanishing whitespace document as input, and return the same kind of
     document which additionally vanishes when the condition is met. *)
-val vanishing_whitespace : Condition.t -> t -> t
+val vanishing_whitespace : ?assume_present:bool -> Condition.t -> t -> t
 
 (** Produces a [Token] document which vanishes when the condition is met.
 
@@ -113,7 +119,12 @@ val opt_token : ?ws_before:t -> ?ws_after:t -> Condition.t -> string -> t
     otherwise. N.B. the condition will necessarily get it's final value before the
     printing engine runs, so it can be used to make elements preceeding the comments
     vanish, not just elements who follow them. *)
-val flush_comments : ws_before:t -> ws_after:t -> Condition.t * t
+val flush_comments
+  :  ?floating_cmts_allowed:bool
+  -> ws_before:t
+  -> ws_after:t
+  -> unit
+  -> Condition.t * t
 
 (** [comment s] wraps [s] with "(*" "*)" and produces a [Comment]. *)
 val comment : string -> t
