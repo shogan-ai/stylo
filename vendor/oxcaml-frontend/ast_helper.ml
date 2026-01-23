@@ -1,16 +1,16 @@
 (**************************************************************************)
-(*                                                                        *)
-(*                                 OCaml                                  *)
-(*                                                                        *)
-(*                         Alain Frisch, LexiFi                           *)
-(*                                                                        *)
-(*   Copyright 2012 Institut National de Recherche en Informatique et     *)
-(*     en Automatique.                                                    *)
-(*                                                                        *)
-(*   All rights reserved.  This file is distributed under the terms of    *)
-(*   the GNU Lesser General Public License version 2.1, with the          *)
-(*   special exception on linking described in the file LICENSE.          *)
-(*                                                                        *)
+(* *)
+(* OCaml *)
+(* *)
+(* Alain Frisch, LexiFi *)
+(* *)
+(* Copyright 2012 Institut National de Recherche en Informatique et *)
+(* en Automatique. *)
+(* *)
+(* All rights reserved. This file is distributed under the terms of *)
+(* the GNU Lesser General Public License version 2.1, with the *)
+(* special exception on linking described in the file LICENSE. *)
+(* *)
 (**************************************************************************)
 
 (** Helpers to produce Parsetree fragments *)
@@ -21,45 +21,44 @@ open Docstrings
 
 type 'a with_loc = 'a Location.loc
 type loc = Location.t
-
 type lid = Longident.t with_loc
 type str = string with_loc
 type str_opt = string option with_loc
 type attrs = attribute list
 
 let default_loc = ref Location.none
-
-let with_default_loc l f =
-  Misc.protect_refs [Misc.R (default_loc, l)] f
+let with_default_loc l f = Misc.protect_refs [ Misc.R (default_loc, l) ] f
 
 module Const = struct
   let integer ?suffix i = Pconst_integer (i, suffix)
   let int ?suffix i = integer ?suffix (Int.to_string i)
-  let int32 ?(suffix='l') i = integer ~suffix (Int32.to_string i)
-  let int64 ?(suffix='L') i = integer ~suffix (Int64.to_string i)
-  let nativeint ?(suffix='n') i = integer ~suffix (Nativeint.to_string i)
+  let int32 ?(suffix = 'l') i = integer ~suffix (Int32.to_string i)
+  let int64 ?(suffix = 'L') i = integer ~suffix (Int64.to_string i)
+  let nativeint ?(suffix = 'n') i = integer ~suffix (Nativeint.to_string i)
   let float ?suffix f = Pconst_float (f, suffix)
   let char c = Pconst_char c
-  let string ?quotation_delimiter ?(loc= !default_loc) s =
+
+  let string ?quotation_delimiter ?(loc = !default_loc) s =
     Pconst_string (s, loc, quotation_delimiter)
+  ;;
 end
 
 module Attr = struct
-  let mk ?(loc= !default_loc) name payload =
-    { attr_name = name;
-      attr_payload = payload;
-      attr_loc = loc }
+  let mk ?(loc = !default_loc) name payload =
+    { attr_name = name; attr_payload = payload; attr_loc = loc }
+  ;;
 end
 
 module Typ = struct
   let mk ?(loc = !default_loc) ?(attrs = []) d =
-    {ptyp_desc = d;
-     ptyp_loc = loc;
-     ptyp_loc_stack = [];
-     ptyp_attributes = attrs}
+    { ptyp_desc = d
+    ; ptyp_loc = loc
+    ; ptyp_loc_stack = []
+    ; ptyp_attributes = attrs
+    }
+  ;;
 
-  let attr d a = {d with ptyp_attributes = d.ptyp_attributes @ [a]}
-
+  let attr d a = { d with ptyp_attributes = d.ptyp_attributes @ [ a ] }
   let any ?loc ?attrs a = mk ?loc ?attrs (Ptyp_any a)
   let var ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_var (a, b))
   let arrow ?loc ?attrs a b c d e = mk ?loc ?attrs (Ptyp_arrow (a, b, c, d, e))
@@ -81,12 +80,13 @@ module Typ = struct
   let force_poly t =
     match t.ptyp_desc with
     | Ptyp_poly _ -> t
-    | _ -> poly ~loc:t.ptyp_loc [] t (* -> ghost? *)
+    | _ -> poly ~loc:t.ptyp_loc [] t
+  ;; (* -> ghost? *)
 
   let varify_constructors var_names t =
     let check_variable vl loc v =
-      if List.mem v vl then
-        raise Syntaxerr.(Error(Variable_in_scope(loc,v))) in
+      if List.mem v vl then raise Syntaxerr.(Error (Variable_in_scope (loc, v)))
+    in
     let check_variable_opt vl v =
       Option.iter (fun v -> check_variable vl v.loc v.txt) v
     in
@@ -95,56 +95,52 @@ module Typ = struct
       let desc =
         match t.ptyp_desc with
         | Ptyp_any jkind ->
-            let jkind = Option.map loop_jkind jkind in
-            Ptyp_any jkind
+          let jkind = Option.map loop_jkind jkind in
+          Ptyp_any jkind
         | Ptyp_var (x, jkind) ->
-            let jkind = Option.map loop_jkind jkind in
-            check_variable var_names t.ptyp_loc x;
-            Ptyp_var (x, jkind)
-        | Ptyp_arrow (label,core_type,core_type',modes,modes') ->
-            Ptyp_arrow(label, loop core_type, loop core_type', modes, modes')
-        | Ptyp_tuple lst ->
-            Ptyp_tuple (List.map (fun (l, t) -> l, loop t) lst)
+          let jkind = Option.map loop_jkind jkind in
+          check_variable var_names t.ptyp_loc x;
+          Ptyp_var (x, jkind)
+        | Ptyp_arrow (label, core_type, core_type', modes, modes') ->
+          Ptyp_arrow (label, loop core_type, loop core_type', modes, modes')
+        | Ptyp_tuple lst -> Ptyp_tuple (List.map (fun (l, t) -> l, loop t) lst)
         | Ptyp_unboxed_tuple lst ->
           Ptyp_unboxed_tuple (List.map (fun (l, t) -> l, loop t) lst)
-        | Ptyp_constr( { txt = Longident.Lident s }, [])
-          when List.mem s var_names ->
-            Ptyp_var (s, None)
-        | Ptyp_constr(longident, lst) ->
-            Ptyp_constr(longident, List.map loop lst)
+        | Ptyp_constr ({ txt = Longident.Lident s }, [])
+          when List.mem s var_names -> Ptyp_var (s, None)
+        | Ptyp_constr (longident, lst) ->
+          Ptyp_constr (longident, List.map loop lst)
         | Ptyp_object (lst, o) ->
-            Ptyp_object (List.map loop_object_field lst, o)
+          Ptyp_object (List.map loop_object_field lst, o)
         | Ptyp_class (longident, lst) ->
-            Ptyp_class (longident, List.map loop lst)
-        | Ptyp_alias(core_type, alias, jkind) ->
-            let jkind = Option.map loop_jkind jkind in
-            check_variable_opt var_names alias;
-            Ptyp_alias(loop core_type, alias, jkind)
-        | Ptyp_variant(row_field_list, flag, lbl_lst_option) ->
-            Ptyp_variant(List.map loop_row_field row_field_list,
-                         flag, lbl_lst_option)
-        | Ptyp_poly(var_lst, core_type) ->
+          Ptyp_class (longident, List.map loop lst)
+        | Ptyp_alias (core_type, alias, jkind) ->
+          let jkind = Option.map loop_jkind jkind in
+          check_variable_opt var_names alias;
+          Ptyp_alias (loop core_type, alias, jkind)
+        | Ptyp_variant (row_field_list, flag, lbl_lst_option) ->
+          Ptyp_variant
+            (List.map loop_row_field row_field_list, flag, lbl_lst_option)
+        | Ptyp_poly (var_lst, core_type) ->
           let var_lst =
-            List.map (fun (v, jkind) ->
-              let jkind = Option.map loop_jkind jkind in
-              check_variable var_names t.ptyp_loc v.txt;
-              v, jkind) var_lst
-            in
-            Ptyp_poly(var_lst, loop core_type)
-        | Ptyp_package(longident,lst) ->
-            Ptyp_package(longident,List.map (fun (n,typ) -> (n,loop typ) ) lst)
+            List.map
+              (fun (v, jkind) ->
+                let jkind = Option.map loop_jkind jkind in
+                check_variable var_names t.ptyp_loc v.txt;
+                v, jkind)
+              var_lst
+          in
+          Ptyp_poly (var_lst, loop core_type)
+        | Ptyp_package (longident, lst) ->
+          Ptyp_package (longident, List.map (fun (n, typ) -> n, loop typ) lst)
         | Ptyp_open (mod_ident, core_type) ->
-            Ptyp_open (mod_ident, loop core_type)
-        | Ptyp_quote core_type ->
-            Ptyp_quote (loop core_type)
-        | Ptyp_splice core_type ->
-            Ptyp_splice (loop core_type)
-        | Ptyp_of_kind jkind ->
-            Ptyp_of_kind (loop_jkind jkind)
-        | Ptyp_extension (s, arg) ->
-            Ptyp_extension (s, arg)
+          Ptyp_open (mod_ident, loop core_type)
+        | Ptyp_quote core_type -> Ptyp_quote (loop core_type)
+        | Ptyp_splice core_type -> Ptyp_splice (loop core_type)
+        | Ptyp_of_kind jkind -> Ptyp_of_kind (loop_jkind jkind)
+        | Ptyp_extension (s, arg) -> Ptyp_extension (s, arg)
       in
-      {t with ptyp_desc = desc}
+      { t with ptyp_desc = desc }
     and loop_jkind jkind =
       let pjkind_desc =
         match jkind.pjkind_desc with
@@ -158,34 +154,34 @@ module Typ = struct
       in
       { jkind with pjkind_desc }
     and loop_row_field field =
-      let prf_desc = match field.prf_desc with
-        | Rtag(label,flag,lst) ->
-            Rtag(label,flag,List.map loop lst)
-        | Rinherit t ->
-            Rinherit (loop t)
+      let prf_desc =
+        match field.prf_desc with
+        | Rtag (label, flag, lst) -> Rtag (label, flag, List.map loop lst)
+        | Rinherit t -> Rinherit (loop t)
       in
-      { field with prf_desc; }
+      { field with prf_desc }
     and loop_object_field field =
-      let pof_desc = match field.pof_desc with
-        | Otag(label, t) ->
-            Otag(label, loop t)
-        | Oinherit t ->
-            Oinherit (loop t)
+      let pof_desc =
+        match field.pof_desc with
+        | Otag (label, t) -> Otag (label, loop t)
+        | Oinherit t -> Oinherit (loop t)
       in
-      { field with pof_desc; }
+      { field with pof_desc }
     in
     loop t
-
+  ;;
 end
 
 module Pat = struct
   let mk ?(loc = !default_loc) ?(attrs = []) d =
-    {ppat_desc = d;
-     ppat_loc = loc;
-     ppat_loc_stack = [];
-     ppat_attributes = attrs}
-  let attr d a = {d with ppat_attributes = d.ppat_attributes @ [a]}
+    { ppat_desc = d
+    ; ppat_loc = loc
+    ; ppat_loc_stack = []
+    ; ppat_attributes = attrs
+    }
+  ;;
 
+  let attr d a = { d with ppat_attributes = d.ppat_attributes @ [ a ] }
   let any ?loc ?attrs () = mk ?loc ?attrs Ppat_any
   let var ?loc ?attrs a = mk ?loc ?attrs (Ppat_var a)
   let alias ?loc ?attrs a b = mk ?loc ?attrs (Ppat_alias (a, b))
@@ -196,8 +192,11 @@ module Pat = struct
   let construct ?loc ?attrs a b = mk ?loc ?attrs (Ppat_construct (a, b))
   let variant ?loc ?attrs a b = mk ?loc ?attrs (Ppat_variant (a, b))
   let record ?loc ?attrs a b = mk ?loc ?attrs (Ppat_record (a, b))
+
   let record_unboxed_product ?loc ?attrs a b =
     mk ?loc ?attrs (Ppat_record_unboxed_product (a, b))
+  ;;
+
   let array ?loc ?attrs a b = mk ?loc ?attrs (Ppat_array (a, b))
   let or_ ?loc ?attrs a b = mk ?loc ?attrs (Ppat_or (a, b))
   let constraint_ ?loc ?attrs a b c = mk ?loc ?attrs (Ppat_constraint (a, b, c))
@@ -211,12 +210,14 @@ end
 
 module Exp = struct
   let mk ?(loc = !default_loc) ?(attrs = []) d =
-    {pexp_desc = d;
-     pexp_loc = loc;
-     pexp_loc_stack = [];
-     pexp_attributes = attrs}
-  let attr d a = {d with pexp_attributes = d.pexp_attributes @ [a]}
+    { pexp_desc = d
+    ; pexp_loc = loc
+    ; pexp_loc_stack = []
+    ; pexp_attributes = attrs
+    }
+  ;;
 
+  let attr d a = { d with pexp_attributes = d.pexp_attributes @ [ a ] }
   let ident ?loc ?attrs a = mk ?loc ?attrs (Pexp_ident a)
   let constant ?loc ?attrs a = mk ?loc ?attrs (Pexp_constant a)
   let let_ ?loc ?attrs a b c d = mk ?loc ?attrs (Pexp_let (a, b, c, d))
@@ -229,8 +230,11 @@ module Exp = struct
   let construct ?loc ?attrs a b = mk ?loc ?attrs (Pexp_construct (a, b))
   let variant ?loc ?attrs a b = mk ?loc ?attrs (Pexp_variant (a, b))
   let record ?loc ?attrs a b = mk ?loc ?attrs (Pexp_record (a, b))
+
   let record_unboxed_product ?loc ?attrs a b =
     mk ?loc ?attrs (Pexp_record_unboxed_product (a, b))
+  ;;
+
   let field ?loc ?attrs a b = mk ?loc ?attrs (Pexp_field (a, b))
   let unboxed_field ?loc ?attrs a b = mk ?loc ?attrs (Pexp_unboxed_field (a, b))
   let setfield ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_setfield (a, b, c))
@@ -246,7 +250,7 @@ module Exp = struct
   let new_ ?loc ?attrs a = mk ?loc ?attrs (Pexp_new a)
   let setinstvar ?loc ?attrs a b = mk ?loc ?attrs (Pexp_setvar (a, b))
   let override ?loc ?attrs a = mk ?loc ?attrs (Pexp_override a)
-  let letmodule ?loc ?attrs a b c= mk ?loc ?attrs (Pexp_letmodule (a, b, c))
+  let letmodule ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_letmodule (a, b, c))
   let letexception ?loc ?attrs a b = mk ?loc ?attrs (Pexp_letexception (a, b))
   let assert_ ?loc ?attrs a = mk ?loc ?attrs (Pexp_assert a)
   let lazy_ ?loc ?attrs a = mk ?loc ?attrs (Pexp_lazy a)
@@ -255,8 +259,11 @@ module Exp = struct
   let newtype ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_newtype (a, b, c))
   let pack ?loc ?attrs a = mk ?loc ?attrs (Pexp_pack a)
   let open_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_open (a, b))
+
   let letop ?loc ?attrs let_ ands body =
-    mk ?loc ?attrs (Pexp_letop {let_; ands; body})
+    mk ?loc ?attrs (Pexp_letop { let_; ands; body })
+  ;;
+
   let extension ?loc ?attrs a = mk ?loc ?attrs (Pexp_extension a)
   let unreachable ?loc ?attrs () = mk ?loc ?attrs Pexp_unreachable
   let stack ?loc ?attrs e = mk ?loc ?attrs (Pexp_stack e)
@@ -265,32 +272,27 @@ module Exp = struct
   let quote ?loc ?attrs a = mk ?loc ?attrs (Pexp_quote a)
   let splice ?loc ?attrs a = mk ?loc ?attrs (Pexp_splice a)
   let hole ?loc ?attrs () = mk ?loc ?attrs Pexp_hole
-
-  let case lhs ?guard rhs =
-    {
-     pc_lhs = lhs;
-     pc_guard = guard;
-     pc_rhs = rhs;
-    }
+  let case lhs ?guard rhs = { pc_lhs = lhs; pc_guard = guard; pc_rhs = rhs }
 
   let binding_op op pat exp loc =
-    {
-      pbop_op = op;
-      pbop_pat = pat;
-      pbop_exp = exp;
-      pbop_loc = loc;
-    }
+    { pbop_op = op; pbop_pat = pat; pbop_exp = exp; pbop_loc = loc }
+  ;;
 end
 
 module Mty = struct
   let mk ?(loc = !default_loc) ?(attrs = []) d =
-    {pmty_desc = d; pmty_loc = loc; pmty_attributes = attrs}
-  let attr d a = {d with pmty_attributes = d.pmty_attributes @ [a]}
+    { pmty_desc = d; pmty_loc = loc; pmty_attributes = attrs }
+  ;;
 
+  let attr d a = { d with pmty_attributes = d.pmty_attributes @ [ a ] }
   let ident ?loc ?attrs a = mk ?loc ?attrs (Pmty_ident a)
   let alias ?loc ?attrs a = mk ?loc ?attrs (Pmty_alias a)
   let signature ?loc ?attrs a = mk ?loc ?attrs (Pmty_signature a)
-  let functor_ ?loc ?attrs ?(ret_mode=[]) a b = mk ?loc ?attrs (Pmty_functor (a, b, ret_mode))
+
+  let functor_ ?loc ?attrs ?(ret_mode = []) a b =
+    mk ?loc ?attrs (Pmty_functor (a, b, ret_mode))
+  ;;
+
   let with_ ?loc ?attrs a b = mk ?loc ?attrs (Pmty_with (a, b))
   let typeof_ ?loc ?attrs a = mk ?loc ?attrs (Pmty_typeof a)
   let extension ?loc ?attrs a = mk ?loc ?attrs (Pmty_extension a)
@@ -299,25 +301,27 @@ end
 
 module Mod = struct
   let mk ?(loc = !default_loc) ?(attrs = []) d =
-    {pmod_desc = d; pmod_loc = loc; pmod_attributes = attrs}
-  let attr d a = {d with pmod_attributes = d.pmod_attributes @ [a]}
+    { pmod_desc = d; pmod_loc = loc; pmod_attributes = attrs }
+  ;;
 
+  let attr d a = { d with pmod_attributes = d.pmod_attributes @ [ a ] }
   let ident ?loc ?attrs x = mk ?loc ?attrs (Pmod_ident x)
   let structure ?loc ?attrs x = mk ?loc ?attrs (Pmod_structure x)
-  let functor_ ?loc ?attrs arg body =
-    mk ?loc ?attrs (Pmod_functor (arg, body))
+  let functor_ ?loc ?attrs arg body = mk ?loc ?attrs (Pmod_functor (arg, body))
   let apply ?loc ?attrs m1 m2 = mk ?loc ?attrs (Pmod_apply (m1, m2))
   let apply_unit ?loc ?attrs m1 = mk ?loc ?attrs (Pmod_apply_unit m1)
+
   let constraint_ ?loc ?attrs ty mode m =
     mk ?loc ?attrs (Pmod_constraint (m, ty, mode))
+  ;;
+
   let unpack ?loc ?attrs e = mk ?loc ?attrs (Pmod_unpack e)
   let extension ?loc ?attrs a = mk ?loc ?attrs (Pmod_extension a)
   let instance ?loc ?attrs a = mk ?loc ?attrs (Pmod_instance a)
 end
 
 module Sig = struct
-  let mk ?(loc = !default_loc) d = {psig_desc = d; psig_loc = loc}
-
+  let mk ?(loc = !default_loc) d = { psig_desc = d; psig_loc = loc }
   let value ?loc a = mk ?loc (Psig_value a)
   let type_ ?loc rec_flag a = mk ?loc (Psig_type (rec_flag, a))
   let type_subst ?loc a = mk ?loc (Psig_typesubst a)
@@ -329,27 +333,31 @@ module Sig = struct
   let modtype ?loc a = mk ?loc (Psig_modtype a)
   let modtype_subst ?loc a = mk ?loc (Psig_modtypesubst a)
   let open_ ?loc a = mk ?loc (Psig_open a)
-  let include_ ?loc ?(modalities = []) a = mk ?loc (Psig_include (a, modalities))
+
+  let include_ ?loc ?(modalities = []) a =
+    mk ?loc (Psig_include (a, modalities))
+  ;;
+
   let class_ ?loc a = mk ?loc (Psig_class a)
   let class_type ?loc a = mk ?loc (Psig_class_type a)
   let extension ?loc ?(attrs = []) a = mk ?loc (Psig_extension (a, attrs))
   let kind_abbrev ?loc a b = mk ?loc (Psig_kind_abbrev (a, b))
   let attribute ?loc a = mk ?loc (Psig_attribute a)
+
   let text txt =
     let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
-    List.map
-      (fun ds -> attribute ~loc:(docstring_loc ds) (text_attr ds))
-      f_txt
+    List.map (fun ds -> attribute ~loc:(docstring_loc ds) (text_attr ds)) f_txt
+  ;;
 end
 
 module Sg = struct
   let mk ?(loc = !default_loc) ?(modalities = []) a =
-    {psg_items = a; psg_modalities = modalities; psg_loc = loc}
+    { psg_items = a; psg_modalities = modalities; psg_loc = loc }
+  ;;
 end
 
 module Str = struct
-  let mk ?(loc = !default_loc) d = {pstr_desc = d; pstr_loc = loc}
-
+  let mk ?(loc = !default_loc) d = { pstr_desc = d; pstr_loc = loc }
   let eval ?loc ?(attrs = []) a = mk ?loc (Pstr_eval (a, attrs))
   let value ?loc a b = mk ?loc (Pstr_value (a, b))
   let primitive ?loc a = mk ?loc (Pstr_primitive a)
@@ -366,22 +374,19 @@ module Str = struct
   let extension ?loc ?(attrs = []) a = mk ?loc (Pstr_extension (a, attrs))
   let kind_abbrev ?loc a b = mk ?loc (Pstr_kind_abbrev (a, b))
   let attribute ?loc a = mk ?loc (Pstr_attribute a)
+
   let text txt =
     let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
-    List.map
-      (fun ds -> attribute ~loc:(docstring_loc ds) (text_attr ds))
-      f_txt
+    List.map (fun ds -> attribute ~loc:(docstring_loc ds) (text_attr ds)) f_txt
+  ;;
 end
 
 module Cl = struct
   let mk ?(loc = !default_loc) ?(attrs = []) d =
-    {
-     pcl_desc = d;
-     pcl_loc = loc;
-     pcl_attributes = attrs;
-    }
-  let attr d a = {d with pcl_attributes = d.pcl_attributes @ [a]}
+    { pcl_desc = d; pcl_loc = loc; pcl_attributes = attrs }
+  ;;
 
+  let attr d a = { d with pcl_attributes = d.pcl_attributes @ [ a ] }
   let constr ?loc ?attrs a b = mk ?loc ?attrs (Pcl_constr (a, b))
   let structure ?loc ?attrs a = mk ?loc ?attrs (Pcl_structure a)
   let fun_ ?loc ?attrs a b c d = mk ?loc ?attrs (Pcl_fun (a, b, c, d))
@@ -394,13 +399,10 @@ end
 
 module Cty = struct
   let mk ?(loc = !default_loc) ?(attrs = []) d =
-    {
-     pcty_desc = d;
-     pcty_loc = loc;
-     pcty_attributes = attrs;
-    }
-  let attr d a = {d with pcty_attributes = d.pcty_attributes @ [a]}
+    { pcty_desc = d; pcty_loc = loc; pcty_attributes = attrs }
+  ;;
 
+  let attr d a = { d with pcty_attributes = d.pcty_attributes @ [ a ] }
   let constr ?loc ?attrs a b = mk ?loc ?attrs (Pcty_constr (a, b))
   let signature ?loc ?attrs a = mk ?loc ?attrs (Pcty_signature a)
   let arrow ?loc ?attrs a b c = mk ?loc ?attrs (Pcty_arrow (a, b, c))
@@ -409,13 +411,12 @@ module Cty = struct
 end
 
 module Ctf = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
-           ?(docs = empty_docs) d =
-    {
-     pctf_desc = d;
-     pctf_loc = loc;
-     pctf_attributes = add_docs_attrs docs attrs;
+  let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs) d =
+    { pctf_desc = d
+    ; pctf_loc = loc
+    ; pctf_attributes = add_docs_attrs docs attrs
     }
+  ;;
 
   let inherit_ ?loc ?attrs a = mk ?loc ?attrs (Pctf_inherit a)
   let val_ ?loc ?attrs a b c d = mk ?loc ?attrs (Pctf_val (a, b, c, d))
@@ -423,24 +424,19 @@ module Ctf = struct
   let constraint_ ?loc ?attrs a b = mk ?loc ?attrs (Pctf_constraint (a, b))
   let extension ?loc ?attrs a = mk ?loc ?attrs (Pctf_extension a)
   let attribute ?loc a = mk ?loc (Pctf_attribute a)
+
   let text txt =
-   let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
-     List.map
-      (fun ds -> attribute ~loc:(docstring_loc ds) (text_attr ds))
-      f_txt
+    let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
+    List.map (fun ds -> attribute ~loc:(docstring_loc ds) (text_attr ds)) f_txt
+  ;;
 
-  let attr d a = {d with pctf_attributes = d.pctf_attributes @ [a]}
-
+  let attr d a = { d with pctf_attributes = d.pctf_attributes @ [ a ] }
 end
 
 module Cf = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) d =
-    {
-     pcf_desc = d;
-     pcf_loc = loc;
-     pcf_attributes = add_docs_attrs docs attrs;
-    }
+  let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs) d =
+    { pcf_desc = d; pcf_loc = loc; pcf_attributes = add_docs_attrs docs attrs }
+  ;;
 
   let inherit_ ?loc ?attrs a b c = mk ?loc ?attrs (Pcf_inherit (a, b, c))
   let val_ ?loc ?attrs a b c = mk ?loc ?attrs (Pcf_val (a, b, c))
@@ -449,274 +445,355 @@ module Cf = struct
   let initializer_ ?loc ?attrs a = mk ?loc ?attrs (Pcf_initializer a)
   let extension ?loc ?attrs a = mk ?loc ?attrs (Pcf_extension a)
   let attribute ?loc a = mk ?loc (Pcf_attribute a)
+
   let text txt =
     let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
-    List.map
-      (fun ds -> attribute ~loc:(docstring_loc ds) (text_attr ds))
-      f_txt
+    List.map (fun ds -> attribute ~loc:(docstring_loc ds) (text_attr ds)) f_txt
+  ;;
 
   let virtual_ ct = Cfk_virtual ct
   let concrete o e = Cfk_concrete (o, e)
-
-  let attr d a = {d with pcf_attributes = d.pcf_attributes @ [a]}
-
+  let attr d a = { d with pcf_attributes = d.pcf_attributes @ [ a ] }
 end
 
 module Val = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(prim = []) ?(modalities=[]) name typ =
-    {
-     pval_name = name;
-     pval_type = typ;
-     pval_attributes = add_docs_attrs docs attrs;
-     pval_modalities = modalities;
-     pval_loc = loc;
-     pval_prim = prim;
+  let mk
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(docs = empty_docs)
+    ?(prim = [])
+    ?(modalities = [])
+    name
+    typ
+    =
+    { pval_name = name
+    ; pval_type = typ
+    ; pval_attributes = add_docs_attrs docs attrs
+    ; pval_modalities = modalities
+    ; pval_loc = loc
+    ; pval_prim = prim
     }
+  ;;
 end
 
 module Md = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(text = []) ?(modalities=[]) name typ =
-    {
-     pmd_name = name;
-     pmd_type = typ;
-     pmd_modalities = modalities;
-     pmd_attributes =
-       add_text_attrs text (add_docs_attrs docs attrs);
-     pmd_loc = loc;
+  let mk
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(docs = empty_docs)
+    ?(text = [])
+    ?(modalities = [])
+    name
+    typ
+    =
+    { pmd_name = name
+    ; pmd_type = typ
+    ; pmd_modalities = modalities
+    ; pmd_attributes = add_text_attrs text (add_docs_attrs docs attrs)
+    ; pmd_loc = loc
     }
+  ;;
 end
 
 module Ms = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(text = []) name syn =
-    {
-     pms_name = name;
-     pms_manifest = syn;
-     pms_attributes =
-       add_text_attrs text (add_docs_attrs docs attrs);
-     pms_loc = loc;
+  let mk
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(docs = empty_docs)
+    ?(text = [])
+    name
+    syn
+    =
+    { pms_name = name
+    ; pms_manifest = syn
+    ; pms_attributes = add_text_attrs text (add_docs_attrs docs attrs)
+    ; pms_loc = loc
     }
+  ;;
 end
 
 module Mtd = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(text = []) ?typ name =
-    {
-     pmtd_name = name;
-     pmtd_type = typ;
-     pmtd_attributes =
-       add_text_attrs text (add_docs_attrs docs attrs);
-     pmtd_loc = loc;
+  let mk
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(docs = empty_docs)
+    ?(text = [])
+    ?typ
+    name
+    =
+    { pmtd_name = name
+    ; pmtd_type = typ
+    ; pmtd_attributes = add_text_attrs text (add_docs_attrs docs attrs)
+    ; pmtd_loc = loc
     }
+  ;;
 end
 
 module Mb = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(text = []) name expr =
-    {
-     pmb_name = name;
-     pmb_expr = expr;
-     pmb_attributes =
-       add_text_attrs text (add_docs_attrs docs attrs);
-     pmb_loc = loc;
+  let mk
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(docs = empty_docs)
+    ?(text = [])
+    name
+    expr
+    =
+    { pmb_name = name
+    ; pmb_expr = expr
+    ; pmb_attributes = add_text_attrs text (add_docs_attrs docs attrs)
+    ; pmb_loc = loc
     }
+  ;;
 end
 
 module Opn = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(override = Fresh) expr =
-    {
-     popen_expr = expr;
-     popen_override = override;
-     popen_loc = loc;
-     popen_attributes = add_docs_attrs docs attrs;
+  let mk
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(docs = empty_docs)
+    ?(override = Fresh)
+    expr
+    =
+    { popen_expr = expr
+    ; popen_override = override
+    ; popen_loc = loc
+    ; popen_attributes = add_docs_attrs docs attrs
     }
+  ;;
 end
 
 module Incl = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-    ?(kind = Structure) mexpr =
-    {
-     pincl_kind = kind;
-     pincl_mod = mexpr;
-     pincl_loc = loc;
-     pincl_attributes = add_docs_attrs docs attrs;
+  let mk
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(docs = empty_docs)
+    ?(kind = Structure)
+    mexpr
+    =
+    { pincl_kind = kind
+    ; pincl_mod = mexpr
+    ; pincl_loc = loc
+    ; pincl_attributes = add_docs_attrs docs attrs
     }
-
+  ;;
 end
 
 module Vb = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(text = []) ?value_constraint ?(modes = []) pat expr =
-    {
-     pvb_pat = pat;
-     pvb_expr = expr;
-     pvb_constraint=value_constraint;
-     pvb_modes=modes;
-     pvb_attributes =
-       add_text_attrs text (add_docs_attrs docs attrs);
-     pvb_loc = loc;
+  let mk
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(docs = empty_docs)
+    ?(text = [])
+    ?value_constraint
+    ?(modes = [])
+    pat
+    expr
+    =
+    { pvb_pat = pat
+    ; pvb_expr = expr
+    ; pvb_constraint = value_constraint
+    ; pvb_modes = modes
+    ; pvb_attributes = add_text_attrs text (add_docs_attrs docs attrs)
+    ; pvb_loc = loc
     }
+  ;;
 end
 
 module Ci = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(text = [])
-        ?(virt = Concrete) ?(params = []) name expr =
-    {
-     pci_virt = virt;
-     pci_params = params;
-     pci_name = name;
-     pci_expr = expr;
-     pci_attributes =
-       add_text_attrs text (add_docs_attrs docs attrs);
-     pci_loc = loc;
+  let mk
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(docs = empty_docs)
+    ?(text = [])
+    ?(virt = Concrete)
+    ?(params = [])
+    name
+    expr
+    =
+    { pci_virt = virt
+    ; pci_params = params
+    ; pci_name = name
+    ; pci_expr = expr
+    ; pci_attributes = add_text_attrs text (add_docs_attrs docs attrs)
+    ; pci_loc = loc
     }
+  ;;
 end
 
 module Type = struct
-  let mk ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(text = [])
-      ?(params = [])
-      ?(cstrs = [])
-      ?(kind = Ptype_abstract)
-      ?(priv = Public)
-      ?manifest
-      ?jkind_annotation
-      name =
-    {
-     ptype_name = name;
-     ptype_params = params;
-     ptype_cstrs = cstrs;
-     ptype_kind = kind;
-     ptype_private = priv;
-     ptype_manifest = manifest;
-     ptype_attributes = add_text_attrs text (add_docs_attrs docs attrs);
-     ptype_jkind_annotation = jkind_annotation;
-     ptype_loc = loc;
+  let mk
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(docs = empty_docs)
+    ?(text = [])
+    ?(params = [])
+    ?(cstrs = [])
+    ?(kind = Ptype_abstract)
+    ?(priv = Public)
+    ?manifest
+    ?jkind_annotation
+    name
+    =
+    { ptype_name = name
+    ; ptype_params = params
+    ; ptype_cstrs = cstrs
+    ; ptype_kind = kind
+    ; ptype_private = priv
+    ; ptype_manifest = manifest
+    ; ptype_attributes = add_text_attrs text (add_docs_attrs docs attrs)
+    ; ptype_jkind_annotation = jkind_annotation
+    ; ptype_loc = loc
     }
+  ;;
 
-  let constructor ?(loc = !default_loc) ?(attrs = []) ?(info = empty_info)
-        ?(vars = []) ?(args = Pcstr_tuple []) ?res name =
-    {
-     pcd_name = name;
-     pcd_vars = vars;
-     pcd_args = args;
-     pcd_res = res;
-     pcd_loc = loc;
-     pcd_attributes = add_info_attrs info attrs;
+  let constructor
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(info = empty_info)
+    ?(vars = [])
+    ?(args = Pcstr_tuple [])
+    ?res
+    name
+    =
+    { pcd_name = name
+    ; pcd_vars = vars
+    ; pcd_args = args
+    ; pcd_res = res
+    ; pcd_loc = loc
+    ; pcd_attributes = add_info_attrs info attrs
     }
+  ;;
 
   let constructor_arg ?(loc = !default_loc) ?(modalities = []) typ =
-    {
-      pca_modalities = modalities;
-      pca_type = typ;
-      pca_loc = loc;
-    }
+    { pca_modalities = modalities; pca_type = typ; pca_loc = loc }
+  ;;
 
-  let field ?(loc = !default_loc) ?(attrs = []) ?(info = empty_info)
-        ?(mut = Immutable) ?(modalities = []) name typ =
-    {
-     pld_name = name;
-     pld_mutable = mut;
-     pld_modalities = modalities;
-     pld_type = typ;
-     pld_loc = loc;
-     pld_attributes = add_info_attrs info attrs;
+  let field
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(info = empty_info)
+    ?(mut = Immutable)
+    ?(modalities = [])
+    name
+    typ
+    =
+    { pld_name = name
+    ; pld_mutable = mut
+    ; pld_modalities = modalities
+    ; pld_type = typ
+    ; pld_loc = loc
+    ; pld_attributes = add_info_attrs info attrs
     }
-
+  ;;
 end
 
 (** Type extensions *)
 module Te = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(params = []) ?(priv = Public) path constructors =
-    {
-     ptyext_path = path;
-     ptyext_params = params;
-     ptyext_constructors = constructors;
-     ptyext_private = priv;
-     ptyext_loc = loc;
-     ptyext_attributes = add_docs_attrs docs attrs;
+  let mk
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(docs = empty_docs)
+    ?(params = [])
+    ?(priv = Public)
+    path
+    constructors
+    =
+    { ptyext_path = path
+    ; ptyext_params = params
+    ; ptyext_constructors = constructors
+    ; ptyext_private = priv
+    ; ptyext_loc = loc
+    ; ptyext_attributes = add_docs_attrs docs attrs
     }
+  ;;
 
-  let mk_exception ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-      constructor =
-    {
-     ptyexn_constructor = constructor;
-     ptyexn_loc = loc;
-     ptyexn_attributes = add_docs_attrs docs attrs;
+  let mk_exception
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(docs = empty_docs)
+    constructor
+    =
+    { ptyexn_constructor = constructor
+    ; ptyexn_loc = loc
+    ; ptyexn_attributes = add_docs_attrs docs attrs
     }
+  ;;
 
-  let constructor ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(info = empty_info) name kind =
-    {
-     pext_name = name;
-     pext_kind = kind;
-     pext_loc = loc;
-     pext_attributes = add_docs_attrs docs (add_info_attrs info attrs);
+  let constructor
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(docs = empty_docs)
+    ?(info = empty_info)
+    name
+    kind
+    =
+    { pext_name = name
+    ; pext_kind = kind
+    ; pext_loc = loc
+    ; pext_attributes = add_docs_attrs docs (add_info_attrs info attrs)
     }
+  ;;
 
-  let decl ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-         ?(info = empty_info) ?(vars = []) ?(args = Pcstr_tuple []) ?res name =
-    {
-     pext_name = name;
-     pext_kind = Pext_decl(vars, args, res);
-     pext_loc = loc;
-     pext_attributes = add_docs_attrs docs (add_info_attrs info attrs);
+  let decl
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(docs = empty_docs)
+    ?(info = empty_info)
+    ?(vars = [])
+    ?(args = Pcstr_tuple [])
+    ?res
+    name
+    =
+    { pext_name = name
+    ; pext_kind = Pext_decl (vars, args, res)
+    ; pext_loc = loc
+    ; pext_attributes = add_docs_attrs docs (add_info_attrs info attrs)
     }
+  ;;
 
-  let rebind ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(info = empty_info) name lid =
-    {
-     pext_name = name;
-     pext_kind = Pext_rebind lid;
-     pext_loc = loc;
-     pext_attributes = add_docs_attrs docs (add_info_attrs info attrs);
+  let rebind
+    ?(loc = !default_loc)
+    ?(attrs = [])
+    ?(docs = empty_docs)
+    ?(info = empty_info)
+    name
+    lid
+    =
+    { pext_name = name
+    ; pext_kind = Pext_rebind lid
+    ; pext_loc = loc
+    ; pext_attributes = add_docs_attrs docs (add_info_attrs info attrs)
     }
-
+  ;;
 end
 
 module Csig = struct
-  let mk self fields =
-    {
-     pcsig_self = self;
-     pcsig_fields = fields;
-    }
+  let mk self fields = { pcsig_self = self; pcsig_fields = fields }
 end
 
 module Cstr = struct
-  let mk self fields =
-    {
-     pcstr_self = self;
-     pcstr_fields = fields;
-    }
+  let mk self fields = { pcstr_self = self; pcstr_fields = fields }
 end
 
 (** Row fields *)
 module Rf = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) desc = {
-    prf_desc = desc;
-    prf_loc = loc;
-    prf_attributes = attrs;
-  }
+  let mk ?(loc = !default_loc) ?(attrs = []) desc =
+    { prf_desc = desc; prf_loc = loc; prf_attributes = attrs }
+  ;;
+
   let tag ?loc ?attrs label const tys =
     mk ?loc ?attrs (Rtag (label, const, tys))
-  let inherit_?loc ty =
-    mk ?loc (Rinherit ty)
+  ;;
+
+  let inherit_ ?loc ty = mk ?loc (Rinherit ty)
 end
 
 (** Object fields *)
 module Of = struct
-  let mk ?(loc = !default_loc) ?(attrs=[]) desc = {
-    pof_desc = desc;
-    pof_loc = loc;
-    pof_attributes = attrs;
-  }
-  let tag ?loc ?attrs label ty =
-    mk ?loc ?attrs (Otag (label, ty))
-  let inherit_ ?loc ty =
-    mk ?loc (Oinherit ty)
+  let mk ?(loc = !default_loc) ?(attrs = []) desc =
+    { pof_desc = desc; pof_loc = loc; pof_attributes = attrs }
+  ;;
+
+  let tag ?loc ?attrs label ty = mk ?loc ?attrs (Otag (label, ty))
+  let inherit_ ?loc ty = mk ?loc (Oinherit ty)
 end

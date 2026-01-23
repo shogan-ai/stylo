@@ -167,6 +167,10 @@ let print_warnings = ref true
 
 let at_beginning_of_line pos = (pos.pos_cnum = pos.pos_bol)
 
+(* CR dvulakh: In general, we'd prefer to avoid cosmetic changes in this file
+   (e.g. change to comments) to make it easier to keep in sync with the version from the
+   compiler . *)
+
 module Syntax_mode = struct
   let quotations = ref true
 end
@@ -434,6 +438,20 @@ let preprocessor = ref None
 let escaped_newlines = ref false
 
 (* Warn about Latin-1 characters used in idents *)
+
+(* XCR dvulakh: Similarly I think I'd consider removing the Latin warning and the change
+   from a list ref to a queue, while obviously in a vacuum an improvement, an example of
+   undesirable drift. 
+
+   trefis: I think the change from list to queue is a leftover from an earlier version of
+   how comments/tokens were attached to the CST and can probably be reverted at this point 
+   indeed.
+   The "Latin" warning however is due to trying to import as little code as possible from
+   "upstream". At some point I went as far as removing locations altogether (they are not 
+   really needed in stylo) but they are still useful for debugging... anyway: the Location 
+   module itself is stripped down, and [Location.deprecated] doesn't exist, as indeed 
+   [Warning] doesn't exist.
+   I think stripping unneeded code from upstream parts is likely to be a win long term. *)
 
 let handle_docstrings = ref true
 let comments = Queue.create ()

@@ -1,5 +1,4 @@
 let str = Document.string
-
 let underscore = str "_"
 let star = str "*"
 let ampersand = str "&"
@@ -77,8 +76,7 @@ let colon_equals = str ":="
 let plus_equals = str "+="
 let dotdot = str ".."
 let pipe = str "|"
-let optional_pipe cond =
-  Document.opt_token ~ws_after:Document.nbsp cond "|"
+let optional_pipe cond = Document.opt_token ~ws_after:Document.nbsp cond "|"
 let open_ = str "open"
 let inherit_ = str "inherit"
 let val_ = str "val"

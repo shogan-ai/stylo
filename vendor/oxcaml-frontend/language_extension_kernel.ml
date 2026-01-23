@@ -42,3 +42,4 @@ let to_string : type a. a t -> string = function
   | Let_mutable -> "let_mutable"
   | Layout_poly -> "layout_poly"
   | Runtime_metaprogramming -> "runtime_metaprogramming"
+;;

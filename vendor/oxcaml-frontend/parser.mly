@@ -921,7 +921,7 @@ let mk_directive ~loc name arg =
 
 (* Unboxed literals *)
 
-(* CR layouts v2.5: The [unboxed_*] functions will both be improved and lose
+(* XXX layouts v2.5: The [unboxed_*] functions will both be improved and lose
    their explicit assert once we have real unboxed literals in Jane syntax; they
    may also get re-inlined at that point *)
 let unboxed_literals_extension = Language_extension.Layouts
@@ -3261,7 +3261,7 @@ let_binding_body_no_punning:
       { let v, modes = $1 in
         (v, $2 modes, None, modes) }
   | let_ident_with_modes constraint_ EQUAL seq_expr
-      (* CR zqian: modes are duplicated, and one of them needs to be made ghost
+      (* XXX zqian: modes are duplicated, and one of them needs to be made ghost
          to make internal tools happy. We should try to avoid that. *)
       { let v, modes0 = $1 in
         let typ, modes1 = $2 in
@@ -3362,7 +3362,7 @@ letop_binding_body:
   | val_ident
       (* Let-punning *)
       { (mkpatvar ~loc:$loc $1, ghexpvar ~loc:$loc $1) }
-  (* CR zqian: support mode annotation on letop. *)
+  (* XXX zqian: support mode annotation on letop. *)
   | pat = simple_pattern COLON typ = core_type EQUAL exp = seq_expr
       { let loc = ($startpos(pat), $endpos(typ)) in
         (ghpat_with_modes ~loc ~pat ~cty:(Some typ) ~modes:[], exp) }

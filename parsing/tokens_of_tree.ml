@@ -1,4 +1,4 @@
-(** {1 Flattening to a sequence of tokens } *)
+(** {1 Flattening to a sequence of tokens} *)
 
 let rec combine_children (top : Tokens.seq) children =
   match top, children with
@@ -7,38 +7,43 @@ let rec combine_children (top : Tokens.seq) children =
   | { desc = Child_node; _ } :: _, [] -> assert false (* missing child *)
   | { desc = Child_node; _ } :: tokens, child :: children ->
     child @ combine_children tokens children
-  | tok :: tokens, _ ->
-    tok :: combine_children tokens children
+  | tok :: tokens, _ -> tok :: combine_children tokens children
+;;
 
 (* dbg printing *)
 let pp_child ppf =
   let open Format in
   fprintf ppf "@[<hov 2>%a@]" Tokens.pp_seq
+;;
 
 let pp_children =
   let open Format in
-  pp_print_list
-    ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
-    pp_child
+  pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ";@ ") pp_child
+;;
 
 let combine_children ~loc top children =
-  try [combine_children top children]
-  with Assert_failure _ as exn ->
+  try [ combine_children top children ] with
+  | Assert_failure _ as exn ->
     let start_pos = loc.Location.loc_start in
     let stop_pos = loc.Location.loc_end in
     dprintf
       "@[<h>loc:@ %d:%d - %d:%d@]@\n\
        tokens:@[<hov 2>@ %a@]@\n\
        children:@[<v 2>@ {%a}@]@."
-      start_pos.pos_lnum (start_pos.pos_cnum - start_pos.pos_bol)
-      stop_pos.pos_lnum (stop_pos.pos_cnum - stop_pos.pos_bol)
-      Tokens.pp_seq top
-      pp_children children;
+      start_pos.pos_lnum
+      (start_pos.pos_cnum - start_pos.pos_bol)
+      stop_pos.pos_lnum
+      (stop_pos.pos_cnum - stop_pos.pos_bol)
+      Tokens.pp_seq
+      top
+      pp_children
+      children;
     raise exn
+;;
 
 (* TODO: should be generated. *)
 let tokenizer =
-  let super = Ast_reduce.mk_default_reducer [] (@) in
+  let super = Ast_reduce.mk_default_reducer [] ( @ ) in
   let reduce_longident reducer env l =
     let sub_tokens = super.longident reducer env l in
     let node_toks = l.tokens in
@@ -50,7 +55,7 @@ let tokenizer =
   in
   let reduce_extension reducer env e =
     let sub_tokens = super.extension reducer env e in
-    let (name,_,node_toks) = e in
+    let name, _, node_toks = e in
     combine_children ~loc:name.loc node_toks sub_tokens
   in
   let reduce_arrow_arg reducer env aa =
@@ -286,11 +291,7 @@ let tokenizer =
   ; module_binding = reduce_module_binding
   ; jkind_annotation = reduce_jkind_annotation
   }
+;;
 
-let structure str =
-  tokenizer.structure tokenizer () str
-  |> List.flatten
-
-let signature sg =
-  tokenizer.signature tokenizer () sg
-  |> List.flatten
+let structure str = tokenizer.structure tokenizer () str |> List.flatten
+let signature sg = tokenizer.signature tokenizer () sg |> List.flatten

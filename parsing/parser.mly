@@ -540,7 +540,7 @@ let mk_directive ~loc name arg =
 
 (* Unboxed literals *)
 
-(* CR layouts v2.5: The [unboxed_*] functions will both be improved and lose
+(* XXX layouts v2.5: The [unboxed_*] functions will both be improved and lose
    their explicit assert once we have real unboxed literals in Jane syntax; they
    may also get re-inlined at that point *)
 type sign = Positive | Negative
@@ -2871,7 +2871,7 @@ let_binding_body_no_punning:
           lbb_modes = modes; lbb_pat = v; lbb_params = params;
           lbb_constraint = tc; lbb_ret_modes = ret_modes; lbb_expr = Some e } }
   | let_ident_with_modes constraint_ EQUAL seq_expr
-      (* CR zqian: modes are duplicated, and one of them needs to be made ghost
+      (* XXX zqian: modes are duplicated, and one of them needs to be made ghost
          to make internal tools happy. We should try to avoid that. *)
       { let legacy_modes, v, modes0 = $1 in (* PR#7344 *)
         let typ, modes1 = $2 in
@@ -2987,7 +2987,7 @@ letop_binding_body:
           ~tokens:(Tokens.at $sloc)
           (mkpatvar ~loc:$loc $1) (* FIXME: ! *)
           None }
-  (* CR zqian: support mode annotation on letop. *)
+  (* XXX zqian: support mode annotation on letop. *)
   | pat = simple_pattern COLON typ = core_type EQUAL exp = seq_expr
       { Vb.mk ~loc:(make_loc $sloc)
           ~tokens:(Tokens.at $sloc)

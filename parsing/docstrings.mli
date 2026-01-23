@@ -1,24 +1,21 @@
 (**************************************************************************)
-(*                                                                        *)
-(*                                 OCaml                                  *)
-(*                                                                        *)
-(*                               Leo White                                *)
-(*                                                                        *)
-(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
-(*     en Automatique.                                                    *)
-(*                                                                        *)
-(*   All rights reserved.  This file is distributed under the terms of    *)
-(*   the GNU Lesser General Public License version 2.1, with the          *)
-(*   special exception on linking described in the file LICENSE.          *)
-(*                                                                        *)
+(* *)
+(* OCaml *)
+(* *)
+(* Leo White *)
+(* *)
+(* Copyright 1996 Institut National de Recherche en Informatique et *)
+(* en Automatique. *)
+(* *)
+(* All rights reserved. This file is distributed under the terms of *)
+(* the GNU Lesser General Public License version 2.1, with the *)
+(* special exception on linking described in the file LICENSE. *)
+(* *)
 (**************************************************************************)
 
 (** Documentation comments
 
-  {b Warning:} this module is unstable and part of
-  {{!Compiler_libs}compiler-libs}.
-
-*)
+    {b Warning:} this module is unstable and part of {{!Compiler_libs} compiler-libs}. *)
 
 (** (Re)Initialise all docstring state *)
 val init : unit -> unit
@@ -42,8 +39,8 @@ val docstring_loc : docstring -> Location.t
 
 (** {2 Set functions}
 
-   These functions are used by the lexer to associate docstrings to
-   the locations of tokens. *)
+    These functions are used by the lexer to associate docstrings to the locations of
+    tokens. *)
 
 (** Docstrings immediately preceding a token *)
 val set_pre_docstrings : Lexing.position -> docstring list -> unit
@@ -65,34 +62,34 @@ val set_post_extra_docstrings : Lexing.position -> docstring list -> unit
     The {!docs} type represents documentation attached to an item. *)
 
 type docs =
-  { docs_pre: docstring option;
-    docs_post: docstring option; }
+  { docs_pre : docstring option
+  ; docs_post : docstring option
+  }
 
 val empty_docs : docs
 
-(** Fetch the item documentation for the current symbol. This also
-    marks this documentation (for ambiguity warnings). *)
+(** Fetch the item documentation for the current symbol. This also marks this
+    documentation (for ambiguity warnings). *)
 val symbol_docs : unit -> docs
+
 val symbol_docs_lazy : unit -> docs Lazy.t
 
-(** Fetch the item documentation for the symbols between two
-    positions. This also marks this documentation (for ambiguity
-    warnings). *)
+(** Fetch the item documentation for the symbols between two positions. This also marks
+    this documentation (for ambiguity warnings). *)
 val rhs_docs : int -> int -> docs
+
 val rhs_docs_lazy : int -> int -> docs Lazy.t
 
-(** Mark the item documentation for the current symbol (for ambiguity
-    warnings). *)
+(** Mark the item documentation for the current symbol (for ambiguity warnings). *)
 val mark_symbol_docs : unit -> unit
 
-(** Mark as associated the item documentation for the symbols between
-    two positions (for ambiguity warnings) *)
+(** Mark as associated the item documentation for the symbols between two positions (for
+    ambiguity warnings) *)
 val mark_rhs_docs : int -> int -> unit
 
 (** {2 Fields and constructors}
 
-    The {!info} type represents documentation attached to a field or
-    constructor. *)
+    The {!info} type represents documentation attached to a field or constructor. *)
 
 type info = docstring option
 
@@ -106,8 +103,7 @@ val rhs_info : int -> info
 
 (** {2 Unattached comments}
 
-    The {!text} type represents documentation which is not attached to
-    anything. *)
+    The {!text} type represents documentation which is not attached to anything. *)
 
 type text = docstring list
 
@@ -116,18 +112,19 @@ val empty_text_lazy : text Lazy.t
 
 (** Fetch the text preceding the current symbol. *)
 val symbol_text : unit -> text
+
 val symbol_text_lazy : unit -> text Lazy.t
 
 (** Fetch the text preceding the symbol at the given position. *)
 val rhs_text : int -> text
+
 val rhs_text_lazy : int -> text Lazy.t
 
 (** {2 Extra text}
 
-    There may be additional text attached to the delimiters of a block
-    (e.g. [struct] and [end]). This is fetched by the following
-    functions, which are applied to the contents of the block rather
-    than the delimiters. *)
+    There may be additional text attached to the delimiters of a block (e.g. [struct] and
+    [end]). This is fetched by the following functions, which are applied to the contents
+    of the block rather than the delimiters. *)
 
 (** Fetch additional text preceding the current symbol *)
 val symbol_pre_extra_text : unit -> text
@@ -144,62 +141,62 @@ val rhs_post_extra_text : int -> text
 (** Fetch text following the symbol at the given position *)
 val rhs_post_text : int -> text
 
-module WithMenhir: sig
-(** Fetch the item documentation for the current symbol. This also
-    marks this documentation (for ambiguity warnings). *)
-val symbol_docs
-  :  Lexing.position * Lexing.position
-  -> docs * (Lexing.position * Lexing.position)
-val symbol_docs_lazy : Lexing.position * Lexing.position -> docs Lazy.t
+module WithMenhir : sig
+  (** Fetch the item documentation for the current symbol. This also marks this
+      documentation (for ambiguity warnings). *)
+  val symbol_docs
+    :  Lexing.position * Lexing.position
+    -> docs * (Lexing.position * Lexing.position)
 
-(** Fetch the item documentation for the symbols between two
-    positions. This also marks this documentation (for ambiguity
-    warnings). *)
-val rhs_docs : Lexing.position -> Lexing.position -> docs
-val rhs_docs_lazy : Lexing.position -> Lexing.position -> docs Lazy.t
+  val symbol_docs_lazy : Lexing.position * Lexing.position -> docs Lazy.t
 
-(** Mark the item documentation for the current symbol (for ambiguity
-    warnings). *)
-val mark_symbol_docs : Lexing.position * Lexing.position -> unit
+  (** Fetch the item documentation for the symbols between two positions. This also marks
+      this documentation (for ambiguity warnings). *)
+  val rhs_docs : Lexing.position -> Lexing.position -> docs
 
-(** Mark as associated the item documentation for the symbols between
-    two positions (for ambiguity warnings) *)
-val mark_rhs_docs : Lexing.position -> Lexing.position -> unit
+  val rhs_docs_lazy : Lexing.position -> Lexing.position -> docs Lazy.t
 
-(** Fetch the field info for the current symbol. *)
-val symbol_info : Lexing.position -> info
+  (** Mark the item documentation for the current symbol (for ambiguity warnings). *)
+  val mark_symbol_docs : Lexing.position * Lexing.position -> unit
 
-(** Fetch the field info following the symbol at a given position. *)
-val rhs_info : Lexing.position -> info
+  (** Mark as associated the item documentation for the symbols between two positions (for
+      ambiguity warnings) *)
+  val mark_rhs_docs : Lexing.position -> Lexing.position -> unit
 
-(** Fetch the text preceding the current symbol. *)
-val symbol_text : Lexing.position -> text
-val symbol_text_lazy : Lexing.position -> text Lazy.t
+  (** Fetch the field info for the current symbol. *)
+  val symbol_info : Lexing.position -> info
 
-(** Fetch the text preceding the symbol at the given position. *)
-val rhs_text : Lexing.position -> text
-val rhs_text_lazy : Lexing.position -> text Lazy.t
+  (** Fetch the field info following the symbol at a given position. *)
+  val rhs_info : Lexing.position -> info
 
-(** {3 Extra text}
+  (** Fetch the text preceding the current symbol. *)
+  val symbol_text : Lexing.position -> text
 
-    There may be additional text attached to the delimiters of a block
-    (e.g. [struct] and [end]). This is fetched by the following
-    functions, which are applied to the contents of the block rather
-    than the delimiters. *)
+  val symbol_text_lazy : Lexing.position -> text Lazy.t
 
-(** Fetch additional text preceding the current symbol *)
-val symbol_pre_extra_text : Lexing.position -> text
+  (** Fetch the text preceding the symbol at the given position. *)
+  val rhs_text : Lexing.position -> text
 
-(** Fetch additional text following the current symbol *)
-val symbol_post_extra_text : Lexing.position -> text
+  val rhs_text_lazy : Lexing.position -> text Lazy.t
 
-(** Fetch additional text preceding the symbol at the given position *)
-val rhs_pre_extra_text : Lexing.position -> text
+  (** {3 Extra text}
 
-(** Fetch additional text following the symbol at the given position *)
-val rhs_post_extra_text : Lexing.position -> text
+      There may be additional text attached to the delimiters of a block (e.g. [struct]
+      and [end]). This is fetched by the following functions, which are applied to the
+      contents of the block rather than the delimiters. *)
 
-(** Fetch text following the symbol at the given position *)
-val rhs_post_text : Lexing.position -> text
+  (** Fetch additional text preceding the current symbol *)
+  val symbol_pre_extra_text : Lexing.position -> text
 
+  (** Fetch additional text following the current symbol *)
+  val symbol_post_extra_text : Lexing.position -> text
+
+  (** Fetch additional text preceding the symbol at the given position *)
+  val rhs_pre_extra_text : Lexing.position -> text
+
+  (** Fetch additional text following the symbol at the given position *)
+  val rhs_post_extra_text : Lexing.position -> text
+
+  (** Fetch text following the symbol at the given position *)
+  val rhs_post_text : Lexing.position -> text
 end

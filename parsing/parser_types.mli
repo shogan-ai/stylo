@@ -8,26 +8,29 @@ open Parsetree
 open Docstrings
 
 type let_binding_body =
-  { lbb_legacy_modes: modes;
-    lbb_pat: pattern;
-    lbb_modes: modes;
-    lbb_params: function_param list;
-    lbb_constraint: value_constraint option;
-    lbb_ret_modes: modes;
-    lbb_expr: expression option }
+  { lbb_legacy_modes : modes
+  ; lbb_pat : pattern
+  ; lbb_modes : modes
+  ; lbb_params : function_param list
+  ; lbb_constraint : value_constraint option
+  ; lbb_ret_modes : modes
+  ; lbb_expr : expression option
+  }
 
 type let_binding =
-  { lb_ext_attrs: ext_attribute;
-    lb_body: let_binding_body;
-    lb_attributes: attributes;
-    lb_docs: docs Lazy.t;
-    lb_text: text Lazy.t;
-    lb_loc: Location.t;
-    lb_toks: Tokens.seq; }
+  { lb_ext_attrs : ext_attribute
+  ; lb_body : let_binding_body
+  ; lb_attributes : attributes
+  ; lb_docs : docs Lazy.t
+  ; lb_text : text Lazy.t
+  ; lb_loc : Location.t
+  ; lb_toks : Tokens.seq
+  }
 
 type let_bindings =
-  { lbs_bindings: let_binding list;
-    lbs_mutable: mutable_flag;
-    lbs_rec: rec_flag; }
+  { lbs_bindings : let_binding list
+  ; lbs_mutable : mutable_flag
+  ; lbs_rec : rec_flag
+  }
 
-exception Failwith of string
+exception Failwith  of string

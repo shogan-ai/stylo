@@ -1,18 +1,17 @@
 (**************************************************************************)
-(*                                                                        *)
-(*                                 OCaml                                  *)
-(*                                                                        *)
-(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
-(*                                                                        *)
-(*   Copyright 1997 Institut National de Recherche en Informatique et     *)
-(*     en Automatique.                                                    *)
-(*                                                                        *)
-(*   All rights reserved.  This file is distributed under the terms of    *)
-(*   the GNU Lesser General Public License version 2.1, with the          *)
-(*   special exception on linking described in the file LICENSE.          *)
-(*                                                                        *)
+(* *)
+(* OCaml *)
+(* *)
+(* Xavier Leroy, projet Cristal, INRIA Rocquencourt *)
+(* *)
+(* Copyright 1997 Institut National de Recherche en Informatique et *)
+(* en Automatique. *)
+(* *)
+(* All rights reserved. This file is distributed under the terms of *)
+(* the GNU Lesser General Public License version 2.1, with the *)
+(* special exception on linking described in the file LICENSE. *)
+(* *)
 (**************************************************************************)
-
 (* Auxiliary type for reporting syntax errors *)
 
 type invalid_package_type =
@@ -24,7 +23,7 @@ type invalid_package_type =
   | Misplaced_attribute
 
 type error =
-    Unclosed of Location.t * string * Location.t * string
+  | Unclosed of Location.t * string * Location.t * string
   | Expecting of Location.t * string
   | Not_expecting of Location.t * string
   | Applicative_path of Location.t
@@ -41,13 +40,13 @@ type error =
   | Let_mutable_not_allowed_with_function_bindings of Location.t
   | Block_access_bad_paren of Location.t
 
-exception Error of error
+exception Error  of error
 exception Escape_error
 
 let location_of_error = function
-  | Unclosed(l,_,_,_)
+  | Unclosed (l, _, _, _)
   | Applicative_path l
-  | Variable_in_scope(l,_)
+  | Variable_in_scope (l, _)
   | Other l
   | Not_expecting (l, _)
   | Ill_formed_ast (l, _)
@@ -61,7 +60,6 @@ let location_of_error = function
   | Let_mutable_not_allowed_in_class_definition l -> l
   | Let_mutable_not_allowed_with_function_bindings l -> l
   | Block_access_bad_paren l -> l
+;;
 
-
-let ill_formed_ast loc s =
-  raise (Error (Ill_formed_ast (loc, s)))
+let ill_formed_ast loc s = raise (Error (Ill_formed_ast (loc, s)))
