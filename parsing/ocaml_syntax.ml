@@ -1,5 +1,4 @@
 module Ast_helper = Ast_helper
-module Ast_traverse = Ast_traverse
 module Docstring = Docstring
 module Docstrings = Docstrings
 module Lexer = Lexer

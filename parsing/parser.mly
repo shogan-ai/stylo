@@ -524,28 +524,16 @@ let pmod_instance : module_expr -> module_expr_desc =
 ;;
 *)
 
-let mk_hashsyntax ~loc mode toggle tokens =
-  Ptop_lex {
-      plex_desc =
-        Plex_syntax {
-             psyn_mode = mode;
-             psyn_toggle = toggle;
-        };
-      plex_loc = make_loc loc;
-      plex_tokens = tokens;
-    }
-
 let mk_directive_arg ~loc k =
   { pdira_desc = k;
     pdira_loc = make_loc loc;
   }
 
-let mk_directive ~loc name arg tokens =
+let mk_directive ~loc name arg =
   Ptop_dir {
       pdir_name = name;
       pdir_arg = arg;
       pdir_loc = make_loc loc;
-      pdir_tokens = tokens;
     }
 
 (* Unboxed literals *)
@@ -663,7 +651,7 @@ The precedences must be listed from low to high.
 %start toplevel_phrase                  /* for interactive use */
 %type <Parsetree.toplevel_phrase> toplevel_phrase
 %start use_file                         /* for the #use directive */
-%type <Parsetree.use_file> use_file
+%type <Parsetree.toplevel_phrase list> use_file
 /* BEGIN AVOID */
 %start parse_module_type
 %type <Parsetree.module_type> parse_module_type
@@ -1021,7 +1009,7 @@ use_file:
     flatten(use_file_element*)
   ))
   EOF
-    { $1, Tokens.at $sloc }
+    { $1 }
 ;
 
 (* An optional standalone expression is just an expression with attributes
@@ -3657,13 +3645,8 @@ type_parameters:
 ;
 
 jkind_desc:
-    jkind_annotation MOD mkrhs(LIDENT)+ { (* LIDENTs here are for modes *)
-      let modes =
-        List.map
-          (fun {txt; loc} -> {txt = Mode txt; loc})
-          $3
-      in
-      Pjk_mod ($1, modes)
+    jkind_annotation MOD mode+ {
+      Pjk_mod ($1, $3)
     }
   | jkind_annotation WITH core_type optional_atat_modalities_expr {
       Pjk_with ($1, $3, $4)
@@ -4246,11 +4229,11 @@ strict_function_or_labeled_tuple_type:
 /* Legacy mode annotations */
 %inline mode_legacy:
    | LOCAL
-       { mkloc (Mode "local") (make_loc $sloc) }
+    { mkloc (Mode ("local", Tokens.at $sloc)) (make_loc $sloc) }
    | UNIQUE
-       { mkloc (Mode "unique") (make_loc $sloc) }
+    { mkloc (Mode ("unique", Tokens.at $sloc)) (make_loc $sloc) }
    | ONCE
-       { mkloc (Mode "once") (make_loc $sloc) }
+    { mkloc (Mode ("once", Tokens.at $sloc)) (make_loc $sloc) }
 ;
 
 %inline mode_expr_legacy:
@@ -4264,7 +4247,7 @@ strict_function_or_labeled_tuple_type:
 
 /* New mode annotation, introduced by AT or ATAT */
 %inline mode:
-  | LIDENT { mkloc (Mode $1) (make_loc $sloc) }
+  | LIDENT { mkloc (Mode ($1, Tokens.at $sloc)) (make_loc $sloc) }
 ;
 
 %inline mode_expr:
@@ -4291,7 +4274,7 @@ at_mode_expr:
 /* Modalities */
 
 %inline modality:
-  | LIDENT { mkloc (Modality $1) (make_loc $sloc) }
+  | LIDENT { mkloc (Modality ($1, Tokens.at $sloc)) (make_loc $sloc) }
 
 %inline modalities:
   | modality+ { $1 }
@@ -4807,12 +4790,9 @@ any_longident:
 /* Toplevel directives */
 
 toplevel_directive:
-  | HASH_SYNTAX
-      { let mode, toggle = $1 in
-        mk_hashsyntax ~loc:$sloc (mkloc mode (make_loc $sloc)) toggle (Tokens.at $sloc) }
-  | hash dir = mkrhs(ident)
-    arg = ioption(mk_directive_arg(toplevel_directive_argument))
-      { mk_directive ~loc:$sloc dir arg (Tokens.at $sloc) }
+  hash dir = mkrhs(ident)
+  arg = ioption(mk_directive_arg(toplevel_directive_argument))
+    { mk_directive ~loc:$sloc dir arg }
 ;
 
 %inline toplevel_directive_argument:

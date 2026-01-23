@@ -1,7 +1,5 @@
 open Core
 
-type nonrec t = t [@@deriving sexp_of]
-
 val ( ^?^ ) : t -> t -> t
 val ( ^/^ ) : t -> t -> t
 val ( ^?/^ ) : t -> t -> t

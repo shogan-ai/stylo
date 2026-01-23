@@ -160,7 +160,6 @@
 %token WITH                   "with"
 %token <string * Location.t * bool ref> COMMENT    "(* comment *)"
 %token <Docstring.t> DOCSTRING "(** documentation *)"
-%token <string * bool> HASH_SYNTAX "#syntax foo on" (* just an example *)
 
 %token EOL                    "\\n"      (* not great, but EOL is unused *)
 

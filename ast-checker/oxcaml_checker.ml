@@ -15,64 +15,66 @@ let cleaner =
     | "ocaml.doc" | "ocaml.txt" -> true
     | _ -> false
   in
-  object(self)
-    inherit Ast_traverse.map as super
-
-    method! location _ = Location.none
-
-    method! location_stack _ = []
-
-    method! attribute attr =
-      let attr_payload =
-        if not (from_docstring attr)
-        then attr.attr_payload
-        else (
-          match attr.attr_payload with
-          | PStr
-              [ ({ pstr_desc =
-                     Pstr_eval
-                       ( ({ pexp_desc =
-                              Pexp_constant (Pconst_string (doc, loc, None))
-                          ; _
-                          } as inner_exp)
-                       , [] )
-                 ; _
-                 } as str)
-              ] ->
-            let doc = normalize_cmt_spaces doc in
-            let inner' =
-              { inner_exp with
-                pexp_desc = Pexp_constant (Pconst_string (doc, loc, None))
-              }
-            in
-            PStr [ { str with pstr_desc = Pstr_eval (inner', []) } ]
-          | _ -> assert false)
+  let super = Ast_mapper.default_mapper in
+  let map_location _ _ _ = Location.none in
+  let map_location_stack _ _ _ = [] in
+  let map_attribute (mapper : 'env Ast_mapper.mapper) (env : 'env) attr =
+    let attr_payload =
+      if not (from_docstring attr)
+      then attr.attr_payload
+      else (
+        match attr.attr_payload with
+        | PStr
+            [ ({ pstr_desc =
+                   Pstr_eval
+                     ( ({ pexp_desc =
+                            Pexp_constant (Pconst_string (doc, loc, None))
+                        ; _
+                        } as inner_exp)
+                     , [] )
+               ; _
+               } as str)
+            ] ->
+          let doc = normalize_cmt_spaces doc in
+          let inner' =
+            { inner_exp with
+              pexp_desc = Pexp_constant (Pconst_string (doc, loc, None))
+            }
+          in
+          PStr [ { str with pstr_desc = Pstr_eval (inner', []) } ]
+        | _ -> assert false)
+    in
+    super.attribute mapper env { attr with attr_payload }
+  in
+  let map_attributes mapper env attrs =
+    let attrs =
+      if not !ignore_docstrings
+      then attrs
+      else List.filter (fun a -> not (from_docstring a)) attrs
+    in
+    super.attributes mapper env ((* FIXME: why? *) sort_attributes attrs)
+  in
+  let map_pattern mapper env p =
+    match p.ppat_desc with
+    | Ppat_or
+        (p1, { ppat_desc = Ppat_or (p2, p3); ppat_attributes; ppat_loc; _ }) ->
+      let rewritten =
+        Ast_helper.Pat.or_
+          ~loc:p.ppat_loc
+          ~attrs:p.ppat_attributes
+          (Ast_helper.Pat.or_ ~loc:ppat_loc ~attrs:ppat_attributes p1 p2)
+          p3
       in
-      super#attribute { attr with attr_payload }
-
-    method! attributes attrs =
-      let attrs =
-        if not !ignore_docstrings
-        then attrs
-        else List.filter (fun a -> not (from_docstring a)) attrs
-      in
-      super#attributes ((* FIXME: why? *) sort_attributes attrs)
-
-    method! pattern p =
-      match p.ppat_desc with
-      | Ppat_or
-          (p1, { ppat_desc = Ppat_or (p2, p3); ppat_attributes; ppat_loc; _ })
-        ->
-        let rewritten =
-          Ast_helper.Pat.or_
-            ~loc:p.ppat_loc
-            ~attrs:p.ppat_attributes
-            (Ast_helper.Pat.or_ ~loc:ppat_loc ~attrs:ppat_attributes p1 p2)
-            p3
-        in
-        self#pattern rewritten
-      | _ -> super#pattern p
-  end
+      mapper.Ast_mapper.pattern mapper env rewritten
+    | _ -> super.pattern mapper env p
+  in
+  { super with
+    attribute = map_attribute
+  ; attributes = map_attributes
+  ; location = map_location
+  ; location_stack = map_location_stack
+  ; pattern = map_pattern
+  }
 ;;
 
 (* method! visit_expression env exp = let [{pexp_desc; pexp_attributes; _}] = exp in match
@@ -97,11 +99,23 @@ let cleaner =
    exception Failed_to_parse_source of exn
 *)
 
-let struct_or_error lex = Parse.implementation lex |> cleaner#structure
-let sig_or_error lex = Parse.interface lex |> cleaner#signature
-let use_or_error lex = Parse.use_file lex |> List.map cleaner#toplevel_phrase
+let struct_or_error lex =
+  Parse.implementation lex |> cleaner.structure cleaner ()
+;;
 
-let check_same_ast fn line s1 s2 parse_or_error =
+let sig_or_error lex = Parse.interface lex |> cleaner.signature cleaner ()
+let print_s sexp = Printf.eprintf "%s\n%!" (Sexplib0.Sexp.to_string sexp)
+
+let on_fail ~debug sexp_of_ast ast1 ast2 () =
+  if debug
+  then (
+    Printf.eprintf "Ast1:\n%!";
+    print_s (sexp_of_ast ast1);
+    Printf.eprintf "Ast2:\n%!";
+    print_s (sexp_of_ast ast2))
+;;
+
+let check_same_ast fn line ~impl s1 s2 ~debug =
   let pos =
     { Lexing.pos_fname = fn; pos_lnum = line; pos_bol = 0; pos_cnum = 0 }
   in
@@ -111,17 +125,19 @@ let check_same_ast fn line s1 s2 parse_or_error =
   Lexing.set_position lex2 pos;
   Lexing.set_filename lex2 (fn ^ ".out");
   Location.input_name := fn;
-  let ast1 = parse_or_error lex1 in
-  Location.input_name := fn ^ ".out";
-  let ast2 = parse_or_error lex2 in
-  ast1 = ast2
+  if impl
+  then (
+    let ast1 = struct_or_error lex1 in
+    Location.input_name := fn ^ ".out";
+    let ast2 = struct_or_error lex2 in
+    if ast1 = ast2
+    then Ok ()
+    else Error (on_fail ~debug sexp_of_structure ast1 ast2))
+  else (
+    let ast1 = sig_or_error lex1 in
+    Location.input_name := fn ^ ".out";
+    let ast2 = sig_or_error lex2 in
+    if ast1 = ast2
+    then Ok ()
+    else Error (on_fail ~debug sexp_of_signature ast1 ast2))
 ;;
-
-module Check_same_ast = struct
-  let implementation fn line s1 s2 =
-    check_same_ast fn line s1 s2 struct_or_error
-  ;;
-
-  let interface fn line s1 s2 = check_same_ast fn line s1 s2 sig_or_error
-  let use_file fn line s1 s2 = check_same_ast fn line s1 s2 use_or_error
-end

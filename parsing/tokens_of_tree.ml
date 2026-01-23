@@ -41,7 +41,7 @@ let combine_children_exn ~loc top children =
 (* TODO: should be generated. *)
 let tokenizer =
   object
-    inherit [Tokens.seq list] Ast_traverse.lift_virtual as super
+    inherit [Tokens.seq list] Parsetree.lift as super
 
     (* The actual tokens. *)
     method tokens list = [ list ]
@@ -69,6 +69,16 @@ let tokenizer =
     method list f = List.concat_map ~f
 
     method constr _ = List.concat
+
+    method! mode (Mode (_, tokens) as m) =
+      let sub_tokens = super#mode m in
+      let node_toks = tokens in
+      combine_children_exn ~loc:Location.none node_toks sub_tokens
+
+    method! modality (Modality (_, tokens) as m) =
+      let sub_tokens = super#modality m in
+      let node_toks = tokens in
+      combine_children_exn ~loc:Location.none node_toks sub_tokens
 
     method! longident l =
       let sub_tokens = super#longident l in
@@ -273,24 +283,8 @@ let tokenizer =
       let sub_tokens = super#jkind_annotation jk in
       let node_toks = jk.pjkind_tokens in
       combine_children_exn ~loc:Location.none node_toks sub_tokens
-
-    method! toplevel_directive dir =
-      let sub_tokens = super#toplevel_directive dir in
-      let node_toks = dir.pdir_tokens in
-      combine_children_exn ~loc:Location.none node_toks sub_tokens
-
-    method! lexer_directive dir =
-      let sub_tokens = super#lexer_directive dir in
-      let node_toks = dir.plex_tokens in
-      combine_children_exn ~loc:Location.none node_toks sub_tokens
-
-    method! use_file use =
-      let sub_tokens = super#use_file use in
-      let node_toks = snd use in
-      combine_children_exn ~loc:Location.none node_toks sub_tokens
   end
 ;;
 
 let structure items = tokenizer#structure items |> List.concat
 let signature items = tokenizer#signature items |> List.concat
-let use_file items = tokenizer#use_file items |> List.concat

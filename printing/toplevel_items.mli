@@ -14,11 +14,4 @@ module Sig : sig
     -> Document.t
 end
 
-module Use_file : sig
-  val pp_grouped_keeping_semi
-    :  (Parsetree.toplevel_phrase -> Document.t)
-    -> Parsetree.use_file
-    -> Document.t
-end
-
 val pp_keeping_semi : ('a -> Document.t) -> 'a list * Tokens.seq -> Document.t

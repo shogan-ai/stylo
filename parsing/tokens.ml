@@ -146,7 +146,6 @@ module Raw = struct
     | WITH -> "WITH"
     | COMMENT _ -> "COMMENT"
     | DOCSTRING _ -> "DOCSTRING"
-    | HASH_SYNTAX _ -> "HASH_SYNTAX"
     | EOL -> "EOL"
   ;;
 
@@ -299,7 +298,6 @@ module Raw = struct
     | COMMENT _, COMMENT _ -> true
     | DOCSTRING _, DOCSTRING _ -> true
     | EOL, EOL -> true
-    | HASH_SYNTAX _, HASH_SYNTAX _ -> true
     | _ -> false
   ;;
 end
@@ -505,11 +503,4 @@ let is_token ?which t =
      | None -> true
      | Some t -> tok = t)
   | _ -> false
-;;
-
-let to_string t =
-  match t.desc with
-  | Token (tok, _) -> Raw.to_string tok
-  | Child_node -> "<child>"
-  | Comment comment -> Printf.sprintf "(*%s*)" comment.text
 ;;

@@ -47,14 +47,8 @@ let map ~recur (parent : Context.parent) exp =
   (* local changes first *)
   let exp = Semicolon.exp_no_trailing exp in
   let exp =
-    match exp with
-    | { pexp_desc = Pexp_begin_end (Some e)
-      ; pexp_ext_attr =
-          (* we can't attach ext_attrs to parens, so this is only valid when there are
-             none *)
-          { pea_ext = None; pea_attrs = [] }
-      ; _
-      } ->
+    match exp.pexp_desc with
+    | Pexp_begin_end (Some e) ->
       let pexp_desc = Pexp_parens { exp = e; optional = false } in
       let pexp_tokens =
         Utils.search_and_replace

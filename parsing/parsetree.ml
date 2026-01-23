@@ -150,9 +150,9 @@ and constant =
       Suffixes [g-z][G-Z] are accepted by the parser. Suffixes except ['s'] are rejected
       by the typechecker. *)
 
-and modality = Modality of string [@@unboxed]
+and modality = Modality of string * token_seq
 and modalities = modality loc list
-and mode = Mode of string [@@unboxed]
+and mode = Mode of string * token_seq
 and modes = mode loc list
 and include_kind =
   | Structure
@@ -1354,8 +1354,8 @@ and value_binding =
   ; pvb_modes : modes
   ; pvb_params : function_param list
   ; pvb_constraint : value_constraint option
-  ; pvb_expr : expression option
   ; pvb_ret_modes : modes
+  ; pvb_expr : expression option
   ; pvb_attributes : attributes
   ; pvb_post_doc : string option
   ; pvb_loc : location
@@ -1396,16 +1396,14 @@ and jkind_annotation =
 (** {2 Toplevel phrases} *)
 
 
-and use_file = toplevel_phrase list * token_seq
 and toplevel_phrase =
   | Ptop_def of structure
   | Ptop_dir of toplevel_directive (** [#use], [#load] ... *)
-  | Ptop_lex of lexer_directive
+
 and toplevel_directive =
   { pdir_name : string loc
   ; pdir_arg : directive_argument option
   ; pdir_loc : location
-  ; pdir_tokens : token_seq
   }
 and directive_argument =
   { pdira_desc : directive_argument_desc
@@ -1416,17 +1414,6 @@ and directive_argument_desc =
   | Pdir_int of string * char option
   | Pdir_ident of longident
   | Pdir_bool of bool
-(** Lexer directives: ugly hack to avoid their deletion *)
-and syntax_directive =
-  { psyn_mode : string loc (* which syntax feature e.g. quotations *)
-  ; psyn_toggle : bool (* on/off *)
-  }
-and lexer_directive_desc = Plex_syntax of syntax_directive
-and lexer_directive =
-  { plex_desc : lexer_directive_desc
-  ; plex_loc : location
-  ; plex_tokens : token_seq
-  }
 [@@deriving_inline traverse]
 
 class virtual map =
@@ -1617,9 +1604,10 @@ class virtual map =
     method modality : modality -> modality =
       fun x ->
       match x with
-      | Modality a ->
+      | Modality (a, b) ->
         let a = self#string a in
-        Modality a
+        let b = self#token_seq b in
+        Modality (a, b)
 
     method modalities : modalities -> modalities =
       self#list (self#loc self#modality)
@@ -1627,9 +1615,10 @@ class virtual map =
     method mode : mode -> mode =
       fun x ->
       match x with
-      | Mode a ->
+      | Mode (a, b) ->
         let a = self#string a in
-        Mode a
+        let b = self#token_seq b in
+        Mode (a, b)
 
     method modes : modes -> modes = self#list (self#loc self#mode)
 
@@ -3597,8 +3586,8 @@ class virtual map =
         ; pvb_modes
         ; pvb_params
         ; pvb_constraint
-        ; pvb_expr
         ; pvb_ret_modes
+        ; pvb_expr
         ; pvb_attributes
         ; pvb_post_doc
         ; pvb_loc
@@ -3613,8 +3602,8 @@ class virtual map =
       let pvb_modes = self#modes pvb_modes in
       let pvb_params = self#list self#function_param pvb_params in
       let pvb_constraint = self#option self#value_constraint pvb_constraint in
-      let pvb_expr = self#option self#expression pvb_expr in
       let pvb_ret_modes = self#modes pvb_ret_modes in
+      let pvb_expr = self#option self#expression pvb_expr in
       let pvb_attributes = self#attributes pvb_attributes in
       let pvb_post_doc = self#option self#string pvb_post_doc in
       let pvb_loc = self#location pvb_loc in
@@ -3627,8 +3616,8 @@ class virtual map =
       ; pvb_modes
       ; pvb_params
       ; pvb_constraint
-      ; pvb_expr
       ; pvb_ret_modes
+      ; pvb_expr
       ; pvb_attributes
       ; pvb_post_doc
       ; pvb_loc
@@ -3718,12 +3707,6 @@ class virtual map =
       let pjkind_tokens = self#token_seq pjkind_tokens in
       { pjkind_loc; pjkind_desc; pjkind_tokens }
 
-    method use_file : use_file -> use_file =
-      fun (a, b) ->
-      let a = self#list self#toplevel_phrase a in
-      let b = self#token_seq b in
-      a, b
-
     method toplevel_phrase : toplevel_phrase -> toplevel_phrase =
       fun x ->
       match x with
@@ -3733,17 +3716,13 @@ class virtual map =
       | Ptop_dir a ->
         let a = self#toplevel_directive a in
         Ptop_dir a
-      | Ptop_lex a ->
-        let a = self#lexer_directive a in
-        Ptop_lex a
 
     method toplevel_directive : toplevel_directive -> toplevel_directive =
-      fun { pdir_name; pdir_arg; pdir_loc; pdir_tokens } ->
+      fun { pdir_name; pdir_arg; pdir_loc } ->
       let pdir_name = self#loc self#string pdir_name in
       let pdir_arg = self#option self#directive_argument pdir_arg in
       let pdir_loc = self#location pdir_loc in
-      let pdir_tokens = self#token_seq pdir_tokens in
-      { pdir_name; pdir_arg; pdir_loc; pdir_tokens }
+      { pdir_name; pdir_arg; pdir_loc }
 
     method directive_argument : directive_argument -> directive_argument =
       fun { pdira_desc; pdira_loc } ->
@@ -3769,26 +3748,6 @@ class virtual map =
       | Pdir_bool a ->
         let a = self#bool a in
         Pdir_bool a
-
-    method syntax_directive : syntax_directive -> syntax_directive =
-      fun { psyn_mode; psyn_toggle } ->
-      let psyn_mode = self#loc self#string psyn_mode in
-      let psyn_toggle = self#bool psyn_toggle in
-      { psyn_mode; psyn_toggle }
-
-    method lexer_directive_desc : lexer_directive_desc -> lexer_directive_desc =
-      fun x ->
-      match x with
-      | Plex_syntax a ->
-        let a = self#syntax_directive a in
-        Plex_syntax a
-
-    method lexer_directive : lexer_directive -> lexer_directive =
-      fun { plex_desc; plex_loc; plex_tokens } ->
-      let plex_desc = self#lexer_directive_desc plex_desc in
-      let plex_loc = self#location plex_loc in
-      let plex_tokens = self#token_seq plex_tokens in
-      { plex_desc; plex_loc; plex_tokens }
   end
 
 class virtual iter =
@@ -3945,14 +3904,18 @@ class virtual iter =
     method modality : modality -> unit =
       fun x ->
       match x with
-      | Modality a -> self#string a
+      | Modality (a, b) ->
+        self#string a;
+        self#token_seq b
 
     method modalities : modalities -> unit = self#list (self#loc self#modality)
 
     method mode : mode -> unit =
       fun x ->
       match x with
-      | Mode a -> self#string a
+      | Mode (a, b) ->
+        self#string a;
+        self#token_seq b
 
     method modes : modes -> unit = self#list (self#loc self#mode)
 
@@ -5314,8 +5277,8 @@ class virtual iter =
         ; pvb_modes
         ; pvb_params
         ; pvb_constraint
-        ; pvb_expr
         ; pvb_ret_modes
+        ; pvb_expr
         ; pvb_attributes
         ; pvb_post_doc
         ; pvb_loc
@@ -5330,8 +5293,8 @@ class virtual iter =
       self#modes pvb_modes;
       self#list self#function_param pvb_params;
       self#option self#value_constraint pvb_constraint;
-      self#option self#expression pvb_expr;
       self#modes pvb_ret_modes;
+      self#option self#expression pvb_expr;
       self#attributes pvb_attributes;
       self#option self#string pvb_post_doc;
       self#location pvb_loc;
@@ -5391,24 +5354,17 @@ class virtual iter =
       self#jkind_annotation_desc pjkind_desc;
       self#token_seq pjkind_tokens
 
-    method use_file : use_file -> unit =
-      fun (a, b) ->
-      self#list self#toplevel_phrase a;
-      self#token_seq b
-
     method toplevel_phrase : toplevel_phrase -> unit =
       fun x ->
       match x with
       | Ptop_def a -> self#structure a
       | Ptop_dir a -> self#toplevel_directive a
-      | Ptop_lex a -> self#lexer_directive a
 
     method toplevel_directive : toplevel_directive -> unit =
-      fun { pdir_name; pdir_arg; pdir_loc; pdir_tokens } ->
+      fun { pdir_name; pdir_arg; pdir_loc } ->
       self#loc self#string pdir_name;
       self#option self#directive_argument pdir_arg;
-      self#location pdir_loc;
-      self#token_seq pdir_tokens
+      self#location pdir_loc
 
     method directive_argument : directive_argument -> unit =
       fun { pdira_desc; pdira_loc } ->
@@ -5424,22 +5380,6 @@ class virtual iter =
         self#option self#char b
       | Pdir_ident a -> self#longident a
       | Pdir_bool a -> self#bool a
-
-    method syntax_directive : syntax_directive -> unit =
-      fun { psyn_mode; psyn_toggle } ->
-      self#loc self#string psyn_mode;
-      self#bool psyn_toggle
-
-    method lexer_directive_desc : lexer_directive_desc -> unit =
-      fun x ->
-      match x with
-      | Plex_syntax a -> self#syntax_directive a
-
-    method lexer_directive : lexer_directive -> unit =
-      fun { plex_desc; plex_loc; plex_tokens } ->
-      self#lexer_directive_desc plex_desc;
-      self#location plex_loc;
-      self#token_seq plex_tokens
   end
 
 class virtual ['acc] fold =
@@ -5618,7 +5558,10 @@ class virtual ['acc] fold =
     method modality : modality -> 'acc -> 'acc =
       fun x acc ->
       match x with
-      | Modality a -> self#string a acc
+      | Modality (a, b) ->
+        let acc = self#string a acc in
+        let acc = self#token_seq b acc in
+        acc
 
     method modalities : modalities -> 'acc -> 'acc =
       self#list (self#loc self#modality)
@@ -5626,7 +5569,10 @@ class virtual ['acc] fold =
     method mode : mode -> 'acc -> 'acc =
       fun x acc ->
       match x with
-      | Mode a -> self#string a acc
+      | Mode (a, b) ->
+        let acc = self#string a acc in
+        let acc = self#token_seq b acc in
+        acc
 
     method modes : modes -> 'acc -> 'acc = self#list (self#loc self#mode)
 
@@ -7224,8 +7170,8 @@ class virtual ['acc] fold =
         ; pvb_modes
         ; pvb_params
         ; pvb_constraint
-        ; pvb_expr
         ; pvb_ret_modes
+        ; pvb_expr
         ; pvb_attributes
         ; pvb_post_doc
         ; pvb_loc
@@ -7240,8 +7186,8 @@ class virtual ['acc] fold =
       let acc = self#modes pvb_modes acc in
       let acc = self#list self#function_param pvb_params acc in
       let acc = self#option self#value_constraint pvb_constraint acc in
-      let acc = self#option self#expression pvb_expr acc in
       let acc = self#modes pvb_ret_modes acc in
+      let acc = self#option self#expression pvb_expr acc in
       let acc = self#attributes pvb_attributes acc in
       let acc = self#option self#string pvb_post_doc acc in
       let acc = self#location pvb_loc acc in
@@ -7310,25 +7256,17 @@ class virtual ['acc] fold =
       let acc = self#token_seq pjkind_tokens acc in
       acc
 
-    method use_file : use_file -> 'acc -> 'acc =
-      fun (a, b) acc ->
-      let acc = self#list self#toplevel_phrase a acc in
-      let acc = self#token_seq b acc in
-      acc
-
     method toplevel_phrase : toplevel_phrase -> 'acc -> 'acc =
       fun x acc ->
       match x with
       | Ptop_def a -> self#structure a acc
       | Ptop_dir a -> self#toplevel_directive a acc
-      | Ptop_lex a -> self#lexer_directive a acc
 
     method toplevel_directive : toplevel_directive -> 'acc -> 'acc =
-      fun { pdir_name; pdir_arg; pdir_loc; pdir_tokens } acc ->
+      fun { pdir_name; pdir_arg; pdir_loc } acc ->
       let acc = self#loc self#string pdir_name acc in
       let acc = self#option self#directive_argument pdir_arg acc in
       let acc = self#location pdir_loc acc in
-      let acc = self#token_seq pdir_tokens acc in
       acc
 
     method directive_argument : directive_argument -> 'acc -> 'acc =
@@ -7347,24 +7285,6 @@ class virtual ['acc] fold =
         acc
       | Pdir_ident a -> self#longident a acc
       | Pdir_bool a -> self#bool a acc
-
-    method syntax_directive : syntax_directive -> 'acc -> 'acc =
-      fun { psyn_mode; psyn_toggle } acc ->
-      let acc = self#loc self#string psyn_mode acc in
-      let acc = self#bool psyn_toggle acc in
-      acc
-
-    method lexer_directive_desc : lexer_directive_desc -> 'acc -> 'acc =
-      fun x acc ->
-      match x with
-      | Plex_syntax a -> self#syntax_directive a acc
-
-    method lexer_directive : lexer_directive -> 'acc -> 'acc =
-      fun { plex_desc; plex_loc; plex_tokens } acc ->
-      let acc = self#lexer_directive_desc plex_desc acc in
-      let acc = self#location plex_loc acc in
-      let acc = self#token_seq plex_tokens acc in
-      acc
   end
 
 class virtual ['acc] fold_map =
@@ -7586,9 +7506,10 @@ class virtual ['acc] fold_map =
     method modality : modality -> 'acc -> modality * 'acc =
       fun x acc ->
       match x with
-      | Modality a ->
+      | Modality (a, b) ->
         let a, acc = self#string a acc in
-        Modality a, acc
+        let b, acc = self#token_seq b acc in
+        Modality (a, b), acc
 
     method modalities : modalities -> 'acc -> modalities * 'acc =
       self#list (self#loc self#modality)
@@ -7596,9 +7517,10 @@ class virtual ['acc] fold_map =
     method mode : mode -> 'acc -> mode * 'acc =
       fun x acc ->
       match x with
-      | Mode a ->
+      | Mode (a, b) ->
         let a, acc = self#string a acc in
-        Mode a, acc
+        let b, acc = self#token_seq b acc in
+        Mode (a, b), acc
 
     method modes : modes -> 'acc -> modes * 'acc =
       self#list (self#loc self#mode)
@@ -9736,8 +9658,8 @@ class virtual ['acc] fold_map =
         ; pvb_modes
         ; pvb_params
         ; pvb_constraint
-        ; pvb_expr
         ; pvb_ret_modes
+        ; pvb_expr
         ; pvb_attributes
         ; pvb_post_doc
         ; pvb_loc
@@ -9754,8 +9676,8 @@ class virtual ['acc] fold_map =
       let pvb_constraint, acc =
         self#option self#value_constraint pvb_constraint acc
       in
-      let pvb_expr, acc = self#option self#expression pvb_expr acc in
       let pvb_ret_modes, acc = self#modes pvb_ret_modes acc in
+      let pvb_expr, acc = self#option self#expression pvb_expr acc in
       let pvb_attributes, acc = self#attributes pvb_attributes acc in
       let pvb_post_doc, acc = self#option self#string pvb_post_doc acc in
       let pvb_loc, acc = self#location pvb_loc acc in
@@ -9768,8 +9690,8 @@ class virtual ['acc] fold_map =
         ; pvb_modes
         ; pvb_params
         ; pvb_constraint
-        ; pvb_expr
         ; pvb_ret_modes
+        ; pvb_expr
         ; pvb_attributes
         ; pvb_post_doc
         ; pvb_loc
@@ -9866,12 +9788,6 @@ class virtual ['acc] fold_map =
       let pjkind_tokens, acc = self#token_seq pjkind_tokens acc in
       { pjkind_loc; pjkind_desc; pjkind_tokens }, acc
 
-    method use_file : use_file -> 'acc -> use_file * 'acc =
-      fun (a, b) acc ->
-      let a, acc = self#list self#toplevel_phrase a acc in
-      let b, acc = self#token_seq b acc in
-      (a, b), acc
-
     method toplevel_phrase : toplevel_phrase -> 'acc -> toplevel_phrase * 'acc =
       fun x acc ->
       match x with
@@ -9881,19 +9797,15 @@ class virtual ['acc] fold_map =
       | Ptop_dir a ->
         let a, acc = self#toplevel_directive a acc in
         Ptop_dir a, acc
-      | Ptop_lex a ->
-        let a, acc = self#lexer_directive a acc in
-        Ptop_lex a, acc
 
     method toplevel_directive
       : toplevel_directive -> 'acc -> toplevel_directive * 'acc
       =
-      fun { pdir_name; pdir_arg; pdir_loc; pdir_tokens } acc ->
+      fun { pdir_name; pdir_arg; pdir_loc } acc ->
       let pdir_name, acc = self#loc self#string pdir_name acc in
       let pdir_arg, acc = self#option self#directive_argument pdir_arg acc in
       let pdir_loc, acc = self#location pdir_loc acc in
-      let pdir_tokens, acc = self#token_seq pdir_tokens acc in
-      { pdir_name; pdir_arg; pdir_loc; pdir_tokens }, acc
+      { pdir_name; pdir_arg; pdir_loc }, acc
 
     method directive_argument
       : directive_argument -> 'acc -> directive_argument * 'acc
@@ -9921,30 +9833,6 @@ class virtual ['acc] fold_map =
       | Pdir_bool a ->
         let a, acc = self#bool a acc in
         Pdir_bool a, acc
-
-    method syntax_directive
-      : syntax_directive -> 'acc -> syntax_directive * 'acc
-      =
-      fun { psyn_mode; psyn_toggle } acc ->
-      let psyn_mode, acc = self#loc self#string psyn_mode acc in
-      let psyn_toggle, acc = self#bool psyn_toggle acc in
-      { psyn_mode; psyn_toggle }, acc
-
-    method lexer_directive_desc
-      : lexer_directive_desc -> 'acc -> lexer_directive_desc * 'acc
-      =
-      fun x acc ->
-      match x with
-      | Plex_syntax a ->
-        let a, acc = self#syntax_directive a acc in
-        Plex_syntax a, acc
-
-    method lexer_directive : lexer_directive -> 'acc -> lexer_directive * 'acc =
-      fun { plex_desc; plex_loc; plex_tokens } acc ->
-      let plex_desc, acc = self#lexer_directive_desc plex_desc acc in
-      let plex_loc, acc = self#location plex_loc acc in
-      let plex_tokens, acc = self#token_seq plex_tokens acc in
-      { plex_desc; plex_loc; plex_tokens }, acc
   end
 
 class virtual ['ctx] map_with_context =
@@ -10144,9 +10032,10 @@ class virtual ['ctx] map_with_context =
     method modality : 'ctx -> modality -> modality =
       fun ctx x ->
       match x with
-      | Modality a ->
+      | Modality (a, b) ->
         let a = self#string ctx a in
-        Modality a
+        let b = self#token_seq ctx b in
+        Modality (a, b)
 
     method modalities : 'ctx -> modalities -> modalities =
       self#list (self#loc self#modality)
@@ -10154,9 +10043,10 @@ class virtual ['ctx] map_with_context =
     method mode : 'ctx -> mode -> mode =
       fun ctx x ->
       match x with
-      | Mode a ->
+      | Mode (a, b) ->
         let a = self#string ctx a in
-        Mode a
+        let b = self#token_seq ctx b in
+        Mode (a, b)
 
     method modes : 'ctx -> modes -> modes = self#list (self#loc self#mode)
 
@@ -12207,8 +12097,8 @@ class virtual ['ctx] map_with_context =
         ; pvb_modes
         ; pvb_params
         ; pvb_constraint
-        ; pvb_expr
         ; pvb_ret_modes
+        ; pvb_expr
         ; pvb_attributes
         ; pvb_post_doc
         ; pvb_loc
@@ -12225,8 +12115,8 @@ class virtual ['ctx] map_with_context =
       let pvb_constraint =
         self#option self#value_constraint ctx pvb_constraint
       in
-      let pvb_expr = self#option self#expression ctx pvb_expr in
       let pvb_ret_modes = self#modes ctx pvb_ret_modes in
+      let pvb_expr = self#option self#expression ctx pvb_expr in
       let pvb_attributes = self#attributes ctx pvb_attributes in
       let pvb_post_doc = self#option self#string ctx pvb_post_doc in
       let pvb_loc = self#location ctx pvb_loc in
@@ -12239,8 +12129,8 @@ class virtual ['ctx] map_with_context =
       ; pvb_modes
       ; pvb_params
       ; pvb_constraint
-      ; pvb_expr
       ; pvb_ret_modes
+      ; pvb_expr
       ; pvb_attributes
       ; pvb_post_doc
       ; pvb_loc
@@ -12332,12 +12222,6 @@ class virtual ['ctx] map_with_context =
       let pjkind_tokens = self#token_seq ctx pjkind_tokens in
       { pjkind_loc; pjkind_desc; pjkind_tokens }
 
-    method use_file : 'ctx -> use_file -> use_file =
-      fun ctx (a, b) ->
-      let a = self#list self#toplevel_phrase ctx a in
-      let b = self#token_seq ctx b in
-      a, b
-
     method toplevel_phrase : 'ctx -> toplevel_phrase -> toplevel_phrase =
       fun ctx x ->
       match x with
@@ -12347,18 +12231,14 @@ class virtual ['ctx] map_with_context =
       | Ptop_dir a ->
         let a = self#toplevel_directive ctx a in
         Ptop_dir a
-      | Ptop_lex a ->
-        let a = self#lexer_directive ctx a in
-        Ptop_lex a
 
     method toplevel_directive : 'ctx -> toplevel_directive -> toplevel_directive
       =
-      fun ctx { pdir_name; pdir_arg; pdir_loc; pdir_tokens } ->
+      fun ctx { pdir_name; pdir_arg; pdir_loc } ->
       let pdir_name = self#loc self#string ctx pdir_name in
       let pdir_arg = self#option self#directive_argument ctx pdir_arg in
       let pdir_loc = self#location ctx pdir_loc in
-      let pdir_tokens = self#token_seq ctx pdir_tokens in
-      { pdir_name; pdir_arg; pdir_loc; pdir_tokens }
+      { pdir_name; pdir_arg; pdir_loc }
 
     method directive_argument : 'ctx -> directive_argument -> directive_argument
       =
@@ -12385,28 +12265,6 @@ class virtual ['ctx] map_with_context =
       | Pdir_bool a ->
         let a = self#bool ctx a in
         Pdir_bool a
-
-    method syntax_directive : 'ctx -> syntax_directive -> syntax_directive =
-      fun ctx { psyn_mode; psyn_toggle } ->
-      let psyn_mode = self#loc self#string ctx psyn_mode in
-      let psyn_toggle = self#bool ctx psyn_toggle in
-      { psyn_mode; psyn_toggle }
-
-    method lexer_directive_desc
-      : 'ctx -> lexer_directive_desc -> lexer_directive_desc
-      =
-      fun ctx x ->
-      match x with
-      | Plex_syntax a ->
-        let a = self#syntax_directive ctx a in
-        Plex_syntax a
-
-    method lexer_directive : 'ctx -> lexer_directive -> lexer_directive =
-      fun ctx { plex_desc; plex_loc; plex_tokens } ->
-      let plex_desc = self#lexer_directive_desc ctx plex_desc in
-      let plex_loc = self#location ctx plex_loc in
-      let plex_tokens = self#token_seq ctx plex_tokens in
-      { plex_desc; plex_loc; plex_tokens }
   end
 
 class virtual ['res] lift =
@@ -12679,18 +12537,20 @@ class virtual ['res] lift =
     method modality : modality -> 'res =
       fun x ->
       match x with
-      | Modality a ->
+      | Modality (a, b) ->
         let a = self#string a in
-        self#constr "Modality" [ a ]
+        let b = self#token_seq b in
+        self#constr "Modality" [ a; b ]
 
     method modalities : modalities -> 'res = self#list (self#loc self#modality)
 
     method mode : mode -> 'res =
       fun x ->
       match x with
-      | Mode a ->
+      | Mode (a, b) ->
         let a = self#string a in
-        self#constr "Mode" [ a ]
+        let b = self#token_seq b in
+        self#constr "Mode" [ a; b ]
 
     method modes : modes -> 'res = self#list (self#loc self#mode)
 
@@ -14923,8 +14783,8 @@ class virtual ['res] lift =
         ; pvb_modes
         ; pvb_params
         ; pvb_constraint
-        ; pvb_expr
         ; pvb_ret_modes
+        ; pvb_expr
         ; pvb_attributes
         ; pvb_post_doc
         ; pvb_loc
@@ -14939,8 +14799,8 @@ class virtual ['res] lift =
       let pvb_modes = self#modes pvb_modes in
       let pvb_params = self#list self#function_param pvb_params in
       let pvb_constraint = self#option self#value_constraint pvb_constraint in
-      let pvb_expr = self#option self#expression pvb_expr in
       let pvb_ret_modes = self#modes pvb_ret_modes in
+      let pvb_expr = self#option self#expression pvb_expr in
       let pvb_attributes = self#attributes pvb_attributes in
       let pvb_post_doc = self#option self#string pvb_post_doc in
       let pvb_loc = self#location pvb_loc in
@@ -14956,8 +14816,8 @@ class virtual ['res] lift =
         ; "pvb_modes", pvb_modes
         ; "pvb_params", pvb_params
         ; "pvb_constraint", pvb_constraint
-        ; "pvb_expr", pvb_expr
         ; "pvb_ret_modes", pvb_ret_modes
+        ; "pvb_expr", pvb_expr
         ; "pvb_attributes", pvb_attributes
         ; "pvb_post_doc", pvb_post_doc
         ; "pvb_loc", pvb_loc
@@ -15054,12 +14914,6 @@ class virtual ['res] lift =
         ; "pjkind_tokens", pjkind_tokens
         ]
 
-    method use_file : use_file -> 'res =
-      fun (a, b) ->
-      let a = self#list self#toplevel_phrase a in
-      let b = self#token_seq b in
-      self#tuple [ a; b ]
-
     method toplevel_phrase : toplevel_phrase -> 'res =
       fun x ->
       match x with
@@ -15069,23 +14923,18 @@ class virtual ['res] lift =
       | Ptop_dir a ->
         let a = self#toplevel_directive a in
         self#constr "Ptop_dir" [ a ]
-      | Ptop_lex a ->
-        let a = self#lexer_directive a in
-        self#constr "Ptop_lex" [ a ]
 
     method toplevel_directive : toplevel_directive -> 'res =
-      fun { pdir_name; pdir_arg; pdir_loc; pdir_tokens } ->
+      fun { pdir_name; pdir_arg; pdir_loc } ->
       let pdir_name = self#loc self#string pdir_name in
       let pdir_arg = self#option self#directive_argument pdir_arg in
       let pdir_loc = self#location pdir_loc in
-      let pdir_tokens = self#token_seq pdir_tokens in
       self
       #
       record
         [ "pdir_name", pdir_name
         ; "pdir_arg", pdir_arg
         ; "pdir_loc", pdir_loc
-        ; "pdir_tokens", pdir_tokens
         ]
 
     method directive_argument : directive_argument -> 'res =
@@ -15110,32 +14959,6 @@ class virtual ['res] lift =
       | Pdir_bool a ->
         let a = self#bool a in
         self#constr "Pdir_bool" [ a ]
-
-    method syntax_directive : syntax_directive -> 'res =
-      fun { psyn_mode; psyn_toggle } ->
-      let psyn_mode = self#loc self#string psyn_mode in
-      let psyn_toggle = self#bool psyn_toggle in
-      self#record [ "psyn_mode", psyn_mode; "psyn_toggle", psyn_toggle ]
-
-    method lexer_directive_desc : lexer_directive_desc -> 'res =
-      fun x ->
-      match x with
-      | Plex_syntax a ->
-        let a = self#syntax_directive a in
-        self#constr "Plex_syntax" [ a ]
-
-    method lexer_directive : lexer_directive -> 'res =
-      fun { plex_desc; plex_loc; plex_tokens } ->
-      let plex_desc = self#lexer_directive_desc plex_desc in
-      let plex_loc = self#location plex_loc in
-      let plex_tokens = self#token_seq plex_tokens in
-      self
-      #
-      record
-        [ "plex_desc", plex_desc
-        ; "plex_loc", plex_loc
-        ; "plex_tokens", plex_tokens
-        ]
   end
 
 class virtual ['ctx, 'res] lift_map_with_context =
@@ -15449,9 +15272,11 @@ class virtual ['ctx, 'res] lift_map_with_context =
     method modality : 'ctx -> modality -> modality * 'res =
       fun ctx x ->
       match x with
-      | Modality a ->
+      | Modality (a, b) ->
         let a = self#string ctx a in
-        Modality (Stdlib.fst a), self#constr ctx "Modality" [ Stdlib.snd a ]
+        let b = self#token_seq ctx b in
+        ( Modality (Stdlib.fst a, Stdlib.fst b)
+        , self#constr ctx "Modality" [ Stdlib.snd a; Stdlib.snd b ] )
 
     method modalities : 'ctx -> modalities -> modalities * 'res =
       self#list (self#loc self#modality)
@@ -15459,9 +15284,11 @@ class virtual ['ctx, 'res] lift_map_with_context =
     method mode : 'ctx -> mode -> mode * 'res =
       fun ctx x ->
       match x with
-      | Mode a ->
+      | Mode (a, b) ->
         let a = self#string ctx a in
-        Mode (Stdlib.fst a), self#constr ctx "Mode" [ Stdlib.snd a ]
+        let b = self#token_seq ctx b in
+        ( Mode (Stdlib.fst a, Stdlib.fst b)
+        , self#constr ctx "Mode" [ Stdlib.snd a; Stdlib.snd b ] )
 
     method modes : 'ctx -> modes -> modes * 'res =
       self#list (self#loc self#mode)
@@ -18699,8 +18526,8 @@ class virtual ['ctx, 'res] lift_map_with_context =
         ; pvb_modes
         ; pvb_params
         ; pvb_constraint
-        ; pvb_expr
         ; pvb_ret_modes
+        ; pvb_expr
         ; pvb_attributes
         ; pvb_post_doc
         ; pvb_loc
@@ -18717,8 +18544,8 @@ class virtual ['ctx, 'res] lift_map_with_context =
       let pvb_constraint =
         self#option self#value_constraint ctx pvb_constraint
       in
-      let pvb_expr = self#option self#expression ctx pvb_expr in
       let pvb_ret_modes = self#modes ctx pvb_ret_modes in
+      let pvb_expr = self#option self#expression ctx pvb_expr in
       let pvb_attributes = self#attributes ctx pvb_attributes in
       let pvb_post_doc = self#option self#string ctx pvb_post_doc in
       let pvb_loc = self#location ctx pvb_loc in
@@ -18731,8 +18558,8 @@ class virtual ['ctx, 'res] lift_map_with_context =
         ; pvb_modes = Stdlib.fst pvb_modes
         ; pvb_params = Stdlib.fst pvb_params
         ; pvb_constraint = Stdlib.fst pvb_constraint
-        ; pvb_expr = Stdlib.fst pvb_expr
         ; pvb_ret_modes = Stdlib.fst pvb_ret_modes
+        ; pvb_expr = Stdlib.fst pvb_expr
         ; pvb_attributes = Stdlib.fst pvb_attributes
         ; pvb_post_doc = Stdlib.fst pvb_post_doc
         ; pvb_loc = Stdlib.fst pvb_loc
@@ -18750,8 +18577,8 @@ class virtual ['ctx, 'res] lift_map_with_context =
           ; "pvb_modes", Stdlib.snd pvb_modes
           ; "pvb_params", Stdlib.snd pvb_params
           ; "pvb_constraint", Stdlib.snd pvb_constraint
-          ; "pvb_expr", Stdlib.snd pvb_expr
           ; "pvb_ret_modes", Stdlib.snd pvb_ret_modes
+          ; "pvb_expr", Stdlib.snd pvb_expr
           ; "pvb_attributes", Stdlib.snd pvb_attributes
           ; "pvb_post_doc", Stdlib.snd pvb_post_doc
           ; "pvb_loc", Stdlib.snd pvb_loc
@@ -18885,13 +18712,6 @@ class virtual ['ctx, 'res] lift_map_with_context =
           ; "pjkind_tokens", Stdlib.snd pjkind_tokens
           ] )
 
-    method use_file : 'ctx -> use_file -> use_file * 'res =
-      fun ctx (a, b) ->
-      let a = self#list self#toplevel_phrase ctx a in
-      let b = self#token_seq ctx b in
-      ( (Stdlib.fst a, Stdlib.fst b)
-      , self#tuple ctx [ Stdlib.snd a; Stdlib.snd b ] )
-
     method toplevel_phrase : 'ctx -> toplevel_phrase -> toplevel_phrase * 'res =
       fun ctx x ->
       match x with
@@ -18901,22 +18721,17 @@ class virtual ['ctx, 'res] lift_map_with_context =
       | Ptop_dir a ->
         let a = self#toplevel_directive ctx a in
         Ptop_dir (Stdlib.fst a), self#constr ctx "Ptop_dir" [ Stdlib.snd a ]
-      | Ptop_lex a ->
-        let a = self#lexer_directive ctx a in
-        Ptop_lex (Stdlib.fst a), self#constr ctx "Ptop_lex" [ Stdlib.snd a ]
 
     method toplevel_directive
       : 'ctx -> toplevel_directive -> toplevel_directive * 'res
       =
-      fun ctx { pdir_name; pdir_arg; pdir_loc; pdir_tokens } ->
+      fun ctx { pdir_name; pdir_arg; pdir_loc } ->
       let pdir_name = self#loc self#string ctx pdir_name in
       let pdir_arg = self#option self#directive_argument ctx pdir_arg in
       let pdir_loc = self#location ctx pdir_loc in
-      let pdir_tokens = self#token_seq ctx pdir_tokens in
       ( { pdir_name = Stdlib.fst pdir_name
         ; pdir_arg = Stdlib.fst pdir_arg
         ; pdir_loc = Stdlib.fst pdir_loc
-        ; pdir_tokens = Stdlib.fst pdir_tokens
         }
       , self
         #
@@ -18925,7 +18740,6 @@ class virtual ['ctx, 'res] lift_map_with_context =
           [ "pdir_name", Stdlib.snd pdir_name
           ; "pdir_arg", Stdlib.snd pdir_arg
           ; "pdir_loc", Stdlib.snd pdir_loc
-          ; "pdir_tokens", Stdlib.snd pdir_tokens
           ] )
 
     method directive_argument
@@ -18964,51 +18778,6 @@ class virtual ['ctx, 'res] lift_map_with_context =
       | Pdir_bool a ->
         let a = self#bool ctx a in
         Pdir_bool (Stdlib.fst a), self#constr ctx "Pdir_bool" [ Stdlib.snd a ]
-
-    method syntax_directive
-      : 'ctx -> syntax_directive -> syntax_directive * 'res
-      =
-      fun ctx { psyn_mode; psyn_toggle } ->
-      let psyn_mode = self#loc self#string ctx psyn_mode in
-      let psyn_toggle = self#bool ctx psyn_toggle in
-      ( { psyn_mode = Stdlib.fst psyn_mode
-        ; psyn_toggle = Stdlib.fst psyn_toggle
-        }
-      , self
-        #
-        record
-          ctx
-          [ "psyn_mode", Stdlib.snd psyn_mode
-          ; "psyn_toggle", Stdlib.snd psyn_toggle
-          ] )
-
-    method lexer_directive_desc
-      : 'ctx -> lexer_directive_desc -> lexer_directive_desc * 'res
-      =
-      fun ctx x ->
-      match x with
-      | Plex_syntax a ->
-        let a = self#syntax_directive ctx a in
-        ( Plex_syntax (Stdlib.fst a)
-        , self#constr ctx "Plex_syntax" [ Stdlib.snd a ] )
-
-    method lexer_directive : 'ctx -> lexer_directive -> lexer_directive * 'res =
-      fun ctx { plex_desc; plex_loc; plex_tokens } ->
-      let plex_desc = self#lexer_directive_desc ctx plex_desc in
-      let plex_loc = self#location ctx plex_loc in
-      let plex_tokens = self#token_seq ctx plex_tokens in
-      ( { plex_desc = Stdlib.fst plex_desc
-        ; plex_loc = Stdlib.fst plex_loc
-        ; plex_tokens = Stdlib.fst plex_tokens
-        }
-      , self
-        #
-        record
-          ctx
-          [ "plex_desc", Stdlib.snd plex_desc
-          ; "plex_loc", Stdlib.snd plex_loc
-          ; "plex_tokens", Stdlib.snd plex_tokens
-          ] )
   end
 
 [@@@end]

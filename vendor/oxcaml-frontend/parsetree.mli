@@ -18,6 +18,7 @@
     {b Warning:} this module is unstable and part of {{!Compiler_libs} compiler-libs}. *)
 
 open Asttypes
+open! Sexplib0.Sexp_conv
 
 type constant =
   | Pconst_integer of string * char option
@@ -47,15 +48,18 @@ type constant =
       Suffixes [g-z][G-Z] are accepted by the parser. Suffixes except ['s'] are rejected
       by the typechecker. *)
 
-type location_stack = Location.t list
-type modality = Modality of string [@@unboxed]
-type modalities = modality loc list
-type mode = Mode of string [@@unboxed]
-type modes = mode loc list
+[@@deriving sexp_of]
+
+type location_stack = Location.t list [@@deriving sexp_of]
+type modality = Modality of string [@@unboxed] [@@deriving sexp_of]
+type modalities = modality loc list [@@deriving sexp_of]
+type mode = Mode of string [@@unboxed] [@@deriving sexp_of]
+type modes = mode loc list [@@deriving sexp_of]
 
 type include_kind =
   | Structure
   | Functor
+[@@deriving sexp_of]
 
 (** {1 Extension points} *)
 
@@ -68,10 +72,6 @@ type attribute =
   ; attr_payload : payload
   ; attr_loc : Location.t
   }
-(** Extension points such as [[%id ARG] and [%%id ARG]].
-
-    Sub-language placeholder -- rejected by the typechecker. *)
-
 (** Extension points such as [[%id ARG] and [%%id ARG]].
 
     Sub-language placeholder -- rejected by the typechecker. *)
@@ -180,11 +180,10 @@ and arg_label = Asttypes.arg_label =
   | Nolabel
   | Labelled of string
   | Optional of string
-    (** As {!package_type} typed values:
+(** As {!package_type} typed values:
     - [(S, [])] represents [(module S)],
     - [(S, [(t1, T1) ; ... ; (tn, Tn)])] represents
       [(module S with type t1 = T1 and ... and tn = Tn)]. *)
-
 and package_type = Longident.t loc * (Longident.t loc * core_type) list
 and row_field =
   { prf_desc : row_field_desc
@@ -512,8 +511,6 @@ and function_param =
   ; pparam_desc : function_param_desc
   }
 (** See the comment on {{!expression_desc.Pexp_function} [Pexp_function]}. *)
-
-(** See the comment on {{!expression_desc.Pexp_function} [Pexp_function]}. *)
 and function_body =
   | Pfunction_body of expression
   | Pfunction_cases of case list * Location.t * attributes
@@ -643,13 +640,12 @@ and type_kind =
   | Ptype_record_unboxed_product of label_declaration list
     (** Invariant: non-empty list *)
   | Ptype_open
-    (** - [{ ...; l: T; ... }] when {{!label_declaration.pld_mutable} [pld_mutable]} is
+(** - [{ ...; l: T; ... }] when {{!label_declaration.pld_mutable} [pld_mutable]} is
       {{!Asttypes.mutable_flag.Immutable} [Immutable]},
     - [{ ...; mutable l: T; ... }] when {{!label_declaration.pld_mutable} [pld_mutable]}
       is {{!Asttypes.mutable_flag.Mutable} [Mutable]}.
 
     Note: [T] can be a {{!core_type_desc.Ptyp_poly} [Ptyp_poly]}. *)
-
 and label_declaration =
   { pld_name : string loc
   ; pld_mutable : mutable_flag
@@ -699,8 +695,6 @@ and extension_constructor =
   ; pext_loc : Location.t
   ; pext_attributes : attributes (** [C of ... [\@id1] [\@id2]] *)
   }
-(** Definition of a new exception ([exception E]). *)
-
 (** Definition of a new exception ([exception E]). *)
 and type_exception =
   { ptyexn_constructor : extension_constructor
@@ -956,19 +950,12 @@ and module_declaration =
   ; pmd_loc : Location.t
   }
 (** Values of type [module_substitution] represents [S := M] *)
-
-(** Values of type [module_substitution] represents [S := M] *)
 and module_substitution =
   { pms_name : string loc
   ; pms_manifest : Longident.t loc
   ; pms_attributes : attributes (** [... [\@\@id1] [\@\@id2]] *)
   ; pms_loc : Location.t
   }
-(** Values of type [module_type_declaration] represents:
-    - [S = MT],
-    - [S] for abstract module type declaration, when {{!module_type_declaration.pmtd_type}
-      [pmtd_type]} is [None]. *)
-
 (** Values of type [module_type_declaration] represents:
     - [S = MT],
     - [S] for abstract module type declaration, when {{!module_type_declaration.pmtd_type}
@@ -985,13 +972,6 @@ and module_type_declaration =
       shadowing" warning)
     - [open  X] when {{!open_infos.popen_override} [popen_override]} is
       {{!Asttypes.override_flag.Fresh} [Fresh]} *)
-
-(** Values of type ['a open_infos] represents:
-    - [open! X] when {{!open_infos.popen_override} [popen_override]} is
-      {{!Asttypes.override_flag.Override} [Override]} (silences the "used identifier
-      shadowing" warning)
-    - [open  X] when {{!open_infos.popen_override} [popen_override]} is
-      {{!Asttypes.override_flag.Fresh} [Fresh]} *)
 and 'a open_infos =
   { popen_expr : 'a
   ; popen_override : override_flag
@@ -1001,16 +981,7 @@ and 'a open_infos =
 (** Values of type [open_description] represents:
     - [open M.N]
     - [open M(N).O] *)
-
-(** Values of type [open_description] represents:
-    - [open M.N]
-    - [open M(N).O] *)
 and open_description = Longident.t loc open_infos
-(** Values of type [open_declaration] represents:
-    - [open M.N]
-    - [open M(N).O]
-    - [open struct ... end] *)
-
 (** Values of type [open_declaration] represents:
     - [open M.N]
     - [open M(N).O]
@@ -1023,11 +994,7 @@ and 'a include_infos =
   ; pincl_attributes : attributes
   }
 (** Values of type [include_description] represents [include MT] *)
-
-(** Values of type [include_description] represents [include MT] *)
 and include_description = module_type include_infos
-(** Values of type [include_declaration] represents [include ME] *)
-
 (** Values of type [include_declaration] represents [include ME] *)
 and include_declaration = module_expr include_infos
 and with_constraint =
@@ -1143,8 +1110,6 @@ and value_binding =
   ; pvb_loc : Location.t
   }
 (** Values of type [module_binding] represents [module X = ME] *)
-
-(** Values of type [module_binding] represents [module X = ME] *)
 and module_binding =
   { pmb_name : string option loc
   ; pmb_expr : module_expr
@@ -1164,6 +1129,7 @@ and jkind_annotation =
   { pjkind_loc : Location.t
   ; pjkind_desc : jkind_annotation_desc
   }
+[@@deriving sexp_of]
 
 (** {1 Toplevel} *)
 (** {2 Toplevel phrases} *)
@@ -1186,3 +1152,4 @@ and directive_argument_desc =
   | Pdir_int of string * char option
   | Pdir_ident of Longident.t
   | Pdir_bool of bool
+[@@deriving sexp_of]

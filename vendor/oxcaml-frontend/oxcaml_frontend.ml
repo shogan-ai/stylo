@@ -1,5 +1,5 @@
 module Ast_helper = Ast_helper
-module Ast_traverse = Ast_traverse
+module Ast_mapper = Ast_mapper
 module Asttypes = Asttypes
 module Builtin_attributes = Builtin_attributes
 module Clflags = Clflags

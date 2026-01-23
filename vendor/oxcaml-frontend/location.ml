@@ -14,12 +14,22 @@
 (**************************************************************************)
 
 open Lexing
+open Sexplib0.Sexp_conv
+
+type nonrec position = position =
+  { pos_fname : string
+  ; pos_lnum : int
+  ; pos_bol : int
+  ; pos_cnum : int
+  }
+[@@deriving sexp_of]
 
 type t = Warnings.loc =
   { loc_start : position
   ; loc_end : position
   ; loc_ghost : bool
   }
+[@@deriving sexp_of]
 
 let compare_position : position -> position -> int =
   fun
@@ -353,11 +363,6 @@ let print_loc ~capitalize_first ppf loc =
 
 let print_loc_in_lowercase = print_loc ~capitalize_first:false
 let print_loc = print_loc ~capitalize_first:true
-
-let to_string t =
-  print_loc Format.str_formatter t;
-  Format.flush_str_formatter ()
-;;
 
 (* Print a comma-separated list of locations *)
 let print_locs ppf locs =

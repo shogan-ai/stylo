@@ -9,7 +9,23 @@ let from_docstring attr =
 
 let normalizer =
   object(self)
-    inherit [Context.parent] Ast_traverse.map_with_context as super
+    inherit [Context.parent] Parsetree.map_with_context as super
+
+    method token _ x = x
+
+    method string _ x = x
+
+    method ref f env r = ref (f env !r)
+
+    method option f env o = Option.map (f env) o
+
+    method list f env l = List.map (f env) l
+
+    method int _ x = x
+
+    method char _ x = x
+
+    method bool _ x = x
 
     method! attribute env attr =
       if from_docstring attr then attr else super#attribute env attr
@@ -71,12 +87,8 @@ let normalizer =
     method! argument_desc f _ arg =
       let parent_for_recursive_calls = Context.Fun_param_or_arg in
       super#argument_desc f parent_for_recursive_calls arg
-
-    method! use_file env use =
-      Semicolon.normalize_use_file_semisemi use |> super#use_file env
   end
 ;;
 
 let structure = normalizer#structure Other
 let signature = normalizer#signature Other
-let use_file = normalizer#use_file Other

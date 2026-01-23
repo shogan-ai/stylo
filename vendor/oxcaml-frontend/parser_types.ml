@@ -1,3 +1,4 @@
+open Asttypes
 open Parsetree
 open Docstrings
 

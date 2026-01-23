@@ -16,7 +16,23 @@ let cleaner =
     | _ -> false
   in
   object(self)
-    inherit Ast_traverse.map as super
+    inherit Parsetree.map as super
+
+    method token x = x
+
+    method string x = x
+
+    method int x = x
+
+    method char x = x
+
+    method bool x = x
+
+    method ref f r = ref (f !r)
+
+    method option f o = Option.map f o
+
+    method list f l = List.map f l
 
     method! attribute attr =
       let attr_payload =

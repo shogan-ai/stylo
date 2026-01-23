@@ -128,6 +128,10 @@ and attribute =
 (** Extension points such as [[%id ARG] and [%%id ARG]].
 
     Sub-language placeholder -- rejected by the typechecker. *)
+
+(** Extension points such as [[%id ARG] and [%%id ARG]].
+
+    Sub-language placeholder -- rejected by the typechecker. *)
 and extension = string loc * payload
 and attributes = attribute list
 and payload =
@@ -549,6 +553,8 @@ and function_param =
   ; pparam_desc : function_param_desc
   }
 (** See the comment on {{!expression_desc.Pexp_function} [Pexp_function]}. *)
+
+(** See the comment on {{!expression_desc.Pexp_function} [Pexp_function]}. *)
 and function_body =
   | Pfunction_body of expression
   | Pfunction_cases of case list * location * attributes
@@ -678,12 +684,13 @@ and type_kind =
   | Ptype_record_unboxed_product of label_declaration list
     (** Invariant: non-empty list *)
   | Ptype_open
-(** - [{ ...; l: T; ... }] when {{!label_declaration.pld_mutable} [pld_mutable]} is
+    (** - [{ ...; l: T; ... }] when {{!label_declaration.pld_mutable} [pld_mutable]} is
       {{!mutable_flag.Immutable} [Immutable]},
     - [{ ...; mutable l: T; ... }] when {{!label_declaration.pld_mutable} [pld_mutable]}
       is {{!mutable_flag.Mutable} [Mutable]}.
 
     Note: [T] can be a {{!core_type_desc.Ptyp_poly} [Ptyp_poly]}. *)
+
 and label_declaration =
   { pld_name : string loc
   ; pld_mutable : mutable_flag
@@ -733,6 +740,8 @@ and extension_constructor =
   ; pext_loc : location
   ; pext_attributes : attributes (** [C of ... [\@id1] [\@id2]] *)
   }
+(** Definition of a new exception ([exception E]). *)
+
 (** Definition of a new exception ([exception E]). *)
 and type_exception =
   { ptyexn_constructor : extension_constructor
@@ -987,12 +996,19 @@ and module_declaration =
   ; pmd_loc : location
   }
 (** Values of type [module_substitution] represents [S := M] *)
+
+(** Values of type [module_substitution] represents [S := M] *)
 and module_substitution =
   { pms_name : string loc
   ; pms_manifest : longident loc
   ; pms_attributes : attributes (** [... [\@\@id1] [\@\@id2]] *)
   ; pms_loc : location
   }
+(** Values of type [module_type_declaration] represents:
+    - [S = MT],
+    - [S] for abstract module type declaration, when {{!module_type_declaration.pmtd_type}
+      [pmtd_type]} is [None]. *)
+
 (** Values of type [module_type_declaration] represents:
     - [S = MT],
     - [S] for abstract module type declaration, when {{!module_type_declaration.pmtd_type}
@@ -1009,6 +1025,13 @@ and module_type_declaration =
       warning)
     - [open  X] when {{!open_infos.popen_override} [popen_override]} is
       {{!override_flag.Fresh} [Fresh]} *)
+
+(** Values of type ['a open_infos] represents:
+    - [open! X] when {{!open_infos.popen_override} [popen_override]} is
+      {{!override_flag.Override} [Override]} (silences the "used identifier shadowing"
+      warning)
+    - [open  X] when {{!open_infos.popen_override} [popen_override]} is
+      {{!override_flag.Fresh} [Fresh]} *)
 and 'a open_infos =
   { popen_expr : 'a
   ; popen_override : override_flag
@@ -1018,7 +1041,16 @@ and 'a open_infos =
 (** Values of type [open_description] represents:
     - [open M.N]
     - [open M(N).O] *)
+
+(** Values of type [open_description] represents:
+    - [open M.N]
+    - [open M(N).O] *)
 and open_description = longident loc open_infos
+(** Values of type [open_declaration] represents:
+    - [open M.N]
+    - [open M(N).O]
+    - [open struct ... end] *)
+
 (** Values of type [open_declaration] represents:
     - [open M.N]
     - [open M(N).O]
@@ -1031,7 +1063,11 @@ and 'a include_infos =
   ; pincl_attributes : attributes
   }
 (** Values of type [include_description] represents [include MT] *)
+
+(** Values of type [include_description] represents [include MT] *)
 and include_description = module_type include_infos
+(** Values of type [include_declaration] represents [include ME] *)
+
 (** Values of type [include_declaration] represents [include ME] *)
 and include_declaration = module_expr include_infos
 and with_constraint =
@@ -1145,6 +1181,8 @@ and value_binding =
   ; pvb_attributes : attributes
   ; pvb_loc : location
   }
+(** Values of type [module_binding] represents [module X = ME] *)
+
 (** Values of type [module_binding] represents [module X = ME] *)
 and module_binding =
   { pmb_name : string option loc

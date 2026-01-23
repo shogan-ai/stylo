@@ -1,19 +1,20 @@
 open Ocaml_syntax
 
-let style_file file_type contents ~filename =
+let style_file contents ~filename =
   let lexbuf = Lexing.from_string contents in
   Location.init lexbuf filename;
   let doc, tokens =
-    let parsed = File_type.parse file_type lexbuf in
-    let normalized = File_type.normalize file_type parsed in
-    ( File_type.pp file_type normalized
-    , File_type.tokens_of_tree file_type normalized )
+    if Filename.check_suffix filename ".mli"
+    then (
+      let sg = Parse.interface lexbuf in
+      let sg = Normalize.signature sg in
+      Print.Signature.pp_interface sg, Tokens_of_tree.signature sg)
+    else (
+      let str = Parse.implementation lexbuf in
+      let str = Normalize.structure str in
+      Print.Structure.pp_implementation str, Tokens_of_tree.structure str)
   in
-  Dbg_print.dprintf "Tokens:\n%a@." Tokens.pp_seq tokens;
-  Dbg_print.dprintf
-    "Doc:\n%a\n%!"
-    Sexplib0.Sexp.pp_hum
-    (Document.Utils.sexp_of_t doc);
+  Dbg_print.dprintf "%a@." Tokens.pp_seq tokens;
   Comments.Insert.from_tokens tokens doc
 ;;
 
@@ -136,8 +137,8 @@ let command_fuzz =
      fun () -> if fuzzer_batch input ~width then exit 1)
 ;;
 
-let format_one file_type contents ~filename ~width ~ast_check ~in_place =
-  match style_file file_type contents ~filename with
+let format_one contents ~filename ~width ~ast_check ~in_place ~debug =
+  match style_file contents with
   | exception Comments.Insert.Error e ->
     Format.eprintf "%s: ERROR: %a@." filename Comments.Insert.Error.pp e;
     Error ()
@@ -147,23 +148,35 @@ let format_one file_type contents ~filename ~width ~ast_check ~in_place =
     if Dbg_print.dbg then Format.eprintf "@\n%s@." bt else Format.eprintf "@.";
     Error ()
   | doc ->
-    let reprinted = Document.Print.to_string ~width doc in
-    if ast_check
-       &&
-       let source = contents in
-       not @@ File_type.check_same_ast file_type filename 0 source reprinted
-    then (
-      (* TODO: location, etc *)
-      Format.eprintf "%s: ast changed@." filename;
-      Error ())
-    else (
-      let pp oc =
-        output_string oc reprinted;
-        output_char oc '\n';
-        flush oc
-      in
-      if not in_place then pp stdout else Out_channel.with_open_text filename pp;
-      Ok ())
+    let reprinted = Document.Print.to_string ~width (doc ~filename) in
+    let ast_check_res =
+      if not ast_check
+      then Ok ()
+      else
+        Ast_checker.Oxcaml_checker.check_same_ast
+          filename
+          0
+          ~impl:(Filename.check_suffix filename ".ml")
+          ~debug
+          contents
+          reprinted
+    in
+    (match ast_check_res with
+     | Error print_debug ->
+       (* TODO: location, etc *)
+       Format.eprintf "%s: ast changed@." filename;
+       print_debug ();
+       Error ()
+     | Ok () ->
+       let pp oc =
+         output_string oc reprinted;
+         output_char oc '\n';
+         flush oc
+       in
+       if not in_place
+       then pp stdout
+       else Out_channel.with_open_text filename pp;
+       Ok ())
 ;;
 
 module Input = struct
@@ -203,6 +216,7 @@ let command_format =
          ~doc:"Check the formatted code parses back to the same AST"
      and in_place = flag "i" no_arg ~doc:"style file in place"
      and width = width_param
+     and debug = flag "debug" no_arg ~doc:"print extra error information"
      and stdin =
        flag
          "stdin"
@@ -219,15 +233,8 @@ let command_format =
            List.map
              (fun input ->
                let filename = Input.filename input in
-               let (File_type.P file_type) = File_type.of_filename filename in
                let contents = Input.load input in
-               format_one
-                 file_type
-                 contents
-                 ~filename
-                 ~width
-                 ~ast_check
-                 ~in_place)
+               format_one contents ~filename ~width ~ast_check ~in_place ~debug)
              inputs
          in
          if List.exists Result.is_error results then exit 1)

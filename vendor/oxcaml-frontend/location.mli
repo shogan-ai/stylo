@@ -38,6 +38,7 @@ type t = Warnings.loc =
   ; loc_end : Lexing.position
   ; loc_ghost : bool
   }
+[@@deriving sexp_of]
 
 (** Note on the use of Lexing.position in this module. If [pos_fname = ""], then use
     [!input_name] instead. If [pos_lnum = -1], then [pos_bol = 0]. Use [pos_cnum] and
@@ -188,7 +189,6 @@ val print_filename : formatter -> string -> unit
 val print_loc : formatter -> t -> unit
 val print_loc_in_lowercase : formatter -> t -> unit
 val print_locs : formatter -> t list -> unit
-val to_string : t -> string
 
 (** {1 Toplevel-specific location highlighting} *)
 
