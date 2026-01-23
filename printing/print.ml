@@ -4116,7 +4116,7 @@ end = struct
         (* The attrs go before [in]. In this case there are also no docs, so the later
            call to attach is a noop. But I'd rather leave it than have two separate code
            paths depending on whether we're adding [in] or not. *)
-        [], Attribute.pp_list ~item pvb_attributes ^?^ S.in_
+        [], Attribute.pp_list ~item:true pvb_attributes ^?^ S.in_
     in
     layout
       ?preceeding
