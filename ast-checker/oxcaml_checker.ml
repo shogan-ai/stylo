@@ -57,6 +57,21 @@ let cleaner =
         else List.filter (fun a -> not (from_docstring a)) attrs
       in
       super#attributes () ((* FIXME: why? *) sort_attributes attrs)
+
+    method! pattern () p =
+      let p =
+        match p.ppat_desc with
+        | Ppat_or
+            (p1, { ppat_desc = Ppat_or (p2, p3); ppat_attributes; ppat_loc; _ })
+          ->
+          Ast_helper.Pat.or_
+            ~loc:p.ppat_loc
+            ~attrs:p.ppat_attributes
+            (Ast_helper.Pat.or_ ~loc:ppat_loc ~attrs:ppat_attributes p1 p2)
+            p3
+        | _ -> p
+      in
+      super#pattern () p
   end
 
   (*
