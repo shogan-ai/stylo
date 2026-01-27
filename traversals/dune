@@ -1,0 +1,8 @@
+(executable
+  (name gen_mapper)
+  (modules gen_mapper)
+  (libraries ppxlib.traverse))
+
+(library
+  (name traversals_helpers)
+  (modules traversals_helpers))

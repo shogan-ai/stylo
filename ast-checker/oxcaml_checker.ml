@@ -16,47 +16,48 @@ let cleaner =
     | "ocaml.doc" | "ocaml.txt"  -> true
     | _ -> false
   in
-  let super = Ast_mapper.default_mapper in
-  let map_location _ _ _ = Location.none in
-  let map_location_stack _ _ _ = [] in
-  let map_attribute (mapper : 'env Ast_mapper.mapper) (env : 'env) attr =
-    let attr_payload =
-      if not (from_docstring attr) then
-        attr.attr_payload
-      else
-        match attr.attr_payload with
-        | PStr [ {
-          pstr_desc =
-            Pstr_eval
-              ({ pexp_desc= Pexp_constant Pconst_string (doc, loc, None)
-               ; _ } as inner_exp,[]);
-          _
-        } as str ] ->
-          let doc = normalize_cmt_spaces doc in
-          let inner' =
-            { inner_exp with
-              pexp_desc = Pexp_constant (Pconst_string (doc, loc, None))
-            }
-          in
-          PStr [ { str with pstr_desc = Pstr_eval (inner', []) }]
-        | _ -> assert false
-    in
-    super.attribute mapper env { attr with attr_payload }
-  in
-  let map_attributes mapper env attrs =
-    let attrs =
-      if not !ignore_docstrings
-      then attrs
-      else List.filter (fun a -> not (from_docstring a)) attrs
-    in
-    super.attributes mapper env ((* FIXME: why? *) sort_attributes attrs)
-  in
-  { super with
-    attribute = map_attribute
-  ; attributes = map_attributes
-  ; location = map_location
-  ; location_stack = map_location_stack
-  }
+  object
+    method unit () () = ()
+    method format__formatter () x = x (* eww. *)
+
+    inherit [unit] Traversals_helpers.map_with_context
+    inherit [unit] Ast_mapper.map_with_context as super
+
+    method location () _ = Location.none
+    method! location_stack () _ = []
+
+    method! attribute () attr =
+      let attr_payload =
+        if not (from_docstring attr) then
+          attr.attr_payload
+        else
+          match attr.attr_payload with
+          | PStr [ {
+            pstr_desc =
+              Pstr_eval
+                ({ pexp_desc= Pexp_constant Pconst_string (doc, loc, None)
+                 ; _ } as inner_exp,[]);
+            _
+          } as str ] ->
+            let doc = normalize_cmt_spaces doc in
+            let inner' =
+              { inner_exp with
+                pexp_desc = Pexp_constant (Pconst_string (doc, loc, None))
+              }
+            in
+            PStr [ { str with pstr_desc = Pstr_eval (inner', []) }]
+          | _ -> assert false
+      in
+      super#attribute () { attr with attr_payload }
+
+    method! attributes () attrs =
+      let attrs =
+        if not !ignore_docstrings
+        then attrs
+        else List.filter (fun a -> not (from_docstring a)) attrs
+      in
+      super#attributes () ((* FIXME: why? *) sort_attributes attrs)
+  end
 
   (*
   method! visit_expression env exp =
@@ -113,11 +114,11 @@ exception Failed_to_parse_source of exn
 
 let struct_or_error lex =
   Parse.implementation lex
-  |> cleaner.structure cleaner ()
+  |> cleaner#structure ()
 
 let sig_or_error lex =
   Parse.interface lex
-  |> cleaner.signature cleaner ()
+  |> cleaner#signature ()
 
 let check_same_ast fn line ~impl s1 s2 =
   let pos =

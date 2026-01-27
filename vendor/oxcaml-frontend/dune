@@ -15,15 +15,9 @@
   (flags :standard -w +a-4-9-40-41-42-44-45-48-63-66-67-70))
 
 
-;; Can't explicitely depend on a .cmti ...
-;; So we depend on the cmi and pray for a cmti to be next to it and not stale
-;;
-;; Cf. https://github.com/ocaml/dune/issues/12633
-
 (rule
   (target ast_mapper.ml)
-  (deps %{cmi:parsetree} %{cmi:longident} %{cmi:asttypes}
-        %{cmi:location})
+  (deps location.mli longident.mli asttypes.mli parsetree.mli)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/parsing/gen_visitors/gen_mapper.exe %{deps}))))
+      (run %{project_root}/traversals/gen_mapper.exe %{deps}))))

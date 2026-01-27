@@ -104,15 +104,11 @@ let try_removing_parens parent p =
     end
   | _ -> assert false
 
-open Ast_mapper
-
-let super = default_mapper
-
-let map_desc mapper _ desc =
+let map_desc ~recur _ desc =
   let parent_for_recursive_calls = Context.Pat desc in
-  super.pattern_desc mapper parent_for_recursive_calls desc
+  recur parent_for_recursive_calls desc
 
-let map mapper (parent : Context.parent) pat =
+let map ~recur (parent : Context.parent) pat =
   let pat =
     match parent, pat.ppat_desc with
     (* Remove parens if they are not mandatory *)
@@ -137,4 +133,4 @@ let map mapper (parent : Context.parent) pat =
     (* Nothing to do in the general case. *)
     | _ -> pat
   in
-  super.pattern mapper parent pat
+  recur parent pat
