@@ -1,6 +1,11 @@
 open Ppxlib
 
-let fnames = List.tl (Array.to_list Sys.argv)
+let args = List.tl (Array.to_list Sys.argv)
+
+let gen_fold, fnames =
+  match args with
+  | "--with-fold" :: fnames -> true, fnames
+  | fnames -> false, fnames
 
 let to_modname fn =
   Filename.basename fn
@@ -81,14 +86,27 @@ let extract_type_decls fn =
 
 let tds = List.concat_map extract_type_decls fnames
 
-let class_ =
-  Ppxlib_traverse.gen_class
-    ~what:Ppxlib_traverse.Backends.mapper_with_context
-    ~loc:Location.none
-    tds
+module Builder = Ast_builder.Make (struct let loc = Location.none end)
+
+let traversals =
+  let open Ppxlib_traverse in
+  let mapper_class =
+    Builder.pstr_class
+      [ gen_class ~what:Ppxlib_traverse.Backends.mapper_with_context
+          ~loc:Location.none tds ]
+  in
+  let lift_class =
+    if not gen_fold
+    then []
+    else [
+      Builder.pstr_class
+        [ gen_class ~what:Ppxlib_traverse.Backends.lifter
+            ~loc:Location.none tds ]
+    ]
+  in
+  mapper_class :: lift_class
 
 let mapper =
-  let (module Builder) = Ast_builder.make Location.none in
   let open Builder in
   let aliases =
     Hashtbl.fold (fun modname () tds ->
@@ -117,7 +135,7 @@ let mapper =
       pstr_open (open_infos ~override:Override ~expr)
     ) modnames
   in
-  aliases :: opens @ [ pstr_class [ class_ ] ]
+  aliases :: opens @ traversals
 
 let () =
   Pprintast.structure Format.std_formatter mapper

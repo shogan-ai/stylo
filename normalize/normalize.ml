@@ -19,7 +19,7 @@ let add_pipe_if_missing ?(mk_optional=false) tokens =
 
 let normalizer = object
   inherit [Context.parent] Traversals_helpers.map_with_context
-  inherit [Context.parent] Ast_mapper.map_with_context as super
+  inherit [Context.parent] Traversals.map_with_context as super
 
   method position _ p = p
 

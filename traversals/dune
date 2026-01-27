@@ -1,6 +1,6 @@
 (executable
-  (name gen_mapper)
-  (modules gen_mapper)
+  (name gen)
+  (modules gen)
   (libraries ppxlib.traverse))
 
 (library

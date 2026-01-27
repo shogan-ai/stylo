@@ -18,7 +18,7 @@ let cleaner =
   in
   object(self)
     inherit [unit] Traversals_helpers.map_with_context
-    inherit [unit] Ast_mapper.map_with_context as super
+    inherit [unit] Traversals.map_with_context as super
 
     method position () x = x
 
