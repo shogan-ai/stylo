@@ -623,14 +623,28 @@ and Core_type : sig
     -> (string loc * jkind_annotation option) list
     -> t
 end = struct
-
-  let pp_var ?preceeding var_name jkind =
-    let var, pre_nest =
-      Preceeding.group_with preceeding (S.squote ^^ string var_name)
+    let squote var_name =
+    let opt_space =
+      if String.length var_name >= 2 && String.get var_name 1 = '\''
+      then break 1
+      else empty
     in
+    group (S.squote ^^ opt_space ^^ string var_name)
+
+  let pp_var ?preceeding ?(attrs = []) var_name jkind =
+    let quote_var = squote var_name in
+    let var, pre_nest = Preceeding.group_with preceeding quote_var in
+    let var = Attribute.attach ~extra_nest:pre_nest ~attrs var in
     match jkind with
     | None -> var
     | Some k -> var ^/^ pre_nest (S.colon ^/^ Jkind_annotation.pp k)
+
+  let pp_any ?preceeding ?(attrs = []) jkind =
+    let any, pre_nest = Preceeding.group_with preceeding S.underscore in
+    let any = Attribute.attach ~extra_nest:pre_nest ~attrs any in
+    match jkind with
+    | None -> any
+    | Some k -> any ^/^ pre_nest (S.colon ^/^ Jkind_annotation.pp k)
 
   let pp_poly_bindings ?preceeding bound_vars =
     let pp_bound (var, jkind) =
@@ -764,35 +778,31 @@ end = struct
   let rec pp ?preceeding ?(in_parens=false)
             ({ ptyp_desc=_; ptyp_attributes; ptyp_tokens = _; ptyp_loc=_} as ct)
     =
-    let attach_attrs doc =
-      if in_parens
-      then doc ^^ Attribute.pp_list ptyp_attributes
-      else doc ^?^ Attribute.pp_list ptyp_attributes
-    in
-    let desc_doc =
-      match Arrow.components ct with
-      | None -> group (pp_desc ?preceeding ct)
-      | Some (poly_params, args, ret) ->
-        let flatness = flatness_tracker () in
-        Arrow.pp ?preceeding flatness poly_params args
-          ~pp_rhs:(Arrow.pp_ret_ty ret)
-        |> group ~flatness
-    in
-    attach_attrs desc_doc
+    match ct.ptyp_desc with
+    | Ptyp_any jk -> pp_any ?preceeding ~attrs:ptyp_attributes jk
+    | Ptyp_var (s, jk) -> pp_var ?preceeding s ~attrs:ptyp_attributes jk
+    | _ ->
+      let attach_attrs doc =
+        if in_parens
+        then doc ^^ Attribute.pp_list ptyp_attributes
+        else doc ^?^ Attribute.pp_list ptyp_attributes
+      in
+      let desc_doc =
+        match Arrow.components ct with
+        | None -> group (pp_desc ?preceeding ct)
+        | Some (poly_params, args, ret) ->
+          let flatness = flatness_tracker () in
+          Arrow.pp ?preceeding flatness poly_params args
+            ~pp_rhs:(Arrow.pp_ret_ty ret)
+          |> group ~flatness
+      in
+      attach_attrs desc_doc
 
   and pp_desc ?preceeding ct =
     let tokens = ct.ptyp_tokens in
     match ct.ptyp_desc with
-    | Ptyp_arrow _ -> assert false (* handled in [pp] *)
-    | Ptyp_any None ->
-      Preceeding.group_with preceeding S.underscore
-      |> fst
-    | Ptyp_any Some k ->
-      let underscore, pre_nest =
-        Preceeding.group_with preceeding S.underscore
-      in
-      underscore ^/^ pre_nest (S.colon ^/^ Jkind_annotation.pp k)
-    | Ptyp_var (s, ko) -> pp_var ?preceeding s ko
+    | Ptyp_any _ | Ptyp_var _ | Ptyp_arrow _ ->
+      assert false (* handled in [pp] *)
     | Ptyp_tuple elts -> pp_tuple ?preceeding elts
     | Ptyp_unboxed_tuple elts ->
       let hlparen, pre_nest =
@@ -804,22 +814,7 @@ end = struct
     | Ptyp_object (fields, closed) -> pp_object ?preceeding fields closed
     | Ptyp_class (lid, args) ->
       Type_constructor.pp_core_type ?preceeding ~class_:true tokens args lid.txt
-    | Ptyp_alias (ct, name, None) ->
-      let pre_nest = Preceeding.implied_nest preceeding in
-      pp ?preceeding ct ^/^ pre_nest (
-        S.as_ ^/^
-        S.squote ^^ string (Option.get name).txt
-      )
-    | Ptyp_alias (ct, name_o, Some jkind) ->
-      let pre_nest = Preceeding.implied_nest preceeding in
-      pp ?preceeding ct ^/^ pre_nest (
-        S.as_ ^/^
-        S.lparen ^^ break 0 ^^ (
-          match name_o with
-          | None -> S.underscore
-          | Some s -> S.squote ^^ string s.txt
-        ) ^^ S.colon ^^ Jkind_annotation.pp jkind ^^ break 0 ^^ S.rparen
-      )
+    | Ptyp_alias (ct, name, jkind) -> pp_alias ?preceeding ct name jkind
     | Ptyp_variant (fields, cf, lbls) ->
       pp_variant ?preceeding ~tokens fields cf lbls
     | Ptyp_poly (bound_vars, ty) ->
@@ -972,6 +967,21 @@ end = struct
   and object_field_desc = function
     | Oinherit ct -> pp ct
     | Otag (lbl, ct) -> string lbl.txt ^^ S.colon ^/^ pp ct
+
+  and pp_alias ?preceeding aliased alias jkind =
+    let pre_nest = Preceeding.implied_nest preceeding in
+    let aliased = pp ?preceeding aliased in
+    let parens =
+      if Option.is_none jkind
+      then Fun.id
+      else parens
+    in
+    let alias =
+      match alias with
+      | None -> pp_any jkind
+      | Some var -> pp_var var.txt jkind
+    in
+    group (aliased ^/^ pre_nest (S.as_ ^/^ nest 2 (parens alias)))
 
   let pp_for_decl
         ({ ptyp_desc; ptyp_attributes; ptyp_tokens; ptyp_loc=_} as ct) =
