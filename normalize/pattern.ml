@@ -113,9 +113,11 @@ let map ~recur (parent : Context.parent) pat =
     match parent, pat.ppat_desc with
     (* Remove parens if they are not mandatory *)
     | Pat parent, Ppat_parens _ -> try_removing_parens parent pat
-    | Value_binding, Ppat_parens { pat = sub; _ } ->
+    | Value_binding vb, Ppat_parens { pat = sub; _ } ->
       begin match sub.ppat_desc with
-      | Ppat_tuple _ -> make_parens_optional pat
+      | Ppat_tuple _
+        when Option.is_none vb.pvb_constraint && vb.pvb_ret_modes = [] ->
+        make_parens_optional pat
       | _ when simple_pattern sub -> remove_parens pat
       | _ -> pat
       end

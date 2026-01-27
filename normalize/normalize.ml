@@ -64,7 +64,7 @@ let normalizer = object
     |> super#structure env
 
   method! value_binding _ vb =
-    let parent_for_recursive_calls = Context.Value_binding in
+    let parent_for_recursive_calls = Context.Value_binding vb in
     super#value_binding parent_for_recursive_calls vb
 
   method! argument_desc f _ arg =
