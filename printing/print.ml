@@ -293,169 +293,6 @@ end
 and Payload : sig
   val pp : payload -> t
 end = struct
-  module Ends_in_obj_type = struct
-    (* We need to be careful in payload to add an extra space before the closing
-       ']' if the payload ends with and object type, otherwise the lexer will
-       parse '>]' as a single token.
-
-       While oxcaml's quotations also end with a '>' we do need to check for
-       them as ']>' will have be recognized as a token already and the following
-       ']' will be lexed independently. *)
-
-    let rec core_type ct =
-      ct.ptyp_attributes = [] &&
-      match ct.ptyp_desc with
-      | Ptyp_object (_, _) -> true
-      | Ptyp_arrow { codom_type = rhs; codom_modes = []; _ }
-      | Ptyp_poly (_, rhs) ->
-        core_type rhs
-      | Ptyp_tuple lst -> core_type (snd (List.hd (List.rev lst)))
-      | Ptyp_any _
-      | Ptyp_var _
-      | Ptyp_parens _
-      | Ptyp_unboxed_tuple _
-      | Ptyp_constr (_, _)
-      | Ptyp_class (_, _)
-      | Ptyp_alias _
-      | Ptyp_variant (_, _, _)
-      | Ptyp_package _
-      | Ptyp_open _
-      | Ptyp_extension _
-      | Ptyp_arrow _
-      | Ptyp_of_kind _
-      | Ptyp_quote _
-      | Ptyp_splice _
-        ->
-        false
-
-    let rec jkind_annotation jk =
-      match jk.pjkind_desc with
-      | Pjk_with (_, ct, [])
-      | Pjk_kind_of ct ->
-        core_type ct
-      | Pjk_product (_ :: _ as jks) ->
-        jkind_annotation List.(hd @@ rev jks)
-      | Pjk_default
-      | Pjk_abbreviation _
-      | Pjk_mod _
-      | Pjk_with (_, _, _ :: _)
-      | Pjk_product []
-      | Pjk_parens _ ->
-        false
-
-    let constructor_argument ca =
-      ca.pca_modalities = [] && core_type ca.pca_type
-
-    let constructor_decl cd =
-      cd.pcd_attributes = [] &&
-      match cd with
-      | { pcd_res = Some ct; _ } -> core_type ct
-      | { pcd_args = Pcstr_tuple (_ :: _ as args); _ } ->
-        constructor_argument (List.hd @@ List.rev args)
-      | _ -> false
-
-    let type_declaration td =
-      td.ptype_attributes = [] &&
-      match td with
-      | { ptype_cstrs = (_ :: _ as cstrs); _ } ->
-        let _, ct, _ = List.hd (List.rev cstrs) in
-        core_type ct
-      | { ptype_manifest = Some ct; ptype_kind = Ptype_abstract; _ } ->
-        core_type ct
-      | { ptype_kind = Ptype_variant (_ :: _ as cds); _ } ->
-        constructor_decl List.(hd (rev cds))
-      | _ -> false
-
-    let rec type_declarations = function
-      | [] -> false
-      | [ td ] -> type_declaration td
-      | _ :: tds -> type_declarations tds
-
-    let extension_constructor ec =
-      ec.pext_attributes = [] &&
-      match ec.pext_kind with
-      | Pext_decl (_, _, Some ret_ct) -> core_type ret_ct
-      | Pext_decl (_, Pcstr_tuple (_ :: _ as args), None) ->
-        constructor_argument List.(hd (rev args))
-      | _ -> false
-
-    let type_extension te =
-      te.ptyext_attributes = [] &&
-      extension_constructor List.(hd (rev te.ptyext_constructors))
-
-    let type_exception exn =
-      exn.ptyexn_attributes = [] &&
-      extension_constructor exn.ptyexn_constructor
-
-    let structure_item it =
-      match it.pstr_desc with
-      | Pstr_type (_, tds) -> type_declarations tds
-      | Pstr_typext te -> type_extension te
-      | Pstr_exception exn -> type_exception exn
-      | Pstr_kind_abbrev (_, jk) -> jkind_annotation jk
-      | Pstr_eval _
-      | Pstr_value _
-      | Pstr_primitive _
-      | Pstr_module _
-      | Pstr_recmodule _
-      | Pstr_modtype _
-      | Pstr_open _
-      | Pstr_include _
-      | Pstr_attribute _
-      | Pstr_extension _
-      | Pstr_class _
-      | Pstr_class_type _
-      | Pstr_docstring _
-        ->
-        false
-
-    let value_description vd =
-      vd.pval_attributes = [] &&
-      vd.pval_prim = [] &&
-      vd.pval_modalities = [] &&
-      core_type vd.pval_type
-
-    let signature_item si =
-      match si.psig_desc with
-      | Psig_value vd -> value_description vd
-      | Psig_type (_, decls)
-      | Psig_typesubst decls ->
-        type_declarations decls
-      | Psig_typext te -> type_extension te
-      | Psig_exception exn -> type_exception exn
-      | Psig_kind_abbrev (_, jk) -> jkind_annotation jk
-      | Psig_attribute _
-      | Psig_extension _
-      | Psig_docstring _
-      | Psig_class _
-      | Psig_class_type _
-      (* FIXME: any of the following could have a with constraint. *)
-      | Psig_module _
-      | Psig_recmodule _
-      | Psig_modsubst _
-      | Psig_modtype _
-      | Psig_modtypesubst _
-      | Psig_open _
-      | Psig_include _
-        ->
-        false
-
-    let structure (items, _tokens) =
-      let rec last = function
-        | [] -> false
-        | [ item ] -> structure_item item
-        | _ :: items -> last items
-      in
-      last items
-
-    let signature sg =
-      let rec last = function
-        | [] -> false
-        | [ item ] -> signature_item item
-        | _ :: items -> last items
-      in
-      last sg.psg_items
-  end
 
   let pp = function
     | PString _ -> assert false (* handled in Extension *)
@@ -465,14 +302,14 @@ end = struct
       | Empty -> doc
       | _ ->
         break 1 ^^ doc ^^
-        if Ends_in_obj_type.structure s then break 1 else empty
+        if Object_type_at.End.of_structure s then break 1 else empty
       end
     | PSig s ->
       S.colon ^/^ Signature.pp_interface s ^^
-      if Ends_in_obj_type.signature s then break 1 else empty
+      if Object_type_at.End.of_signature s then break 1 else empty
     | PTyp c ->
       S.colon ^/^ Core_type.pp c ^^
-      if Ends_in_obj_type.core_type c then break 1 else empty
+      if Object_type_at.End.of_core_type c then break 1 else empty
     | PPat (p, eo) ->
       S.qmark ^/^ Pattern.pp p ^^
       match eo with
@@ -564,18 +401,12 @@ end = struct
   let would_lex_differently = function
     | [] -> false
     | first :: rest ->
-      let is_obj_or_quote ct =
-        match ct.ptyp_desc with
-        | Ptyp_object _
-        | Ptyp_quote _ -> true
-        | _ -> false
-      in
       let rec last_is_obj_or_quote = function
         | [] -> false
-        | [ x ] -> is_obj_or_quote x
+        | [ x ] -> Object_type_at.End.of_core_type x
         | _ :: xs -> last_is_obj_or_quote xs
       in
-      is_obj_or_quote first || last_is_obj_or_quote rest
+      Object_type_at.Start.of_core_type first || last_is_obj_or_quote rest
 
   let pp_class_constr args lid =
     let delims = Brackets { spaces_required = would_lex_differently args } in
