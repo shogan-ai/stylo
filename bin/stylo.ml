@@ -45,10 +45,14 @@ let fuzzer_batch fn =
       match
         if intf then (
           let sg = Parse.interface lexbuf in
-          Print.Signature.pp_interface sg, Tokens_of_tree.signature sg
+          let tokens = Tokens_of_tree.signature sg in
+          Ast_checker.Tokenisation_check.ensure_order_is_preserved tokens;
+          Print.Signature.pp_interface sg, tokens
         ) else (
           let str = Parse.implementation lexbuf in
-          Print.Structure.pp_implementation str, Tokens_of_tree.structure str
+          let tokens = Tokens_of_tree.structure str in
+          Ast_checker.Tokenisation_check.ensure_order_is_preserved tokens;
+          Print.Structure.pp_implementation str, tokens
         )
       with
       | exception Parser.Error ->

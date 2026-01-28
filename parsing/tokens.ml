@@ -320,16 +320,8 @@ type elt = {
 type seq = elt list
 
 let desc_as_string = function
-  | Token (t, false) ->
-    if Dbg_print.dbg then
-      Raw.to_string t
-    else
-      "tok"
-  | Token (t, true) ->
-    if Dbg_print.dbg then
-      "optional(" ^ Raw.to_string t ^ ")"
-    else
-      "opttok"
+  | Token (t, false) -> Raw.to_string t
+  | Token (t, true) -> "optional(" ^ Raw.to_string t ^ ")"
   | Comment c -> Printf.sprintf "(* %s *)" c.text
   | Child_node -> "child"
 
