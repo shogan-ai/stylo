@@ -92,7 +92,7 @@ module Typ :
       core_type list -> lid -> core_type
     val object_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> object_field list
                    -> closed_flag -> core_type
-    val class_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> core_type list -> core_type
+    val class_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> core_type list -> lid -> core_type
     val alias: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> core_type -> string with_loc option
                -> jkind_annotation option -> core_type
     (* Invariant: One of the options must be [Some]. *)
@@ -475,7 +475,7 @@ module Cty:
     val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> class_type_desc -> class_type
     val attr: class_type -> attribute -> class_type
 
-    val constr: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> core_type list -> class_type
+    val constr: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> core_type list -> lid -> class_type
     val signature: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> class_signature -> class_type
     val arrow: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> arrow_arg ->
       class_type -> class_type
@@ -512,7 +512,7 @@ module Cl:
       class_expr_desc -> class_expr
     val attr: class_expr -> attribute -> class_expr
 
-    val constr: ?loc:loc -> ?attrs:attrs -> lid -> core_type list -> class_expr
+    val constr: ?loc:loc -> ?attrs:attrs -> core_type list -> lid -> class_expr
     val structure: ?loc:loc -> ?attrs:attrs -> class_structure -> class_expr
     val fun_: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
       pattern argument list -> class_expr -> class_expr

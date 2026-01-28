@@ -176,7 +176,7 @@ and core_type_desc =
             - [< l1:T1; ...; ln:Tn; .. >] when [flag] is
                                            {{!Asttypes.closed_flag.Open}[Open]}.
          *)
-  | Ptyp_class of Longident.t loc * core_type list
+  | Ptyp_class of core_type list * Longident.t loc
       (** [Ptyp_class(tconstr, l)] represents:
             - [#tconstr]               when [l=[]],
             - [T #tconstr]             when [l=[T]],
@@ -552,8 +552,8 @@ and expression_desc =
   | Pexp_hole (** _ *)
   | Pexp_index_op of {
       kind: paren_kind;
-      op: (Longident.t option * string) option;
       seq: expression;
+      op: (Longident.t option * string) option;
       indices: expression list;
       assign: expression option
     }
@@ -668,7 +668,7 @@ and function_body =
 
 and function_body_desc =
   | Pfunction_body of expression
-  | Pfunction_cases of case list * ext_attribute
+  | Pfunction_cases of ext_attribute * case list
   (** In [Pfunction_cases (_, loc, attrs)], the location extends from the
       start of the [function] keyword to the end of the last case. The compiler
       will only use typechecking-related attributes from [attrs], e.g. enabling
@@ -723,9 +723,9 @@ and comprehension_iterator =
 (** [@...] PAT (in/=) ... *)
 and comprehension_clause_binding =
   { pcomp_cb_mode: mode loc option;
+    pcomp_cb_attributes : attributes;
     pcomp_cb_pattern : pattern;
     pcomp_cb_iterator : comprehension_iterator;
-    pcomp_cb_attributes : attributes;
     pcomp_cb_tokens : Tokens.seq;
   }
 
@@ -899,8 +899,8 @@ and type_extension =
     {
      ptyext_pre_doc: string option;
      ptyext_ext_attrs: ext_attribute;
-     ptyext_path: Longident.t loc;
      ptyext_params: ptype_param list;
+     ptyext_path: Longident.t loc;
      ptyext_constructors: extension_constructor list;
      ptyext_private: private_flag;
      ptyext_loc: Location.t;
@@ -972,7 +972,7 @@ and class_type =
     }
 
 and class_type_desc =
-  | Pcty_constr of Longident.t loc * core_type list
+  | Pcty_constr of core_type list * Longident.t loc
       (** - [c]
             - [['a1, ..., 'an] c] *)
   | Pcty_signature of class_signature  (** [object ... end] *)
@@ -1010,15 +1010,17 @@ and class_type_field =
     }
 
 and class_type_field_desc =
-  | Pctf_inherit of class_type  (** [inherit CT] *)
-  | Pctf_val of (string loc * mutable_flag * virtual_flag * core_type)
+  | Pctf_inherit of attributes * class_type  (** [inherit CT] *)
+  | Pctf_val of
+      attributes * (string loc * mutable_flag * virtual_flag * core_type)
       (** [val x: T] *)
-  | Pctf_method of (string loc * private_flag * virtual_flag * core_type)
+  | Pctf_method of
+      attributes * (string loc * private_flag * virtual_flag * core_type)
       (** [method x: T]
 
             Note: [T] can be a {{!core_type_desc.Ptyp_poly}[Ptyp_poly]}.
         *)
-  | Pctf_constraint of (core_type * core_type)  (** [constraint T1 = T2] *)
+  | Pctf_constraint of attributes * (core_type * core_type)  (** [constraint T1 = T2] *)
   | Pctf_attribute of attribute  (** [[\@\@\@id]] *)
   | Pctf_extension of extension  (** [[%%id]] *)
   | Pctf_docstring of string
@@ -1062,7 +1064,7 @@ and class_expr =
     }
 
 and class_expr_desc =
-  | Pcl_constr of Longident.t loc * core_type list
+  | Pcl_constr of core_type list * Longident.t loc
       (** [c] and [['a1, ..., 'an] c] *)
   | Pcl_structure of class_structure  (** [object ... end] *)
   | Pcl_fun of pattern argument list * class_expr
@@ -1122,7 +1124,7 @@ and class_field =
     }
 
 and class_field_desc =
-  | Pcf_inherit of override_flag * class_expr * string loc option
+  | Pcf_inherit of override_flag * attributes * class_expr * string loc option
       (** [Pcf_inherit(flag, CE, s)] represents:
             - [inherit CE]
                     when [flag] is {{!Asttypes.override_flag.Fresh}[Fresh]}
@@ -1137,7 +1139,7 @@ and class_field_desc =
                    when [flag] is {{!Asttypes.override_flag.Override}[Override]}
                     and [s] is [Some x]
   *)
-  | Pcf_val of (string loc * mutable_flag * class_field_kind)
+  | Pcf_val of attributes * (string loc * mutable_flag * class_field_kind)
       (** [Pcf_val(x,flag, kind)] represents:
             - [val x = E]
        when [flag] is {{!Asttypes.mutable_flag.Immutable}[Immutable]}
@@ -1152,13 +1154,13 @@ and class_field_desc =
        when [flag] is {{!Asttypes.mutable_flag.Mutable}[Mutable]}
         and [kind] is {{!class_field_kind.Cfk_virtual}[Cfk_virtual(T)]}
   *)
-  | Pcf_method of (string loc * private_flag * class_field_kind)
+  | Pcf_method of attributes * (string loc * private_flag * class_field_kind)
       (** - [method x = E]
           - [method virtual x: T]
                       ([T] can be a {{!core_type_desc.Ptyp_poly}[Ptyp_poly]})
   *)
-  | Pcf_constraint of (core_type * core_type)  (** [constraint T1 = T2] *)
-  | Pcf_initializer of expression  (** [initializer E] *)
+  | Pcf_constraint of attributes * (core_type * core_type)  (** [constraint T1 = T2] *)
+  | Pcf_initializer of attributes * expression  (** [initializer E] *)
   | Pcf_attribute of attribute  (** [[\@\@\@id]] *)
   | Pcf_extension of extension  (** [[%%id]] *)
   | Pcf_docstring of string
@@ -1391,7 +1393,8 @@ and module_expr_desc =
           - [(ME @ modes)]
           - [(ME : MT)]
       *)
-  | Pmod_unpack of expression * package_type option * package_type option
+  | Pmod_unpack of
+      attributes * expression * package_type option * package_type option
       (** [(val E)] *)
   | Pmod_extension of extension  (** [[%id]] *)
   | Pmod_parens of module_expr

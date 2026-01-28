@@ -643,7 +643,7 @@ end = struct
     | Ptyp_constr (args, lid) ->
       Type_constructor.pp_core_type ?preceeding tokens args lid.txt
     | Ptyp_object (fields, closed) -> pp_object ?preceeding fields closed
-    | Ptyp_class (lid, args) ->
+    | Ptyp_class (args, lid) ->
       Type_constructor.pp_core_type ?preceeding ~class_:true tokens args lid.txt
     | Ptyp_alias (ct, name, jkind) -> pp_alias ?preceeding ct name jkind
     | Ptyp_variant (fields, cf, lbls) ->
@@ -2237,13 +2237,13 @@ end = struct
   let pp_parts ?preceeding fb =
     match fb.pfb_desc with
     | Pfunction_body e -> empty, Expression.pp ?preceeding e
-    | Pfunction_cases (cases, ext_attrs) ->
+    | Pfunction_cases (ext_attrs, cases) ->
       pp_cases ?preceeding cases ext_attrs
 
   let as_rhs fb =
     match fb.pfb_desc with
     | Pfunction_body _ -> assert false (* can't be on value binding rhs *)
-    | Pfunction_cases (cases, ext_attrs) ->
+    | Pfunction_cases (ext_attrs, cases) ->
       let kw, cases = pp_cases cases ext_attrs in
       Layout_module_binding.Three_parts
         { start = kw; main = cases; stop = empty }
@@ -2665,7 +2665,7 @@ end = struct
 
   let rec pp_desc ct =
     match ct.pcty_desc with
-    | Pcty_constr (lid, args) -> Type_constructor.pp_class_constr args lid.txt
+    | Pcty_constr (args, lid) -> Type_constructor.pp_class_constr args lid.txt
     | Pcty_signature cs -> pp_signature cs
     | Pcty_arrow (arrow_arg, rhs) ->
       let args, rhs = collect_arrow_args [arrow_arg] rhs in
@@ -2696,15 +2696,17 @@ end = struct
     |> Doc.attach ?pre_doc:pctf_pre_doc ?post_doc:pctf_post_doc
 
   and pp_field_desc = function
-    | Pctf_inherit ct -> S.inherit_ ^/^ pp ct
-    | Pctf_val (lbl, mut, virt, ct) ->
-      S.val_ ^/^ mutable_ mut ^?^ virtual_ virt ^?^
-      string lbl.txt ^/^ S.colon ^/^ Core_type.pp ct
-    | Pctf_method (lbl, priv, virt, ct) ->
-      S.method_ ^/^ private_ priv ^?^ virtual_ virt ^?^
-      string lbl.txt ^/^ S.colon ^/^ Core_type.pp ct
-    | Pctf_constraint (ct1, ct2) ->
-      S.constraint_ ^/^ Core_type.pp ct1 ^/^ S.equals ^/^ Core_type.pp ct2
+    | Pctf_inherit (attrs, ct) ->
+      Attribute.attach ~attrs S.inherit_ ^/^ nest 2 (pp ct)
+    | Pctf_val (attrs, (lbl, mut, virt, ct)) ->
+      Attribute.attach ~attrs S.val_ ^/^ mutable_ mut ^?^ virtual_ virt ^?^
+      nest 2 (string lbl.txt ^/^ S.colon ^/^ Core_type.pp ct)
+    | Pctf_method (attrs, (lbl, priv, virt, ct)) ->
+      Attribute.attach ~attrs S.method_ ^/^ private_ priv ^?^ virtual_ virt ^?^
+      nest 2 (string lbl.txt ^/^ S.colon ^/^ Core_type.pp ct)
+    | Pctf_constraint (attrs, (ct1, ct2)) ->
+      Attribute.attach ~attrs S.constraint_ ^/^
+      nest 2 (Core_type.pp ct1 ^/^ S.equals ^/^ Core_type.pp ct2)
     | Pctf_attribute attr -> Attribute.pp_floating attr
     | Pctf_extension ext -> Extension.pp ~floating:true ext
     | Pctf_docstring s -> Doc.pp_floating s
@@ -2779,7 +2781,7 @@ end = struct
   let rec pp_desc ext_attr d =
     let (!!) kw = Ext_attribute.decorate kw ext_attr in
     match d with
-    | Pcl_constr (lid, args) -> Type_constructor.pp_class_constr args lid.txt
+    | Pcl_constr (args, lid) -> Type_constructor.pp_class_constr args lid.txt
     | Pcl_structure cs -> pp_structure ext_attr cs
     | Pcl_fun (params, rhs) ->
       let params = flow_map (break 1) (Argument.pp Pattern.pp) params in
@@ -2826,44 +2828,43 @@ end = struct
     |> Doc.attach ?pre_doc:pcf_pre_doc ?post_doc:pcf_post_doc
 
   and pp_field_desc = function
-    | Pcf_inherit (override, ce, alias) ->
-      S.inherit_ ^^
-      begin match override with
-        | Fresh -> empty
-        | Override -> S.bang
-      end ^/^
-      pp ce ^^
-      begin match alias with
+    | Pcf_inherit (override, attrs, ce, alias) ->
+      let inherit_ = S.inherit_ ^^ override_ override in
+      Attribute.attach ~attrs inherit_ ^/^
+      nest 2 (
+        pp ce ^^
+        match alias with
         | None -> empty
-        | Some s -> break 1 ^^ S.as_ ^/^ string s.txt
-      end
-    | Pcf_val (lbl, mut, kind) -> pp_value lbl mut kind
-    | Pcf_method (lbl, priv, kind) -> pp_method lbl priv kind
-    | Pcf_constraint (ct1, ct2) ->
-      S.constraint_ ^/^ Core_type.pp ct1 ^/^ S.equals ^/^ Core_type.pp ct2
-    | Pcf_initializer e -> S.initializer_ ^/^ Expression.pp e
+        | Some s -> break 1 ^^ S.as_ ^/^ string s.txt)
+    | Pcf_val (attrs, (lbl, mut, kind)) -> pp_value ~attrs lbl mut kind
+    | Pcf_method (attrs, (lbl, priv, kind)) -> pp_method ~attrs lbl priv kind
+    | Pcf_constraint (attrs, (ct1, ct2)) ->
+      Attribute.attach ~attrs S.constraint_ ^/^
+      nest 2 (Core_type.pp ct1 ^/^ S.equals ^/^ Core_type.pp ct2)
+    | Pcf_initializer (attrs, e) ->
+      Attribute.attach ~attrs S.initializer_ ^/^ nest 2 (Expression.pp e)
     | Pcf_attribute attr -> Attribute.pp_floating attr
     | Pcf_extension ext -> Extension.pp ~floating:true ext
     | Pcf_docstring s -> Doc.pp_floating s
 
-  and pp_value lbl mut = function
+  and pp_value ~attrs lbl mut = function
     | Cfk_virtual ct ->
-      S.val_ ^/^ mutable_ mut ^?^ S.virtual_ ^/^ string lbl.txt ^/^
-      S.colon ^/^ Core_type.pp ct
+      Attribute.attach ~attrs S.val_ ^/^ mutable_ mut ^?^ S.virtual_ ^/^
+      nest 2 (string lbl.txt ^/^ S.colon ^/^ Core_type.pp ct)
     | Cfk_concrete (over, vb) ->
       let start = [
-        S.val_ ^^ override_ over;
+        Attribute.attach ~attrs (S.val_ ^^ override_ over);
         mutable_ mut
       ] in
       Value_binding.pp ~start vb ~add_in:false
 
-  and pp_method lbl priv = function
+  and pp_method ~attrs lbl priv = function
     | Cfk_virtual ct ->
-      S.method_ ^/^ private_ priv ^?^ S.virtual_ ^/^ string lbl.txt ^/^
-      S.colon ^/^ Core_type.pp ct
+      Attribute.attach ~attrs S.method_ ^/^ private_ priv ^?^ S.virtual_ ^/^
+      nest 2 (string lbl.txt ^/^ S.colon ^/^ Core_type.pp ct)
     | Cfk_concrete (over, vb) ->
       let start = [
-        S.method_ ^^ override_ over;
+        Attribute.attach ~attrs (S.method_ ^^ override_ over);
         private_ priv
       ] in
       Value_binding.pp ~start vb ~add_in:false
@@ -3267,11 +3268,13 @@ end = struct
         | Some mty -> me ^^ group (break 1 ^^ S.colon) ^/^ Module_type.pp mty
       in
       parens (with_modes ~modes with_mty)
-    | Pmod_unpack (e, ty1, ty2) ->
+    | Pmod_unpack (attrs, e, ty1, ty2) ->
       parens (
-        S.val_ ^/^ Expression.pp e ^?^
-        optional (fun c -> S.colon ^/^ Module_type.pp c) ty1 ^?^
-        optional (fun c -> S.coerce ^/^ Module_type.pp c) ty2
+        Attribute.attach ~attrs S.val_ ^/^ nest 2 (
+          Expression.pp e ^?^
+          optional (fun c -> S.colon ^/^ Module_type.pp c) ty1 ^?^
+          optional (fun c -> S.coerce ^/^ Module_type.pp c) ty2
+        )
       )
     | Pmod_extension ext -> Extension.pp ext
     | Pmod_parens me -> parens (pp me)

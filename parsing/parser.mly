@@ -1188,7 +1188,7 @@ paren_module_expr:
        This expression can be annotated in various ways. *)
     LPAREN VAL attrs = attributes e = expr_colon_package_type RPAREN
       { let e, ty1, ty2 = e in
-        mkmod ~loc:$sloc ~attrs (Pmod_unpack (e, ty1, ty2)) }
+        mkmod ~loc:$sloc (Pmod_unpack (attrs, e, ty1, ty2)) }
   | LPAREN VAL attributes expr COLON error
       { unclosed "(" $loc($1) ")" $loc($6) }
   | LPAREN VAL attributes expr COLONGREATER error
@@ -1854,7 +1854,7 @@ class_simple_expr:
     | LPAREN class_expr error
         { unclosed "(" $loc($1) ")" $loc($3) }
     | tys = actual_class_parameters cid = mkrhs(class_longident)
-        { Pcl_constr(cid, tys) }
+        { Pcl_constr(tys, cid) }
     | OBJECT attributes class_structure error
         { unclosed "object" $loc($1) "end" $loc($4) }
     | LPAREN class_expr COLON class_type RPAREN
@@ -1893,21 +1893,21 @@ class_field:
     self = preceded(AS, mkrhs(LIDENT))?
     post_item_attributes
       { let docs, sloc = symbol_docs $sloc in
-        mkcf ~loc:sloc (Pcf_inherit ($2, $4, self)) ~attrs:($3@$6) ~docs }
+        mkcf ~loc:sloc (Pcf_inherit ($2, $3, $4, self)) ~attrs:$6 ~docs }
   | VAL value post_item_attributes
       { let v, attrs = $2 in
         let docs, sloc = symbol_docs $sloc in
-        mkcf ~loc:sloc (Pcf_val v) ~attrs:(attrs@$3) ~docs }
+        mkcf ~loc:sloc (Pcf_val (attrs, v)) ~attrs:$3 ~docs }
   | METHOD method_ post_item_attributes
       { let meth, attrs = $2 in
         let docs, sloc = symbol_docs $sloc in
-        mkcf ~loc:sloc (Pcf_method meth) ~attrs:(attrs@$3) ~docs }
+        mkcf ~loc:sloc (Pcf_method (attrs, meth)) ~attrs:$3 ~docs }
   | CONSTRAINT attributes constrain_field post_item_attributes
       { let docs, sloc = symbol_docs $sloc in
-        mkcf ~loc:sloc (Pcf_constraint $3) ~attrs:($2@$4) ~docs }
+        mkcf ~loc:sloc (Pcf_constraint ($2, $3)) ~attrs:$4 ~docs }
   | INITIALIZER attributes seq_expr post_item_attributes
       { let docs, sloc = symbol_docs $sloc in
-        mkcf ~loc:sloc (Pcf_initializer $3) ~attrs:($2@$4) ~docs }
+        mkcf ~loc:sloc (Pcf_initializer ($2, $3)) ~attrs:$4 ~docs }
   | item_extension post_item_attributes
       { let docs, sloc = symbol_docs $sloc in
         mkcf ~loc:sloc (Pcf_extension $1) ~attrs:$2 ~docs }
@@ -2046,7 +2046,7 @@ class_type:
 class_signature:
     mkcty(
       tys = actual_class_parameters cid = mkrhs(clty_longident)
-        { Pcty_constr (cid, tys) }
+        { Pcty_constr (tys, cid) }
     | extension
         { Pcty_extension $1 }
     ) { $1 }
@@ -2098,18 +2098,18 @@ class_self_type:
 class_sig_field:
     INHERIT attributes class_signature post_item_attributes
       { let docs, sloc = symbol_docs $sloc in
-        mkctf ~loc:sloc (Pctf_inherit $3) ~attrs:($2@$4) ~docs }
+        mkctf ~loc:sloc (Pctf_inherit ($2, $3)) ~attrs:$4 ~docs }
   | VAL attributes value_type post_item_attributes
       { let docs, sloc = symbol_docs $sloc in
-        mkctf ~loc:sloc (Pctf_val $3) ~attrs:($2@$4) ~docs }
+        mkctf ~loc:sloc (Pctf_val ($2, $3)) ~attrs:$4 ~docs }
   | METHOD attributes private_virtual_flags mkrhs(label) COLON poly_type
     post_item_attributes
       { let (p, v) = $3 in
         let docs, sloc = symbol_docs $sloc in
-        mkctf ~loc:sloc (Pctf_method ($4, p, v, $6)) ~attrs:($2@$7) ~docs }
+        mkctf ~loc:sloc (Pctf_method ($2, ($4, p, v, $6))) ~attrs:$7 ~docs }
   | CONSTRAINT attributes constrain_field post_item_attributes
       { let docs, sloc = symbol_docs $sloc in
-        mkctf ~loc:sloc (Pctf_constraint $3) ~attrs:($2@$4) ~docs }
+        mkctf ~loc:sloc (Pctf_constraint ($2, $3)) ~attrs:$4 ~docs }
   | item_extension post_item_attributes
       { let docs, sloc = symbol_docs $sloc in
         mkctf ~loc:sloc (Pctf_extension $1) ~attrs:$2 ~docs }
@@ -2221,7 +2221,7 @@ class_type_declarations:
       { let loc = make_loc $sloc in
         let cases = $3 in
         let body =
-          { pfb_desc = Pfunction_cases (cases, $2)
+          { pfb_desc = Pfunction_cases ($2, cases)
           ; pfb_loc = loc
           ; pfb_tokens = Tokens.at $sloc }
         in
@@ -3041,7 +3041,7 @@ strict_binding_modes:
 ;
 fun_body:
   | FUNCTION ext_attributes match_cases
-      { { pfb_desc = Pfunction_cases ($3, $2)
+      { { pfb_desc = Pfunction_cases ($2, $3)
         ; pfb_loc = make_loc $sloc
         ; pfb_tokens = Tokens.at $sloc } }
   | fun_seq_expr
@@ -4480,7 +4480,7 @@ atomic_type:
     | tys = actual_type_parameters
       HASH
       cid = mkrhs(clty_longident)
-        { Ptyp_class (cid, tys) }
+        { Ptyp_class (tys, cid) }
     | mod_ident = mkrhs(mod_ext_longident)
       DOT
       type_ = delimited_type_supporting_local_open
