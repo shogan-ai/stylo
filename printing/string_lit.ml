@@ -20,6 +20,7 @@ let pp_words ?(last_line=false) words =
       then 1 (* pp_lines might insert a backslash *)
       else 0
     in
+    let is_space = word = "" in
     let word =
       nest 1 @@ string (
         if not last
@@ -34,15 +35,19 @@ let pp_words ?(last_line=false) words =
     | _ ->
       let flatness = flatness_tracker () in
       let fits = Condition.flat flatness in
+      let potential_escape =
+        if last_line || last || not is_space
+        then empty
+        else opt_token fits "\\"
+      in
       (* If we are not flat because of the margin but would be otherwise, then
          no further word would have fit on the line anyway. So breaking here was
          actually correct. *)
       sentence ^^ group ~margin ~flatness (
         (* If we are flat, then the backslash disappears, otherwise it stays and
            will be followed a linebreak. *)
-        opt_token ~ws_before:nbsp fits "\\" ^^
-        break 1 ^^
-        word
+        opt_token ~ws_before:nbsp fits "\\" ^/^
+        potential_escape ^^ word
       )
   in
   let rec aux acc = function
