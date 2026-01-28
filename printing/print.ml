@@ -2332,6 +2332,11 @@ end = struct
         ~pp_rhs:(Core_type.Arrow.pp_ret_ty ret)
       |> Attribute.attach ~attrs:ct.ptyp_attributes
 
+  let pp_prim_name s =
+    if List.exists (String.contains s) [ ' '; '\n' ]
+    then fancy_string "{|%s|}" s
+    else stringf "%S" s
+
   let pp { pval_pre_doc; pval_ext_attrs; pval_name; pval_type; pval_modalities;
            pval_prim; pval_attributes; pval_post_doc; pval_loc = _ ;
            pval_tokens = _ ; } =
@@ -2347,13 +2352,9 @@ end = struct
         with_modalities ~modalities:pval_modalities
           (pp_type flatness pval_type)
         ^?^
-        begin match pval_prim with
+        match pval_prim with
         | [] -> empty
-        | ps ->
-          group (
-            S.equals ^/^ separate_map (break 1) (fun s -> stringf "%S" s) ps
-          )
-        end
+        | ps -> group (S.equals ^/^ separate_map (break 1) pp_prim_name ps)
       )
     )
     |> Attribute.attach ~item:true ~attrs:pval_attributes
