@@ -82,25 +82,23 @@ let try_removing_parens parent p =
        TODO: push to child when possible. *)
     p
   | { ppat_desc = Ppat_parens { pat = p'; optional = _ }; _ } ->
-    begin match parent with
-    | Ppat_open _
-    | Ppat_list _ -> p
-    | Ppat_exception _
-    | Ppat_alias _
-    | Ppat_lazy _
-    | Ppat_tuple _
-    | Ppat_construct _
-    | Ppat_variant _
-    | Ppat_cons _ when not (simple_pattern p') -> p
-    | _ ->
+    begin match parent, p'.ppat_desc with
+    | (Ppat_open _ | Ppat_list _), _ -> p
+    | ( Ppat_exception _
+      | Ppat_alias _
+      | Ppat_lazy _
+      | Ppat_tuple _
+      | Ppat_construct _
+      | Ppat_variant _
+      | Ppat_cons _), _ when not (simple_pattern p') -> p
+    | Ppat_or _, Ppat_alias _ -> p
+    | _, Ppat_tuple _ ->
       (* parens are not mandatory but we might still optionally keep them.
          Removing them and letting recursive calls reintroduce them would be
          correct, but might move comments from one outside the parentheses to
          inside. *)
-      begin match p'.ppat_desc with
-      | Ppat_tuple _ -> make_parens_optional p
-      | _ -> remove_parens p
-      end
+      make_parens_optional p
+    | _ -> remove_parens p
     end
   | _ -> assert false
 
