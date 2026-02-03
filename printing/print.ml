@@ -2456,12 +2456,14 @@ end = struct
     let pre_pipe =
       match List.find Tokens.is_token pcd_tokens with
       | { desc = Token (BAR, opt); _ } ->
-        let pipe =
+        let pipe, space =
           if not opt
-          then S.pipe ^^ nbsp
-          else S.optional_pipe (Condition.flat td_flatness)
+          then S.pipe, nbsp
+          else
+            let flat = Condition.flat td_flatness in
+            S.optional_pipe flat, vanishing_whitespace flat nbsp
         in
-        Some (Preceeding.tight pipe ~indent:2)
+        Some (Preceeding.mk pipe space ~indent:2)
       | _ -> None
     in
     let pcd_vars =

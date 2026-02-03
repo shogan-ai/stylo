@@ -33,7 +33,7 @@
 
 (rule
   (alias runtest)
-  (action (diff %{dep:preceeding_and_comments.oxcamlformat-ref} %{dep:preceeding_and_comments.out})))
+  (action (diff %{dep:preceeding_and_comments.ref} %{dep:preceeding_and_comments.out})))
 
 ; idempotence check
 (rule
