@@ -53,7 +53,13 @@ type t = private
   (** N.B. if the [vanishing_cond] is not [None], then [Token] must correspond
       to an "optional" token. *)
   | Comment of pseudo_token
-  | Comments_flushing_hint of bool ref * t * t
+  | Comments_flushing_hint of {
+      cmts_were_flushed: bool ref;
+      floating_cmts_allowed: bool;
+      pull_cmts_attached_before_hint: bool;
+      ws_before: t;
+      ws_after: t;
+    }
   | Whitespace of whitespace can_vanish
   | Cat of Requirement.t * t * t
   | Nest of Requirement.t * int * Condition.t option * t
@@ -113,10 +119,18 @@ val opt_token : ?ws_before:t -> ?ws_after:t -> Condition.t -> string -> t
 
 (** {2 Comment documents} *)
 
-val flush_comments : ws_before:t -> ws_after:t -> Condition.t * t
+val flush_comments
+  :  pull_preceeding_comments:bool
+  -> floating_allowed:bool
+  -> ws_before:t
+  -> ws_after:t
+  -> Condition.t * t
 (** An explicit hint for the comments insertion algorithm to flush comments at
-    this point: it allows for floating comments to be displayed as such, whereas
-    they would otherwise be attached to what follows them.
+    this point: it allows for floating comments to be displayed as such if
+    desirable, whereas they would usually be attached to what follows them.
+
+    Likewise it can also "pull" comments that would otherwise be attached the
+    preceeding token.
 
     Renders as [empty] if there are no comments to insert.
 

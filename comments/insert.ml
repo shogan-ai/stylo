@@ -70,8 +70,12 @@ let rec first_is_space = function
 
 let first_is_space d = first_is_space d = `yes
 
-let rec first_is_flushhint = function
-  | Doc.Comments_flushing_hint _ -> `yes
+let rec first_is_flushhint ?pulls_before = function
+  | Doc.Comments_flushing_hint fh ->
+    begin match pulls_before with
+    | Some value when value <> fh.pull_cmts_attached_before_hint -> `no
+    | _ -> `yes
+    end
   | Token _ | Comment _ | Whitespace _ -> `no
   | Group (_, _, _, d) | Nest (_, _, _, d) ->
     first_is_flushhint d
@@ -81,7 +85,8 @@ let rec first_is_flushhint = function
     | `maybe -> first_is_flushhint d2
     | res -> res
 
-let first_is_flushhint d = first_is_flushhint d = `yes
+let first_is_flushhint ?pulls_before d =
+  first_is_flushhint ?pulls_before d = `yes
 
 let rec nest_before_leaf = function
   | Doc.Nest _ -> `yes
@@ -115,11 +120,16 @@ type state = {
   (** This is [true] for the rightmost branch under a [Group] node.
       In that situation we delay comment insertion: appending at the end of a
       group might make it non flat. *)
+
+  next_is_pulling_flush_hint: bool;
+  (** [true] if the the next leaf is a [Comments_flushing_hint fh] which pulls
+      comments that would otherwise be attached to the token preceeding it. *)
 }
 
 let init_state =
   { space_handling = Nothing_special
-  ; at_end_of_a_group = false }
+  ; at_end_of_a_group = false
+  ; next_is_pulling_flush_hint = false }
 
 let under_nest st = { st with at_end_of_a_group = false }
 let exit_nest prev st = { st with at_end_of_a_group = prev.at_end_of_a_group }
@@ -134,8 +144,8 @@ let is_comment_attaching_before elt =
   | _ -> false
 
 let attach_before_comments state tokens doc =
-  if state.at_end_of_a_group then
-    (* delay until outside the group. *)
+  if state.at_end_of_a_group || state.next_is_pulling_flush_hint then
+    (* delay until flush hint or having left the group. *)
     tokens, doc, state
   else
     match List.take_while is_comment_attaching_before tokens with
@@ -175,15 +185,16 @@ let prepend_comments_to_doc state (floating, attached_after) doc =
   in
   insert_space_if_required ~inserting_comment:true state doc
 
-let flush_comments tokens ~before:ws_b ~after:ws_a state =
+let flush_comments tokens floating_allowed ~before:ws_b ~after:ws_a state =
   let to_prepend, rest = consume_leading_comments tokens in
+  let after_floating = Doc.(if floating_allowed then ws_a ^^ ws_a else ws_a) in
   let doc =
     match to_prepend with
     | Empty, after -> Doc.(ws_b ^^ after ^^ ws_a)
-    | floating, Empty -> Doc.(ws_b ^^ floating ^^ ws_a ^^ ws_a)
-    | floating, after -> Doc.(ws_b ^^ floating ^^ ws_a ^^ ws_a ^^ after ^^ ws_a)
+    | floating, Empty -> Doc.(ws_b ^^ floating ^^ after_floating)
+    | floating, after ->
+      Doc.(ws_b ^^ floating ^^ after_floating ^^ after ^^ ws_a)
   in
-  let doc = insert_space_if_required ~inserting_comment:true state doc in
   rest, doc, { state with space_handling = Nothing_special }
 
 (** Traverse the document and sequence of tokens simultaneously, extending the
@@ -242,10 +253,11 @@ let rec walk_both state seq doc =
     (* Comments flushing hint take precedence over attachement and nesting
        considerations. *)
     | T.Comment { explicitely_inserted; _ },
-      Doc.Comments_flushing_hint (inserted, before, after)
+      Doc.Comments_flushing_hint fh
       when not !explicitely_inserted ->
-      inserted := true;
-      flush_comments seq ~before ~after state
+      fh.cmts_were_flushed := true;
+      flush_comments seq fh.floating_cmts_allowed ~before:fh.ws_before
+        ~after:fh.ws_after state
 
     | _, Doc.Comments_flushing_hint _ ->
       (* No comments to insert, the hint vanishes. *)
@@ -266,8 +278,13 @@ let rec walk_both state seq doc =
 
     (* Traverse document structure *)
     | _, Doc.Cat (_, left, right) ->
+      let next_is_pulling_flush_hint =
+        first_is_flushhint ~pulls_before:true right
+      in
       let restl, left, mid_state =
-        walk_both { state with at_end_of_a_group = false } seq left
+        walk_both
+          { state with at_end_of_a_group = false; next_is_pulling_flush_hint }
+          seq left
       in
       let restr, right, final_state =
         walk_both { mid_state with at_end_of_a_group = state.at_end_of_a_group }
@@ -294,7 +311,8 @@ let rec walk_both state seq doc =
 
 and traverse_group tokens state margin flatness grouped_doc =
   let rest, d, state' =
-    walk_both { space_handling = Nothing_special; at_end_of_a_group = true }
+    walk_both
+      { state with space_handling = Nothing_special; at_end_of_a_group = true }
       tokens grouped_doc
   in
   let return_state =

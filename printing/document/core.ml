@@ -83,7 +83,13 @@ type t =
   | Empty
   | Token of pseudo_token can_vanish
   | Comment of pseudo_token
-  | Comments_flushing_hint of bool ref * t * t
+  | Comments_flushing_hint of {
+      cmts_were_flushed: bool ref;
+      floating_cmts_allowed: bool;
+      pull_cmts_attached_before_hint: bool;
+      ws_before: t;
+      ws_after: t;
+    }
   | Whitespace of whitespace can_vanish
   | Cat of Req.t * t * t
   | Nest of Req.t * int * Condition.t option * t
@@ -148,10 +154,18 @@ let vanishing_whitespace cond = function
     Whitespace { vanishing_cond = Some cond; value }
   | _ -> invalid_arg "Document.vanishing_whitespace"
 
-let flush_comments ~ws_before ~ws_after =
-  let inserted_comments = ref false in
-  let cond : Condition.t = lazy !inserted_comments in
-  cond, Comments_flushing_hint (inserted_comments, ws_before, ws_after)
+let flush_comments ~pull_preceeding_comments:pull ~floating_allowed:float
+      ~ws_before ~ws_after =
+  let cmts_were_flushed = ref false in
+  let cond : Condition.t = lazy !cmts_were_flushed in
+  let hint =
+    Comments_flushing_hint {
+      cmts_were_flushed; ws_before; ws_after;
+      floating_cmts_allowed = float;
+      pull_cmts_attached_before_hint = pull;
+    }
+  in
+  cond, hint
 
 let (^^) t1 t2 =
   match t1, t2 with

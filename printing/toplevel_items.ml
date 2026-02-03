@@ -3,16 +3,22 @@ open Document.Utils
 
 open Ocaml_syntax.Tokens
 
+(* All toplevel flush hints "allow" floating comments, but none want to pull
+   comments attached before them. *)
+let flush_hint ~ws_before ~ws_after =
+  flush_comments ~pull_preceeding_comments:false ~floating_allowed:true
+    ~ws_before ~ws_after
+
 let add_item ?flatness last_in_group doc item =
   let post_break = if last_in_group then empty else break 0 in
   match doc with
   | Empty ->
-    let _, hint = flush_comments ~ws_before:empty ~ws_after:softline in
+    let _, hint = flush_hint ~ws_before:empty ~ws_after:softline in
     hint ^^
     group ?flatness (item ^^ post_break)
   | _ ->
     let comments_inserted, hint =
-      flush_comments ~ws_before:softline ~ws_after:softline
+      flush_hint ~ws_before:softline ~ws_after:softline
     in
     doc ^^ softline ^^
     hint ^^
@@ -82,7 +88,7 @@ let rec separate_groups = function
   | [] -> empty
   | [ group ] -> group
   | g :: gs ->
-    let _, hint = flush_comments ~ws_before:softline ~ws_after:softline in
+    let _, hint = flush_hint ~ws_before:softline ~ws_after:softline in
     (* We want a single blank line between groups. *)
     g ^^ softline ^^ softline ^^ hint ^^ separate_groups gs
 
