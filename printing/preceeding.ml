@@ -32,7 +32,13 @@ let mk ?indent doc space =
 let tight ?indent doc = mk doc empty ?indent
 let spaced ?indent doc = mk doc (break 1) ?indent
 
-let preceed ~by:t doc = t.pre_doc ^^ t.space ^^ t.nest doc
+let preceed ~by:t doc =
+  let inserted, hint =
+    flush_comments ~pull_preceeding_comments:true ~floating_allowed:false
+      ~ws_before:t.space ~ws_after:(break 1)
+  in
+  let space = vanishing_whitespace inserted t.space in
+  t.pre_doc ^^ t.nest (hint ^^ space ^^ doc)
 
 let ( + ) fst_opt snd =
   match fst_opt with

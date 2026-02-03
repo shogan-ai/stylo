@@ -58,6 +58,7 @@ module Condition = struct
 
   let flat r = lazy !r
   let (&&) t1 t2 = lazy (!!t1 && !!t2)
+  let (||) t1 t2 = lazy (!!t1 || !!t2)
 
   let check = function
     | None -> false
@@ -150,8 +151,11 @@ let softest_break = ws (Break (1, Softest))
 
 let nbsp = ws Non_breakable
 let vanishing_whitespace cond = function
+  | Empty -> Empty
   | Whitespace { vanishing_cond = None; value } ->
     Whitespace { vanishing_cond = Some cond; value }
+  | Whitespace { vanishing_cond = Some other_cond; value } ->
+    Whitespace { vanishing_cond = Some Condition.(cond || other_cond); value }
   | _ -> invalid_arg "Document.vanishing_whitespace"
 
 let flush_comments ~pull_preceeding_comments:pull ~floating_allowed:float
