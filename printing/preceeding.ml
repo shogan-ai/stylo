@@ -18,10 +18,19 @@ let mk doc ~indent =
   in
   (doc, nest ?vanish indent)
 
-let extend t_opt doc ~indent =
-  let _, nest as suf = mk doc ~indent in
-  match t_opt with
-  | None -> suf, Fun.id
+let tight ?indent doc =
+  let indent =
+    match indent with
+    | None -> Requirement.to_int (requirement doc)
+    | Some i -> i
+  in
+  mk doc ~indent
+
+let spaced ?indent doc = tight ?indent (doc ^^ break 1)
+
+let ( + ) fst_opt (doc, nest as snd) =
+  match fst_opt with
+  | None -> snd, Fun.id
   | Some (preceeding, previous_nest) ->
     (preceeding ^^ previous_nest doc, Fun.compose nest previous_nest),
     previous_nest

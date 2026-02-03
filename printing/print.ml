@@ -366,8 +366,8 @@ end = struct
         let pre_nest = Preceeding.implied_nest preceeding in
         pp_arg ?preceeding arg ^/^ pre_nest @@ nest 2 ty_doc
       | _ ->
-        let left, pre_nest = Preceeding.extend preceeding left ~indent:2 in
-        let comma_pre = Preceeding.mk (S.comma ^^ break 1) ~indent:2 in
+        let left, pre_nest = Preceeding.(preceeding + tight left ~indent:2) in
+        let comma_pre = Preceeding.spaced S.comma in
         let left_and_args =
           List.fold_left (fun acc arg ->
             acc ^^ break 0 ^^ pre_nest (pp_arg ~preceeding:comma_pre arg)
@@ -569,12 +569,14 @@ end = struct
           ~(pp_rhs:printer) =
       let extra_space_vanishing_cond = Condition.flat flatness in
       let mk_pre_doc token =
+        (* TODO: swap vanishing nbsp with break, so we can use
+           [Preceeding.spaced] *)
         group (token ^/^ vanishing_whitespace extra_space_vanishing_cond nbsp)
       in
       let first_pre, pre_nest =
         if for_descr then
           let pre, pre_nest =
-            Preceeding.extend preceeding ~indent:3 (mk_pre_doc S.colon)
+            Preceeding.(preceeding + tight ~indent:3 (mk_pre_doc S.colon))
           in
           Some pre, pre_nest
         else
@@ -585,10 +587,10 @@ end = struct
         | [] -> empty, first_pre, Fun.id
         | _ ->
           let polys = pp_poly_bindings ?preceeding:first_pre poly_params in
-          let dot_pre = Preceeding.mk ~indent:3 (mk_pre_doc S.dot) in
+          let dot_pre = Preceeding.tight ~indent:3 (mk_pre_doc S.dot) in
           polys ^^ break 0, Some dot_pre, pre_nest
       in
-      let arrow_pre = Preceeding.mk (S.rarrow ^^ break 1) ~indent:3 in
+      let arrow_pre = Preceeding.tight (S.rarrow ^^ break 1) ~indent:3 in
       let args =
         List.mapi (fun i arg ->
           if i = 0
@@ -665,17 +667,17 @@ end = struct
       pre_lid ^^ pre_nest (space ^^ pp ct)
     | Ptyp_quote ct ->
       let preceeding, pre_nest =
-        Preceeding.extend preceeding (S.lt_lbracket ^^ break 1) ~indent:3
+        Preceeding.(preceeding + spaced S.lt_lbracket)
       in
       pp ~preceeding ct ^/^ pre_nest S.rbracket_gt
     | Ptyp_splice ct ->
-      let spaces, indent =
+      let spaces =
         match ct.ptyp_desc with
-        | Ptyp_quote _ -> 1, 2
-        | _ -> 0, 1
+        | Ptyp_quote _ -> 1
+        | _ -> 0
       in
       let preceeding, _ =
-        Preceeding.extend preceeding (S.dollar ^^ break spaces) ~indent
+        Preceeding.(preceeding + tight (S.dollar ^^ break spaces))
       in
       pp ~preceeding ct
     | Ptyp_of_kind jkind ->
@@ -688,7 +690,7 @@ end = struct
     | Ptyp_parens ct -> pp_parens ?preceeding ct
 
   and pp_parens ?preceeding ct =
-    let lparen, pre_nest = Preceeding.extend preceeding S.lparen ~indent:1 in
+    let lparen, pre_nest = Preceeding.(preceeding + tight S.lparen) in
     pp ~in_parens:true ~preceeding:lparen ct ^^ pre_nest S.rparen
 
   and pp_variant ?(compact=true) ?preceeding ~tokens fields
@@ -702,10 +704,8 @@ end = struct
       | [] -> fst (Preceeding.group_with preceeding init)
       | rf :: rfs ->
         let indent = Requirement.to_int (requirement init) + 1 in
-        let first_pre, _ =
-          Preceeding.extend preceeding (init ^^ break 1) ~indent
-        in
-        let pipe_pre = Preceeding.mk (S.pipe ^^ break 1) ~indent in
+        let first_pre, _ = Preceeding.(preceeding + spaced init) in
+        let pipe_pre = Preceeding.spaced S.pipe ~indent in
         let rf = row_field first_pre rf in
         let rfs = List.map (fun rf -> pre_nest (row_field pipe_pre rf)) rfs in
         separate (if compact then break 1 else hardline) (rf :: rfs)
@@ -863,7 +863,7 @@ end = struct
     | Ppat_tuple (elts, closed) -> pp_tuple ?preceeding closed elts
     | Ppat_unboxed_tuple (elts, cf) ->
       let pre_hash_lparen, _ =
-        Preceeding.extend preceeding ~indent:1 S.hash_lparen
+        Preceeding.(preceeding + tight ~indent:1 S.hash_lparen)
       in
       pp_tuple ~preceeding:pre_hash_lparen cf elts ^^ S.rparen
     | Ppat_construct (lid, arg) -> pp_construct ~preceeding p.ppat_tokens lid arg
@@ -876,7 +876,7 @@ end = struct
       pp_array ~preceeding (nb_semis p.ppat_tokens) mut ps
     | Ppat_or (p1, p2) ->
       let pre_nest = Preceeding.implied_nest preceeding in
-      let pipe_pre = Preceeding.mk (S.pipe ^^ break 1) ~indent:2 in
+      let pipe_pre = Preceeding.spaced S.pipe in
       pp ?preceeding p1 ^/^
       pre_nest (pp ~preceeding:pipe_pre p2)
     | Ppat_constraint (p, ty, modes) ->
@@ -917,7 +917,7 @@ end = struct
       let preceeding =
         if on_right then (
           assert (Option.is_none preceeding);
-          Some (Preceeding.mk (S.cons ^^ break 1) ~indent:3)
+          Some (Preceeding.spaced S.cons)
         ) else
           preceeding
       in
@@ -938,7 +938,11 @@ end = struct
           opt_token cond "(", opt_token cond ")"
         else S.lparen, S.rparen
       in
-      let before, pre_nest = Preceeding.extend preceeding before ~indent:1 in
+      let before, pre_nest =
+        (* we explicitely pass the indent as it is guessed incorrectly for
+           vanishing tokens... *)
+        Preceeding.(preceeding + tight before ~indent:1)
+      in
       pp ~preceeding:before pat ^^ pre_nest after
 
   and pp_parens_tuple ~preceeding ~attrs ~optional ~closed flatness pats =
@@ -956,8 +960,11 @@ end = struct
         S.lparen ^^ space_when_multiline ^^ break 0,
         space_when_multiline ^^ break 0 ^^ S.rparen
     in
-    let lparen, pre_nest = Preceeding.extend preceeding lparen ~indent:2 in
-    let comma = Preceeding.mk (S.comma ^^ break 1) ~indent:2 in
+    let lparen, pre_nest =
+      (* same remark as in [pp_parens] regarding the explicit indent. *)
+      Preceeding.(preceeding + tight lparen ~indent:2)
+    in
+    let comma = Preceeding.spaced S.comma in
     let join a b = a ^^ break 0 ^^ pre_nest b in
     let pats =
       foldli (fun i acc pat ->
@@ -991,9 +998,10 @@ end = struct
     | elts ->
       let semi_as_term = List.compare_length_with elts nb_semis = 0 in
       let pre_opn, pre_nest =
-        Preceeding.extend preceeding (opn ^^ break 1) ~indent:2
+        (* Is [~indent:2] correct for arrays? *)
+        Preceeding.(preceeding + spaced opn ~indent:2)
       in
-      let semi_as_pre = Preceeding.mk (S.semi ^^ break 1) ~indent:2 in
+      let semi_as_pre = Preceeding.spaced S.semi in
       let opn_and_pats =
         List.mapi (fun i pat ->
           if i = 0
@@ -1012,9 +1020,7 @@ end = struct
     pp_delimited_seq ~preceeding (S.lbracket, S.rbracket) nb_semis
 
   and pp_constraint ~preceeding p ty_opt modes =
-    let pre_lparen, pre_nest =
-      Preceeding.extend preceeding ~indent:1 S.lparen
-    in
+    let pre_lparen, pre_nest = Preceeding.(preceeding + tight S.lparen) in
     let p = pp ~preceeding:pre_lparen p in
     let p_with_extras =
       match ty_opt with
@@ -1111,10 +1117,10 @@ end = struct
       nb_fields = nb_semis
     in
     let pre_lbrace, pre_nest =
-      Preceeding.extend preceeding ~indent:2
-        ((if unboxed then S.hash_lbrace else S.lbrace) ^^ break 1)
+      let lbrace = if unboxed then S.hash_lbrace else S.lbrace in
+      Preceeding.(preceeding + spaced lbrace ~indent:2)
     in
-    let semi_as_pre = Preceeding.mk ~indent:2 (S.semi ^^ break 1) in
+    let semi_as_pre = Preceeding.spaced S.semi in
     group (
       foldli (fun i acc field ->
         if i = 0 then
@@ -1347,14 +1353,13 @@ end = struct
       )
     | Pexp_quote e ->
       let preceeding, pre_nest =
-        Preceeding.extend preceeding (S.lt_lbracket ^^ break 1)
-          ~indent:3
+        Preceeding.(preceeding + spaced S.lt_lbracket)
       in
       pp ~preceeding e ^/^ pre_nest S.rbracket_gt
     | Pexp_splice e ->
       let space = if needs_space_if_prefixed e then 1 else 0 in
       let preceeding, _ =
-        Preceeding.extend preceeding (S.dollar ^^ break space) ~indent:1
+        Preceeding.(preceeding + tight (S.dollar ^^ break space))
       in
       pp ~preceeding e
     | Pexp_hole ->
@@ -1500,7 +1505,7 @@ end = struct
     match assign with
     | None -> group access
     | Some e ->
-      let preceeding = Preceeding.mk (S.larrow ^^ break 1) ~indent:3 in
+      let preceeding = Preceeding.spaced S.larrow in
       let assignment = pp ~preceeding e in
       group access ^^ group (break 1 ^^ pre_nest assignment)
 
@@ -1512,8 +1517,7 @@ end = struct
     let pre_kw, pre_nest =
       let decorated = Ext_attribute.decorate kw ext_attr in
       let pre_ext = group (decorated ^^ break 1) in
-      let ext_indent = Requirement.to_int (requirement pre_ext) in
-      Preceeding.extend preceeding pre_ext ~indent:ext_indent
+      Preceeding.(preceeding + tight pre_ext)
     in
     let if_cond = pp ~preceeding:pre_kw e1 in
     let then_ = pp_if_branch S.then_ e2 in
@@ -1549,8 +1553,10 @@ end = struct
     | elts ->
       let semi_as_term = List.compare_length_with elts nb_semis = 0 in
       let pre_opn, pre_nest =
-        Preceeding.extend preceeding (opn ^^ break 1) ~indent:2 in
-      let semi_as_pre = Preceeding.mk ~indent:2 (S.semi ^^ break 1) in
+        (* Is [~indent:2] correct for arrays? *)
+        Preceeding.(preceeding + spaced opn ~indent:2)
+      in
+      let semi_as_pre = Preceeding.spaced S.semi in
       let opn_and_elts =
         foldli (fun i acc elt ->
           if i = 0 then
@@ -1608,14 +1614,9 @@ end = struct
 
 
   and pp_constraint ~preceeding e ct_opt modes =
-    let pre_lparen, pre_nest =
-      Preceeding.extend preceeding S.lparen ~indent:1
-    in
+    let pre_lparen, pre_nest = Preceeding.(preceeding + tight S.lparen) in
     let colon_constr =
-      optional (fun ct ->
-        let preceeding = Preceeding.mk (S.colon ^^ break 1) ~indent:2 in
-        Core_type.pp ~preceeding ct
-      ) ct_opt
+      optional (Core_type.pp ~preceeding:(Preceeding.spaced S.colon)) ct_opt
       |> with_modes ~modes
     in
     group (
@@ -1624,19 +1625,13 @@ end = struct
     )
 
   and pp_coerce ~preceeding e ct1 ct2 =
-    let pre_lparen, pre_nest =
-      Preceeding.extend preceeding S.lparen ~indent:1
-    in
+    let pre_lparen, pre_nest = Preceeding.(preceeding + tight S.lparen) in
     let lparen_e = pp ~preceeding:pre_lparen e in
     let colon_ct1 =
-      optional (fun ct ->
-        let preceeding = Preceeding.mk (S.colon ^^ break 1) ~indent:2 in
-        Core_type.pp ~preceeding ct
-      ) ct1
+      optional (Core_type.pp ~preceeding:(Preceeding.spaced S.colon)) ct1
     in
     let coerce_ct2 =
-      let preceeding = Preceeding.mk (S.coerce ^^ break 1) ~indent:3 in
-      Core_type.pp ~preceeding ct2
+      Core_type.pp ~preceeding:(Preceeding.spaced S.coerce) ct2
     in
     group (
       lparen_e ^/^
@@ -1684,11 +1679,7 @@ end = struct
       | None -> Preceeding.implied_nest preceeding
       | Some nest -> nest
     in
-    let comma =
-      let comma = comma_aligner ^^ S.comma ^^ break 1 in
-      let indent = if is_empty comma_aligner then 2 else 3 in
-      Preceeding.mk comma ~indent
-    in
+    let comma = Preceeding.spaced (comma_aligner ^^ S.comma) in
     foldli (fun i acc exp ->
       if i = 0 then
         Argument.pp_preceeded ?preceeding pp exp
@@ -1723,8 +1714,10 @@ end = struct
         space_when_multiline ^^ break 0 ^^ S.rparen
     in
     let lparen, pre_nest =
+      (* NB. indent is not guessed correctly by [Preceeding] when given optional
+         tokens. *)
       let indent = if kind = `Unboxed then 3 else 2 in
-      Preceeding.extend preceeding lparen ~indent
+      Preceeding.(preceeding + tight lparen ~indent)
     in
     let elts =
       pp_tuple ~preceeding:lparen ~pre_nest_override:pre_nest elts
@@ -1756,7 +1749,7 @@ end = struct
         | Pexp_function _ -> 0
         | _ -> 1
       in
-      let before,pre_nest = Preceeding.extend preceeding before ~indent in
+      let before,pre_nest = Preceeding.(preceeding + tight before ~indent) in
       pp ~preceeding:before exp ^^
       pre_nest after
 
@@ -1782,9 +1775,7 @@ end = struct
              those case. *)
           group (op ^^ pp arg)
         | _ ->
-          let indent = Requirement.to_int (requirement op) in
-          let op_pre = Preceeding.mk (group op) ~indent in
-          pp ~preceeding:op_pre arg
+          pp ~preceeding:(Preceeding.tight (group op)) arg
     in
     match arg.pexp_desc with
     | Pexp_apply (f, args) when on_right ->
@@ -1796,16 +1787,17 @@ end = struct
       | _ ->
         (* N.B. the app is not under parentheses, that's why this is valid!
            (we are not dropping attributes or anything) *)
-        let op = pp_op op ^^ break 1 in
-        let indent = Requirement.to_int (requirement op) in
-        let op_pre = Preceeding.mk op ~indent in
-        let f = pp ~preceeding:op_pre f in
-        Application.pp ~indent:(indent + 2) f args
+        let op = pp_op op in
+        let app_indent =
+          Requirement.to_int (requirement op) + 1 (* space *) + 2 (* indent *)
+        in
+        let f = pp ~preceeding:(Preceeding.spaced op) f in
+        Application.pp ~indent:app_indent f args
         |> Attribute.attach ~attrs:arg.pexp_attributes
       end
     | Pexp_function _ when on_right ->
-      let op = pp_op (Option.get op) ^^ break 1 in
-      let op_pre = Preceeding.mk op ~indent:0 (* ! *) in
+      let op = pp_op (Option.get op) in
+      let op_pre = Preceeding.spaced op ~indent:0 (* ! *) in
       let kw_and_params, body = pp_function_parts ~preceeding:op_pre arg in
       group (kw_and_params ^/^ body)
       |> Attribute.attach ~attrs:arg.pexp_attributes
@@ -1836,7 +1828,7 @@ end = struct
       let preceeding =
         if on_right then (
           assert (Option.is_none preceeding);
-          Some (Preceeding.mk (S.cons ^^ break 1) ~indent:3)
+          Some (Preceeding.spaced S.cons)
         ) else
           preceeding
       in
@@ -1851,8 +1843,8 @@ end = struct
   and pp_record ~preceeding ?(unboxed = false) nb_semis expr_opt fields =
     let semi_as_term = List.compare_length_with fields nb_semis = 0 in
     let opening_tok, pre_nest =
-      ((if unboxed then S.hash_lbrace else S.lbrace) ^^ break 1)
-      |> Preceeding.extend preceeding ~indent:2
+      let lbrace = if unboxed then S.hash_lbrace else S.lbrace in
+      Preceeding.(preceeding + spaced lbrace ~indent:2)
     in
     let first_part, nest_first_field, first_pre =
       match expr_opt with
@@ -1862,7 +1854,7 @@ end = struct
         (fun f -> pre_nest @@ nest 2 f),
         None
     in
-    let semi_as_pre = Preceeding.mk ~indent:2 (S.semi ^^ break 1) in
+    let semi_as_pre = Preceeding.spaced S.semi in
     let first_part_and_fields =
       foldli (fun i acc field ->
         if i = 0 then
@@ -1889,10 +1881,7 @@ end = struct
   and pp_setfield ?preceeding e1 lid e2 =
     let pre_nest = Preceeding.implied_nest preceeding in
     let access = pp_field ?preceeding e1 lid in
-    let assignment =
-      let arrow_pre = Preceeding.mk (S.larrow ^^ break 1) ~indent:3 in
-      pp ~preceeding:arrow_pre e2
-    in
+    let assignment = pp ~preceeding:(Preceeding.spaced S.larrow) e2 in
     group (access ^/^ pre_nest assignment)
 end
 
@@ -2027,11 +2016,7 @@ and Case : sig
 end = struct
   let pp_guard = function
     | None -> empty
-    | Some e ->
-      let pre = S.when_ ^^ break 1 in
-      let indent = Requirement.to_int (requirement pre) in
-      let preceeding = Preceeding.mk pre ~indent in
-      Expression.pp ~preceeding e
+    | Some e -> Expression.pp ~preceeding:(Preceeding.spaced S.when_) e
 
   (* we only nest the pattern, not the pipes (there might be several due to
      or-patterns). *)
@@ -2045,7 +2030,7 @@ end = struct
         split_top_or p1 @ split_top_or p2
       | _ -> [ p ]
     in
-    let pipe_pre = Some (Preceeding.mk (S.pipe ^^ break 1) ~indent:2) in
+    let pipe_pre = Some (Preceeding.spaced S.pipe) in
     let first_pre = if pipe then pipe_pre else None in
     split_top_or p
     |> List.fold_left (fun (acc, preceeding) pat ->
@@ -2165,7 +2150,7 @@ end = struct
         else empty, empty, 2
       in
       let pre, pre_nest =
-        Preceeding.extend preceeding (fst_tok ^^ break 0 ^^ lparen) ~indent
+        Preceeding.(preceeding + tight (fst_tok ^^ break 0 ^^ lparen) ~indent)
       in
       pre, pre_nest rparen
     in
@@ -2173,9 +2158,7 @@ end = struct
     | Parg_unlabelled { legacy_modes=[]; arg; typ_constraint=None; modes=[] } ->
       pp_preceeded_arg ?preceeding arg
     | Parg_unlabelled { legacy_modes; arg; typ_constraint; modes } ->
-      let lpre, pre_nest =
-        Preceeding.extend preceeding S.lparen ~indent:1
-      in
+      let lpre, pre_nest = Preceeding.(preceeding + tight S.lparen) in
       pp_generic ~preceeding:lpre legacy_modes (pp_preceeded_arg arg)
         typ_constraint modes ^^
       pre_nest S.rparen
@@ -2311,9 +2294,7 @@ end = struct
         let left, right = array_delimiters mut in
         left, right, c
     in
-    let left_pre, pre_nest =
-      Preceeding.extend preceeding (left ^^ break 1) ~indent:2
-    in
+    let left_pre, pre_nest = Preceeding.(preceeding + spaced left ~indent:2) in
     pp ~preceeding:left_pre c ^/^ pre_nest right
 end
 
@@ -2324,9 +2305,7 @@ and Value_description : sig
 end = struct
   let pp_type flatness ct =
     match Core_type.Arrow.components ct with
-    | None ->
-      let preceeding = Preceeding.mk (S.colon ^^ break 1) ~indent:2 in
-      Core_type.pp ~preceeding ct
+    | None -> Core_type.pp ~preceeding:(Preceeding.spaced S.colon) ct
     | Some (poly_params, args, ret) ->
       Core_type.Arrow.pp_for_descr flatness poly_params args
         ~pp_rhs:(Core_type.Arrow.pp_ret_ty ret)
@@ -2402,7 +2381,7 @@ end = struct
         let next_tok =
           if List.exists is_semi lbl.pld_tokens then S.semi else empty
         in
-        let preceeding = Preceeding.mk (preceding_tok ^^ break 1) ~indent:2 in
+        let preceeding = Preceeding.spaced preceding_tok ~indent:2 in
         next_tok, group (pp_field ~preceeding lbl)
       ) (if unboxed then S.hash_lbrace else S.lbrace) lbls
     in
@@ -2479,7 +2458,7 @@ end = struct
           then S.pipe ^^ nbsp
           else S.optional_pipe (Condition.flat td_flatness)
         in
-        Some (Preceeding.mk pipe ~indent:2)
+        Some (Preceeding.tight pipe ~indent:2)
       | _ -> None
     in
     let pcd_vars =
