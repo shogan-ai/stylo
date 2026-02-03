@@ -2,13 +2,24 @@ open Document
 
 type nest_fun = t -> t
 
-type nonrec t = t * nest_fun
+type nonrec t = {
+  pre_doc: t;
+  space: t;
+  nest: nest_fun;
+}
 
 let implied_nest = function
   | None -> Fun.id
-  | Some (_, f) -> f
+  | Some t -> t.nest
 
-let mk doc ~indent =
+let mk ?indent doc space =
+  let indent =
+    match indent with
+    | None ->
+      Requirement.to_int (requirement doc) +
+      if is_empty space then 0 else 1
+    | Some i -> i
+  in
   let vanish =
     match doc with
     | Cat (_, Token { vanishing_cond; _}, _)
@@ -16,26 +27,23 @@ let mk doc ~indent =
     | Token { vanishing_cond; _ } -> vanishing_cond
     | _ -> None
   in
-  (doc, nest ?vanish indent)
+  { pre_doc = doc; space; nest = nest ?vanish indent }
 
-let tight ?indent doc =
-  let indent =
-    match indent with
-    | None -> Requirement.to_int (requirement doc)
-    | Some i -> i
-  in
-  mk doc ~indent
+let tight ?indent doc = mk doc empty ?indent
+let spaced ?indent doc = mk doc (break 1) ?indent
 
-let spaced ?indent doc = tight ?indent (doc ^^ break 1)
+let preceed ~by:t doc = t.pre_doc ^^ t.space ^^ t.nest doc
 
-let ( + ) fst_opt (doc, nest as snd) =
+let ( + ) fst_opt snd =
   match fst_opt with
   | None -> snd, Fun.id
-  | Some (preceeding, previous_nest) ->
-    (preceeding ^^ previous_nest doc, Fun.compose nest previous_nest),
-    previous_nest
+  | Some fst ->
+    let pre_doc = preceed snd.pre_doc ~by:fst in
+    let space = snd.space in
+    let nest = Fun.compose snd.nest fst.nest in
+    { pre_doc; space; nest }, fst.nest
 
 let group_with t doc =
   match t with
   | None -> doc, Fun.id
-  | Some (t, nest) -> group (t ^^ nest doc), nest
+  | Some t -> group (preceed doc ~by:t), t.nest
