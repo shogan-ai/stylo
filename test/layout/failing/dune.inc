@@ -96,7 +96,7 @@
 
 (rule
   (alias runtest)
-  (action (diff %{dep:tuples.oxcamlformat-ref} %{dep:tuples.out})))
+  (action (diff %{dep:tuples.ref} %{dep:tuples.out})))
 
 ; idempotence check
 (rule

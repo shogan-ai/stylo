@@ -11,5 +11,5 @@
 (rule
   (aliases fuzz runtest)
   (enabled_if (and (not %{file-available:../exhaust})
-                   (not %{bin-available:formatpinata})))
+                   (not %{bin-available:ocamlgrammarfuzzer})))
   (action (echo "Fuzzer output not present and can't be generated.")))

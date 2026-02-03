@@ -14,8 +14,7 @@ let foo =
 
 let foo2 =
   if whatever2
-  then
-    (* some comment2 *) smtg2
+  then (* some comment2 *) smtg2
   else (
     match not_flat2 with
     | () -> ())
