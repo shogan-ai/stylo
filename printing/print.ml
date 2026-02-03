@@ -168,7 +168,8 @@ module Doc = struct
   let pp_floating s =
     softline ^^ pp s ^^ softline
 
-  let attach ?(extra_nest=Fun.id) ?(text = []) ?pre_doc ?post_doc t =
+  let attach ?(possibly_ambiguous=true) ?(extra_nest=Fun.id)
+        ?(text = []) ?pre_doc ?post_doc t =
     extra_nest (
       begin match text with
       | [] -> empty
@@ -181,7 +182,9 @@ module Doc = struct
     ) ^?/^
     match post_doc with
     | None -> t
-    | Some s -> group (t ^^ softest_break ^^ extra_nest (pp s)) ^^ softline
+    | Some s ->
+      group (t ^^ softest_break ^^ extra_nest (pp s)) ^^
+      if possibly_ambiguous then softline else empty
 end
 
 module rec Attribute : sig
@@ -727,7 +730,7 @@ end = struct
     let extra_nest x = nest 2 (pre_nest x) in
     row_field_desc preceeding prf_desc
     |> Attribute.attach ~extra_nest ~attrs:prf_attributes
-    |> Doc.attach ~extra_nest ?post_doc:prf_doc
+    |> Doc.attach ~possibly_ambiguous:false ~extra_nest ?post_doc:prf_doc
 
   and row_field_desc preceeding = function
     | Rinherit ct -> pp ~preceeding ct
