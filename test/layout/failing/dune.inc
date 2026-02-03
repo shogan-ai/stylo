@@ -20,6 +20,27 @@
   (action (diff %{dep:ext_attributes.out} %{dep:ext_attributes.snd-run})))
 
 (rule
+  (target preceeding_and_comments.out)
+  (action
+    (with-stdout-to %{target}
+      (run ../../../bin/stylo.exe %{dep:preceeding_and_comments.ml}))))
+
+(rule
+  (target preceeding_and_comments.snd-run)
+  (action
+    (with-stdout-to %{target}
+      (run ../../../bin/stylo.exe %{dep:preceeding_and_comments.out}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:preceeding_and_comments.oxcamlformat-ref} %{dep:preceeding_and_comments.out})))
+
+; idempotence check
+(rule
+  (alias runtest)
+  (action (diff %{dep:preceeding_and_comments.out} %{dep:preceeding_and_comments.snd-run})))
+
+(rule
   (target relative_nest.out)
   (action
     (with-stdout-to %{target}
