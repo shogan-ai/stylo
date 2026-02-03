@@ -2471,39 +2471,43 @@ end = struct
   let constructor_declaration td_flatness
       { pcd_name; pcd_vars; pcd_args; pcd_res; pcd_attributes;
         pcd_doc; pcd_loc = _; pcd_tokens } =
+    let pre_pipe =
+      match List.find Tokens.is_token pcd_tokens with
+      | { desc = Token (BAR, opt); _ } ->
+        let pipe =
+          if not opt
+          then S.pipe ^^ nbsp
+          else S.optional_pipe (Condition.flat td_flatness)
+        in
+        Some (Preceeding.mk pipe ~indent:2)
+      | _ -> None
+    in
     let pcd_vars =
       match pcd_vars with
       | [] -> empty
       | vars -> Core_type.pp_poly_bindings vars ^^ S.dot
     in
     let name = group (constr_ident pcd_name.txt) in
+    let pipe_and_name, pre_nest = Preceeding.group_with pre_pipe name in
     let constr =
       match pcd_args, pcd_res with
-      | Pcstr_tuple [], None -> name
+      | Pcstr_tuple [], None -> pipe_and_name
       | args, None ->
-        group (name ^/^ nest 2 S.of_) ^/^ nest 2 @@ Constructor_argument.pp_args args
+        group (pipe_and_name ^/^ pre_nest @@ nest 2 S.of_) ^/^
+        pre_nest @@ nest 2 @@ Constructor_argument.pp_args args
       | Pcstr_tuple [], Some ct ->
-        group (name ^/^ nest 2 S.colon) ^?^ nest 2 (pcd_vars ^?^ Core_type.pp ct)
+        group (pipe_and_name ^/^ pre_nest @@ nest 2 S.colon) ^?^
+        pre_nest @@ nest 2 (pcd_vars ^?^ Core_type.pp ct)
       | args, Some ct ->
-        group (name ^/^ nest 2 S.colon) ^?^ nest 2 (
+        group (pipe_and_name ^/^ pre_nest @@ nest 2 S.colon) ^?^
+        pre_nest @@ nest 2 (
           pcd_vars ^?^
           Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct
         )
     in
-    let without_pipe =
-      Attribute.attach ~attrs:pcd_attributes
-        (group constr)
-      |> Doc.attach ?post_doc:pcd_doc
-      |> group
-      |> nest 2
-    in
-    match List.find Tokens.is_token pcd_tokens with
-    | { desc = Token (BAR, opt); _ } ->
-      if not opt
-      then S.pipe ^^ nbsp ^^ without_pipe
-      else S.optional_pipe (Condition.flat td_flatness) ^^ without_pipe
-    | _ ->
-      without_pipe
+    Attribute.attach ~extra_nest:pre_nest ~attrs:pcd_attributes (group constr)
+    |> Doc.attach ~extra_nest:pre_nest ?post_doc:pcd_doc
+    |> group
 
   let pp_variant td_flatness = function
     | [] -> S.pipe
