@@ -1,0 +1,20 @@
+module M = struct
+  let x = i $ foo
+
+  let x =
+#syntax quotations on
+
+    i $ <[ foo ]>
+#syntax quotations off
+
+    |> ignore
+  ;;
+
+  let x =
+#666 "pretend_file.ml"
+
+    i $ foo
+  ;;
+
+  let x
+end

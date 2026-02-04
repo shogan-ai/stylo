@@ -37,6 +37,7 @@ type desc =
       This optional status is matched by a twin flag on document leaves (cf
       [../print/document/core.mli]). *)
   | Comment of comment
+  | Lexer_directive of Lexer_directive.t
   | Child_node
 
 type elt = {

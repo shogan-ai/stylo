@@ -146,6 +146,7 @@ module Raw = struct
   | WITH  -> "WITH"
   | COMMENT _ -> "COMMENT"
   | DOCSTRING _ -> "DOCSTRING"
+  | LEXER_DIRECTIVE _ -> "LEXER_SYNTAX"
   | EOL  -> "EOL"
 
   let equals t1 t2 = match t1, t2 with
@@ -296,6 +297,7 @@ module Raw = struct
   | COMMENT _, COMMENT _-> true
   | DOCSTRING _, DOCSTRING _-> true
   | EOL , EOL -> true
+  | LEXER_DIRECTIVE _, LEXER_DIRECTIVE _ -> true
   | _ -> false
 end
 
@@ -310,6 +312,7 @@ type comment = {
 type desc =
   | Token of Parser_tokens.token * bool
   | Comment of comment
+  | Lexer_directive of Lexer_directive.t
   | Child_node
 
 type elt = {
@@ -323,6 +326,7 @@ let desc_as_string = function
   | Token (t, false) -> Raw.to_string t
   | Token (t, true) -> "optional(" ^ Raw.to_string t ^ ")"
   | Comment c -> Printf.sprintf "(* %s *)" c.text
+  | Lexer_directive _ -> "#lexer_directive"
   | Child_node -> "child"
 
 let pp_elt ppf e = Format.pp_print_string ppf (desc_as_string e.desc)

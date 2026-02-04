@@ -27,7 +27,7 @@
 (rule
   (target traversals.ml)
   (deps location.mli tokens.ml longident.mli asttypes.mli parsetree.ml
-        parser_tokens.ml docstring.ml)
+        parser_tokens.ml docstring.ml lexer_directive.ml)
   (action
     (with-stdout-to %{target}
       (run ../traversals/gen.exe --with-fold %{deps}))))

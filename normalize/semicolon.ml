@@ -22,6 +22,7 @@ let normalize_struct_semisemi (items, tokens) =
     | t :: tokens ->
       match t.Tokens.desc with
       | Token (EOF, _) (* TODO: filter this out earlier in the pipeline... *)
+      | Lexer_directive _
       | Comment _ ->
         t :: walk_both items tokens
       | Token _ ->

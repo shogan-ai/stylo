@@ -82,6 +82,7 @@ type 'a can_vanish = {
 
 type t =
   | Empty
+  | Directive of pseudo_token
   | Token of pseudo_token can_vanish
   | Comment of pseudo_token
   | Comments_flushing_hint of {
@@ -125,6 +126,7 @@ let pseudo_token_req = function
 
 let requirement = function
   | Empty -> Req.of_int 0
+  | Directive pt
   | Token { vanishing_cond = None; value = pt }
   | Comment pt -> pseudo_token_req pt
   | Whitespace { vanishing_cond = None; value = ws } -> ws_req ws
@@ -225,6 +227,10 @@ let fancy_string s = Token { vanishing_cond = None; value = pseudo_of_string s }
 
 let formatted_string t =
   Token { vanishing_cond = None; value = Complex (requirement t, t) }
+
+let directive t =
+  let t = softline ^^ group t ^^ softest_line in
+  Directive (Complex (requirement t, t))
 
 (* FIXME *)
 let comment s = Comment (pseudo_of_string s)

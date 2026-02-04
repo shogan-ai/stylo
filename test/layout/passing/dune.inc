@@ -40,3 +40,24 @@
   (alias runtest)
   (action (diff %{dep:flat_non_flat_groups_and_comments.out} %{dep:flat_non_flat_groups_and_comments.snd-run})))
 
+(rule
+  (target lexer_directives.out)
+  (action
+    (with-stdout-to %{target}
+      (run ../../../bin/stylo.exe %{dep:lexer_directives.ml}))))
+
+(rule
+  (target lexer_directives.snd-run)
+  (action
+    (with-stdout-to %{target}
+      (run ../../../bin/stylo.exe %{dep:lexer_directives.out}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:lexer_directives.ref} %{dep:lexer_directives.out})))
+
+; idempotence check
+(rule
+  (alias runtest)
+  (action (diff %{dep:lexer_directives.out} %{dep:lexer_directives.snd-run})))
+

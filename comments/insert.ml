@@ -53,12 +53,15 @@ let consume_leading_comments =
         aux acc rest
       | Comment _
       | Token _ -> acc, first :: rest
+      | Lexer_directive _ ->
+        (* Should we consume directives too here? *)
+        acc, first :: rest
   in
   aux Doc.(empty, empty)
 
 let rec first_is_space = function
   | Doc.Whitespace _ -> `yes
-  | Token _ | Comment _  -> `no
+  | Token _ | Comment _ | Directive _ -> `no
   | Group (_, _, _, d) | Nest (_, _, _, d) ->
     first_is_space d
   | Empty
@@ -76,7 +79,7 @@ let rec first_is_flushhint ?pulls_before = function
     | Some value when value <> fh.pull_cmts_attached_before_hint -> `no
     | _ -> `yes
     end
-  | Token _ | Comment _ | Whitespace _ -> `no
+  | Token _ | Comment _ | Whitespace _ | Directive _ -> `no
   | Group (_, _, _, d) | Nest (_, _, _, d) ->
     first_is_flushhint d
   | Empty -> `maybe
@@ -90,7 +93,7 @@ let first_is_flushhint ?pulls_before d =
 
 let rec nest_before_leaf = function
   | Doc.Nest _ -> `yes
-  | Token _ | Comment _ -> `no
+  | Token _ | Comment _ | Directive _ -> `no
   | Group (_, _, _, d) -> nest_before_leaf d
   | Empty
   | Whitespace _
@@ -137,6 +140,22 @@ let exit_nest prev st = { st with at_end_of_a_group = prev.at_end_of_a_group }
 let no_space st = { st with space_handling = Nothing_special }
 let saw_leaf st =
   { st with space_handling = Insert_before_inserting_comment }
+
+let format_directive (ldir : Lexer_directive.t) =
+  let open Doc in
+  directive @@
+  match ldir with
+  | Hash_syntax (mode, toggle) ->
+    Utils.separate_map nbsp string
+      ["#syntax"; mode; if toggle then "on" else "off"]
+  | Line_directive (path, line_num) ->
+    string "#" ^^ string (string_of_int line_num) ^^ nbsp ^^
+    string (Printf.sprintf "%S" path)
+
+
+let insert_directive doc ldir =
+  dprintf "reinserting lexer directive@.";
+  Doc.(format_directive ldir ^^ doc)
 
 let is_comment_attaching_before elt =
   match elt.T.desc with
@@ -276,6 +295,14 @@ let rec walk_both state seq doc =
          be inside the group. *)
       insert_comments_before_subtree seq state doc
 
+    (* Lexer directives are to be inserted in a similar way to comments, except:
+       - they are not attached to anything (so we don't care about nesting,
+         grouping, etc)
+       - they cannot have been explicitely inserted already *)
+    | T.Lexer_directive ldir, _ ->
+      let rest, doc, state = walk_both (no_space state) rest doc in
+      rest, insert_directive doc ldir, state
+
     (* Traverse document structure *)
     | _, Doc.Cat (_, left, right) ->
       let next_is_pulling_flush_hint =
@@ -306,8 +333,11 @@ let rec walk_both state seq doc =
         Doc.pp_pseudo p;
       raise (Error (Optional_mismatch first.pos))
 
-    (* [Child_node] doesn't appear in linearized token stream *)
-    | T.Child_node, _ -> assert false
+
+    | (* [Child_node] doesn't appear in linearized token stream *)
+      T.Child_node, _
+    | (* No directives have been inserted prior to reaching us. *)
+      _, Doc.Directive _ -> assert false
 
 and traverse_group tokens state margin flatness grouped_doc =
   let rest, d, state' =
@@ -339,6 +369,8 @@ let append_trailing_comments (tokens, doc, _) =
     | [ T.{ desc = Token (EOF, _); _ } ] -> doc
     | tok :: toks ->
       match tok.T.desc with
+      | Lexer_directive d ->
+        aux Doc.Utils.(doc ^?^ format_directive d) toks
       | Comment c ->
         let doc =
           if !(c.explicitely_inserted)

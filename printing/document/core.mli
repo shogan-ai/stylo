@@ -49,6 +49,7 @@ type 'a can_vanish = {
 
 type t = private
   | Empty
+  | Directive of pseudo_token
   | Token of pseudo_token can_vanish
   (** N.B. if the [vanishing_cond] is not [None], then [Token] must correspond
       to an "optional" token. *)
@@ -145,6 +146,13 @@ val comment : string -> t
 
 val docstring : string -> t
 (** As [comment] but wraps with "(**" "*)" instead. *)
+
+(** {2 Lexer directive} *)
+
+val directive : t -> t
+(** Mark a subtree as being a lexer directive, that is:
+    - the comment insertion logic will ignore that subtree
+    - the printing engine knows it must be on its own line, not indented *)
 
 (** {1 Structured documents} *)
 

@@ -44,7 +44,8 @@ let rec advance_tokens = function
     | Token (EOF, _) -> assert (tokens = []); Done
     | Token (SEMISEMI, optional) -> Semi_followed_by (optional, tokens)
     | Token _ -> assert false
-    | Comment _ -> advance_tokens tokens
+    | Comment _
+    | Lexer_directive _ -> advance_tokens tokens
 
 (* We keep the list of items in sync with the list of "tokens" of the
    structure (each [Child_node] is an item).

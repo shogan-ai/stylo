@@ -40,7 +40,7 @@ let search_and_replace pairs =
   List.map (fun tok ->
     match tok.desc with
     | Token (t, opt) -> { tok with desc = Token (replace t, opt) }
-    | Comment _ | Child_node -> tok
+    | Lexer_directive _ | Comment _ | Child_node -> tok
   )
 
 (** removes all occurences of [token] from the given list of tokens *)

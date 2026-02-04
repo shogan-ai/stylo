@@ -167,12 +167,13 @@ let print_warnings = ref true
 
 let at_beginning_of_line pos = (pos.pos_cnum = pos.pos_bol)
 
+(* Syntax mode configuration for the #syntax directive *)
 module Syntax_mode = struct
-  let quotations = ref true
+  let quotations = ref false
 end
 
 let reset_syntax_mode () =
-  Syntax_mode.quotations := true
+  Syntax_mode.quotations := false
 
 (* See the comment on the [directive] lexer. *)
 type directive_lexing_already_consumed =
@@ -821,13 +822,11 @@ rule token = parse
    the line was already consumed, either just the '#' or the '#4'. That's
    indicated by the [already_consumed] argument. The caller is responsible
    for checking that the '#' appears in column 0.
-
-   The [directive] lexer always attempts to read the line number from the
-   lexbuf. It expects to receive a line number from exactly one source (either
-   the lexbuf or the [already_consumed] argument, but not both) and will fail if
-   this isn't the case.
 *)
 and directive already_consumed = parse
+  (* Expects to receive a line number from exactly one source (either the lexbuf or
+     the [already_consumed] argument, but not both) and will fail if this isn't
+     the case. *)
   | ([' ' '\t']* (['0'-'9']+? as line_num_opt) [' ' '\t']*
      ("\"" ([^ '\010' '\013' '\"' ] * as name) "\"") as directive)
         [^ '\010' '\013'] *
@@ -851,8 +850,7 @@ and directive already_consumed = parse
            (* Documentation says that the line number should be
               positive, but we have never guarded against this and it
               might have useful hackish uses. *)
-            update_loc lexbuf (Some name) (line_num - 1) true 0;
-            token lexbuf
+            LEXER_DIRECTIVE (Line_directive (name, line_num))
       }
   | "syntax" [' ' '\t']+ (lowercase identchar* as mode) [' ' '\t']+
     (lowercase identchar* as toggle) [^ '\010' '\013']*
@@ -866,13 +864,14 @@ and directive already_consumed = parse
                  ^ toggle ^ " not recognized")
                 ~already_consumed ~directive:"syntax"
         in
-        match mode with
+        begin match mode with
         | "quotations" ->
-            Syntax_mode.quotations := toggle;
-            token lexbuf
+            Syntax_mode.quotations := toggle
         | _ ->
             directive_error lexbuf ("unknown syntax mode " ^ mode)
               ~already_consumed ~directive:"syntax"
+        end;
+        LEXER_DIRECTIVE (Hash_syntax (mode, toggle))
       }
 and comment = parse
     "(*"
@@ -1341,8 +1340,14 @@ and skip_hash_bang = parse
           Line_indent.new_info lines_for_comments start_pos;
           Option.iter (Staged_comments.unstage lines_for_comments) sc_opt;
           attach lines_for_docstrings docs post_pos start_pos;
-          Tokens.add ~pos:start_pos (Token (tok, false));
-          tok
+          match tok with
+          | LEXER_DIRECTIVE dir ->
+            Tokens.add ~pos:start_pos (Lexer_directive dir);
+            (* We don't pass lexer directives to the parser *)
+            loop NoLine NoLine docs None lexbuf
+          | _ ->
+            Tokens.add ~pos:start_pos (Token (tok, false));
+            tok
     in
       loop (lines_init_state !previous_token) NoLine Initial None lexbuf
 

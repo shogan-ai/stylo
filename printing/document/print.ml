@@ -126,6 +126,7 @@ let rec pretty buf state indent flat = function
     state
   | Token { value = pseudo; _ }
   | Comment pseudo -> pp_pseudo buf state indent flat pseudo
+  | Directive pseudo -> pp_pseudo buf state 0 flat pseudo
   | Whitespace { value = ws; _ } -> whitespace buf state indent flat ws
   | Cat (_, t1, t2) ->
     let state' = pretty buf state indent flat t1 in
