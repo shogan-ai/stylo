@@ -156,7 +156,7 @@ let () =
           let source = In_channel.(with_open_text fn input_all) in
           not @@
           Ast_checker.Oxcaml_checker.check_same_ast fn 0
-            ~impl:(Filename.check_suffix fn ".ml") source reprinted
+            ~impl:(not @@ Filename.check_suffix fn ".mli") source reprinted
         then
           (* TODO: location, etc *)
           Format.eprintf "%s: ast changed@." fn
