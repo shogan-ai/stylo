@@ -1,7 +1,8 @@
 ;; generated here and used in subdir because the computation of the directory
 ;; contents is otherwise cyclic (according to dune).
+
 (rule
-  (target exhaust)
+  (target exhaust-no-quotations)
   (enabled_if %{bin-available:ocamlgrammarfuzzer})
   (mode fallback)
   (action
@@ -9,7 +10,25 @@
       (run
         ocamlgrammarfuzzer --cmly %{dep:../parsing/parser.cmly} --exhaust
           --entrypoint implementation --entrypoint interface --print-entrypoint
+          --avoid DOLLAR --avoid LESSLBRACKET --avoid RBRACKETGREATER
           ; HASH_CHAR is present in our grammar but not in the one the fuzzer is
           ; built against.
           --terminal "HASH_CHAR=#'a'"
+          --terminal "LEXER_DIRECTIVE=#syntax foo on"
+          ))))
+
+(rule
+  (target exhaust-quotations)
+  (enabled_if %{bin-available:ocamlgrammarfuzzer})
+  (mode fallback)
+  (action
+    (with-stdout-to %{target}
+      (run
+        ocamlgrammarfuzzer --cmly %{dep:../parsing/parser.cmly}
+          --entrypoint implementation --print-entrypoint
+          --focus DOLLAR --focus LESSLBRACKET --focus RBRACKETGREATER
+          ; HASH_CHAR is present in our grammar but not in the one the fuzzer is
+          ; built against.
+          --terminal "HASH_CHAR=#'a'"
+          --terminal "LEXER_DIRECTIVE=#syntax foo on"
           ))))

@@ -17,10 +17,29 @@ let batch_by ~size seq =
 
 
 let default_batch_size = 800
+let syntax_quotations = ref false
+
+let batch_size = ref default_batch_size
+let cmd = ref "ocamlformat"
+let jobs = ref 0
+let input_file = ref ""
+
+let () =
+  Arg.parse
+    ["--cmd", Arg.Set_string cmd, "default = ocamlformat"
+    ;"--size", Arg.Set_int batch_size, "default = 800"
+    ;"--syntax-quotations", Arg.Set syntax_quotations, ""
+    ;"-j", Arg.Set_int jobs, "number of parallel jobs, default = 1"]
+    ((:=) input_file)
+    "fuzzer_driver.exe"
+
 
 let temp_dir =
   let root = Filename.get_temp_dir_name () in
-  let sub = Filename.concat root "formatpinata" in
+  let sub =
+    Filename.concat root
+      (if !syntax_quotations then "formatpinata-quotations" else "formatpinata")
+  in
   Unix.mkdir sub 0o770;
   sub
 
@@ -48,8 +67,12 @@ let start_batch ~ocamlformat_command = function
       ) inputs
     );
     let process =
-      Unix.create_process ocamlformat_command
-        [|ocamlformat_command; "-fuzzing"; path|]
+      let args =
+        if !syntax_quotations
+        then [|ocamlformat_command; "-fuzzing"; "-syntax-quotations"; path|]
+        else [|ocamlformat_command; "-fuzzing"; path|]
+      in
+      Unix.create_process ocamlformat_command args
         Unix.stdin Unix.stdout Unix.stderr
     in
     Some (path, process)
@@ -109,19 +132,6 @@ let check ~ocamlformat_command ~jobs ~batch_size seq =
   overlapping_force jobs
   |> (* Collect the results *)
   Seq.iter consume_batch
-
-let batch_size = ref default_batch_size
-let cmd = ref "ocamlformat"
-let jobs = ref 0
-let input_file = ref ""
-
-let () =
-  Arg.parse
-    ["--cmd", Arg.Set_string cmd, "default = ocamlformat"
-    ;"--size", Arg.Set_int batch_size, "default = 800"
-    ;"-j", Arg.Set_int jobs, "number of parallel jobs, default = 1"]
-    ((:=) input_file)
-    "fuzzer_driver.exe"
 
 let () =
   assert (!input_file <> "");

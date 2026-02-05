@@ -4,12 +4,21 @@
 
 (rule
   (alias fuzz)
-  (enabled_if %{file-available:../exhaust})
+  (enabled_if %{file-available:../exhaust-no-quotations})
   (action
-    (run ../../bin/fuzzer_driver.exe --cmd %{dep:../../bin/stylo.exe} -j 8 %{dep:../exhaust})))
+    (run ../../bin/fuzzer_driver.exe --cmd %{dep:../../bin/stylo.exe}
+         -j 8 %{dep:../exhaust-no-quotations})))
+
+(rule
+  (alias fuzz)
+  (enabled_if %{file-available:../exhaust-quotations})
+  (action
+    (run ../../bin/fuzzer_driver.exe --cmd %{dep:../../bin/stylo.exe}
+         --syntax-quotations -j 8 %{dep:../exhaust-quotations})))
 
 (rule
   (aliases fuzz runtest)
-  (enabled_if (and (not %{file-available:../exhaust})
+  (enabled_if (and (or (not %{file-available:../exhaust-no-quotations})
+                       (not %{file-available:../exhaust-quotations}))
                    (not %{bin-available:ocamlgrammarfuzzer})))
   (action (echo "Fuzzer output not present and can't be generated.")))
