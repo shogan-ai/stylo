@@ -124,6 +124,8 @@ let () =
   Arg.parse
     ["-ast-check", Arg.Set ast_check,
      "Check the formatted code parses back to the same AST"
+    ;"-syntax_quotations", Arg.Set Config.syntax_quotations,
+     "oxcaml specifig: enable quotations by default"
     ;"-fuzzing", Arg.Set fuzzing, "-ast-check on each line separately"
     ;"-i", Arg.Set inplace, "style file in place"
     ;"-width", Arg.Set_int width, ""]

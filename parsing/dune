@@ -3,12 +3,14 @@
 (rule
   (targets parser_tokens.ml parser_tokens.mli)
   (action
-    (run menhir --strategy simplified --table --inspection --only-tokens %{dep:parser_tokens.mly})))
+    (run menhir --strategy simplified --table --inspection --only-tokens
+         %{dep:parser_tokens.mly})))
 
 (menhir
   (modules parser parser_tokens)
   (merge_into parser)
-  (flags :standard --lalr --strategy simplified --table --inspection --external-tokens Parser_tokens --cmly))
+  (flags :standard --lalr --strategy simplified --table --inspection --cmly
+         --external-tokens Parser_tokens))
 
 (rule
   (target raw_grammar)
@@ -21,7 +23,7 @@
 (library
   (name ocaml_syntax)
   (modules_without_implementation asttypes)
-  (libraries menhirLib dbg_print)
+  (libraries menhirLib dbg_print config)
   (flags :standard -w -9-63 -open Dbg_print))
 
 (rule

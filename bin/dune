@@ -1,6 +1,6 @@
 (executable
   (name stylo)
-  (libraries ast_checker ocaml_syntax print document dbg_print normalize
+  (libraries config ast_checker ocaml_syntax print document dbg_print normalize
              comments)
   (modules :standard \ fuzzer_driver))
 
