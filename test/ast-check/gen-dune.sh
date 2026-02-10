@@ -5,7 +5,7 @@ function check-file {
   (alias runtest)
   (action
     (with-stdout-to null
-      (run ../../bin/stylo.exe -ast-check %{dep:$f}))))
+      (run ../../bin/main.exe -ast-check %{dep:$f}))))
 
 EOF
 }

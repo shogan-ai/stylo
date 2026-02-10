@@ -135,7 +135,13 @@ let sig_or_error lex =
   Parse.interface lex
   |> cleaner#signature ()
 
-let check_same_ast fn line ~impl s1 s2 =
+exception Ast_changed
+
+let report () =
+  (* TODO: location, etc *)
+  Format.eprintf " ast changed@."
+
+let check_same_ast ~fname:fn ~start_line:line ~impl s1 s2 =
   let pos =
     { Lexing.pos_fname = fn
     ; pos_lnum = line
@@ -148,13 +154,17 @@ let check_same_ast fn line ~impl s1 s2 =
   Lexing.set_position lex2 pos;
   Lexing.set_filename lex2 (fn ^ ".out");
   Location.input_name := fn;
-  if impl then
-    let ast1 = struct_or_error lex1 in
-    Location.input_name := (fn ^ ".out");
-    let ast2 = struct_or_error lex2 in
-    ast1 = ast2
-  else
-    let ast1 = sig_or_error lex1 in
-    Location.input_name := (fn ^ ".out");
-    let ast2 = sig_or_error lex2 in
-    ast1 = ast2
+  let same_ast =
+    if impl then
+      let ast1 = struct_or_error lex1 in
+      Location.input_name := (fn ^ ".out");
+      let ast2 = struct_or_error lex2 in
+      ast1 = ast2
+    else
+      let ast1 = sig_or_error lex1 in
+      Location.input_name := (fn ^ ".out");
+      let ast2 = sig_or_error lex2 in
+      ast1 = ast2
+  in
+  if not same_ast then
+    raise Ast_changed

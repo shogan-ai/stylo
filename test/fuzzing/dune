@@ -6,14 +6,14 @@
   (alias fuzz)
   (enabled_if %{file-available:../exhaust-no-quotations})
   (action
-    (run ../../bin/fuzzer_driver.exe --cmd %{dep:../../bin/stylo.exe}
+    (run ../../bin/fuzzer_driver.exe --cmd %{dep:../../bin/main.exe}
          -j 8 %{dep:../exhaust-no-quotations})))
 
 (rule
   (alias fuzz)
   (enabled_if %{file-available:../exhaust-quotations})
   (action
-    (run ../../bin/fuzzer_driver.exe --cmd %{dep:../../bin/stylo.exe}
+    (run ../../bin/fuzzer_driver.exe --cmd %{dep:../../bin/main.exe}
          --syntax-quotations -j 8 %{dep:../exhaust-quotations})))
 
 (rule

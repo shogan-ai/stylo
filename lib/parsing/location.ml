@@ -71,10 +71,10 @@ let curr lexbuf = {
   loc_ghost = false
 }
 
-let init lexbuf fname =
+let init lexbuf ?(lnum=1) fname =
   lexbuf.lex_curr_p <- {
     pos_fname = fname;
-    pos_lnum = 1;
+    pos_lnum = lnum;
     pos_bol = 0;
     pos_cnum = 0;
   }

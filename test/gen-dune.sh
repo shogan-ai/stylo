@@ -4,7 +4,7 @@ function implementation_file {
     cat <<EOF
 (rule
   (with-stdout-to printed-$f
-    (run ../bin/stylo.exe %{dep:$f})))
+    (run ../bin/main.exe %{dep:$f})))
 
 (rule
   (alias $name)
@@ -37,7 +37,7 @@ function fuzzer_output {
 (rule
   (alias $BASE)
   (deps ${FILENAMES[@]})
-  (action (run ../bin/stylo.exe -only-check %{deps})))
+  (action (run ../bin/main.exe -only-check %{deps})))
 ;; ---
 
 EOF

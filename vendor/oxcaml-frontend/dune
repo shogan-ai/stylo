@@ -20,4 +20,4 @@
   (deps location.mli longident.mli asttypes.mli parsetree.mli)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/traversals/gen.exe %{deps}))))
+      (run %{project_root}/lib/traversals/gen.exe %{deps}))))
