@@ -1495,9 +1495,16 @@ end = struct
       | Some (Some lid, op) -> S.dot ^^ longident lid ^^ stringf ".%s" op
     in
     let pre_nest = Preceeding.implied_nest preceeding in
+    let spaces_before_dot =
+      match seq.pexp_desc with
+      | Pexp_constant Pconst_integer (_, _, None) ->
+        (* An int without suffix would become a float... *)
+        1
+      | _ -> 0
+    in
     let access =
       group (
-        pp ?preceeding seq ^^ break 0 ^^
+        pp ?preceeding seq ^^ break spaces_before_dot ^^
         pre_nest (group dotop ^^ open_)
       ) ^^
       break spaces_around_indices ^^
