@@ -12,7 +12,14 @@ let fuzzer_batch fn =
     | None -> () (* done *)
     | Some entrypoint_and_src ->
       match Stylo.style_fuzzer_line ~fname:fn ~lnum:i entrypoint_and_src with
-      | exception Parser.Error ->
+      | Ok _ -> loop_lines (i + 1) ic
+
+      | Error `Cst_parser_error (Parser_types.Failwith _) ->
+        (* ignoring error thrown from semantic actions. *)
+        loop_lines (i + 1) ic
+
+      | Error `Cst_parser_error _
+      | Error `Input_parse_error _ ->
         (* ignoring entries that don't parse *)
         let oc = Lazy.force parse_error_oc in
         Out_channel.output_string oc entrypoint_and_src;
@@ -20,34 +27,17 @@ let fuzzer_batch fn =
         has_parse_errors := true;
         loop_lines (i + 1) ic
 
-      | exception (Parser_types.Failwith _) ->
-        (* ignoring error thrown from semantic actions. *)
-        loop_lines (i + 1) ic
-
-      | exception (Failure s)
-        when String.ends_with s ~suffix:"for use in runtime metaprog" ->
-        (* same as above *)
-        loop_lines (i + 1) ic
-
-      | exception Comments.Insert.Error e ->
+      | Error e ->
         (* we stop at the first error in the batch
            Eventually we might want to go further, but while we try to fix the
            errors, there's not much point. *)
-        Format.eprintf "%s, line %d: ERROR: %a@\n@\n%s@\n@."
-          fn i Comments.Insert.Error.pp e entrypoint_and_src;
-        has_errors := true
-
-      | exception Ast_checker.Oxcaml_checker.Ast_changed ->
-        Format.eprintf "%s, line %d: ast changed@\n%s@\n@." fn i
-          entrypoint_and_src;
+        let fname = fn ^ ":" ^ string_of_int i in
+        Stylo.Pipeline.pp_error fname e;
         has_errors := true
 
       | exception exn ->
         Format.eprintf "%s, line %d: uncaught exception:@." fn i;
         raise exn
-
-      | _output ->
-        loop_lines (i + 1) ic
   in
   In_channel.with_open_text fn (loop_lines 1);
   if !has_parse_errors then (
@@ -76,6 +66,7 @@ let () =
   let has_error = ref false in
   if !fuzzing then (
     assert (List.length !inputs = 1);
+    Config.check_same_ast := true;
     has_error := fuzzer_batch (List.hd !inputs)
   ) else
     List.iter (fun fn ->
@@ -85,9 +76,6 @@ let () =
         then Stylo.style_file Intf fn
         else Stylo.style_file Impl fn
       with
-      | exception Comments.Insert.Error e ->
-        Format.eprintf "%s: ERROR: %a@." fn Comments.Insert.Error.pp e;
-        has_error := true
       | exception exn ->
         let bt = Printexc.get_backtrace () in
         Format.eprintf "%s: %s" fn (Printexc.to_string exn);
@@ -96,7 +84,10 @@ let () =
         else
           Format.eprintf "@.";
         has_error := true
-      | output ->
+      | Error e ->
+        Stylo.Pipeline.pp_error fn e;
+        has_error := true
+      | Ok output ->
         let pp oc =
           output_string oc output;
           output_char oc '\n';

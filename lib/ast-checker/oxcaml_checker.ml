@@ -105,66 +105,84 @@ let cleaner =
      *)
 
 
-(*
-let report_error lex exn =
+type error = [
+  | `Input_parse_error of exn
+  | `Output_parse_error of exn
+  | `Ast_changed of string
+]
+
+let report_parse_error ppf exn =
   match Location.error_of_exn exn with
-  | None ->
-    let loc =
-      { Location.loc_start = lex.Lexing.lex_start_p
-      ; loc_end = lex.Lexing.lex_curr_p
-      ; loc_ghost = true }
-    in
-    Format.eprintf "%a@ Unexpected exn: %s@."
-      Location.print_loc loc
-      (Printexc.to_string exn);
-    exit 1
-  | Some `Already_displayed -> assert false
+  | Some `Already_displayed -> ()
   | Some `Ok report ->
-    Format.eprintf "%a@."
-      Location.print_report report;
-    exit 1
+    Format.fprintf ppf "%a" Location.print_report report
+  | None ->
+    Format.fprintf ppf "%s" (Printexc.to_string exn)
 
-exception Failed_to_parse_source of exn
-   *)
+let pp_error : error -> _ = function
+  | `Ast_changed fname -> Format.eprintf "%s: ast changed@." fname
+  | `Input_parse_error exn ->
+    Format.eprintf "@[<v>Error while parsing the input:@;@[<hov 2>%a@]@]@."
+      report_parse_error exn
+  | `Output_parse_error exn ->
+    Format.eprintf "@[<v>Error while parsing the output:@;@[<hov 2>%a@]@]@."
+      report_parse_error exn
 
-let struct_or_error lex =
-  Parse.implementation lex
-  |> cleaner#structure ()
+type _ input_kind =
+  | Impl : Parsetree.structure input_kind
+  | Intf : Parsetree.signature input_kind
 
-let sig_or_error lex =
-  Parse.interface lex
-  |> cleaner#signature ()
+type 'a input = {
+  fname : string;
+  start_line : int;
+  source : string;
+  kind : 'a input_kind;
+}
 
-exception Ast_changed
-
-let report () =
-  (* TODO: location, etc *)
-  Format.eprintf " ast changed@."
-
-let check_same_ast ~fname:fn ~start_line:line ~impl s1 s2 =
+let parse (type a) (input : a input) wrap_exn : (a, _) result =
   let pos =
-    { Lexing.pos_fname = fn
-    ; pos_lnum = line
+    { Lexing.pos_fname = input.fname
+    ; pos_lnum = input.start_line
     ; pos_bol = 0
     ; pos_cnum = 0 }
   in
-  let lex1 = Lexing.from_string s1 in
-  Lexing.set_position lex1 pos;
-  let lex2 = Lexing.from_string s2 in
-  Lexing.set_position lex2 pos;
-  Lexing.set_filename lex2 (fn ^ ".out");
-  Location.input_name := fn;
-  let same_ast =
-    if impl then
-      let ast1 = struct_or_error lex1 in
-      Location.input_name := (fn ^ ".out");
-      let ast2 = struct_or_error lex2 in
-      ast1 = ast2
-    else
-      let ast1 = sig_or_error lex1 in
-      Location.input_name := (fn ^ ".out");
-      let ast2 = sig_or_error lex2 in
-      ast1 = ast2
+  let lb = Lexing.from_string input.source in
+  Lexing.set_position lb pos;
+  try
+    Ok (
+      match input.kind with
+      | Impl -> Parse.implementation lb
+      | Intf -> Parse.interface lb
+    )
+  with exn ->
+    Error (wrap_exn exn)
+
+let clean (type a) (kind : a input_kind) (ast : a) : a =
+  match kind with
+  | Impl -> cleaner#structure () ast
+  | Intf -> cleaner#signature () ast
+
+let input_wrap exn = `Input_parse_error exn
+let output_wrap exn = `Output_parse_error exn
+
+let (let*) = Result.bind
+
+let check_same_ast input output =
+  let* input_ast = parse input input_wrap in
+  let input_ast = clean input.kind input_ast in
+  let output =
+    { input with
+      fname = input.fname ^ ".out";
+      source = output }
   in
-  if not same_ast then
-    raise Ast_changed
+  let* output_ast = parse output output_wrap in
+  let output_ast = clean output.kind output_ast in
+  if input_ast = output_ast
+  then Ok ()
+  else Error (`Ast_changed input.fname)
+
+let check_same_ast ~fname ~start_line ~impl input output =
+  if impl
+  then check_same_ast { fname; start_line; kind = Impl; source = input} output
+  else check_same_ast { fname; start_line; kind = Intf; source = input} output
+

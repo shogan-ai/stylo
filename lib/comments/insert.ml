@@ -9,7 +9,7 @@ module Error = struct
     | Missing_token of Lexing.position
     | Optional_mismatch of Lexing.position
 
-  let pp ppf = function
+  let pp ppf : t -> unit = function
     | Output_longer_than_input doc ->
       Format.fprintf ppf "Output longer than the input.";
       dprintf "remaining doc: << %s >>@."
@@ -383,6 +383,13 @@ let append_trailing_comments (tokens, doc, _) =
   in
   aux doc tokens
 
+type error = [ `Comment_insertion_error of Error.t ]
+
 let from_tokens tokens doc =
-  walk_both init_state tokens doc
-  |> append_trailing_comments
+  try
+    Ok (
+      walk_both init_state tokens doc
+      |> append_trailing_comments
+    )
+  with Error e ->
+    Result.Error (`Comment_insertion_error e)

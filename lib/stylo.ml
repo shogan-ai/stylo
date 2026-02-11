@@ -14,21 +14,8 @@ type 'a input = {
 module Check = struct
   open Ast_checker
 
-  let retokenisation tokens_lazy =
-    if !Config.check_retokenisation then (
-      Lazy.force tokens_lazy
-      |> Tokenisation_check.Ordering.ensure_preserved
-    )
-
-  let normalization_kept_comments tokens_before tokens_after =
-    if !Config.check_normalization_kept_comments then (
-      let tokens_before = Lazy.force tokens_before in
-      Tokenisation_check.Comments_comparison.same_number
-        tokens_before tokens_after
-    )
-
   let same_ast (type a) { fname; start_line; kind; source = input } output =
-    if !Config.check_same_ast then (
+    if not !Config.check_same_ast then Ok () else (
       let impl =
         match (kind : a input_kind) with
         | Impl -> true
@@ -37,15 +24,40 @@ module Check = struct
       Oxcaml_checker.check_same_ast ~fname ~start_line ~impl input output
     )
 
+  open Tokenisation_check
+
+  let retokenisation tokens_lazy =
+    if not !Config.check_retokenisation then Ok () else (
+      Lazy.force tokens_lazy
+      |> Ordering.ensure_preserved
+    )
+
+  let normalization_kept_comments tokens_before tokens_after =
+    if not !Config.check_normalization_kept_comments then Ok () else (
+      let tokens_before = Lazy.force tokens_before in
+      Comments_comparison.same_number
+        tokens_before tokens_after
+    )
+
+  type error = [
+    | Ordering.error
+    | Comments_comparison.error
+    | Oxcaml_checker.error
+  ]
 end
 
 module Pipeline = struct
-  let parse (type a) (input : a input) : a =
+  let parse (type a) (input : a input) : (a, _) result =
     let lb = Lexing.from_string input.source in
     Location.init lb ~lnum:input.start_line input.fname;
-    match input.kind with
-    | Impl -> Parse.implementation lb
-    | Intf -> Parse.interface lb
+    try
+      Ok (
+        match input.kind with
+        | Impl -> Parse.implementation lb
+        | Intf -> Parse.interface lb
+      )
+    with exn ->
+      Error (`Cst_parser_error exn)
 
   let normalize (type a) (kind : a input_kind) (cst : a) : a =
     match kind with
@@ -65,20 +77,46 @@ module Pipeline = struct
   let print_doc doc =
     Document.Print.to_string ~width:!Config.width doc
 
+  let (let*) = Result.bind
+
   let run ({ kind; _ } as input) =
-    let cst = parse input in
+    let* cst = parse input in
     let tokens_pre_normalize = lazy (tokens_of_tree kind cst) in
-    Check.retokenisation tokens_pre_normalize;
+    let* () = Check.retokenisation tokens_pre_normalize in
     let cst = normalize kind cst in
     let tokens_post_normalize = tokens_of_tree kind cst in
-    Check.normalization_kept_comments tokens_pre_normalize tokens_post_normalize;
-    let document =
+    let* () =
+      Check.normalization_kept_comments tokens_pre_normalize
+        tokens_post_normalize
+    in
+    let* document =
       build_doc kind cst
       |> Comments.Insert.from_tokens tokens_post_normalize
     in
     let output = print_doc document in
-    Check.same_ast input output;
-    output
+    let* () = Check.same_ast input output in
+    Ok output
+
+  type error = [
+    | `Cst_parser_error of exn
+    | Check.error
+    | Comments.Insert.error
+  ]
+
+  let pp_error fname : error -> unit =
+    let open Ast_checker in
+    let open Tokenisation_check in
+    function
+    | `Cst_parser_error exn ->
+      (* FIXME: improve *)
+      Format.eprintf "%s: %s@." fname (Printexc.to_string exn)
+    | `Comments_dropped as e -> Comments_comparison.pp_error e
+    | (`Reordered _ | `Incomplete_flattening _) as e -> Ordering.pp_error e
+    | `Comment_insertion_error e ->
+      Format.eprintf "%s: ERROR: %a@." fname
+        Comments.Insert.Error.pp e
+    | (`Input_parse_error _ | `Output_parse_error _ | `Ast_changed _) as e ->
+      Oxcaml_checker.pp_error e
 end
 
 let style_file kind fname =

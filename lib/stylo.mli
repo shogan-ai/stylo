@@ -12,18 +12,26 @@ type 'a input = {
 }
 
 module Check : sig
-  val retokenisation : Tokens.seq lazy_t -> unit
-  (** @raise Ast_checker.Tokenisation_check.Ordering.Error *)
+  open Ast_checker
 
-  val normalization_kept_comments : Tokens.seq lazy_t -> Tokens.seq -> unit
-  (** @raise Ast_checker.Tokenisation_check.Comments_comparison.Error *)
+  val same_ast : _ input -> string -> (unit, [> Oxcaml_checker.error ]) result
 
-  val same_ast : _ input -> string -> unit
-  (** @raise Ast_checker.Oxcaml_checker.Ast_changed *)
+  open Tokenisation_check
+
+  val retokenisation : Tokens.seq lazy_t -> (unit, [> Ordering.error]) result
+
+  val normalization_kept_comments : Tokens.seq lazy_t -> Tokens.seq ->
+    (unit, [> Comments_comparison.error]) result
+
+  type error = [
+    | Ordering.error
+    | Comments_comparison.error
+    | Oxcaml_checker.error
+  ]
 end
 
 module Pipeline : sig
-  val parse : 'cst input -> 'cst
+  val parse : 'cst input -> ('cst, [> `Cst_parser_error of exn]) result
 
   val normalize : 'cst input_kind -> 'cst -> 'cst
 
@@ -33,9 +41,18 @@ module Pipeline : sig
 
   val print_doc : Document.t -> string
 
-  val run : _ input -> string
+  type error = [
+    | `Cst_parser_error of exn
+    | Check.error
+    | Comments.Insert.error
+  ]
+
+  val run : _ input -> (string, error) result
+
+  val pp_error : string -> error -> unit
 end
 
-val style_file : _ input_kind -> string -> string
+val style_file : _ input_kind -> string -> (string, Pipeline.error) result
 
-val style_fuzzer_line : lnum:int -> fname:string -> string -> string
+val style_fuzzer_line
+  : lnum:int -> fname:string -> string -> (string, Pipeline.error) result
