@@ -1352,6 +1352,7 @@ and skip_hash_bang = parse
       loop (lines_init_state !previous_token) NoLine Initial None lexbuf
 
   let init () =
+    reset_syntax_mode ();
     is_in_string := false;
     comment_start_loc := [];
     Queue.clear comments;
