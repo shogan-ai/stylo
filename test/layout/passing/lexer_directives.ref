@@ -8,13 +8,11 @@ module M = struct
 #syntax quotations off
 
     |> ignore
-  ;;
 
   let x =
 #666 "pretend_file.ml"
 
     i $ foo
-  ;;
 
   let x
 end

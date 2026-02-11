@@ -109,18 +109,24 @@ module Pipeline = struct
     let* cst = parse input in
     let tokens_pre_normalize = lazy (tokens_of_tree kind cst) in
     let* () = Check.retokenisation tokens_pre_normalize in
-    let* cst, ast_for_checker =
+    let* cst, normalized, ast_for_checker =
       if not run_normalize
-      then Ok (cst, Check.Cst (input, cst))
+      then Ok (cst, false, Check.Cst (input, cst))
       else (
         (* we normalize only if the source parses with the upstream parser *)
         let input_for_oxchecker = Obj.magic input in
-        let* ast = Ast_checker.Oxcaml_checker.parse input_for_oxchecker in
-        Ok (normalize kind cst, Check.Ast (input_for_oxchecker, ast))
+        match Ast_checker.Oxcaml_checker.parse input_for_oxchecker with
+        | Error e ->
+          if !Config.check_same_ast
+          then Error e (* might as well fail early *)
+          else Ok (cst, false, Check.Cst (input, cst))
+        | Ok ast ->
+          Ok (normalize kind cst, true, Check.Ast (input_for_oxchecker, ast))
       )
     in
     let tokens_post_normalize = tokens_of_tree kind cst in
     let* () =
+      if not normalized then Ok () (* nothing will have changed *) else
       Check.normalization_kept_comments tokens_pre_normalize
         tokens_post_normalize
     in
