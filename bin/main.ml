@@ -14,11 +14,10 @@ let fuzzer_batch fn =
       match Stylo.style_fuzzer_line ~fname:fn ~lnum:i entrypoint_and_src with
       | Ok _ -> loop_lines (i + 1) ic
 
-      | Error `Cst_parser_error (Parser_types.Failwith _) ->
+      | Error `Input_parse_error (_, Parser_types.Failwith _) ->
         (* ignoring error thrown from semantic actions. *)
         loop_lines (i + 1) ic
 
-      | Error `Cst_parser_error _
       | Error `Input_parse_error _ ->
         (* ignoring entries that don't parse *)
         let oc = Lazy.force parse_error_oc in
@@ -26,6 +25,12 @@ let fuzzer_batch fn =
         Out_channel.output_char oc '\n';
         has_parse_errors := true;
         loop_lines (i + 1) ic
+
+      | Error `Output_parse_error _ ->
+        Format.eprintf
+          "File %s, line %d: error while parsing stylo's output@\n%s@."
+          fn i entrypoint_and_src;
+        has_errors := true
 
       | Error e ->
         (* we stop at the first error in the batch

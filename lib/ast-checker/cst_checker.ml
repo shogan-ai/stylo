@@ -97,57 +97,49 @@ let cleaner =
     | _ -> super#visit_pattern env pat
      *)
 
+type _ input_kind =
+  | Impl : Parsetree.structure  input_kind
+  | Intf : Parsetree.signature input_kind
 
-(*
-let report_error lex exn =
-  match Location.error_of_exn exn with
-  | None ->
-    let loc =
-      { Location.loc_start = lex.Lexing.lex_start_p
-      ; loc_end = lex.Lexing.lex_curr_p
-      ; loc_ghost = true }
-    in
-    Format.eprintf "%a@ Unexpected exn: %s@."
-      Location.print_loc loc
-      (Printexc.to_string exn);
-    exit 1
-  | Some `Already_displayed -> assert false
-  | Some `Ok report ->
-    Format.eprintf "%a@."
-      Location.print_report report;
-    exit 1
+type 'a input = {
+  fname : string;
+  start_line : int;
+  source : string;
+  kind : 'a input_kind;
+}
 
-exception Failed_to_parse_source of exn
-   *)
-
-let struct_or_error lex =
-  Parse.implementation lex
-  |> cleaner#structure ()
-
-let sig_or_error lex =
-  Parse.interface lex
-  |> cleaner#signature ()
-
-let check_same_ast fn line ~impl s1 s2 =
+let parse (type a) (input : a input) wrap_exn : (a, _) result =
   let pos =
-    { Lexing.pos_fname = fn
-    ; pos_lnum = line
+    { Lexing.pos_fname = input.fname
+    ; pos_lnum = input.start_line
     ; pos_bol = 0
     ; pos_cnum = 0 }
   in
-  let lex1 = Lexing.from_string s1 in
-  Lexing.set_position lex1 pos;
-  let lex2 = Lexing.from_string s2 in
-  Lexing.set_position lex2 pos;
-  Lexing.set_filename lex2 (fn ^ ".out");
-  Location.input_name := fn;
-  if impl then
-    let ast1 = struct_or_error lex1 in
-    Location.input_name := (fn ^ ".out");
-    let ast2 = struct_or_error lex2 in
-    ast1 = ast2
-  else
-    let ast1 = sig_or_error lex1 in
-    Location.input_name := (fn ^ ".out");
-    let ast2 = sig_or_error lex2 in
-    ast1 = ast2
+  let lb = Lexing.from_string input.source in
+  Lexing.set_position lb pos;
+  try
+    Ok (
+      match input.kind with
+      | Impl -> Parse.implementation lb
+      | Intf -> Parse.interface lb
+    )
+  with exn ->
+    Error (wrap_exn exn)
+
+let clean (type a) (kind : a input_kind) (ast : a) : a =
+  match kind with
+  | Impl -> cleaner#structure () ast
+  | Intf -> cleaner#signature () ast
+
+let output_wrap exn = `Output_parse_error (Errors.Stylo's, exn)
+
+let (let*) = Result.bind
+
+let check_same_ast (type a) (input_cst : a) (output : a input) =
+  let input_cst = clean output.kind input_cst in
+  let output = { output with fname = output.fname ^ ".out" } in
+  let* output_cst = parse output output_wrap in
+  let output_cst = clean output.kind output_cst in
+  if input_cst = output_cst
+  then Ok ()
+  else Error (`Ast_changed (Errors.Stylo's, output.fname))

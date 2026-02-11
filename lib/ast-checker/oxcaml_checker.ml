@@ -105,31 +105,8 @@ let cleaner =
      *)
 
 
-type error = [
-  | `Input_parse_error of exn
-  | `Output_parse_error of exn
-  | `Ast_changed of string
-]
-
-let report_parse_error ppf exn =
-  match Location.error_of_exn exn with
-  | Some `Already_displayed -> ()
-  | Some `Ok report ->
-    Format.fprintf ppf "%a" Location.print_report report
-  | None ->
-    Format.fprintf ppf "%s" (Printexc.to_string exn)
-
-let pp_error : error -> _ = function
-  | `Ast_changed fname -> Format.eprintf "%s: ast changed@." fname
-  | `Input_parse_error exn ->
-    Format.eprintf "@[<v>Error while parsing the input:@;@[<hov 2>%a@]@]@."
-      report_parse_error exn
-  | `Output_parse_error exn ->
-    Format.eprintf "@[<v>Error while parsing the output:@;@[<hov 2>%a@]@]@."
-      report_parse_error exn
-
 type _ input_kind =
-  | Impl : Parsetree.structure input_kind
+  | Impl : Parsetree.structure  input_kind
   | Intf : Parsetree.signature input_kind
 
 type 'a input = {
@@ -162,27 +139,18 @@ let clean (type a) (kind : a input_kind) (ast : a) : a =
   | Impl -> cleaner#structure () ast
   | Intf -> cleaner#signature () ast
 
-let input_wrap exn = `Input_parse_error exn
-let output_wrap exn = `Output_parse_error exn
+let input_wrap exn = `Input_parse_error (Errors.Oxcaml's, exn)
+let output_wrap exn = `Output_parse_error (Errors.Oxcaml's, exn)
 
 let (let*) = Result.bind
 
-let check_same_ast input output =
-  let* input_ast = parse input input_wrap in
-  let input_ast = clean input.kind input_ast in
-  let output =
-    { input with
-      fname = input.fname ^ ".out";
-      source = output }
-  in
-  let* output_ast = parse output output_wrap in
-  let output_ast = clean output.kind output_ast in
-  if input_ast = output_ast
+let check_same_ast (type a) (input_cst : a) (output : a input) =
+  let input_cst = clean output.kind input_cst in
+  let output = { output with fname = output.fname ^ ".out" } in
+  let* output_cst = parse output output_wrap in
+  let output_cst = clean output.kind output_cst in
+  if input_cst = output_cst
   then Ok ()
-  else Error (`Ast_changed input.fname)
+  else Error (`Ast_changed (Errors.Oxcaml's, output.fname))
 
-let check_same_ast ~fname ~start_line ~impl input output =
-  if impl
-  then check_same_ast { fname; start_line; kind = Impl; source = input} output
-  else check_same_ast { fname; start_line; kind = Intf; source = input} output
-
+let parse i = parse i input_wrap
