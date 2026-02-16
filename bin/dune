@@ -1,6 +1,6 @@
 (executable
   (name main)
-  (libraries config stylo ocaml_syntax dbg_print)
+  (libraries cmdliner config stylo ocaml_syntax dbg_print)
   (modules :standard \ fuzzer_driver)
   (empty_module_interface_if_absent))
 

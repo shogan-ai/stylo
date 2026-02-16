@@ -1,4 +1,40 @@
-open Ocaml_syntax
+open Cmdliner
+open Cmdliner.Term.Syntax
+
+module Arg = struct
+  open Arg
+
+  let single_file =
+    pos 0 (some file) None (info [])
+    |> required
+
+  let files =
+    pos_all file [] (info [])
+    |> value
+
+  let ast_check =
+    info ["ast-check"]
+      ~doc:"Check the formatted code parses back to the same syntax tree."
+    |> flag
+    |> value
+
+  let syntax_quotations =
+    info ["syntax-quotations"]
+      ~doc:"OxCaml specific: enable quotations by default."
+    |> flag
+    |> value
+
+  let inplace =
+    info ["inplace"; "i"]
+      ~doc:"Replace the file's content with stylo's output."
+    |> flag
+    |> value
+
+  let width =
+    info ["width"; "w"]
+    |> opt int 80
+    |> value
+end
 
 let fuzzer_batch fn =
   let has_errors = ref false in
@@ -14,7 +50,7 @@ let fuzzer_batch fn =
       match Stylo.style_fuzzer_line ~fname:fn ~lnum:i entrypoint_and_src with
       | Ok _ -> loop_lines (i + 1) ic
 
-      | Error `Input_parse_error (_, Parser_types.Failwith _) ->
+      | Error `Input_parse_error (_, Ocaml_syntax.Parser_types.Failwith _) ->
         (* ignoring error thrown from semantic actions. *)
         loop_lines (i + 1) ic
 
@@ -49,59 +85,71 @@ let fuzzer_batch fn =
     Format.eprintf "Parse errors collected in %s.parse-errors@." fn;
     Out_channel.close (Lazy.force parse_error_oc)
   );
-  !has_errors
+  if !has_errors
+  then Cmd.Exit.some_error
+  else Cmd.Exit.ok
 
-let inputs = ref []
-let fuzzing = ref false
-let inplace = ref false
-
-let () =
-  Arg.parse
-    ["-ast-check", Arg.Set Config.check_same_ast,
-     "Check the formatted code parses back to the same AST"
-    ;"-syntax-quotations", Arg.Set Config.syntax_quotations,
-     "oxcaml specifig: enable quotations by default"
-    ;"-fuzzing", Arg.Set fuzzing, "-ast-check on each line separately"
-    ;"-i", Arg.Set inplace, "style file in place"
-    ;"-width", Arg.Set_int Config.width, ""]
-    (fun fn -> inputs := fn :: !inputs)
-    "stylo.exe [-ast-check] [-i] FILENAME*"
-
-let () =
+let style_files inplace fns =
   let has_error = ref false in
-  if !fuzzing then (
-    assert (List.length !inputs = 1);
-    Config.check_same_ast := true;
-    has_error := fuzzer_batch (List.hd !inputs)
-  ) else
-    List.iter (fun fn ->
-      let is_mli = Filename.check_suffix fn ".mli" in
-      match
-        if is_mli
-        then Stylo.style_file Intf fn
-        else Stylo.style_file Impl fn
-      with
-      | exception exn ->
-        let bt = Printexc.get_backtrace () in
-        Format.eprintf "%s: %s" fn (Printexc.to_string exn);
-        if Dbg_print.dbg then
-          Format.eprintf "@\n%s@." bt
-        else
-          Format.eprintf "@.";
-        has_error := true
-      | Error e ->
-        Stylo.Pipeline.pp_error fn e;
-        has_error := true
-      | Ok output ->
-        let pp oc =
-          output_string oc output;
-          output_char oc '\n';
-          flush oc
-        in
-        if not !inplace then
-          pp stdout
-        else
-          Out_channel.with_open_text fn pp
-    ) !inputs;
-  if !has_error then
-    exit 1
+  List.iter (fun fn ->
+    let is_mli = Filename.check_suffix fn ".mli" in
+    match
+      if is_mli
+      then Stylo.style_file Intf fn
+      else Stylo.style_file Impl fn
+    with
+    | exception exn ->
+      let bt = Printexc.get_backtrace () in
+      Format.eprintf "%s: %s" fn (Printexc.to_string exn);
+      if Dbg_print.dbg then
+        Format.eprintf "@\n%s@." bt
+      else
+        Format.eprintf "@.";
+      has_error := true
+    | Error e ->
+      Stylo.Pipeline.pp_error fn e;
+      has_error := true
+    | Ok output ->
+      let pp oc =
+        output_string oc output;
+        output_char oc '\n';
+        flush oc
+      in
+      if not inplace then
+        pp stdout
+      else
+        Out_channel.with_open_text fn pp
+  ) fns;
+  if !has_error
+  then Cmd.Exit.some_error
+  else Cmd.Exit.ok
+
+let fuzz_cmd =
+  Cmd.make (Cmd.info "fuzz") @@
+  let+ fn = Arg.single_file
+  and+ quotations = Arg.syntax_quotations in
+  Config.(
+    check_same_ast := true;
+    check_retokenisation := true;
+    syntax_quotations := quotations;
+  );
+  fuzzer_batch fn
+
+let style_cmd =
+  Cmd.make (Cmd.info "style") @@
+  let open Arg in
+  let+ files
+  and+ inplace
+  and+ ast_check
+  and+ w = width in
+  Config.(
+    width := w;
+    check_same_ast := ast_check;
+  );
+  style_files inplace files
+
+let main () =
+  Cmd.group (Cmd.info "stylo") [fuzz_cmd; style_cmd]
+  |> Cmd.eval'
+
+let () = exit (main ())

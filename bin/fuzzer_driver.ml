@@ -69,8 +69,8 @@ let start_batch ~ocamlformat_command = function
     let process =
       let args =
         if !syntax_quotations
-        then [|ocamlformat_command; "-fuzzing"; "-syntax-quotations"; path|]
-        else [|ocamlformat_command; "-fuzzing"; path|]
+        then [|ocamlformat_command; "fuzz"; "--syntax-quotations"; path|]
+        else [|ocamlformat_command; "fuzz"; path|]
       in
       Unix.create_process ocamlformat_command args
         Unix.stdin Unix.stdout Unix.stderr

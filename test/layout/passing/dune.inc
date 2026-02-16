@@ -2,13 +2,13 @@
   (target comments_insertion.out)
   (action
     (with-stdout-to %{target}
-      (run ../../../bin/main.exe -width 90 %{dep:comments_insertion.ml}))))
+      (run ../../../bin/main.exe style --width 90 %{dep:comments_insertion.ml}))))
 
 (rule
   (target comments_insertion.snd-run)
   (action
     (with-stdout-to %{target}
-      (run ../../../bin/main.exe -width 90 %{dep:comments_insertion.out}))))
+      (run ../../../bin/main.exe style --width 90 %{dep:comments_insertion.out}))))
 
 (rule
   (alias runtest)
@@ -23,13 +23,13 @@
   (target flat_non_flat_groups_and_comments.out)
   (action
     (with-stdout-to %{target}
-      (run ../../../bin/main.exe -width 90 %{dep:flat_non_flat_groups_and_comments.ml}))))
+      (run ../../../bin/main.exe style --width 90 %{dep:flat_non_flat_groups_and_comments.ml}))))
 
 (rule
   (target flat_non_flat_groups_and_comments.snd-run)
   (action
     (with-stdout-to %{target}
-      (run ../../../bin/main.exe -width 90 %{dep:flat_non_flat_groups_and_comments.out}))))
+      (run ../../../bin/main.exe style --width 90 %{dep:flat_non_flat_groups_and_comments.out}))))
 
 (rule
   (alias runtest)
@@ -44,13 +44,13 @@
   (target lexer_directives.out)
   (action
     (with-stdout-to %{target}
-      (run ../../../bin/main.exe -width 90 %{dep:lexer_directives.ml}))))
+      (run ../../../bin/main.exe style --width 90 %{dep:lexer_directives.ml}))))
 
 (rule
   (target lexer_directives.snd-run)
   (action
     (with-stdout-to %{target}
-      (run ../../../bin/main.exe -width 90 %{dep:lexer_directives.out}))))
+      (run ../../../bin/main.exe style --width 90 %{dep:lexer_directives.out}))))
 
 (rule
   (alias runtest)

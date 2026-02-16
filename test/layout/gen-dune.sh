@@ -17,13 +17,13 @@ function check-file {
   (target $name.out)
   (action
     (with-stdout-to %{target}
-      (run ../../../bin/main.exe -width 90 %{dep:$f}))))
+      (run ../../../bin/main.exe style --width 90 %{dep:$f}))))
 
 (rule
   (target $name.snd-run)
   (action
     (with-stdout-to %{target}
-      (run ../../../bin/main.exe -width 90 %{dep:$name.out}))))
+      (run ../../../bin/main.exe style --width 90 %{dep:$name.out}))))
 
 (rule
   (alias runtest)
