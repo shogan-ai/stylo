@@ -57,10 +57,13 @@ module Check = struct
     )
 
   let normalization_kept_comments tokens_before tokens_after =
-    if not !Config.check_normalization_kept_comments then Ok () else (
+    if not !Config.check_normalization_kept_comments ||
+       tokens_before == tokens_after
+    then Ok ()
+    else (
       let tokens_before = Lazy.force tokens_before in
-      Comments_comparison.same_number
-        tokens_before tokens_after
+      let tokens_after = Lazy.force tokens_after in
+      Comments_comparison.same_number tokens_before tokens_after
     )
 
   type error = [
@@ -103,15 +106,35 @@ module Pipeline = struct
   let print_doc doc =
     Document.Print.to_string ~width:!Config.width doc
 
+  type tokens_source =
+    | Parser
+    | Normalization
+
+  let dump_tokens input ~src tokens_lazy =
+    if !Config.dbg_dump then (
+      let tokens = Lazy.force tokens_lazy in
+      let fname =
+        input.fname ^
+        match src with
+        | Parser -> ".parser-tokens"
+        | Normalization -> ".normalized-tokens"
+      in
+      Out_channel.with_open_text fname @@ fun oc ->
+      let ppf = Format.formatter_of_out_channel oc in
+      Tokens.dump ppf tokens;
+      Format.pp_print_flush ppf ()
+    )
+
   let (let*) = Result.bind
 
   let run ?normalize:(run_normalize=true) ({ kind; _ } as input) =
     let* cst = parse input in
     let tokens_pre_normalize = lazy (tokens_of_tree kind cst) in
+    dump_tokens input ~src:Parser tokens_pre_normalize;
     let* () = Check.retokenisation tokens_pre_normalize in
-    let* cst, normalized, ast_for_checker =
+    let* cst, tokens_post_normalize, ast_for_checker =
       if not run_normalize
-      then Ok (cst, false, Check.Cst (input, cst))
+      then Ok (cst, tokens_pre_normalize, Check.Cst (input, cst))
       else (
         (* we normalize only if the source parses with the upstream parser *)
         let input_for_oxchecker = Check.make_ast_input input input.source in
@@ -119,20 +142,24 @@ module Pipeline = struct
         | Error e ->
           if !Config.check_same_ast
           then Error e (* might as well fail early *)
-          else Ok (cst, false, Check.Cst (input, cst))
+          else Ok (cst, tokens_pre_normalize, Check.Cst (input, cst))
         | Ok ast ->
-          Ok (normalize kind cst, true, Check.Ast (input, ast))
+          let normalized = normalize kind cst in
+          let tokens =
+            (* No need to suspend, we know those will be used. *)
+            Lazy.from_val (tokens_of_tree kind normalized)
+          in
+          dump_tokens input ~src:Normalization tokens;
+          Ok (normalized, tokens, Check.Ast (input, ast))
       )
     in
-    let tokens_post_normalize = tokens_of_tree kind cst in
     let* () =
-      if not normalized then Ok () (* nothing will have changed *) else
       Check.normalization_kept_comments tokens_pre_normalize
         tokens_post_normalize
     in
     let* document =
       build_doc kind cst
-      |> Comments.Insert.from_tokens tokens_post_normalize
+      |> Comments.Insert.from_tokens (Lazy.force tokens_post_normalize)
     in
     let output = print_doc document in
     let* () = Check.same_ast ast_for_checker output in

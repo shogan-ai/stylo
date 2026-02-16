@@ -79,3 +79,6 @@ end
 
 val pp_elt : Format.formatter -> elt -> unit
 val pp_seq : Format.formatter -> seq -> unit
+
+val dump : Format.formatter -> seq -> unit
+(* one token per line, useful for diffing *)

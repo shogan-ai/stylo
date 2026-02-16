@@ -28,8 +28,10 @@ module Check : sig
 
   val retokenisation : Tokens.seq lazy_t -> (unit, [> Ordering.error]) result
 
-  val normalization_kept_comments : Tokens.seq lazy_t -> Tokens.seq ->
-    (unit, [> Comments_comparison.error]) result
+  val normalization_kept_comments
+    :  Tokens.seq lazy_t
+    -> Tokens.seq lazy_t
+    -> (unit, [> Comments_comparison.error]) result
 
   type error = [
     | Ordering.error

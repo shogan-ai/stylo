@@ -337,6 +337,8 @@ let pp_seq =
     ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
     pp_elt
 
+let dump = Format.(pp_print_list ~pp_sep:pp_print_newline pp_elt)
+
 module Indexed_list = struct
   open Lexing
 

@@ -18,6 +18,12 @@ module Arg = struct
     |> flag
     |> value
 
+  let tokens_checks =
+    info ["tokens-checks"]
+      ~doc:"Performs various tokens-related sanity checks."
+    |> flag
+    |> value
+
   let syntax_quotations =
     info ["syntax-quotations"]
       ~doc:"OxCaml specific: enable quotations by default."
@@ -33,6 +39,16 @@ module Arg = struct
   let width =
     info ["width"; "w"]
     |> opt int 80
+    |> value
+
+  let debug =
+    let doc =
+      "Dumps stylo's internal structures at various stages of the pipeline.\
+       For a given input file FILE the files which can appear are: \
+       $(i,FOO.parser-tokens), $(i,FOO.normalized-tokens)."
+    in
+    info ~doc ["debug"]
+    |> flag
     |> value
 end
 
@@ -141,10 +157,17 @@ let style_cmd =
   let+ files
   and+ inplace
   and+ ast_check
+  and+ tokens_checks
+  and+ debug
   and+ w = width in
   Config.(
     width := w;
     check_same_ast := ast_check;
+    dbg_dump := debug;
+    if tokens_checks then (
+      check_retokenisation := true;
+      check_normalization_kept_comments := true;
+    );
   );
   style_files inplace files
 
