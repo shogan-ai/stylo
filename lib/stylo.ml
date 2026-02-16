@@ -14,6 +14,8 @@ type ('a, 'b) input = {
   kind : ('a, 'b) input_kind;
 }
 
+module Debug = Ast_checker.Debug
+
 module Check = struct
   open Ast_checker
 
@@ -106,31 +108,12 @@ module Pipeline = struct
   let print_doc doc =
     Document.Print.to_string ~width:!Config.width doc
 
-  type tokens_source =
-    | Parser
-    | Normalization
-
-  let dump_tokens input ~src tokens_lazy =
-    if !Config.dbg_dump then (
-      let tokens = Lazy.force tokens_lazy in
-      let fname =
-        input.fname ^
-        match src with
-        | Parser -> ".parser-tokens"
-        | Normalization -> ".normalized-tokens"
-      in
-      Out_channel.with_open_text fname @@ fun oc ->
-      let ppf = Format.formatter_of_out_channel oc in
-      Tokens.dump ppf tokens;
-      Format.pp_print_flush ppf ()
-    )
-
   let (let*) = Result.bind
 
   let run ?normalize:(run_normalize=true) ({ kind; _ } as input) =
     let* cst = parse input in
     let tokens_pre_normalize = lazy (tokens_of_tree kind cst) in
-    dump_tokens input ~src:Parser tokens_pre_normalize;
+    Debug.dump_tokens input.fname ~src:Parser tokens_pre_normalize;
     let* () = Check.retokenisation tokens_pre_normalize in
     let* cst, tokens_post_normalize, ast_for_checker =
       if not run_normalize
@@ -149,7 +132,7 @@ module Pipeline = struct
             (* No need to suspend, we know those will be used. *)
             Lazy.from_val (tokens_of_tree kind normalized)
           in
-          dump_tokens input ~src:Normalization tokens;
+          Debug.dump_tokens input.fname ~src:Normalization tokens;
           Ok (normalized, tokens, Check.Ast (input, ast))
       )
     in

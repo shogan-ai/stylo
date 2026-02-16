@@ -144,13 +144,35 @@ let output_wrap exn = `Output_parse_error (Errors.Oxcaml's, exn)
 
 let (let*) = Result.bind
 
-let check_same_ast (type a) (input_cst : a) (output : a input) =
-  let input_cst = clean output.kind input_cst in
-  let output = { output with fname = output.fname ^ ".out" } in
-  let* output_cst = parse output output_wrap in
-  let output_cst = clean output.kind output_cst in
-  if input_cst = output_cst
+type ast_source =
+  | Input
+  | Stylo
+
+let dump_ast (type a) (input : a input) ~src (ast : a) =
+  let fname =
+    input.fname ^
+    match src with
+    | Input -> ".input-tree"
+    | Stylo -> ".output-tree"
+  in
+  Debug.dump_to_file fname Oxcaml_frontend.Printast.(fun ppf ->
+    match input.kind with
+    | Impl -> implementation ppf ast
+    | Intf -> interface ppf ast
+  )
+
+let check_same_ast (type a) (input_ast : a) (output : a input) =
+  let input_ast = clean output.kind input_ast in
+  let* output_ast =
+    parse { output with fname = output.fname ^ ".out" } output_wrap
+  in
+  let output_ast = clean output.kind output_ast in
+  if input_ast = output_ast
   then Ok ()
-  else Error (`Ast_changed (Errors.Oxcaml's, output.fname))
+  else (
+    dump_ast output ~src:Input input_ast;
+    dump_ast output ~src:Stylo output_ast;
+    Error (`Ast_changed (Errors.Oxcaml's, output.fname))
+  )
 
 let parse i = parse i input_wrap

@@ -45,7 +45,10 @@ module Arg = struct
     let doc =
       "Dumps stylo's internal structures at various stages of the pipeline.\
        For a given input file FILE the files which can appear are: \
-       $(i,FOO.parser-tokens), $(i,FOO.normalized-tokens)."
+       $(i,FOO.parser-tokens), $(i,FOO.normalized-tokens), $(i,FOO.input-tree) \
+       and $(i,FOO.output-tree). These last two only appear if \
+       $(b,--ast-check) has been passed and the syntax tree changed as a \
+       result of styling."
     in
     info ~doc ["debug"]
     |> flag
