@@ -114,14 +114,14 @@ module Pipeline = struct
       then Ok (cst, false, Check.Cst (input, cst))
       else (
         (* we normalize only if the source parses with the upstream parser *)
-        let input_for_oxchecker = Obj.magic input in
+        let input_for_oxchecker = Check.make_ast_input input input.source in
         match Ast_checker.Oxcaml_checker.parse input_for_oxchecker with
         | Error e ->
           if !Config.check_same_ast
           then Error e (* might as well fail early *)
           else Ok (cst, false, Check.Cst (input, cst))
         | Ok ast ->
-          Ok (normalize kind cst, true, Check.Ast (input_for_oxchecker, ast))
+          Ok (normalize kind cst, true, Check.Ast (input, ast))
       )
     in
     let tokens_post_normalize = tokens_of_tree kind cst in
