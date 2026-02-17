@@ -99,6 +99,8 @@ let pstr_type (nr, tys) =
   Pstr_type (nr, tys)
 let pstr_exception te =
   Pstr_exception te
+let pstr_recmodule bindings =
+  Pstr_recmodule bindings
 
 let psig_typext te =
   Psig_typext te
@@ -750,8 +752,6 @@ The precedences must be listed from low to high.
 %inline mkclass(symb): symb
     { mkclass ~loc:$sloc $1 }
 
-%inline wrap_mkstr_ext(symb): symb
-    { wrap_mkstr_ext ~loc:$sloc $1 }
 %inline wrap_mksig_ext(symb): symb
     { wrap_mksig_ext ~loc:$sloc $1 }
 
@@ -1269,40 +1269,39 @@ structure:
 structure_item:
     let_bindings(ext_attributes)
       { val_of_let_bindings ~loc:$sloc $1 }
+  | item_extension post_item_attributes
+      { let docs, sloc = symbol_docs $sloc in
+        let ext = Ext.mk $1 $2 ~docs in
+        mkstr ~loc:sloc (Pstr_extension ext) }
   | mkstr(
-      item_extension post_item_attributes
-        { let docs, _sloc = symbol_docs $sloc in
-          let ext = Ext.mk $1 $2 ~docs in
-          (* FIXME: sloc not used for item tokens! *)
-          Pstr_extension ext }
-    | floating_attribute
+      floating_attribute
         { Pstr_attribute $1 }
     | kind_abbreviation_decl
         { let name, jkind = $1 in
           Pstr_kind_abbrev (name, jkind)
         }
-    | type_declarations
-        { pstr_type $1 }
-    | rec_module_bindings
-        { Pstr_recmodule $1 }
-    | module_binding
-        { $1 }
-    | class_declarations
-        { (Pstr_class $1) }
-    | class_type_declarations
-        { (Pstr_class_type $1) }
     | primitive_declaration
         { pstr_primitive $1 }
     | value_description
         { pstr_primitive $1 }
+    | type_declarations
+        { pstr_type $1 }
     | str_type_extension
         { pstr_typext $1 }
     | str_exception_declaration
         { pstr_exception $1 }
+    | module_binding
+        { $1 }
+    | rec_module_bindings
+        { pstr_recmodule $1 }
     | module_type_declaration
         { (Pstr_modtype $1) }
     | open_declaration
         { (Pstr_open $1) }
+    | class_declarations
+        { (Pstr_class $1) }
+    | class_type_declarations
+        { (Pstr_class_type $1) }
     | include_statement(module_expr)
         { (Pstr_include $1) }
     )
@@ -1375,7 +1374,7 @@ module_binding_body:
 (* The following bindings in a group of recursive module bindings. *)
 %inline and_module_binding:
   AND
-  ext_attr = noext_attributes
+  ext_attr = attrs_as_extattrs
   name = module_name_modal(at_mode_expr)
   body = module_binding_body
   attrs = post_item_attributes
@@ -1597,18 +1596,14 @@ signature_item:
         { let name, jkind = $1 in
           Psig_kind_abbrev (name, jkind)
         }
-    | type_declarations
-        { psig_type $1 }
-    | type_subst_declarations
-        { psig_typesubst $1 }
-    | class_descriptions
-        { (Psig_class $1) }
-    | class_type_declarations
-        { (Psig_class_type $1) }
     | value_description
         { psig_value $1 }
     | primitive_declaration
         { psig_value $1 }
+    | type_declarations
+        { psig_type $1 }
+    | type_subst_declarations
+        { psig_typesubst $1 }
     | sig_type_extension
         { psig_typext $1 }
     | sig_exception_declaration
@@ -1627,6 +1622,10 @@ signature_item:
         { (Psig_modtypesubst $1) }
     | open_description
         { (Psig_open $1) }
+    | class_descriptions
+        { (Psig_class $1) }
+    | class_type_declarations
+        { (Psig_class_type $1) }
     | include_statement(module_type) modalities = optional_atat_modalities_expr
       { (Psig_include ($1, modalities)) }
     )
@@ -1729,7 +1728,7 @@ module_subst:
 ;
 %inline and_module_declaration:
   AND
-  ext_attrs = noext_attributes
+  ext_attrs = attrs_as_extattrs
   name = mkrhs(module_name)
   COLON
   mty = module_type
@@ -1788,7 +1787,7 @@ module_type_subst:
 ;
 %inline and_class_declaration:
   AND
-  ext_attr = noext_attributes
+  ext_attr = attrs_as_extattrs
   virt = virtual_flag
   params = formal_class_parameters
   id = mkrhs(LIDENT)
@@ -1826,12 +1825,12 @@ formal_class_parameters:
 class_expr:
     class_simple_expr
       { $1 }
-  | FUN noext_attributes class_fun_def
+  | FUN attrs_as_extattrs class_fun_def
       { let (args, body) = $3 in
         Cl.fun_ ~loc:(make_loc $sloc) ~ext_attrs:$2 args body }
   | let_bindings(noext_attributes) IN class_expr
       { class_of_let_bindings ~loc:$sloc $1 $3 }
-  | LET OPEN override_flag noext_attributes mkrhs(mod_longident) IN class_expr
+  | LET OPEN override_flag attrs_as_extattrs mkrhs(mod_longident) IN class_expr
       { let loc = ($startpos($2), $endpos($5)) in
         let od =
           Opn.mk ~ext_attrs:$4 ~override:$3 ~loc:(make_loc loc) ~tokens:(Tokens.at loc) $5
@@ -1861,7 +1860,7 @@ class_simple_expr:
     | LPAREN class_expr COLON class_type error
         { unclosed "(" $loc($1) ")" $loc($5) }
     ) { $1 }
-  | OBJECT noext_attributes class_structure END
+  | OBJECT attrs_as_extattrs class_structure END
     { mkclass ~loc:$sloc ~ext_attrs:$2 (Pcl_structure $3) }
 ;
 
@@ -1920,7 +1919,7 @@ value:
     mutable_ = virtual_with_mutable_flag
     label = mkrhs(label) COLON ty = core_type
       { (label, mutable_, Cfk_virtual ty), attrs }
-  | override_flag noext_attributes mutable_flag mkrhs(label) EQUAL seq_expr
+  | override_flag attrs_as_extattrs mutable_flag mkrhs(label) EQUAL seq_expr
       { let pat = mkpat ~loc:$loc($4) (Ppat_var (wrap_str $4)) in
         let vb =
           { pvb_pre_text = [];
@@ -1935,7 +1934,7 @@ value:
             pvb_tokens = Tokens.at $sloc; }
         in
         ($4, $3, Cfk_concrete ($1, vb)), [] }
-  | override_flag noext_attributes mutable_flag mkrhs(label) type_constraint
+  | override_flag attrs_as_extattrs mutable_flag mkrhs(label) type_constraint
     EQUAL seq_expr
       {
         let t =
@@ -1966,7 +1965,7 @@ method_:
     private_ = virtual_with_private_flag
     label = mkrhs(label) COLON ty = poly_type
       { (label, private_, Cfk_virtual ty), attrs }
-  | override_flag noext_attributes private_flag mkrhs(label) strict_binding
+  | override_flag attrs_as_extattrs private_flag mkrhs(label) strict_binding
       { let params, tc, ret_modes, e = $5 in
         let pat = mkpat ~loc:$loc($4) (Ppat_var (wrap_str $4)) in
         let vb =
@@ -1984,7 +1983,7 @@ method_:
         in
         ($4, $3,
         Cfk_concrete ($1, vb)), [] }
-  | override_flag noext_attributes private_flag mkrhs(label)
+  | override_flag attrs_as_extattrs private_flag mkrhs(label)
     COLON poly_type EQUAL seq_expr
       { let constr =
           Pvc_constraint { locally_abstract_univars = []; typ = $6 }
@@ -2004,7 +2003,7 @@ method_:
             pvb_tokens = Tokens.at $sloc; }
         in
         ($4, $3, Cfk_concrete ($1, vb)), [] }
-  | override_flag noext_attributes private_flag mkrhs(label) COLON TYPE newtypes
+  | override_flag attrs_as_extattrs private_flag mkrhs(label) COLON TYPE newtypes
     DOT core_type EQUAL seq_expr
       { let constr =
           Pvc_constraint { locally_abstract_univars = $7; typ = $9 }
@@ -2063,7 +2062,7 @@ class_signature:
           Tokens.replace_first_child tokens ~subst:cs.pcty_tokens
         in
         { cty_with_attr with pcty_tokens } }
-  | LET OPEN override_flag noext_attributes mkrhs(mod_longident) IN class_signature
+  | LET OPEN override_flag attrs_as_extattrs mkrhs(mod_longident) IN class_signature
       { let loc = ($startpos($2), $endpos($5)) in
         let od =
           Opn.mk ~override:$3 ~ext_attrs:$4 ~loc:(make_loc loc)
@@ -2157,7 +2156,7 @@ constrain_field:
 ;
 %inline and_class_description:
   AND
-  ext_attr = noext_attributes
+  ext_attr = attrs_as_extattrs
   virt = virtual_flag
   params = formal_class_parameters
   id = mkrhs(LIDENT)
@@ -2194,7 +2193,7 @@ class_type_declarations:
 ;
 %inline and_class_type_declaration:
   AND
-  ext_attr = noext_attributes
+  ext_attr = attrs_as_extattrs
   virt = virtual_flag
   params = formal_class_parameters
   id = mkrhs(LIDENT)
@@ -2407,17 +2406,6 @@ fun_expr:
   | fun_expr_attrs
       { let desc, attrs = $1 in
         mkexp_attrs ~loc:$sloc desc attrs }
-  | LET OPEN override_flag ext_attributes module_expr IN seq_expr
-      { (* FIXME: extracted from fun_expr_attrs as the ext_attrs go into the
-          open_decl.
-          Could we push it into expr_? Should we care? *)
-        let open_loc = ($startpos($2), $endpos($5)) in
-        let od =
-          Opn.mk $5 ~override:$3 ~loc:(make_loc open_loc)
-            ~ext_attrs:$4
-            ~tokens:(Tokens.at open_loc)
-        in
-        mkexp ~loc:$sloc (Pexp_let_open(od, $7)) }
   | fun_
       { $1 }
   | expr_
@@ -2473,6 +2461,15 @@ fun_expr:
         Pexp_letmodule(mb, $7), { pea_ext = None; pea_attrs = [] } }
   | LET EXCEPTION ext_attributes let_exception_declaration IN seq_expr
       { Pexp_letexception($4, $6), $3 }
+  | LET OPEN override_flag ext_attributes module_expr IN seq_expr
+      { (* Similar remark as for LET MODULE above. *)
+        let open_loc = ($startpos($2), $endpos($5)) in
+        let od =
+          Opn.mk $5 ~override:$3 ~loc:(make_loc open_loc)
+            ~ext_attrs:$4
+            ~tokens:(Tokens.at open_loc)
+        in
+        Pexp_let_open(od, $7), { pea_ext = None; pea_attrs = [] } }
   | MATCH ext_attributes seq_expr WITH match_cases
       { Pexp_match($3, $5), $2 }
   | TRY ext_attributes seq_expr WITH match_cases
@@ -2967,7 +2964,7 @@ let_bindings(EXT_ATTR):
 ;
 and_let_binding:
   AND
-  ext_attr = noext_attributes
+  ext_attr = attrs_as_extattrs
   body = let_binding_body
   attrs = post_item_attributes
     {
@@ -3060,7 +3057,7 @@ match_case(opening):
   | opening pattern MINUSGREATER exp_unreachable
       { mkcase $sloc $2 $4 }
 ;
-exp_unreachable:
+%inline exp_unreachable:
   | DOT { mkexp ~loc:$sloc Pexp_unreachable }
 ;
 fun_param_as_list:
@@ -3575,7 +3572,7 @@ generic_type_declaration(flag, kind):
 ;
 %inline generic_and_type_declaration(kind):
   AND
-  ext_attr = noext_attributes
+  ext_attr = attrs_as_extattrs
   params = type_parameters
   id = mkrhs(LIDENT)
   jkind_annotation = jkind_constraint?
@@ -5026,6 +5023,10 @@ ext:
 %inline ext_noattrs:
   | PERCENT attr_id
     { { pea_ext = Some $2; pea_attrs = [] } }
+;
+%inline attrs_as_extattrs:
+  attributes
+  { { pea_ext = None; pea_attrs = $1 } }
 ;
 %inline noext_attributes:
   no_ext attributes

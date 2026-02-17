@@ -8,7 +8,7 @@
   (action
     (with-stdout-to %{target}
       (run
-        ocamlgrammarfuzzer --cmly %{dep:../parsing/parser.cmly} --exhaust
+        ocamlgrammarfuzzer --cmly %{dep:../lib/parsing/parser.cmly} --exhaust
           --entrypoint implementation --entrypoint interface --print-entrypoint
           --avoid DOLLAR --avoid LESSLBRACKET --avoid RBRACKETGREATER
           ; HASH_CHAR is present in our grammar but not in the one the fuzzer is
@@ -24,7 +24,7 @@
   (action
     (with-stdout-to %{target}
       (run
-        ocamlgrammarfuzzer --cmly %{dep:../parsing/parser.cmly}
+        ocamlgrammarfuzzer --cmly %{dep:../lib/parsing/parser.cmly}
           --entrypoint implementation --print-entrypoint
           --focus DOLLAR --focus LESSLBRACKET --focus RBRACKETGREATER
           ; HASH_CHAR is present in our grammar but not in the one the fuzzer is
