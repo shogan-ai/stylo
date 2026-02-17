@@ -68,6 +68,10 @@ let tokenizer = object
   (* The actual tokens. *)
   method tokens list = [ list ]
 
+  (* Ppxlib.lift internal structure *)
+  method record alist = List.concat_map snd alist
+  method constr _ = List.concat
+
   (* Leaf types. *)
   method bool _ = []
   method char _ = []
@@ -78,20 +82,29 @@ let tokenizer = object
   (* Polymorphic types. *)
   method ref f x = f !x
   method tuple = List.concat
-  method record alist = List.concat_map snd alist
   method option f = function
     | None -> []
     | Some x -> f x
   method list f = List.concat_map f
-  method constr _ = List.concat
-
   (* Replacing [Child_node]s by actual children *)
   method! longident l =
     let sub_tokens = super#longident l in
     let node_toks = l.tokens in
     combine_children "longident" ~loc:Location.none node_toks sub_tokens
 
-  method! attribute (a : Parsetree.attribute) =
+  method! modes : Parsetree.modes -> Tokens.seq list = function
+    | No_modes -> []
+    | Modes m as modes ->
+      let sub_tokens = super#modes modes in
+      combine_children "modes" ~loc:Location.none m.tokens sub_tokens
+
+  method! modalities : Parsetree.modalities -> Tokens.seq list = function
+    | No_modalities -> []
+    | Modalities m as modalities ->
+      let sub_tokens = super#modalities modalities in
+      combine_children "modalities" ~loc:Location.none m.tokens sub_tokens
+
+  method! attribute a =
     let sub_tokens = super#attribute a in
     combine_children "attribute" ~loc:a.attr_loc a.attr_tokens sub_tokens
 

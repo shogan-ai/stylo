@@ -155,12 +155,12 @@ let mk_attr ~sloc name payload =
 
 let mkpat_with_modes ~loc ~pat ~cty ~modes =
   match cty, modes with
-  | None, [] -> pat
+  | None, No_modes -> pat
   | cty, modes -> mkpat ~loc (Ppat_constraint (pat, cty, modes))
 
 let mkexp_constraint ~loc ~exp ~cty ~modes =
   match cty, modes with
-  | None, [] -> invalid_arg "empty mkexp_constraint" (* ? *)
+  | None, No_modes -> invalid_arg "empty mkexp_constraint" (* ? *)
   | cty, modes -> mkexp ~loc (Pexp_constraint (exp, cty, modes))
 
 let ghexp_constraint ~loc ~exp ~cty ~modes =
@@ -295,10 +295,10 @@ let mkexp_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
      mk ~loc ~exp:e ~cty:(Some t) ~modes
   | Pcoerce(t1, t2)  ->
      match modes with
-     | [] ->
+     | No_modes ->
       let mk = if ghost then ghexp else mkexp ?attrs:None in
       mk ~loc (Pexp_coerce(e, t1, t2))
-     | _ :: _ -> not_expecting loc "mode annotations"
+     | Modes _ -> not_expecting loc "mode annotations"
 
 (* Helper functions for desugaring array indexing operators *)
 
@@ -479,7 +479,7 @@ let class_of_let_bindings ~loc lbs body =
     mkclass ~loc (Pcl_let (lbs.lbs_rec, List.rev bindings, body))
 
 let empty_body_constraint =
-  { ret_type_constraint = None; ret_mode_annotations = []}
+  { ret_type_constraint = None; ret_mode_annotations = No_modes}
 
 let mkfunction ~loc ~ext_attrs params body_constraint body =
   mkexp_attrs (Pexp_function (params, body_constraint, body)) ext_attrs ~loc
@@ -678,6 +678,10 @@ The precedences must be listed from low to high.
 %type <Longident.t> parse_mod_longident
 %start parse_any_longident
 %type <Longident.t> parse_any_longident
+
+%type <modes> at_mode_expr
+%type <modes> mode_expr_legacy
+%type <modes> optional_mode_expr_legacy
 /* END AVOID */
 
 %%
@@ -1117,8 +1121,8 @@ module_name:
       { None }
 ;
 
-module_name_modal(at_modal_expr):
-  | mkrhs(module_name) { $1, [] }
+module_name_modal(at_modal_expr, no_modal_expr):
+  | mkrhs(module_name) no_modal_expr { $1, $2 }
   | LPAREN mkrhs(module_name) at_modal_expr RPAREN { $2, $3 }
 
 (* -------------------------------------------------------------------------- *)
@@ -1312,7 +1316,7 @@ structure_item:
 %inline module_binding:
   MODULE
   ext_attr = ext_attributes
-  name = module_name_modal(at_mode_expr)
+  name = module_name_modal(at_mode_expr, no_modes)
   body = module_binding_body
   attrs = post_item_attributes
     { let docs, sloc = symbol_docs $sloc in
@@ -1336,7 +1340,7 @@ structure_item:
 (* The body (right-hand side) of a module binding. *)
 module_binding_body:
     EQUAL me = module_expr
-      { [], None, [], me }
+      { [], None, No_modes, me }
   | COLON error
       { expecting $loc($1) "=" }
   | mty_mm = module_constraint EQUAL me = module_expr
@@ -1359,7 +1363,7 @@ module_binding_body:
   MODULE
   ext_attr = ext_attributes
   REC
-  name = module_name_modal(at_mode_expr)
+  name = module_name_modal(at_mode_expr, no_modes)
   body = module_binding_body
   attrs = post_item_attributes
   {
@@ -1375,7 +1379,7 @@ module_binding_body:
 %inline and_module_binding:
   AND
   ext_attr = attrs_as_extattrs
-  name = module_name_modal(at_mode_expr)
+  name = module_name_modal(at_mode_expr, no_modes)
   body = module_binding_body
   attrs = post_item_attributes
   {
@@ -1531,7 +1535,7 @@ module_type:
 ;
 
 %inline module_type_with_optional_modes:
-  | module_type { $1, [] }
+  | module_type { $1, No_modes }
   | module_type_atomic at_mode_expr { $1, $2 }
 
 (* A signature, which appears between SIG and END (among other places),
@@ -1549,7 +1553,7 @@ signature:
           from a side table of docstrings. So $symbolstartpos doesn't know about
           that and would reduce to $endpos. *)
         match $1, $2 with
-        | [], item :: _ ->
+        | No_modalities, item :: _ ->
             if empty_red
             then item.psig_loc.loc_start
             else
@@ -1635,7 +1639,7 @@ signature_item:
 %inline module_declaration:
   MODULE
   ext_attrs = ext_attributes
-  name = module_name_modal(atat_modalities_expr)
+  name = module_name_modal(atat_modalities_expr, no_modalities)
   body = module_declaration_body(
     module_type optional_atat_modalities_expr { ($1, $2) }
   )
@@ -1669,7 +1673,7 @@ module_declaration_body(module_type_with_optional_modal_expr):
 %inline module_alias:
   MODULE
   ext_attrs = ext_attributes
-  name = module_name_modal(atat_modalities_expr)
+  name = module_name_modal(atat_modalities_expr, no_modalities)
   EQUAL
   alias = module_expr_alias
   modalities = optional_atat_modalities_expr
@@ -1722,7 +1726,7 @@ module_subst:
     let loc = make_loc $sloc in
     let docs, sloc = symbol_docs $sloc in
     let body = Without_params (mty, modalities) in
-    Md.mk ~ext_attrs (name, []) body ~attrs ~loc ~docs
+    Md.mk ~ext_attrs (name, No_modalities) body ~attrs ~loc ~docs
       ~tokens:(Tokens.at sloc)
   }
 ;
@@ -1740,7 +1744,7 @@ module_subst:
     (* FIXME: extend sloc with text! *)
     let text = symbol_text $symbolstartpos in
     let body = Without_params (mty, modalities) in
-    Md.mk ~ext_attrs (name, []) body ~attrs ~loc ~text ~docs
+    Md.mk ~ext_attrs (name, No_modalities) body ~attrs ~loc ~text ~docs
       ~tokens:(Tokens.at sloc)
   }
 ;
@@ -1878,7 +1882,7 @@ class_self_pattern:
     LPAREN pattern RPAREN
       { mkpat ~loc:$sloc (Ppat_parens { pat = $2; optional = false }) }
   | LPAREN pattern COLON core_type RPAREN
-      { mkpat_with_modes ~loc:$sloc ~pat:$2 ~cty:(Some $4) ~modes:[] }
+      { mkpat_with_modes ~loc:$sloc ~pat:$2 ~cty:(Some $4) ~modes:No_modes }
   | /* empty */
       { ghpat ~loc:$sloc Ppat_any }
 ;
@@ -1926,8 +1930,8 @@ value:
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
             pvb_pat = pat;
-            pvb_legacy_modes = []; pvb_modes = []; pvb_params = [];
-            pvb_constraint = None; pvb_ret_modes = [];
+            pvb_legacy_modes = No_modes; pvb_modes = No_modes; pvb_params = [];
+            pvb_constraint = None; pvb_ret_modes = No_modes;
             pvb_expr = Some $6; pvb_loc = make_loc $sloc;
             pvb_attributes = [] (* FIXME? *);
             pvb_post_doc = None;
@@ -1949,8 +1953,8 @@ value:
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
             pvb_pat = pat;
-            pvb_legacy_modes = []; pvb_modes = []; pvb_params = [];
-            pvb_constraint = Some t; pvb_ret_modes = [];
+            pvb_legacy_modes = No_modes; pvb_modes = No_modes; pvb_params = [];
+            pvb_constraint = Some t; pvb_ret_modes = No_modes;
             pvb_expr = Some $7; pvb_loc = make_loc $sloc;
             pvb_attributes = [] (* FIXME? *);
             pvb_post_doc = None;
@@ -1973,7 +1977,7 @@ method_:
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
             pvb_pat = pat;
-            pvb_legacy_modes = []; pvb_modes = []; pvb_params = params;
+            pvb_legacy_modes = No_modes; pvb_modes = No_modes; pvb_params = params;
             pvb_constraint = tc; pvb_ret_modes = ret_modes;
             pvb_expr = Some e;
             pvb_loc = make_loc $sloc;
@@ -1994,8 +1998,8 @@ method_:
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
             pvb_pat = pat;
-            pvb_legacy_modes = []; pvb_modes = []; pvb_params = [];
-            pvb_constraint = Some constr; pvb_ret_modes = [];
+            pvb_legacy_modes = No_modes; pvb_modes = No_modes; pvb_params = [];
+            pvb_constraint = Some constr; pvb_ret_modes = No_modes;
             pvb_expr = Some $8;
             pvb_loc = make_loc $sloc;
             pvb_attributes = [] (* FIXME: ? *);
@@ -2014,8 +2018,8 @@ method_:
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
             pvb_pat = pat;
-            pvb_legacy_modes = []; pvb_modes = []; pvb_params = [];
-            pvb_constraint = Some constr; pvb_ret_modes = [];
+            pvb_legacy_modes = No_modes; pvb_modes = No_modes; pvb_params = [];
+            pvb_constraint = Some constr; pvb_ret_modes = No_modes;
             pvb_expr = Some $11;
             pvb_loc = make_loc $sloc;
             pvb_attributes = [] (* FIXME: ? *);
@@ -2036,7 +2040,7 @@ class_type:
       MINUSGREATER
       codomain = class_type
         { let domain =
-            mk_arrow_arg ~loc:($symbolstartpos, $endpos(domain)) label [] domain []
+            mk_arrow_arg ~loc:($symbolstartpos, $endpos(domain)) label No_modes domain No_modes
           in
           Pcty_arrow(domain, codomain) }
     ) { $1 }
@@ -2302,7 +2306,7 @@ pattern_var:
 ;
 
 optional_poly_type_and_modes:
-      { None, [] }
+      { None, No_modes }
   | at_mode_expr
       { None, $1 }
   | COLON cty_mm = poly_type_with_optional_modes
@@ -2333,7 +2337,7 @@ let_pattern:
 
 (* simple_pattern extended with poly_type and modes *)
 simple_pattern_extend_modes_or_poly:
-    simple_pattern { [], $1, None, [] }
+    simple_pattern { No_modes, $1, None, No_modes }
   | LPAREN pattern_with_modes_or_poly RPAREN
     { $2 }
 
@@ -2344,15 +2348,15 @@ pattern_with_modes_or_poly:
   | pat = pattern COLON cty_modes = poly_type_with_modes
       {
         let cty, modes = cty_modes in
-        [], pat, Some cty, modes
+        No_modes, pat, Some cty, modes
       }
   | pat = pattern modes = at_mode_expr
       {
-        [], pat, None, modes
+        No_modes, pat, None, modes
       }
   | pat = pattern COLON cty = strictly_poly_type
       {
-        [], pat, Some cty, []
+        No_modes, pat, Some cty, No_modes
       }
 ;
 
@@ -2382,7 +2386,7 @@ pattern_with_modes_or_poly:
 optional_atomic_constraint_:
   | COLON atomic_type {
     { ret_type_constraint = Some (Pconstraint $2)
-    ; ret_mode_annotations = []
+    ; ret_mode_annotations = No_modes
     }
    }
   | at_mode_expr {
@@ -2448,7 +2452,7 @@ fun_expr:
   | or_function(fun_expr) { $1 }
 ;
 %inline fun_expr_attrs:
-  | LET MODULE ext_attributes module_name_modal(at_mode_expr) module_binding_body IN seq_expr
+  | LET MODULE ext_attributes module_name_modal(at_mode_expr, no_modes) module_binding_body IN seq_expr
       {
         let params, mty_opt, modes, me = $5 in
         let mb_loc = ($startpos($2), $endpos($5)) in
@@ -2851,13 +2855,11 @@ labeled_simple_expr:
     }
 ;
 
-%inline empty_list: { [] }
-
 %inline let_ident_with_modes:
     optional_mode_expr_legacy let_ident
-      { ($1, $2, []) }
+      { ($1, $2, No_modes) }
   | LPAREN let_ident at_mode_expr RPAREN
-      { ([], $2, $3) }
+      { (No_modes, $2, $3) }
 
 let_binding_body_no_punning:
     let_ident_with_modes strict_binding_modes
@@ -2892,7 +2894,7 @@ let_binding_body_no_punning:
             Some (Pvc_constraint { locally_abstract_univars = []; typ });
           lbb_ret_modes = modes1; lbb_expr = Some $5 }
       }
-  | let_ident_with_modes COLON TYPE ntys = newtypes DOT cty = core_type modes1=empty_list EQUAL e = seq_expr
+  | let_ident_with_modes COLON TYPE ntys = newtypes DOT cty = core_type modes1=no_modes EQUAL e = seq_expr
   | let_ident_with_modes COLON TYPE ntys = newtypes DOT cty = tuple_type modes1=at_mode_expr EQUAL e = seq_expr
       (* The code upstream looks like:
          {[
@@ -2920,12 +2922,12 @@ let_binding_body_no_punning:
           lbb_ret_modes = modes1; lbb_expr = Some e }
        }
   | pattern_no_exn EQUAL seq_expr
-      { { lbb_legacy_modes = []; lbb_modes = []; lbb_pat = $1; lbb_params = [];
-          lbb_constraint = None; lbb_ret_modes = []; lbb_expr = Some $3 } }
+      { { lbb_legacy_modes = No_modes; lbb_modes = No_modes; lbb_pat = $1; lbb_params = [];
+          lbb_constraint = None; lbb_ret_modes = No_modes; lbb_expr = Some $3 } }
   | simple_pattern_not_ident pvc_modes EQUAL seq_expr
       {
         let pvc, modes = $2 in
-        { lbb_legacy_modes = []; lbb_modes = []; lbb_pat = $1; lbb_params = [];
+        { lbb_legacy_modes = No_modes; lbb_modes = No_modes; lbb_pat = $1; lbb_params = [];
           lbb_constraint = pvc; lbb_ret_modes = modes; lbb_expr = Some $4 }
       }
 ;
@@ -2934,9 +2936,9 @@ let_binding_body:
       { $1 }
 /* BEGIN AVOID */
   | val_ident %prec below_HASH
-      { { lbb_legacy_modes = []; lbb_modes = [];
+      { { lbb_legacy_modes = No_modes; lbb_modes = No_modes;
           lbb_pat = mkpatvar ~loc:$loc $1;
-          lbb_params = []; lbb_constraint = None; lbb_ret_modes = [];
+          lbb_params = []; lbb_constraint = None; lbb_ret_modes = No_modes;
           lbb_expr = None } }
   (* The production that allows puns is marked so that [make list-parse-errors]
      does not attempt to exploit it. That would be problematic because it
@@ -3004,12 +3006,12 @@ letop_bindings:
 ;
 strict_binding_modes:
     EQUAL seq_expr
-      { [], None, [], $2 }
+      { [], None, No_modes, $2 }
   | fun_params constraint_? EQUAL fun_body
     {
       let ret_type_constraint, ret_mode_annotations =
         match $2 with
-        | None -> None, []
+        | None -> None, No_modes
         | Some (ret_type_constraint, ret_mode_annotations) ->
             ret_type_constraint, ret_mode_annotations
       in
@@ -3422,7 +3424,7 @@ simple_pattern_not_ident:
       { Ppat_extension $1 }
   ) { $1 }
   | LPAREN pattern COLON core_type RPAREN
-    { mkpat_with_modes ~loc:$sloc ~pat:$2 ~cty:(Some $4) ~modes:[] }
+    { mkpat_with_modes ~loc:$sloc ~pat:$2 ~cty:(Some $4) ~modes:No_modes }
 ;
 
 simple_delimited_pattern:
@@ -3649,7 +3651,8 @@ jkind_desc:
           (fun {txt; loc} -> {txt = Mode txt; loc})
           $3
       in
-      Pjk_mod ($1, modes)
+      let tokens = Tokens.at $loc($3) in
+      Pjk_mod ($1, Modes { modes; tokens })
     }
   | jkind_annotation WITH core_type optional_atat_modalities_expr {
       Pjk_with ($1, $3, $4)
@@ -4031,11 +4034,11 @@ possibly_poly(X):
 
 %inline poly_type_with_optional_modes:
   | poly_type_with_modes { $1 }
-  | poly_type { $1, [] }
+  | poly_type { $1, No_modes }
 ;
 
 %inline strictly_poly_type_with_optional_modes:
-  | strictly_poly_type { $1, [] }
+  | strictly_poly_type { $1, No_modes }
   | strictly_poly_tuple_type at_mode_expr { $1, $2 }
 ;
 
@@ -4066,7 +4069,7 @@ core_type:
 ;
 
 %inline core_type_with_optional_modes:
-    core_type { $1, [] }
+    core_type { $1, No_modes }
   | tuple_type at_mode_expr { $1, $2 }
 
 (* A core type without attributes is currently defined as an alias type, but
@@ -4126,9 +4129,9 @@ strict_function_or_labeled_tuple_type:
           in
            Ptyp_arrow
              { domain ;
-              codom_legacy_modes = [];
+              codom_legacy_modes = No_modes;
               codom_type = codomain;
-              codom_modes = [] }
+              codom_modes = No_modes }
              }
     )
     { $1 }
@@ -4180,9 +4183,9 @@ strict_function_or_labeled_tuple_type:
            in
            Ptyp_arrow
              { domain ;
-              codom_legacy_modes = [];
+              codom_legacy_modes = No_modes;
               codom_type = codomain;
-              codom_modes = [] }
+              codom_modes = No_modes }
          }
     )
     { $1 }
@@ -4240,11 +4243,11 @@ strict_function_or_labeled_tuple_type:
 ;
 
 %inline mode_expr_legacy:
-   | mode_legacy+ { $1 }
+   | mode_legacy+ { Modes { modes = $1; tokens = Tokens.at $sloc } }
 ;
 
 %inline optional_mode_expr_legacy:
-   | { [] }
+   | { No_modes }
    | mode_expr_legacy {$1}
 ;
 
@@ -4257,13 +4260,16 @@ strict_function_or_labeled_tuple_type:
   | mode+ { $1 }
 ;
 
+%inline no_modes:
+  | { No_modes }
+;
 at_mode_expr:
-  | AT mode_expr {$2}
+  | AT mode_expr { Modes { modes = $2; tokens = Tokens.at $sloc } }
   | AT error { expecting $loc($2) "mode expression" }
 ;
 
 %inline optional_at_mode_expr:
-  | { [] }
+  | no_modes
   | at_mode_expr {$1}
 ;
 
@@ -4282,14 +4288,17 @@ at_mode_expr:
 %inline modalities:
   | modality+ { $1 }
 
+%inline no_modalities:
+  { No_modalities }
+;
 atat_modalities_expr:
-  | ATAT modalities {$2}
+  | ATAT modalities { Modalities { modalities = $2; tokens = Tokens.at $sloc } }
   | ATAT error { expecting $loc($2) "modality expression" }
 ;
 
 optional_atat_modalities_expr:
   | %prec below_HASH
-    { [] }
+    { No_modalities }
   | atat_modalities_expr
     { $1 }
 ;

@@ -60,10 +60,19 @@ type constant =
   *)
 
 type modality = | Modality of string [@@unboxed]
-type modalities = modality loc list
+type modalities =
+  | No_modalities
+  | Modalities of
+      { modalities: modality loc list
+      ; tokens: Tokens.seq }
 
 type mode = | Mode of string [@@unboxed]
-type modes = mode loc list
+type modes =
+  | No_modes
+  | Modes of
+      { modes: mode loc list
+      ; tokens: Tokens.seq }
+
 
 type include_kind = Structure | Functor
 
@@ -839,8 +848,8 @@ and label_declaration =
      pld_name: string loc;
      pld_mutable: mutable_flag;
      pld_global: bool;
-     pld_modalities: modalities;
      pld_type: core_type;
+     pld_modalities: modalities;
      pld_loc: Location.t;
      pld_attributes: attributes;  (** [l : T [\@id1] [\@id2]] *)
      pld_doc: string option;
@@ -1481,8 +1490,8 @@ and value_binding =
     pvb_modes: modes;
     pvb_params: function_param list;
     pvb_constraint: value_constraint option;
-    pvb_expr: expression option;
     pvb_ret_modes: modes;
+    pvb_expr: expression option;
     pvb_attributes: attributes;
     pvb_post_doc: string option;
     pvb_loc: Location.t;

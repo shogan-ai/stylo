@@ -134,20 +134,24 @@ let modalities = separate_loc_list (break 1) modality
 
 let with_modalities ~modalities:l t =
   match l with
-  | [] -> t
-  | _ -> t ^?^ group (S.atat ^/^ modalities l)
+  | No_modalities -> t
+  | Modalities { modalities = l; _ } -> t ^?^ group (S.atat ^/^ modalities l)
 
 let mode (Mode s) = string s
-let modes = separate_loc_list (break 1) mode
+let modes = function
+  | No_modes -> empty
+  | Modes { modes; _ } -> separate_loc_list (break 1) mode modes
 
 let mode_legacy = function
   | Mode ("local" | "once" | "unique" as s) -> stringf "%s_" s
   | _ -> assert false
-let modes_legacy = separate_loc_list (break 1) mode_legacy
+let modes_legacy = function
+  | No_modes -> empty
+  | Modes { modes; _ } -> separate_loc_list (break 1) mode_legacy modes
 
 let with_modes ?(extra_nest=Fun.id) ~modes:l t =
   match l with
-  | [] -> t
+  | No_modes -> t
   | _ ->
     let modes = extra_nest @@ group (S.at ^/^ modes l) in
     match t with
@@ -156,7 +160,7 @@ let with_modes ?(extra_nest=Fun.id) ~modes:l t =
 
 let with_atat_modes ?(extra_nest=Fun.id) ~modes:l t =
   match l with
-  | [] -> t
+  | No_modes -> t
   | _ -> t ^?^ extra_nest @@ group (S.atat ^/^ modes l)
 
 let include_kind = function
@@ -498,7 +502,7 @@ end = struct
     type printer = ?preceeding:Preceeding.t -> unit -> t
 
     let rec collect_args rev_args = function
-      | [], [], { ptyp_desc = Ptyp_arrow arrow; _ } ->
+      | No_modes, No_modes, { ptyp_desc = Ptyp_arrow arrow; _ } ->
         (* there can't be attributes on Ptyp_arrow, they'd be on Ptyp_parens *)
         collect_args (arrow.domain :: rev_args)
           (arrow.codom_legacy_modes, arrow.codom_modes, arrow.codom_type)
@@ -528,7 +532,7 @@ end = struct
       let pre_nest = Preceeding.implied_nest preceeding in
       let pre_ty =
         match pre_m with
-        | [] -> Core_type.pp ?preceeding ty
+        | No_modes -> Core_type.pp ?preceeding ty
         | _ ->
           let pre_modes, _ =
             Preceeding.group_with preceeding (modes_legacy pre_m)
@@ -1980,11 +1984,12 @@ end = struct
 
   let pp_arg_parts ?app_prefix_flatness arg =
     match arg.parg_desc with
-    | Parg_unlabelled { legacy_modes=[]; arg; typ_constraint=None; modes=[] }
+    | Parg_unlabelled
+        { legacy_modes=No_modes; arg; typ_constraint=None; modes=No_modes }
       when is_function arg ->
       pp_function_parts ?app_prefix_flatness arg
-    | Parg_labelled { optional=false; legacy_modes=[]; name;
-                      maybe_punned=Some arg; typ_constraint=None;modes=[];
+    | Parg_labelled { optional=false; legacy_modes=No_modes; name;
+                      maybe_punned=Some arg; typ_constraint=None;modes=No_modes;
                       default=None }
       when is_function arg ->
       pp_function_parts ?app_prefix_flatness ~lbl:name arg
@@ -2130,7 +2135,8 @@ end = struct
       else doc
     in
     group @@ match arg.parg_desc with
-    | Parg_unlabelled { legacy_modes=[]; arg; typ_constraint=None; modes=[] } ->
+    | Parg_unlabelled
+        { legacy_modes=No_modes; arg; typ_constraint=None; modes=No_modes } ->
       pp_arg arg
     | Parg_unlabelled { legacy_modes; arg; typ_constraint; modes } ->
       parens (pp_generic legacy_modes (pp_arg arg) typ_constraint modes)
@@ -2165,7 +2171,8 @@ end = struct
       pre, pre_nest rparen
     in
     group @@ match arg.parg_desc with
-    | Parg_unlabelled { legacy_modes=[]; arg; typ_constraint=None; modes=[] } ->
+    | Parg_unlabelled
+        { legacy_modes=No_modes; arg; typ_constraint=None; modes=No_modes } ->
       pp_preceeded_arg ?preceeding arg
     | Parg_unlabelled { legacy_modes; arg; typ_constraint; modes } ->
       let lpre, pre_nest = Preceeding.(preceeding + tight S.lparen) in
@@ -3000,18 +3007,19 @@ end = struct
 
   let pp_item it = pp_item_desc it.psig_desc
 
-  let pp_keeping_semi { psg_modalities=_; psg_items; psg_tokens; psg_loc=_ } =
-    (* Modalities are currently not marked as "children" of the signature, so we
-       need to remove the prefix of the tokens as they correspond to the
-       modalities tokens *)
+  let pp_keeping_semi { psg_modalities; psg_items; psg_tokens; psg_loc=_ } =
     let items_tokens =
-      List.drop_while (fun tok ->
-        match tok.Tokens.desc with
-        | Token ((ATAT | LIDENT _), _) (* modality tokens *)
-        | Comment _ (* comments might appear before/inside the modalities *) ->
-          true
-        | _ -> false
-      ) psg_tokens
+      match psg_modalities with
+      | No_modalities -> psg_tokens
+      | Modalities _ ->
+        (* The presence of modalities implies that the first [Child_node] in the
+           signature's tokens does not map to a signature item. *)
+        let saw_child = ref false in
+        List.drop_while (fun tok ->
+          if !saw_child
+          then (* we can stop now. *) false
+          else (saw_child := Tokens.is_child tok; true)
+        ) psg_tokens
     in
     Toplevel_items.Sig.pp_grouped_keeping_semi pp_item (psg_items, items_tokens)
 
@@ -3055,7 +3063,7 @@ end = struct
         | Some s -> string s
       in
       match modalities with
-      | [] -> name
+      | No_modalities -> name
       | _ -> parens (with_modalities name ~modalities)
     in
     let params, equal_sign, rhs =
@@ -3674,13 +3682,13 @@ end = struct
     let pat = Pattern.pp pvb_pat in
     let pat =
       match pvb_modes with
-      | [] -> pat
+      | No_modes -> pat
       | modes -> parens (with_modes pat ~modes)
     in
     let params = List.map Function_param.pp pvb_params in
     let constraint_ =
       match pvb_constraint, pvb_ret_modes with
-      | None, [] -> None
+      | None, No_modes -> None
       | None, lst -> Some (S.at ^/^ modes lst)
       | Some vc, lst ->
         Some (with_modes (Value_constraint.pp vc) ~modes:lst)
@@ -3739,7 +3747,7 @@ and Module_binding : sig
 end = struct
   let modal_constraint constr mode_l : Layout_module_binding.rhs option =
     match Option.map Module_type.as_rhs constr, mode_l with
-    | None, [] -> None
+    | None, No_modes -> None
     | Some Three_parts { start; main; stop }, modes ->
       Some (Three_parts { start; main; stop = with_modes stop ~modes })
     | Some Single_part mty, modes ->
@@ -3767,7 +3775,7 @@ end = struct
         | Some s -> string s
       in
       match name_modes with
-      | [] -> name
+      | No_modes -> name
       | modes -> parens (with_modes name ~modes)
     in
     let params = List.map Functor_parameter.pp pmb_params in

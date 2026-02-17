@@ -114,7 +114,7 @@ let map ~recur (parent : Context.parent) pat =
     | Value_binding vb, Ppat_parens { pat = sub; _ } ->
       begin match sub.ppat_desc with
       | Ppat_tuple _
-        when Option.is_none vb.pvb_constraint && vb.pvb_ret_modes = [] ->
+        when Option.is_none vb.pvb_constraint && vb.pvb_ret_modes = No_modes ->
         make_parens_optional pat
       | _ when simple_pattern sub -> remove_parens pat
       | _ -> pat

@@ -230,7 +230,7 @@ module Mty = struct
   let ident ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_ident a)
   let alias ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_alias a)
   let signature ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_signature a)
-  let functor_ ?loc ?attrs ~tokens ?(ret_mode=[]) a b c =
+  let functor_ ?loc ?attrs ~tokens ?(ret_mode=No_modes) a b c =
     mk ?loc ?attrs ~tokens (Pmty_functor (a, b, c,ret_mode))
   let with_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pmty_with (a, b))
   let typeof_ ?loc ?attrs ~tokens a b =
@@ -294,7 +294,7 @@ module Sig = struct
 end
 
 module Sg = struct
-  let mk ?(loc = !default_loc) ~tokens ?(modalities = []) a =
+  let mk ?(loc = !default_loc) ~tokens ?(modalities = No_modalities) a =
     {psg_items = a; psg_modalities = modalities; psg_loc = loc;
      psg_tokens = tokens}
 end
@@ -443,7 +443,8 @@ end
 
 module Val = struct
   let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
-      ~tokens ?(docs = empty_docs) ?(prim = []) ?(modalities=[]) name typ =
+        ~tokens ?(docs = empty_docs) ?(prim = []) ?(modalities=No_modalities)
+        name typ =
     let pre_doc, post_doc = Docs.pre_post docs in
     {
      pval_pre_doc = pre_doc;
@@ -565,8 +566,8 @@ end
 module Vb = struct
   let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr)
         ?(attrs = []) ~tokens ?(docs = empty_docs)
-        ?(text = []) ?(params = []) ?(legacy_modes = []) ?(modes = [])
-        ?value_constraint ?(ret_modes = []) pat expr =
+        ?(text = []) ?(params = []) ?(legacy_modes = No_modes) ?(modes = No_modes)
+        ?value_constraint ?(ret_modes = No_modes) pat expr =
     let pre_doc, post_doc = Docs.pre_post docs in
     {
      pvb_pre_text = Docs.text text;
@@ -652,7 +653,7 @@ module Type = struct
      pcd_tokens = tokens;
     }
 
-  let constructor_arg ?(loc = !default_loc) ~global ?(modalities = []) typ =
+  let constructor_arg ?(loc = !default_loc) ~global ?(modalities = No_modalities) typ =
     {
       pca_global = global;
       pca_modalities = modalities;
@@ -661,7 +662,7 @@ module Type = struct
     }
 
   let field ?(loc = !default_loc) ?(attrs = []) ~tokens ?(info = empty_info)
-        ?(mut = Immutable) ?(global=false) ?(modalities = []) name typ =
+        ?(mut = Immutable) ?(global=false) ?(modalities = No_modalities) name typ =
     {
      pld_name = name;
      pld_mutable = mut;
@@ -798,12 +799,12 @@ module Of = struct
 end
 
 module Arg = struct
-  let nolabel ~tokens ?(legacy_modes=[]) ?typ_constraint ?(modes=[]) arg =
+  let nolabel ~tokens ?(legacy_modes=No_modes) ?typ_constraint ?(modes=No_modes) arg =
     { parg_desc = Parg_unlabelled { legacy_modes; arg; typ_constraint; modes };
       parg_tokens = tokens }
 
-  let mk ~opt ?(legacy_modes=[]) ?maybe_punned ?typ_constraint ?(modes=[])
-      ?default name =
+  let mk ~opt ?(legacy_modes=No_modes) ?maybe_punned ?typ_constraint
+      ?(modes=No_modes) ?default name =
     Parg_labelled {
       optional = opt;
       legacy_modes;

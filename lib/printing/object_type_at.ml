@@ -15,7 +15,8 @@ module End = struct
     &&
     match ct.ptyp_desc with
     | Ptyp_object (_, _) -> true
-    | Ptyp_arrow { codom_type = rhs; codom_modes = []; _ } | Ptyp_poly (_, rhs)
+    | Ptyp_arrow { codom_type = rhs; codom_modes = No_modes; _ }
+    | Ptyp_poly (_, rhs)
       -> of_core_type rhs
     | Ptyp_tuple lst -> of_core_type (snd (List.hd (List.rev lst)))
     | Ptyp_any _
@@ -37,18 +38,18 @@ module End = struct
 
   let rec of_jkind_annotation jk =
     match jk.pjkind_desc with
-    | Pjk_with (_, ct, []) | Pjk_kind_of ct -> of_core_type ct
+    | Pjk_with (_, ct, No_modalities) | Pjk_kind_of ct -> of_core_type ct
     | Pjk_product (_ :: _ as jks) -> of_jkind_annotation List.(hd @@ rev jks)
     | Pjk_default
     | Pjk_abbreviation _
     | Pjk_mod _
-    | Pjk_with (_, _, _ :: _)
+    | Pjk_with (_, _, Modalities _)
     | Pjk_product []
     | Pjk_parens _ -> false
   ;;
 
   let of_constructor_argument ca =
-    ca.pca_modalities = [] && of_core_type ca.pca_type
+    ca.pca_modalities = No_modalities && of_core_type ca.pca_type
   ;;
 
   let of_constructor_decl cd =
@@ -125,7 +126,7 @@ module End = struct
   let of_value_description vd =
     vd.pval_attributes = []
     && vd.pval_prim = []
-    && vd.pval_modalities = []
+    && vd.pval_modalities = No_modalities
     && of_core_type vd.pval_type
   ;;
 
@@ -192,6 +193,8 @@ module Start = struct
     | Ptyp_splice _ -> false
 
   and of_arrow_arg aa =
-    aa.aa_legacy_modes = [] && aa.aa_lbl = Nolabel && of_core_type aa.aa_type
+    aa.aa_legacy_modes = No_modes &&
+    aa.aa_lbl = Nolabel &&
+    of_core_type aa.aa_type
   ;;
 end

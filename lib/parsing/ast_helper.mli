@@ -83,7 +83,7 @@ module Typ :
       -> core_type
 (*
     val arrow: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> arg_label -> core_type ->
-      mode with_loc list -> core_type -> mode with_loc list -> core_type
+      modes -> core_type -> modes -> core_type
 *)
     val tuple: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> (string option * core_type) list -> core_type
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq
@@ -146,7 +146,7 @@ module Pat:
       pattern
     val or_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern -> pattern -> pattern
     val constraint_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern -> core_type option
-                     -> mode with_loc list -> pattern
+                     -> modes -> pattern
     val type_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> pattern
     val lazy_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern -> pattern
     val unpack: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str_opt ->
@@ -202,7 +202,7 @@ module Exp:
     val coerce: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> core_type option
                 -> core_type -> expression
     val constraint_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> core_type option
-                     -> mode with_loc list -> expression
+                     -> modes -> expression
     val send: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> str -> expression
     val new_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> expression
     val setinstvar: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str -> expression -> expression
@@ -240,7 +240,7 @@ module Val:
   sig
     val mk: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
       tokens:Tokens.seq -> ?docs:docs -> ?prim:string list ->
-      ?modalities:modality with_loc list -> str_or_op -> core_type ->
+      ?modalities:modalities -> str_or_op -> core_type ->
       value_description
   end
 
@@ -263,11 +263,11 @@ module Type:
       str_or_op ->
       constructor_declaration
 
-    val constructor_arg: ?loc:loc -> global:bool -> ?modalities:modality with_loc list -> core_type ->
+    val constructor_arg: ?loc:loc -> global:bool -> ?modalities:modalities -> core_type ->
       constructor_argument
 
     val field: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?info:info ->
-      ?mut:mutable_flag -> ?global:bool -> ?modalities:modality with_loc list ->
+      ?mut:mutable_flag -> ?global:bool -> ?modalities:modalities ->
       str -> core_type -> label_declaration
   end
 
@@ -374,7 +374,7 @@ module Sig:
 module Sg:
   sig
     val mk : ?loc:loc -> tokens:Tokens.seq ->
-      ?modalities:modality with_loc list ->
+      ?modalities:modalities ->
       signature_item list -> signature
   end
 
