@@ -13,11 +13,11 @@
          --external-tokens Parser_tokens))
 
 (rule
-  (target raw_grammar)
+  (target raw_grammar.txt)
   (deps parser.mly parser_tokens.mly)
   (action
     (with-stdout-to %{target}
-     (run menhir --external-tokens Parser_tokens --only-preprocess-u
+     (run menhir --external-tokens Parser_tokens --only-preprocess-uu
           --base parser %{deps}))))
 
 (library
