@@ -161,10 +161,16 @@ let dump_ast (type a) (input : a input) ~src (ast : a) =
     | Intf -> interface ppf ast
   )
 
+let dump_out output =
+  Debug.dump_to_file output.fname
+    (fun ppf -> Format.pp_print_string ppf output.source)
+
 let check_same_ast (type a) (input_ast : a) (output : a input) =
   let input_ast = clean output.kind input_ast in
   let* output_ast =
-    parse { output with fname = output.fname ^ ".out" } output_wrap
+    let output = { output with fname = output.fname ^ ".out" } in
+    parse output output_wrap
+    |> Result.map_error (fun err -> dump_out output; err)
   in
   let output_ast = clean output.kind output_ast in
   if input_ast = output_ast

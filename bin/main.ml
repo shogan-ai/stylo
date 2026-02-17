@@ -48,7 +48,8 @@ module Arg = struct
        $(i,FOO.parser-tokens), $(i,FOO.normalized-tokens), $(i,FOO.input-tree) \
        and $(i,FOO.output-tree). These last two only appear if \
        $(b,--ast-check) has been passed and the syntax tree changed as a \
-       result of styling."
+       result of styling. Finally, $(i,FOO.out) can also appear when
+       $(b,--ast-check) was passed and the output fails to parse."
     in
     info ~doc ["debug"]
     |> flag
