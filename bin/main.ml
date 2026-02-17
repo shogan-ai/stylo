@@ -5,15 +5,23 @@ module Arg = struct
   open Arg
 
   let single_file =
-    pos 0 (some file) None (info [])
+    pos 0 (some filepath) None (info [])
     |> required
 
   let files =
-    pos_all file [] (info [])
+    pos_all filepath [] (info [])
     |> value
 
+  let stdin_arg_name = "stdin"
+  let stdin =
+    info [stdin_arg_name]
+      ~doc:"Take file via stdin; pass a name (with extension) to use."
+    |> opt (some filepath) None
+    |> value
+
+  let ast_check_arg_name = "ast-check"
   let ast_check =
-    info ["ast-check"]
+    info [ast_check_arg_name]
       ~doc:"Check the formatted code parses back to the same syntax tree."
     |> flag
     |> value
@@ -30,8 +38,9 @@ module Arg = struct
     |> flag
     |> value
 
+  let inplace_arg_name = "in-place"
   let inplace =
-    info ["inplace"; "i"]
+    info [inplace_arg_name; "i"]
       ~doc:"Replace the file's content with stylo's output."
     |> flag
     |> value
@@ -43,13 +52,15 @@ module Arg = struct
 
   let debug =
     let doc =
-      "Dumps stylo's internal structures at various stages of the pipeline.\
-       For a given input file FILE the files which can appear are: \
-       $(i,FOO.parser-tokens), $(i,FOO.normalized-tokens), $(i,FOO.input-tree) \
-       and $(i,FOO.output-tree). These last two only appear if \
-       $(b,--ast-check) has been passed and the syntax tree changed as a \
-       result of styling. Finally, $(i,FOO.out) can also appear when
-       $(b,--ast-check) was passed and the output fails to parse."
+      Format.sprintf
+        "Dumps stylo's internal structures at various stages of the pipeline.\
+         For a given input file FILE the files which can appear are: \
+         $(i,FOO.parser-tokens), $(i,FOO.normalized-tokens), \
+         $(i,FOO.input-tree) and $(i,FOO.output-tree). These last two only \
+         appear if $(b,--%s) has been passed and the syntax tree changed as a \
+         result of styling. Finally, $(i,FOO.out) can also appear when \
+         $(b,--%s) was passed and the output fails to parse."
+        ast_check_arg_name ast_check_arg_name
     in
     info ~doc ["debug"]
     |> flag
@@ -109,15 +120,23 @@ let fuzzer_batch fn =
   then Cmd.Exit.some_error
   else Cmd.Exit.ok
 
+type file_kind = Regular | Stdin
+
+let style_input fkind fname =
+  let is_mli = Filename.check_suffix fname ".mli" in
+  let source =
+    match fkind with
+    | Regular -> In_channel.(with_open_text fname input_all)
+    | Stdin -> In_channel.input_all stdin
+  in
+  if is_mli
+  then Stylo.style_file Intf ~fname source
+  else Stylo.style_file Impl ~fname source
+
 let style_files inplace fns =
   let has_error = ref false in
-  List.iter (fun fn ->
-    let is_mli = Filename.check_suffix fn ".mli" in
-    match
-      if is_mli
-      then Stylo.style_file Intf fn
-      else Stylo.style_file Impl fn
-    with
+  List.iter (fun (fkind, fn) ->
+    match style_input fkind fn with
     | exception exn ->
       let bt = Printexc.get_backtrace () in
       Format.eprintf "%s: %s" fn (Printexc.to_string exn);
@@ -159,6 +178,7 @@ let style_cmd =
   Cmd.make (Cmd.info "style") @@
   let open Arg in
   let+ files
+  and+ stdin
   and+ inplace
   and+ ast_check
   and+ tokens_checks
@@ -173,7 +193,14 @@ let style_cmd =
       check_normalization_kept_comments := true;
     );
   );
-  style_files inplace files
+  let files = List.map (fun fn -> Regular, fn) files in
+  match stdin, inplace with
+  | Some _, true ->
+    Format.eprintf "Can't pass both --%s and --%s.@."
+      stdin_arg_name inplace_arg_name;
+    Cmd.Exit.cli_error
+  | None, _ -> style_files inplace files
+  | Some fn, _ -> style_files inplace @@ (Stdin, fn) :: files
 
 let main () =
   Cmd.group (Cmd.info "stylo") [fuzz_cmd; style_cmd]

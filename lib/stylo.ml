@@ -166,8 +166,7 @@ module Pipeline = struct
       Ast_checker.Errors.pp_error e
 end
 
-let style_file kind fname =
-  let source = In_channel.(with_open_text fname input_all) in
+let style_file kind ~fname source =
   Pipeline.run { kind; fname; source; start_line = 1 }
 
 let split_fuzzer_line entrypoint_and_src =
