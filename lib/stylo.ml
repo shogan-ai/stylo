@@ -1,5 +1,7 @@
 open Ocaml_syntax
 
+let (let*) = Result.bind
+
 module Cst = Ocaml_syntax.Parsetree
 module Ast = Oxcaml_frontend.Parsetree
 
@@ -54,8 +56,8 @@ module Check = struct
 
   let retokenisation tokens_lazy =
     if not !Config.check_retokenisation then Ok () else (
-      Lazy.force tokens_lazy
-      |> Ordering.ensure_preserved
+      let* tokens = Lazy.force tokens_lazy in
+      Ordering.ensure_preserved tokens
     )
 
   let normalization_kept_comments tokens_before tokens_after =
@@ -63,8 +65,8 @@ module Check = struct
        tokens_before == tokens_after
     then Ok ()
     else (
-      let tokens_before = Lazy.force tokens_before in
-      let tokens_after = Lazy.force tokens_after in
+      let* tokens_before = Lazy.force tokens_before in
+      let* tokens_after = Lazy.force tokens_after in
       Comments_comparison.same_number tokens_before tokens_after
     )
 
@@ -94,7 +96,7 @@ module Pipeline = struct
     | Intf -> Normalize.signature cst
 
   let tokens_of_tree (type cst ast) (kind : (cst, ast) input_kind) (cst : cst)
-    : Tokens.seq =
+    : (Tokens.seq, _) result =
     match kind with
     | Impl -> Tokens_of_tree.structure cst
     | Intf -> Tokens_of_tree.signature cst
@@ -108,12 +110,10 @@ module Pipeline = struct
   let print_doc doc =
     Document.Print.to_string ~width:!Config.width doc
 
-  let (let*) = Result.bind
-
   let run ?normalize:(run_normalize=true) ({ kind; _ } as input) =
     let* cst = parse input in
     let tokens_pre_normalize = lazy (tokens_of_tree kind cst) in
-    Debug.dump_tokens input.fname ~src:Parser tokens_pre_normalize;
+    let* () = Debug.dump_tokens input.fname ~src:Parser tokens_pre_normalize in
     let* () = Check.retokenisation tokens_pre_normalize in
     let* cst, tokens_post_normalize, ast_for_checker =
       if not run_normalize
@@ -132,7 +132,7 @@ module Pipeline = struct
             (* No need to suspend, we know those will be used. *)
             Lazy.from_val (tokens_of_tree kind normalized)
           in
-          Debug.dump_tokens input.fname ~src:Normalization tokens;
+          let* () = Debug.dump_tokens input.fname ~src:Normalization tokens in
           Ok (normalized, tokens, Check.Ast (input, ast))
       )
     in
@@ -140,15 +140,17 @@ module Pipeline = struct
       Check.normalization_kept_comments tokens_pre_normalize
         tokens_post_normalize
     in
+    let* tokens_post_normalize = Lazy.force tokens_post_normalize in
     let* document =
       build_doc kind cst
-      |> Comments.Insert.from_tokens (Lazy.force tokens_post_normalize)
+      |> Comments.Insert.from_tokens tokens_post_normalize
     in
     let output = print_doc document in
     let* () = Check.same_ast ast_for_checker output in
     Ok output
 
   type error = [
+    | Tokens_of_tree.Error.t
     | Check.error
     | Comments.Insert.error
   ]
@@ -164,6 +166,8 @@ module Pipeline = struct
         Comments.Insert.Error.pp e
     | (`Input_parse_error _ | `Output_parse_error _ | `Ast_changed _) as e ->
       Ast_checker.Errors.pp_error e
+    | (`Missing_children _ | `Extra_children _) as e ->
+      Tokens_of_tree.Error.pp Format.err_formatter e
 end
 
 let style_file kind ~fname source =

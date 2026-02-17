@@ -155,7 +155,7 @@ let dump_ast (type a) (input : a input) ~src (ast : a) =
     | Input -> ".input-tree"
     | Stylo -> ".output-tree"
   in
-  Debug.dump_to_file fname Oxcaml_frontend.Printast.(fun ppf ->
+  Debug.dump_to_file ~or_:() fname Oxcaml_frontend.Printast.(fun ppf ->
     match input.kind with
     | Impl -> implementation ppf ast
     | Intf -> interface ppf ast
@@ -170,7 +170,7 @@ let check_same_ast (type a) (input_ast : a) (output : a input) =
   let* output_ast =
     let output = { output with fname = output.fname ^ ".out" } in
     parse output output_wrap
-    |> Result.map_error (fun err -> dump_out output; err)
+    |> Result.map_error (fun err -> dump_out ~or_:() output; err)
   in
   let output_ast = clean output.kind output_ast in
   if input_ast = output_ast

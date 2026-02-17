@@ -26,12 +26,14 @@ module Check : sig
 
   open Tokenisation_check
 
-  val retokenisation : Tokens.seq lazy_t -> (unit, [> Ordering.error]) result
+  val retokenisation
+    : (Tokens.seq, 'a) result lazy_t
+    -> (unit, [> Ordering.error] as 'a) result
 
   val normalization_kept_comments
-    :  Tokens.seq lazy_t
-    -> Tokens.seq lazy_t
-    -> (unit, [> Comments_comparison.error]) result
+    :  (Tokens.seq, 'a) result lazy_t
+    -> (Tokens.seq, 'a) result lazy_t
+    -> (unit, [> Comments_comparison.error] as 'a) result
 
   type error = [
     | Ordering.error
@@ -47,13 +49,17 @@ module Pipeline : sig
 
   val normalize : ('cst, _) input_kind -> 'cst -> 'cst
 
-  val tokens_of_tree : ('cst, _) input_kind -> 'cst -> Tokens.seq
+  val tokens_of_tree
+    : ('cst, _) input_kind
+    -> 'cst
+    -> (Tokens.seq, [> Tokens_of_tree.Error.t ]) result
 
   val build_doc : ('cst, _) input_kind -> 'cst -> Document.t
 
   val print_doc : Document.t -> string
 
   type error = [
+    | Tokens_of_tree.Error.t
     | Check.error
     | Comments.Insert.error
   ]
