@@ -205,12 +205,13 @@ module Exp = struct
   let overwrite ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pexp_overwrite (a, b))
   let hole ?loc ?attrs ~tokens () = mk ?loc ?attrs ~tokens Pexp_hole
 
-  let case ~tokens lhs ?guard rhs =
+  let case ?(loc = !default_loc) ~tokens lhs ?guard rhs =
     {
      pc_lhs = lhs;
      pc_guard = guard;
      pc_rhs = rhs;
      pc_tokens = tokens;
+     pc_loc = loc;
     }
 
   let binding_op op vb loc =
@@ -799,9 +800,10 @@ module Of = struct
 end
 
 module Arg = struct
-  let nolabel ~tokens ?(legacy_modes=No_modes) ?typ_constraint ?(modes=No_modes) arg =
+  let nolabel ~loc ~tokens ?(legacy_modes=No_modes) ?typ_constraint
+        ?(modes=No_modes) arg =
     { parg_desc = Parg_unlabelled { legacy_modes; arg; typ_constraint; modes };
-      parg_tokens = tokens }
+      parg_tokens = tokens; parg_loc = loc }
 
   let mk ~opt ?(legacy_modes=No_modes) ?maybe_punned ?typ_constraint
       ?(modes=No_modes) ?default name =
@@ -815,17 +817,18 @@ module Arg = struct
       default;
     }
 
-  let labelled ~tokens ?legacy_modes ?maybe_punned ?typ_constraint ?modes name =
+  let labelled ~loc ~tokens ?legacy_modes ?maybe_punned ?typ_constraint ?modes
+        name =
     let desc =
       mk ~opt:false ?legacy_modes ?maybe_punned ?typ_constraint ?modes name
     in
-    { parg_desc = desc; parg_tokens = tokens; }
+    { parg_desc = desc; parg_tokens = tokens; parg_loc = loc }
 
-  let optional ~tokens ?legacy_modes ?maybe_punned ?typ_constraint ?modes ?default name
-    =
+  let optional ~loc ~tokens ?legacy_modes ?maybe_punned ?typ_constraint ?modes
+        ?default name =
     let desc =
       mk ~opt:true ?legacy_modes ?maybe_punned ?typ_constraint ?modes ?default
         name
     in
-    { parg_desc = desc; parg_tokens = tokens; }
+    { parg_desc = desc; parg_tokens = tokens; parg_loc = loc }
 end

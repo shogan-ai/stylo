@@ -177,9 +177,9 @@ module Struct = struct
     | [] -> []
     | item :: items -> group_by_desc same_group [ item ] items
 
-  let pp_grouped_keeping_semi pp_item (items, tokens) =
-    let groups = group_by_desc items in
-    pp_grouped_keeping_semi pp_item groups tokens
+  let pp_grouped_keeping_semi pp_item str =
+    let groups = group_by_desc str.pst_items in
+    pp_grouped_keeping_semi pp_item groups str.pst_tokens
 end
 
 module Sig = struct

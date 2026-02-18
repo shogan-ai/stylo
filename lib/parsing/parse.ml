@@ -1,10 +1,10 @@
 let implementation lb =
   Lexer.init ();
   Tokens.reset ();
-  let (str, struct_tokens) =
+  let str =
     Parser.implementation Lexer.token_updating_indexed_list lb in
-  let all_tokens = Tokens.attach_leading_and_trailing struct_tokens in
-  str, all_tokens
+  let all_tokens = Tokens.attach_leading_and_trailing str.pst_tokens in
+  { str with pst_tokens = all_tokens }
 
 let interface lb =
   Lexer.init ();

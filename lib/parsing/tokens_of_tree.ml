@@ -96,13 +96,13 @@ let tokenizer = object
     | No_modes -> []
     | Modes m as modes ->
       let sub_tokens = super#modes modes in
-      combine_children "modes" ~loc:Location.none m.tokens sub_tokens
+      combine_children "modes" ~loc:m.loc m.tokens sub_tokens
 
   method! modalities : Parsetree.modalities -> Tokens.seq list = function
     | No_modalities -> []
     | Modalities m as modalities ->
       let sub_tokens = super#modalities modalities in
-      combine_children "modalities" ~loc:Location.none m.tokens sub_tokens
+      combine_children "modalities" ~loc:m.loc m.tokens sub_tokens
 
   method! attribute a =
     let sub_tokens = super#attribute a in
@@ -146,12 +146,12 @@ let tokenizer = object
   method! case c =
     let sub_tokens = super#case c in
     let node_toks = c.pc_tokens in
-    combine_children "case" ~loc:Location.none node_toks sub_tokens
+    combine_children "case" ~loc:c.pc_loc node_toks sub_tokens
 
   method! argument visit_elt a =
     let sub_tokens = super#argument visit_elt a in
     let node_toks = a.parg_tokens in
-    combine_children "argument" ~loc:Location.none node_toks sub_tokens
+    combine_children "argument" ~loc:a.parg_loc node_toks sub_tokens
 
   method! function_body fb =
     let sub_tokens = super#function_body fb in
@@ -161,12 +161,13 @@ let tokenizer = object
   method! comprehension_clause_binding cb =
     let sub_tokens = super#comprehension_clause_binding cb in
     let node_toks = cb.pcomp_cb_tokens in
-    combine_children "comprehension_clause_binding" ~loc:Location.none node_toks sub_tokens
+    combine_children "comprehension_clause_binding"
+      ~loc:cb.pcomp_cb_loc node_toks sub_tokens
 
   method! comprehension c =
     let sub_tokens = super#comprehension c in
     let node_toks = c.pcomp_tokens in
-    combine_children "comprehension" ~loc:Location.none node_toks sub_tokens
+    combine_children "comprehension" ~loc:c.pcomp_loc node_toks sub_tokens
 
   method! value_description vd =
     let sub_tokens = super#value_description vd in
@@ -280,8 +281,8 @@ let tokenizer = object
 
   method! structure s =
     let sub_tokens = super#structure s in
-    let node_toks = snd s in
-    combine_children "structure" ~loc:Location.none node_toks sub_tokens
+    let node_toks = s.pst_tokens in
+    combine_children "structure" ~loc:s.pst_loc node_toks sub_tokens
 
   method! structure_item si =
     let sub_tokens = super#structure_item si in
@@ -301,7 +302,7 @@ let tokenizer = object
   method! jkind_annotation jk =
     let sub_tokens = super#jkind_annotation jk in
     let node_toks = jk.pjkind_tokens in
-    combine_children "jkind_annotation" ~loc:Location.none node_toks sub_tokens
+    combine_children "jkind_annotation" ~loc:jk.pjkind_loc node_toks sub_tokens
 end
 
 let mk_error : Error.t -> _ = function

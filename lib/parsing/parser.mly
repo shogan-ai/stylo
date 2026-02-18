@@ -69,7 +69,7 @@ let mkexp ~loc ?attrs d =
   Exp.mk ~loc:(make_loc loc) ~tokens ?attrs d
 let mkcase sloc pat ?guard exp =
   let tokens = Tokens.at sloc in
-  Exp.case ~tokens pat ?guard exp
+  Exp.case ~loc:(make_loc sloc) ~tokens pat ?guard exp
 let mkmty ~loc ?attrs d =
   let tokens = Tokens.at loc in
   Mty.mk ~loc:(make_loc loc) ?attrs ~tokens d
@@ -338,7 +338,10 @@ let text_def pos =
   List.map (fun def ->
     let fake_tok = (* FIXME: don't add synthezise nodes *)
       { Tokens.desc = Child_node ; pos = def.pstr_loc.loc_start } in
-    Ptop_def ([def], [fake_tok])) (Str.text (rhs_text pos))
+    let str =
+      { pst_items = [def]; pst_loc = def.pstr_loc; pst_tokens = [fake_tok] }
+    in
+    Ptop_def str) (Str.text (rhs_text pos))
 
 let extra_text startpos endpos text items =
   match items with
@@ -360,7 +363,10 @@ let extra_def p1 p2 items =
     (fun txt -> List.map (fun def ->
       let fake_tok = (* FIXME: don't add synthezise nodes *)
         { Tokens.desc = Child_node ; pos = def.pstr_loc.loc_start } in
-      Ptop_def ([def], [fake_tok])) (Str.text txt))
+      let str =
+        { pst_items = [def]; pst_loc = def.pstr_loc; pst_tokens = [fake_tok] }
+      in
+      Ptop_def str) (Str.text txt))
     items
 
 let mk_arrow_arg ~loc lbl legacy_modes typ modes =
@@ -715,7 +721,10 @@ The precedences must be listed from low to high.
   { let def = $1 in
     let fake_tok = (* FIXME: don't add synthezise nodes *)
       { Tokens.desc = Child_node ; pos = def.pstr_loc.loc_start } in
-    Ptop_def ([def], [fake_tok]) }
+    let str =
+      { pst_items = [def]; pst_loc = def.pstr_loc; pst_tokens = [fake_tok] }
+    in
+    Ptop_def str }
 %inline text_cstr(symb): symb
   { text_cstr $startpos @ [$1] }
 %inline text_csig(symb): symb
@@ -990,11 +999,13 @@ toplevel_phrase:
   (* An expression with attributes, ended by a double semicolon. *)
   extra_str(text_str(str_exp))
   SEMISEMI
-    { Ptop_def ($1, Tokens.at $sloc) }
+    { Ptop_def { pst_items = $1; pst_loc = make_loc $sloc
+               ; pst_tokens = Tokens.at $sloc } }
 | (* A list of structure items, ended by a double semicolon. *)
   extra_str(flatten(text_str(structure_item)*))
   SEMISEMI
-    { Ptop_def ($1, Tokens.at $sloc) }
+    { Ptop_def { pst_items = $1; pst_loc = make_loc $sloc
+               ; pst_tokens = Tokens.at $sloc } }
 | (* A directive, ended by a double semicolon. *)
   toplevel_directive
   SEMISEMI
@@ -1224,7 +1235,7 @@ structure:
   { let str = $1 in
     (* See the comments on [signature] for an explanation of the positions
        fiddleing. *)
-    let startp, endp =
+    let sloc =
       match str with
       | [] -> $symbolstartpos, $endpos
       | { pstr_loc = { loc_start = startp; _ }; _ } :: _ ->
@@ -1243,7 +1254,7 @@ structure:
              *)
           min $symbolstartpos startp, max $endpos endp
     in
-    str, Tokens.at (startp, endp) }
+    { pst_items = str; pst_loc = make_loc sloc; pst_tokens = Tokens.at sloc } }
 ;
 
 (* An optional standalone expression is just an expression with attributes
@@ -2259,36 +2270,41 @@ seq_expr:
 labeled_simple_pattern:
     QUESTION LPAREN label_let_pattern opt_default RPAREN
       { let legacy_modes, lbl, cty, modes = $3 in
-        Arg.optional ~tokens:(Tokens.at $sloc) ~legacy_modes
+        Arg.optional ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) ~legacy_modes
           ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
           ~modes ?default:$4 lbl
       }
   | QUESTION label_var
-      { Arg.optional ~tokens:(Tokens.at $sloc) $2 }
+      { Arg.optional ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) $2 }
   | OPTLABEL LPAREN let_pattern opt_default RPAREN
       { let legacy_modes, pat, cty, modes = $3 in
-        Arg.optional ~tokens:(Tokens.at $sloc) ~legacy_modes ~maybe_punned:pat
+        Arg.optional ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc)
+          ~legacy_modes ~maybe_punned:pat
           ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
           ?default:$4 ~modes $1
       }
   | OPTLABEL pattern_var
-      { Arg.optional ~tokens:(Tokens.at $sloc) ~maybe_punned:$2 $1 }
+      { Arg.optional ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc)
+          ~maybe_punned:$2 $1 }
   | TILDE LPAREN label_let_pattern RPAREN
       { let legacy_modes, lbl, cty, modes = $3 in
-        Arg.labelled ~tokens:(Tokens.at $sloc) ~legacy_modes
+        Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc)
+          ~legacy_modes
           ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
           ~modes lbl
       }
   | TILDE label_var
-      { Arg.labelled ~tokens:(Tokens.at $sloc) $2 }
+      { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) $2 }
   | LABEL simple_pattern_extend_modes_or_poly
       { let legacy_modes, pat, cty, modes = $2 in
-        Arg.labelled ~tokens:(Tokens.at $sloc) ~legacy_modes ~maybe_punned:pat
+        Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc)
+          ~legacy_modes ~maybe_punned:pat
           ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
           ~modes $1 }
   | simple_pattern_extend_modes_or_poly
       { let legacy_modes, pat, cty, modes = $1 in
-        Arg.nolabel ~tokens:(Tokens.at $sloc) ~legacy_modes
+        Arg.nolabel ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc)
+          ~legacy_modes
           ?typ_constraint:(Option.map (fun c -> Pconstraint c) cty)
           ~modes pat }
 ;
@@ -2612,6 +2628,7 @@ comprehension_clause_binding:
         ; pcomp_cb_iterator = $3
         ; pcomp_cb_attributes = $1
         ; pcomp_cb_tokens = Tokens.at $sloc
+        ; pcomp_cb_loc = make_loc $sloc
         } }
 ;
 
@@ -2623,7 +2640,8 @@ comprehension_clause:
 
 %inline comprehension(lbracket, rbracket):
   lbracket expr nonempty_llist(comprehension_clause) rbracket
-    { { pcomp_body = $2; pcomp_clauses = $3; pcomp_tokens = Tokens.at $sloc } }
+    { { pcomp_body = $2; pcomp_clauses = $3
+      ; pcomp_tokens = Tokens.at $sloc; pcomp_loc = make_loc $sloc } }
 ;
 
 %inline comprehension_ext_expr:
@@ -2828,21 +2846,24 @@ block_access:
 ;
 labeled_simple_expr:
     simple_expr %prec below_HASH
-      { Arg.nolabel ~tokens:(Tokens.at $sloc) $1 }
+      { Arg.nolabel ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) $1 }
   | LABEL simple_expr %prec below_HASH
-      { Arg.labelled ~tokens:(Tokens.at $sloc) $1 ~maybe_punned:$2 }
+      { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) $1
+          ~maybe_punned:$2 }
   | TILDE label = LIDENT
-      { Arg.labelled ~tokens:(Tokens.at $sloc) label }
+      { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) label }
   | TILDE UNDERSCORE
-      { Arg.labelled ~tokens:(Tokens.at $sloc) "_" }
+      { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) "_" }
   | TILDE LPAREN label = LIDENT c = type_constraint RPAREN
-      { Arg.labelled ~tokens:(Tokens.at $sloc) ~typ_constraint:c label }
+      { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc)
+          ~typ_constraint:c label }
   | QUESTION label = LIDENT
-      { Arg.optional ~tokens:(Tokens.at $sloc) label }
+      { Arg.optional ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) label }
   | QUESTION UNDERSCORE
-      { Arg.optional ~tokens:(Tokens.at $sloc) "_" }
+      { Arg.optional ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) "_" }
   | OPTLABEL simple_expr %prec below_HASH
-      { Arg.optional ~tokens:(Tokens.at $sloc) $1 ~maybe_punned:$2 }
+      { Arg.optional ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) $1
+          ~maybe_punned:$2 }
 ;
 %inline let_ident:
     val_ident { mkpatvar ~loc:$sloc $1 }
@@ -3120,24 +3141,28 @@ fun_params:
    in one base case for each case of [labeled_tuple_element].  *)
 %inline labeled_tuple_element :
   | expr
-     { Arg.nolabel ~tokens:(Tokens.at $sloc) $1 }
+     { Arg.nolabel ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) $1 }
   | LABEL simple_expr %prec below_HASH
-     { Arg.labelled ~tokens:(Tokens.at $sloc) $1 ~maybe_punned:$2 }
+     { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) $1
+        ~maybe_punned:$2 }
   | TILDE label = LIDENT
-     { Arg.labelled ~tokens:(Tokens.at $sloc) label }
+     { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) label }
   | TILDE LPAREN label = LIDENT c = type_constraint RPAREN %prec below_HASH
-     { Arg.labelled ~tokens:(Tokens.at $sloc) ~typ_constraint:c label }
+     { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc)
+        ~typ_constraint:c label }
 ;
 
 %inline labeled_tuple_element_noprec :
   | expr
-     { Arg.nolabel ~tokens:(Tokens.at $sloc) $1 }
+     { Arg.nolabel ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) $1 }
   | LABEL simple_expr
-     { Arg.labelled ~tokens:(Tokens.at $sloc) $1 ~maybe_punned:$2 }
+     { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) $1
+        ~maybe_punned:$2 }
   | TILDE label = LIDENT
-     { Arg.labelled ~tokens:(Tokens.at $sloc) label }
+     { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) label }
   | TILDE LPAREN label = LIDENT c = type_constraint RPAREN
-     { Arg.labelled ~tokens:(Tokens.at $sloc) ~typ_constraint:c label }
+     { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc)
+        ~typ_constraint:c label }
 ;
 
 reversed_labeled_tuple_body:
@@ -3306,25 +3331,27 @@ pattern_no_exn:
 *)
 %inline labeled_tuple_pat_element(self):
   | self
-      { Arg.nolabel ~tokens:(Tokens.at $sloc) $1 }
+      { Arg.nolabel ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) $1 }
   | LABEL simple_pattern %prec COMMA
-      { Arg.labelled ~tokens:(Tokens.at $sloc) $1 ~maybe_punned:$2 }
+      { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) $1
+          ~maybe_punned:$2 }
   | TILDE label = LIDENT
-      { Arg.labelled ~tokens:(Tokens.at $sloc) label }
+      { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) label }
   | TILDE LPAREN label = LIDENT COLON cty = core_type RPAREN %prec COMMA
-      { Arg.labelled ~tokens:(Tokens.at $sloc)
+      { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc)
           ~typ_constraint:(Pconstraint cty) label }
 
 (* If changing this, don't forget to change its copy just above. *)
 %inline labeled_tuple_pat_element_noprec(self):
   | self
-      { Arg.nolabel ~tokens:(Tokens.at $sloc) $1 }
+      { Arg.nolabel ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) $1 }
   | LABEL simple_pattern
-      { Arg.labelled ~tokens:(Tokens.at $sloc) $1 ~maybe_punned:$2 }
+      { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) $1
+          ~maybe_punned:$2 }
   | TILDE label = LIDENT
-      { Arg.labelled ~tokens:(Tokens.at $sloc) label }
+      { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc) label }
   | TILDE LPAREN label = LIDENT COLON cty = core_type RPAREN
-      { Arg.labelled ~tokens:(Tokens.at $sloc)
+      { Arg.labelled ~loc:(make_loc $sloc) ~tokens:(Tokens.at $sloc)
           ~typ_constraint:(Pconstraint cty) label }
 
 labeled_tuple_pat_element_list(self):
@@ -3651,8 +3678,9 @@ jkind_desc:
           (fun {txt; loc} -> {txt = Mode txt; loc})
           $3
       in
-      let tokens = Tokens.at $loc($3) in
-      Pjk_mod ($1, Modes { modes; tokens })
+      let modes_loc = $loc($3) in
+      let tokens = Tokens.at modes_loc in
+      Pjk_mod ($1, Modes { modes; loc = make_loc modes_loc; tokens })
     }
   | jkind_annotation WITH core_type optional_atat_modalities_expr {
       Pjk_with ($1, $3, $4)
@@ -4243,7 +4271,8 @@ strict_function_or_labeled_tuple_type:
 ;
 
 %inline mode_expr_legacy:
-   | mode_legacy+ { Modes { modes = $1; tokens = Tokens.at $sloc } }
+   | mode_legacy+
+     { Modes { modes = $1; loc = make_loc $sloc; tokens = Tokens.at $sloc } }
 ;
 
 %inline optional_mode_expr_legacy:
@@ -4264,7 +4293,8 @@ strict_function_or_labeled_tuple_type:
   | { No_modes }
 ;
 at_mode_expr:
-  | AT mode_expr { Modes { modes = $2; tokens = Tokens.at $sloc } }
+  | AT mode_expr
+    { Modes { modes = $2; loc = make_loc $sloc; tokens = Tokens.at $sloc } }
   | AT error { expecting $loc($2) "mode expression" }
 ;
 
@@ -4292,7 +4322,9 @@ at_mode_expr:
   { No_modalities }
 ;
 atat_modalities_expr:
-  | ATAT modalities { Modalities { modalities = $2; tokens = Tokens.at $sloc } }
+  | ATAT modalities
+    { Modalities
+        { modalities = $2; loc = make_loc $sloc; tokens = Tokens.at $sloc } }
   | ATAT error { expecting $loc($2) "modality expression" }
 ;
 

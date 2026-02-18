@@ -4,7 +4,7 @@ open Parsetree
 let semisemi ~optional pos =
   Tokens.{ pos; desc = Token (SEMISEMI, optional)}
 
-let normalize_struct_semisemi (items, tokens) =
+let normalize_struct_semisemi str =
   let rec walk_both items tokens =
     match tokens with
     | [] ->
@@ -42,9 +42,9 @@ let normalize_struct_semisemi (items, tokens) =
             walk_both items tokens
           | _ -> t :: walk_both items tokens
   in
-  let tokens_no_semi = Utils.without ~token:SEMISEMI tokens in
-  let tokens_with_minimal_semi = walk_both items tokens_no_semi in
-  items, tokens_with_minimal_semi
+  let tokens_no_semi = Utils.without ~token:SEMISEMI str.pst_tokens in
+  let tokens_with_minimal_semi = walk_both str.pst_items tokens_no_semi in
+  { str with pst_tokens = tokens_with_minimal_semi }
 
 let nb_semis =
   List.fold_left (fun nb tok ->

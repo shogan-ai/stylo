@@ -152,13 +152,13 @@ module End = struct
     | Psig_include _ -> false
   ;;
 
-  let of_structure (items, _tokens) =
+  let of_structure str =
     let rec last = function
       | [] -> false
       | [ item ] -> of_structure_item item
       | _ :: items -> last items
     in
-    last items
+    last str.pst_items
   ;;
 
   let of_signature sg =

@@ -263,7 +263,8 @@ and Extension : sig
   val pp_toplevel : toplevel_extension -> t
 end = struct
   let payload_indent = function
-    | PTyp _ | PPat _ | PString _ | PStr ([_], _) | PSig {psg_items = [_]; _} ->
+    | PTyp _ | PPat _ | PString _
+    | PStr {pst_items = [_]; _} | PSig {psg_items = [_]; _} ->
       2
     | PStr _ | PSig _ -> 0
 
@@ -2054,7 +2055,7 @@ end = struct
     ) (empty, first_pre)
     |> fst
 
-  let pp { pc_lhs; pc_guard; pc_rhs; pc_tokens } =
+  let pp { pc_lhs; pc_guard; pc_rhs; pc_tokens; pc_loc = _ } =
     let pipe = starts_with_pipe pc_tokens in
     let guarded_pat =
       prefix (group (pp_pattern pipe pc_lhs))
@@ -2283,6 +2284,7 @@ end = struct
     ; pcomp_cb_iterator = it
     ; pcomp_cb_attributes = attrs
     ; pcomp_cb_tokens = _
+    ; pcomp_cb_loc = _
     } =
     Attribute.pp_list attrs ^?^
     optional (fun m -> mode_legacy m.txt ^^ break 1) m_opt ^^

@@ -64,6 +64,7 @@ type modalities =
   | No_modalities
   | Modalities of
       { modalities: modality loc list
+      ; loc: Location.t
       ; tokens: Tokens.seq }
 
 type mode = | Mode of string [@@unboxed]
@@ -71,6 +72,7 @@ type modes =
   | No_modes
   | Modes of
       { modes: mode loc list
+      ; loc: Location.t
       ; tokens: Tokens.seq }
 
 
@@ -585,6 +587,7 @@ and case =
      pc_guard: expression option;
      pc_rhs: expression;
      pc_tokens: Tokens.seq;
+     pc_loc: Location.t;
    }
 (** Values of type {!case} represents [(P -> E)] or [(P when E0 -> E)] *)
 
@@ -621,6 +624,7 @@ and 'a argument_desc =
 
 and 'a argument =
   { parg_desc: 'a argument_desc;
+    parg_loc: Location.t;
     parg_tokens: Tokens.seq; }
 
 and function_param_desc =
@@ -731,11 +735,12 @@ and comprehension_iterator =
 
 (** [@...] PAT (in/=) ... *)
 and comprehension_clause_binding =
-  { pcomp_cb_mode: mode loc option;
+  { pcomp_cb_mode : mode loc option;
     pcomp_cb_attributes : attributes;
     pcomp_cb_pattern : pattern;
     pcomp_cb_iterator : comprehension_iterator;
     pcomp_cb_tokens : Tokens.seq;
+    pcomp_cb_loc : Location.t;
   }
 
 and comprehension_clause =
@@ -749,6 +754,7 @@ and comprehension =
     pcomp_clauses : comprehension_clause list;
       (** The clauses of the comprehension; must be nonempty *)
     pcomp_tokens : Tokens.seq;
+    pcomp_loc : Location.t;
   }
 
 and comprehension_expression =
@@ -1421,7 +1427,12 @@ and module_instance =
   (** [M(P1)(MI1)...(Pn)(MIn)] *)
          *)
 
-and structure = structure_item list * Tokens.seq
+and structure =
+  {
+    pst_items: structure_item list;
+    pst_loc: Location.t;
+    pst_tokens: Tokens.seq;
+  }
 
 and structure_item =
     {

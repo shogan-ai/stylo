@@ -230,8 +230,8 @@ module Exp:
     val overwrite : ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression -> expression -> expression
     val hole : ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> unit -> expression
 
-    val case: tokens:Tokens.seq -> pattern -> ?guard:expression -> expression ->
-      case
+    val case: ?loc:loc -> tokens:Tokens.seq -> pattern -> ?guard:expression ->
+      expression -> case
     val binding_op: str -> value_binding -> loc -> binding_op
   end
 
@@ -599,12 +599,14 @@ module Of:
 
 module Arg : sig
   val nolabel :
+      loc:loc ->
       tokens:Tokens.seq ->
       ?legacy_modes:modes ->
       ?typ_constraint:type_constraint ->
       ?modes:modes -> 'a -> 'a argument
 
   val labelled:
+      loc:loc ->
       tokens:Tokens.seq ->
       ?legacy_modes:modes ->
       ?maybe_punned:'a ->
@@ -613,6 +615,7 @@ module Arg : sig
       string -> 'a argument
 
   val optional:
+      loc:loc ->
       tokens:Tokens.seq ->
       ?legacy_modes:modes ->
       ?maybe_punned:'a ->

@@ -36,23 +36,23 @@ let cleaner =
           attr.attr_payload
         else
           match attr.attr_payload with
-          | PStr ([ {
+          | PStr ({ pst_items = [ {
             pstr_desc =
               Pstr_eval
                 ({ pexp_desc= Pexp_constant Pconst_string (doc, loc, none)
                  ; _ } as inner_exp,[]);
             _
-          } as str ], tokens) ->
+          } as item ]; _ } as str) ->
             let doc = normalize_cmt_spaces doc in
             let inner' =
               { inner_exp with
                 pexp_desc = Pexp_constant (Pconst_string (doc, loc, none))
               }
             in
-            PStr (
-              [ { str with pstr_desc = Pstr_eval (inner', []) }],
-              self#seq () tokens
-            )
+            let item = { item with pstr_desc = Pstr_eval (inner', []) } in
+            let pst_tokens = self#seq () str.pst_tokens in
+            let str = { str with pst_items = [ item ]; pst_tokens } in
+            PStr str
           | _ -> assert false
       in
       super#attribute () { attr with attr_payload }
