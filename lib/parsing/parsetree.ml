@@ -105,7 +105,12 @@ and toplevel_extension =
   ; te_post_doc: string option }
 (** [[%%id]] (** docstrings *) *)
 
-and attributes = attribute list
+and attributes =
+  | No_attributes
+  | Attributes of
+      { attributes: attribute list
+      ; loc: Location.t
+      ; tokens: Tokens.seq }
 
 and payload =
   | PStr of structure
@@ -1076,6 +1081,7 @@ and class_expr =
      pcl_desc: class_expr_desc;
      pcl_loc: Location.t;
      pcl_attributes: attributes;  (** [... [\@id1] [\@id2]] *)
+     pcl_tokens: Tokens.seq;
     }
 
 and class_expr_desc =

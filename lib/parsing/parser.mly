@@ -83,7 +83,8 @@ let mkstr ~loc d =
   let tokens = Tokens.at loc in
   Str.mk ~loc:(make_loc loc) ~tokens d
 let mkclass ~loc ?ext_attrs ?attrs d =
-  Cl.mk ~loc:(make_loc loc) ?ext_attrs ?attrs d
+  let tokens = Tokens.at loc in
+  Cl.mk ~loc:(make_loc loc) ?ext_attrs ?attrs ~tokens d
 let mkcty ~loc ?attrs d =
   let tokens = Tokens.at loc in
   Cty.mk ~loc:(make_loc loc) ?attrs ~tokens d
@@ -146,7 +147,7 @@ let mkinfix arg1 op arg2 =
 
 let mkuminus ~oploc:_ name arg =
   Pexp_add_or_sub (name, arg),
-  { pea_ext = None; pea_attrs = [] }
+  { pea_ext = None; pea_attrs = No_attributes }
 
 let mkuplus = mkuminus
 
@@ -490,6 +491,88 @@ let empty_body_constraint =
 let mkfunction ~loc ~ext_attrs params body_constraint body =
   mkexp_attrs (Pexp_function (params, body_constraint, body)) ext_attrs ~loc
 
+let attributes_patching sloc prev_tokens prev_attributes attr =
+  (* Called from rules of the form:
+     {[
+       elt = some_syntactic_element attr = attribute
+     ]}
+     where [attr] is going to be appended to [elt]'s attributes.
+
+     We start by getting the tokens at that location, which will be of the form
+     {[
+       CMTS* Child_node CMTS* Child_node CMTS*
+     ]}
+     since [elt] and [attr] have both been reduced already.
+  *)
+  let tokens = Tokens.at sloc in
+  (* Everything that comes after the first Child_node (corresponding to [elt])
+     will be appended to the attributes tokens. *)
+  let attr_tokens =
+    let saw_child = ref false in
+    List.drop_while (fun tok ->
+      if !saw_child
+      then (* we can stop now. *) false
+      else (saw_child := Tokens.is_child tok; true)
+    ) tokens
+  in
+  (* And any comment that comes before will be prepended to [elt]'s tokens. *)
+  let to_prepend =
+    List.take_while (fun tok -> not @@ Tokens.is_child tok) tokens
+  in
+  (* There is one subtlety however: if [elt] didn't have any attributes yet, we
+     must append a Child_node to its tokens, this corresponds to the now present
+     attributes. *)
+  match prev_attributes with
+  | No_attributes ->
+    let attr_startp = (List.hd attr_tokens).pos in
+    let child_for_attrs = { Tokens.pos = attr_startp; desc = Child_node } in
+    let elt_tokens = to_prepend @ prev_tokens @ [child_for_attrs] in
+    let attrs =
+      let attr_loc = make_loc (attr_startp, snd sloc) in
+      Attributes { attributes = [attr]; loc = attr_loc; tokens = attr_tokens }
+    in
+    elt_tokens, attrs
+  | Attributes { attributes; loc; tokens } ->
+    (* There were already attributes, so we just need to append.
+       We also take the opportunity to grow the location. *)
+    let attrs =
+      let attributes = attributes @ [attr] in
+      let loc = { loc with loc_end = snd sloc } in
+      let tokens = tokens @ attr_tokens in
+      Attributes { attributes; loc; tokens }
+    in
+    to_prepend @ prev_tokens, attrs
+
+let merge_attrs parent_tokens attrs1 attrs2 =
+  match attrs1, attrs2 with
+  | No_attributes, attrs
+  | attrs, No_attributes ->
+      parent_tokens, attrs
+  | Attributes a1, Attributes a2 ->
+      (* We're taking two subtrees and merging them into one, so we need to
+         remove one Child_node from the parent's tokens. *)
+      let tokens =
+        let rev_toks = List.rev parent_tokens in
+        let rev_tail =
+          List.take_while (fun t -> not (Tokens.is_child t)) rev_toks
+        in
+        let rev_head =
+          let saw_child = ref false in
+          List.drop_while (fun tok ->
+            if !saw_child
+            then (* we can stop now. *) false
+            else (saw_child := Tokens.is_child tok; true)
+          ) rev_toks
+        in
+        List.rev (rev_tail @ rev_head)
+      in
+      let attrs =
+        let attributes = a1.attributes @ a2.attributes in
+        let loc = { a1.loc with loc_end = a2.loc.loc_end } in
+        let tokens = a1.tokens @ a2.tokens in
+        Attributes { attributes; loc; tokens }
+      in
+      tokens, attrs
 
       (*
 (* There's no dedicated syntax for module instances. Functor application
@@ -685,9 +768,8 @@ The precedences must be listed from low to high.
 %start parse_any_longident
 %type <Longident.t> parse_any_longident
 
-%type <modes> at_mode_expr
-%type <modes> mode_expr_legacy
-%type <modes> optional_mode_expr_legacy
+%type <attributes> attributes
+%type <attributes> post_item_attributes
 /* END AVOID */
 
 %%
@@ -1160,12 +1242,10 @@ module_expr:
       { (* We are "patching" the module expr to add an attribute, we must also
            patch the tokens attached to the me to account for the new tokens
            relative to the attribute. *)
-        let tokens = Tokens.at $sloc in
-        let me_with_attr = Mod.attr me attr in
-        let pmod_tokens =
-          Tokens.replace_first_child tokens ~subst:me.pmod_tokens
+        let new_tokens, attributes =
+          attributes_patching $sloc me.pmod_tokens me.pmod_attributes attr
         in
-        { me_with_attr with pmod_tokens } }
+        { me with pmod_tokens = new_tokens; pmod_attributes = attributes } }
   | mkmod(
       (* A module identifier. *)
       x = mkrhs(mod_longident)
@@ -1523,12 +1603,10 @@ module_type:
       { (* We are "patching" the module type to add an attribute, we must also
            patch the tokens attached to the mty to account for the new tokens
            relative to the attribute. *)
-        let tokens = Tokens.at $sloc in
-        let mty_with_attr = Mty.attr mty attr in
-        let pmty_tokens =
-          Tokens.replace_first_child tokens ~subst:mty.pmty_tokens
+        let new_tokens, attributes =
+          attributes_patching $sloc mty.pmty_tokens mty.pmty_attributes attr
         in
-        { mty_with_attr with pmty_tokens } }
+        { mty with pmty_tokens = new_tokens; pmty_attributes = attributes } }
   | mkmty(
       module_type_with_optional_modes MINUSGREATER module_type_with_optional_modes
         %prec below_WITH
@@ -1842,7 +1920,9 @@ class_expr:
       { $1 }
   | FUN attrs_as_extattrs class_fun_def
       { let (args, body) = $3 in
-        Cl.fun_ ~loc:(make_loc $sloc) ~ext_attrs:$2 args body }
+        Cl.fun_ ~loc:(make_loc $sloc) ~ext_attrs:$2 args body
+          ~tokens:(Tokens.at $sloc)
+      }
   | let_bindings(noext_attributes) IN class_expr
       { class_of_let_bindings ~loc:$sloc $1 $3 }
   | LET OPEN override_flag attrs_as_extattrs mkrhs(mod_longident) IN class_expr
@@ -1851,8 +1931,11 @@ class_expr:
           Opn.mk ~ext_attrs:$4 ~override:$3 ~loc:(make_loc loc) ~tokens:(Tokens.at loc) $5
         in
         mkclass ~loc:$sloc (Pcl_open(od, $7)) }
-  | class_expr attribute
-      { Cl.attr $1 $2 }
+  | ce = class_expr attribute
+      { let new_tokens, attributes =
+          attributes_patching $sloc ce.pcl_tokens ce.pcl_attributes $2
+        in
+        { ce with pcl_tokens = new_tokens; pcl_attributes = attributes } }
   | mkclass(
       class_simple_expr nonempty_llist(labeled_simple_expr)
         { Pcl_apply($1, $2) }
@@ -1944,11 +2027,11 @@ value:
             pvb_legacy_modes = No_modes; pvb_modes = No_modes; pvb_params = [];
             pvb_constraint = None; pvb_ret_modes = No_modes;
             pvb_expr = Some $6; pvb_loc = make_loc $sloc;
-            pvb_attributes = [] (* FIXME? *);
+            pvb_attributes = No_attributes;
             pvb_post_doc = None;
             pvb_tokens = Tokens.at $sloc; }
         in
-        ($4, $3, Cfk_concrete ($1, vb)), [] }
+        ($4, $3, Cfk_concrete ($1, vb)), No_attributes }
   | override_flag attrs_as_extattrs mutable_flag mkrhs(label) type_constraint
     EQUAL seq_expr
       {
@@ -1967,11 +2050,11 @@ value:
             pvb_legacy_modes = No_modes; pvb_modes = No_modes; pvb_params = [];
             pvb_constraint = Some t; pvb_ret_modes = No_modes;
             pvb_expr = Some $7; pvb_loc = make_loc $sloc;
-            pvb_attributes = [] (* FIXME? *);
+            pvb_attributes = No_attributes;
             pvb_post_doc = None;
             pvb_tokens = Tokens.at $sloc; }
         in
-        ($4, $3, Cfk_concrete ($1, vb)), []
+        ($4, $3, Cfk_concrete ($1, vb)), No_attributes
       }
 ;
 method_:
@@ -1992,12 +2075,12 @@ method_:
             pvb_constraint = tc; pvb_ret_modes = ret_modes;
             pvb_expr = Some e;
             pvb_loc = make_loc $sloc;
-            pvb_attributes = [] (* FIXME: ? *);
+            pvb_attributes = No_attributes;
             pvb_post_doc = None;
             pvb_tokens = Tokens.at $sloc; }
         in
         ($4, $3,
-        Cfk_concrete ($1, vb)), [] }
+        Cfk_concrete ($1, vb)), No_attributes }
   | override_flag attrs_as_extattrs private_flag mkrhs(label)
     COLON poly_type EQUAL seq_expr
       { let constr =
@@ -2013,11 +2096,11 @@ method_:
             pvb_constraint = Some constr; pvb_ret_modes = No_modes;
             pvb_expr = Some $8;
             pvb_loc = make_loc $sloc;
-            pvb_attributes = [] (* FIXME: ? *);
+            pvb_attributes = No_attributes (* FIXME: ? *);
             pvb_post_doc = None;
             pvb_tokens = Tokens.at $sloc; }
         in
-        ($4, $3, Cfk_concrete ($1, vb)), [] }
+        ($4, $3, Cfk_concrete ($1, vb)), No_attributes }
   | override_flag attrs_as_extattrs private_flag mkrhs(label) COLON TYPE newtypes
     DOT core_type EQUAL seq_expr
       { let constr =
@@ -2033,11 +2116,11 @@ method_:
             pvb_constraint = Some constr; pvb_ret_modes = No_modes;
             pvb_expr = Some $11;
             pvb_loc = make_loc $sloc;
-            pvb_attributes = [] (* FIXME: ? *);
+            pvb_attributes = No_attributes (* FIXME: ? *);
             pvb_post_doc = None;
             pvb_tokens = Tokens.at $sloc; }
         in
-        ($4, $3, Cfk_concrete ($1, vb)), [] }
+        ($4, $3, Cfk_concrete ($1, vb)), No_attributes }
 ;
 
 /* Class types */
@@ -2071,12 +2154,10 @@ class_signature:
       { (* We are "patching" the signature to add an attribute, we must also
         patch the tokens attached to the sig to account for the new tokens
         relative to the attribute. *)
-        let tokens = Tokens.at $sloc in
-        let cty_with_attr = Cty.attr cs $2 in
-        let pcty_tokens =
-          Tokens.replace_first_child tokens ~subst:cs.pcty_tokens
+        let new_tokens, attributes =
+          attributes_patching $sloc cs.pcty_tokens cs.pcty_attributes $2
         in
-        { cty_with_attr with pcty_tokens } }
+        { cs with pcty_tokens = new_tokens; pcty_attributes = attributes } }
   | LET OPEN override_flag attrs_as_extattrs mkrhs(mod_longident) IN class_signature
       { let loc = ($startpos($2), $endpos($5)) in
         let od =
@@ -2239,7 +2320,7 @@ class_type_declarations:
           ; pfb_tokens = Tokens.at $sloc }
         in
         mkfunction [] empty_body_constraint body ~loc:$sloc
-            ~ext_attrs:{ pea_ext = None; pea_attrs = []}
+            ~ext_attrs:{ pea_ext = None; pea_attrs = No_attributes}
       }
     )
     { $1 }
@@ -2452,12 +2533,13 @@ fun_expr:
       { (* We are "patching" the expr to add an attribute, we must also patch
            the tokens attached to the expression to account for the new tokens
            relative to the attribute. *)
-        let tokens = Tokens.at $sloc in
-        let exp_with_attrs = Exp.attr exp $2 in
-        let pexp_tokens =
-          Tokens.replace_first_child tokens ~subst:exp.pexp_tokens
+        let new_tokens, attributes =
+          attributes_patching $sloc exp.pexp_tokens exp.pexp_attributes $2
         in
-        { exp_with_attrs with pexp_tokens; pexp_loc = make_loc $sloc }
+        { exp with
+          pexp_tokens = new_tokens;
+          pexp_attributes = attributes;
+          pexp_loc = make_loc $sloc }
     }
   | mode=mode_legacy exp=seq_expr
      { mkexp ~loc:$sloc (Pexp_mode_legacy (mode, exp)) }
@@ -2478,7 +2560,7 @@ fun_expr:
           Mb.mk $4 params mty_opt modes me ~ext_attr:$3 ~loc:(make_loc mb_loc)
             ~tokens:(Tokens.at mb_loc)
         in
-        Pexp_letmodule(mb, $7), { pea_ext = None; pea_attrs = [] } }
+        Pexp_letmodule(mb, $7), { pea_ext = None; pea_attrs = No_attributes } }
   | LET EXCEPTION ext_attributes let_exception_declaration IN seq_expr
       { Pexp_letexception($4, $6), $3 }
   | LET OPEN override_flag ext_attributes module_expr IN seq_expr
@@ -2489,7 +2571,7 @@ fun_expr:
             ~ext_attrs:$4
             ~tokens:(Tokens.at open_loc)
         in
-        Pexp_let_open(od, $7), { pea_ext = None; pea_attrs = [] } }
+        Pexp_let_open(od, $7), { pea_ext = None; pea_attrs = No_attributes } }
   | MATCH ext_attributes seq_expr WITH match_cases
       { Pexp_match($3, $5), $2 }
   | TRY ext_attributes seq_expr WITH match_cases
@@ -3049,7 +3131,7 @@ strict_binding_modes:
         | Pfunction_body e -> e
         | Pfunction_cases _ ->
             mkfunction [] empty_body_constraint fb ~loc:$loc($4)
-            ~ext_attrs:{ pea_ext = None; pea_attrs = []}
+            ~ext_attrs:{ pea_ext = None; pea_attrs = No_attributes }
       in
       $1, typ, ret_mode_annotations, expr
     }
@@ -3289,12 +3371,10 @@ pattern_no_exn:
       { (* We are "patching" the pattern to add an attribute, we must also patch
            the tokens attached to the pattern to account for the new tokens
            relative to the attribute. *)
-        let tokens = Tokens.at $sloc in
-        let pat_with_attr = Pat.attr pat attr in
-        let ppat_tokens =
-          Tokens.replace_first_child tokens ~subst:pat.ppat_tokens
+        let new_tokens, attributes =
+          attributes_patching $sloc pat.ppat_tokens pat.ppat_attributes attr
         in
-        { pat_with_attr with ppat_tokens }
+        { pat with ppat_tokens = new_tokens; ppat_attributes = attributes }
       }
   | pattern_gen
       { $1 }
@@ -3748,9 +3828,9 @@ parenthesized_type_parameter:
 type_parameter:
     type_variance ty=type_variable attributes
       { let typ =
-          (* We are "patching" the type to add an attribute, we must also patch
+          (* We are "patching" the type to add attributes, we must also patch
              the tokens attached to the type to account for the new tokens
-             relative to the attribute. *)
+             relative to the attributes. *)
            let typ_tokens = Tokens.at ($startpos(ty), $endpos) in
            let ptyp_tokens =
              Tokens.replace_first_child typ_tokens ~subst:ty.ptyp_tokens
@@ -3928,8 +4008,9 @@ label_declaration_semi:
           | None -> symbol_info $endpos
        in
        let mut, global = $1 in
-       Type.field $2 $4 ~mut ~global ~modalities:m1 ~attrs:(attrs0 @ attrs1)
-         ~tokens:(Tokens.at $sloc) ~loc:(make_loc $sloc) ~info}
+       let tokens, attrs = merge_attrs (Tokens.at $sloc) attrs0 attrs1 in
+       Type.field $2 $4 ~mut ~global ~modalities:m1 ~attrs
+         ~tokens ~loc:(make_loc $sloc) ~info}
 ;
 
 /* Type Extensions */
@@ -4088,12 +4169,10 @@ core_type:
       { (* We are "patching" the type to add an attribute, we must also patch
            the tokens attached to the type to account for the new tokens
            relative to the attribute. *)
-        let tokens = Tokens.at $sloc in
-        let typ_with_attr = Typ.attr ty $2 in
-        let ptyp_tokens =
-          Tokens.replace_first_child tokens ~subst:ty.ptyp_tokens
+        let new_tokens, attributes =
+          attributes_patching $sloc ty.ptyp_tokens ty.ptyp_attributes $2
         in
-        { typ_with_attr with ptyp_tokens } }
+        { ty with ptyp_tokens = new_tokens; ptyp_attributes = attributes } }
 ;
 
 %inline core_type_with_optional_modes:
@@ -4638,8 +4717,8 @@ meth_list:
         | Some _ as info_before_semi -> info_before_semi
         | None -> symbol_info $endpos
       in
-      let attrs = ($4 @ $6) in
-      Of.tag ~loc:(make_loc $sloc) ~attrs ~info ~tokens:(Tokens.at $sloc) $1 $3 }
+      let tokens, attrs = merge_attrs (Tokens.at $sloc) $4 $6 in
+      Of.tag ~loc:(make_loc $sloc) ~attrs ~info ~tokens $1 $3 }
 ;
 
 %inline inherit_field:
@@ -5040,12 +5119,16 @@ floating_attribute:
       mk_attr ~sloc:$sloc $2 $3 }
 ;
 %inline post_item_attributes:
-  post_item_attribute*
-    { $1 }
+  | /* empty */ { No_attributes }
+  | post_item_attribute+
+    { Attributes
+        { attributes = $1; loc = make_loc $sloc; tokens = Tokens.at $sloc } }
 ;
 %inline attributes:
-  attribute*
-    { $1 }
+  | /* empty */ { No_attributes }
+  | attribute+
+    { Attributes
+        { attributes = $1; loc = make_loc $sloc; tokens = Tokens.at $sloc } }
 ;
 ext:
   | /* empty */   { None }
@@ -5063,7 +5146,7 @@ ext:
 ;
 %inline ext_noattrs:
   | PERCENT attr_id
-    { { pea_ext = Some $2; pea_attrs = [] } }
+    { { pea_ext = Some $2; pea_attrs = No_attributes } }
 ;
 %inline attrs_as_extattrs:
   attributes

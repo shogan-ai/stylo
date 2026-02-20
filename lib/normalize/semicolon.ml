@@ -61,7 +61,7 @@ let exp_no_trailing e =
   match e.pexp_desc with
   | Pexp_seq_empty e ->
     (* Can't attach attrs without parens here *)
-    assert (e.pexp_attributes = []);
+    assert (e.pexp_attributes = No_attributes);
     e
   | Pexp_record (_, fields)
   | Pexp_record_unboxed_product (_, fields)

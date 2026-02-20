@@ -26,7 +26,7 @@ type lid = Longident.t with_loc
 type str = string with_loc
 type str_or_op = Longident.str_or_op with_loc
 type str_opt = string option with_loc
-type attrs = attribute list
+type attrs = attributes
 
 let default_loc = ref Location.none
 
@@ -40,7 +40,7 @@ let with_default_loc l f =
   Fun.protect ~finally:(fun () -> default_loc := orig) f
 
 let empty_ext_attr =
-  { pea_ext = None; pea_attrs = []; }
+  { pea_ext = None; pea_attrs = No_attributes }
 
 module Docs = struct
   let text =
@@ -90,13 +90,13 @@ module Attr = struct
 end
 
 module Typ = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
+  let mk ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens d =
     {ptyp_desc = d;
      ptyp_loc = loc;
      ptyp_attributes = attrs;
      ptyp_tokens = tokens;}
 
-  let attr d a = {d with ptyp_attributes = d.ptyp_attributes @ [a]}
+(*   let attr d a = {d with ptyp_attributes = d.ptyp_attributes @ [a]} *)
 
   let any ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ptyp_any a)
   let var ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Ptyp_var (a, b))
@@ -121,13 +121,13 @@ module Typ = struct
 end
 
 module Pat = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
+  let mk ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens d =
     {ppat_ext_attr = empty_ext_attr;
      ppat_desc = d;
      ppat_loc = loc;
      ppat_attributes = attrs;
      ppat_tokens = tokens}
-  let attr d a = {d with ppat_attributes = d.ppat_attributes @ [a]}
+(*   let attr d a = {d with ppat_attributes = d.ppat_attributes @ [a]} *)
 
   let any ?loc ?attrs ~tokens () = mk ?loc ?attrs ~tokens Ppat_any
   let var ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Ppat_var a)
@@ -153,13 +153,13 @@ module Pat = struct
 end
 
 module Exp = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
+  let mk ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens d =
     {pexp_ext_attr = empty_ext_attr;
      pexp_desc = d;
      pexp_loc = loc;
      pexp_attributes = attrs;
      pexp_tokens = tokens}
-  let attr d a = {d with pexp_attributes = d.pexp_attributes @ [a]}
+(*   let attr d a = {d with pexp_attributes = d.pexp_attributes @ [a]} *)
 
   let ident ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_ident a)
   let constant ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pexp_constant a)
@@ -223,10 +223,10 @@ module Exp = struct
 end
 
 module Mty = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
+  let mk ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens d =
     {pmty_desc = d; pmty_loc = loc; pmty_attributes = attrs;
      pmty_tokens = tokens}
-  let attr d a = {d with pmty_attributes = d.pmty_attributes @ [a]}
+(*   let attr d a = {d with pmty_attributes = d.pmty_attributes @ [a]} *)
 
   let ident ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_ident a)
   let alias ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_alias a)
@@ -241,10 +241,10 @@ module Mty = struct
 end
 
 module Mod = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
+  let mk ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens d =
     {pmod_desc = d; pmod_loc = loc; pmod_attributes = attrs;
      pmod_tokens = tokens}
-  let attr d a = {d with pmod_attributes = d.pmod_attributes @ [a]}
+(*   let attr d a = {d with pmod_attributes = d.pmod_attributes @ [a]} *)
 
   let ident ?loc ?attrs ~tokens x = mk ?loc ?attrs ~tokens (Pmod_ident x)
   let structure ?loc ?attrs ~tokens a x =
@@ -255,7 +255,7 @@ module Mod = struct
   let apply_unit ?loc ?attrs ~tokens m1 = mk ?loc ?attrs ~tokens (Pmod_apply_unit m1)
   let constraint_ ?loc ?attrs ~tokens ty mode m =
     mk ?loc ?attrs ~tokens (Pmod_constraint (m, ty, mode))
-  let unpack ?loc ?(attrs=[]) ~tokens ?constr ?coerce e =
+  let unpack ?loc ?(attrs = No_attributes) ~tokens ?constr ?coerce e =
     mk ?loc ~tokens (Pmod_unpack (attrs, e, constr, coerce))
   let extension ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmod_extension a)
 (*   let instance ?loc ?attrs a = mk ?loc ?attrs (Pmod_instance a) *)
@@ -280,7 +280,7 @@ module Sig = struct
   let include_ ?loc ?(modalities = []) a = mk ?loc (Psig_include (a, modalities))
   let class_ ?loc a = mk ?loc (Psig_class a)
   let class_type ?loc a = mk ?loc (Psig_class_type a)
-  let extension ?loc ?(attrs = []) a = mk ?loc (Psig_extension (a, attrs))
+  let extension ?loc ?(attrs = No_attributes) a = mk ?loc (Psig_extension (a, attrs))
   let kind_abbrev ?loc a b = mk ?loc (Psig_kind_abbrev (a, b))
   let attribute ?loc ~tokens a = mk ?loc ~tokens (Psig_attribute a)
   *)
@@ -304,7 +304,7 @@ module Str = struct
   let mk ?(loc = !default_loc) ~tokens d =
     {pstr_desc = d; pstr_loc = loc; pstr_tokens = tokens}
 
-  let eval ?loc ?(attrs = []) ~tokens a = mk ?loc ~tokens (Pstr_eval (a, attrs))
+  let eval ?loc ?(attrs = No_attributes) ~tokens a = mk ?loc ~tokens (Pstr_eval (a, attrs))
   (*
   let value ?loc a b = mk ?loc (Pstr_value (a, b))
   let primitive ?loc a = mk ?loc (Pstr_primitive a)
@@ -318,7 +318,7 @@ module Str = struct
   let class_ ?loc a = mk ?loc (Pstr_class a)
   let class_type ?loc a = mk ?loc (Pstr_class_type a)
   let include_ ?loc a = mk ?loc (Pstr_include a)
-  let extension ?loc ?(attrs = []) a = mk ?loc (Pstr_extension (a, attrs))
+  let extension ?loc ?(attrs = No_attributes) a = mk ?loc (Pstr_extension (a, attrs))
   let kind_abbrev ?loc a b = mk ?loc (Pstr_kind_abbrev (a, b))
   let attribute ?loc ~tokens a = mk ?loc ~tokens (Pstr_attribute a)
      *)
@@ -333,35 +333,37 @@ module Str = struct
 end
 
 module Cl = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = []) d =
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr)
+        ?(attrs = No_attributes) ~tokens d =
     {
      pcl_ext_attrs = ext_attrs;
      pcl_desc = d;
      pcl_loc = loc;
      pcl_attributes = attrs;
+     pcl_tokens = tokens;
     }
-  let attr d a = {d with pcl_attributes = d.pcl_attributes @ [a]}
+(*   let attr d a = {d with pcl_attributes = d.pcl_attributes @ [a]} *)
 
-  let constr ?loc ?attrs a b = mk ?loc ?attrs (Pcl_constr (a, b))
-  let structure ?loc ?attrs a = mk ?loc ?attrs (Pcl_structure a)
-  let fun_ ?loc ?ext_attrs ?attrs a b =
-    mk ?loc ?ext_attrs ?attrs (Pcl_fun (a, b))
-  let apply ?loc ?attrs a b = mk ?loc ?attrs (Pcl_apply (a, b))
-  let let_ ?loc ?attrs a b c = mk ?loc ?attrs (Pcl_let (a, b, c))
-  let constraint_ ?loc ?attrs a b = mk ?loc ?attrs (Pcl_constraint (a, b))
-  let extension ?loc ?attrs a = mk ?loc ?attrs (Pcl_extension a)
-  let open_ ?loc ?attrs a b = mk ?loc ?attrs (Pcl_open (a, b))
+  let constr ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pcl_constr (a, b))
+  let structure ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pcl_structure a)
+  let fun_ ?loc ?ext_attrs ?attrs ~tokens a b =
+    mk ?loc ?ext_attrs ?attrs ~tokens (Pcl_fun (a, b))
+  let apply ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pcl_apply (a, b))
+  let let_ ?loc ?attrs ~tokens a b c = mk ?loc ?attrs ~tokens (Pcl_let (a, b, c))
+  let constraint_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pcl_constraint (a, b))
+  let extension ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pcl_extension a)
+  let open_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pcl_open (a, b))
 end
 
 module Cty = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens d =
+  let mk ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens d =
     {
      pcty_desc = d;
      pcty_loc = loc;
      pcty_attributes = attrs;
      pcty_tokens = tokens;
     }
-  let attr d a = {d with pcty_attributes = d.pcty_attributes @ [a]}
+(*   let attr d a = {d with pcty_attributes = d.pcty_attributes @ [a]} *)
 
   let constr ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pcty_constr (a, b))
   let signature ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pcty_signature a)
@@ -371,7 +373,7 @@ module Cty = struct
 end
 
 module Ctf = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens
+  let mk ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens
            ?(docs = empty_docs) d =
     let pre_doc, post_doc = Docs.pre_post docs in
     {
@@ -405,7 +407,7 @@ module Ctf = struct
 end
 
 module Cf = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens
+  let mk ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens
         ?(docs = empty_docs) d =
     let pre_doc, post_doc = Docs.pre_post docs in
     {
@@ -443,7 +445,7 @@ module Cf = struct
 end
 
 module Val = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = No_attributes)
         ~tokens ?(docs = empty_docs) ?(prim = []) ?(modalities=No_modalities)
         name typ =
     let pre_doc, post_doc = Docs.pre_post docs in
@@ -462,7 +464,7 @@ module Val = struct
 end
 
 module Md = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = No_attributes)
         ~tokens ?(docs = empty_docs) ?(text = []) name body =
     let pre_doc, post_doc = Docs.pre_post docs in
     {
@@ -479,7 +481,7 @@ module Md = struct
 end
 
 module Ms = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = No_attributes)
         ~tokens ?(docs = empty_docs) name syn =
     let pre_doc, post_doc = Docs.pre_post docs in
     {
@@ -495,7 +497,7 @@ module Ms = struct
 end
 
 module Mtd = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = No_attributes)
         ~tokens ?(docs = empty_docs) ?typ name =
     let pre_doc, post_doc = Docs.pre_post docs in
     {
@@ -511,7 +513,7 @@ module Mtd = struct
 end
 
 module Mb = struct
-  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) ?(attrs = []) ~tokens
+  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) ?(attrs = No_attributes) ~tokens
         ?(docs = empty_docs) ?(text = []) name params mty_opt modes expr =
     let pmb_pre_doc, pmb_post_doc = Docs.pre_post docs in
     {
@@ -531,7 +533,7 @@ module Mb = struct
 end
 
 module Opn = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = No_attributes)
       ~tokens ?(docs = empty_docs) ?(override = Fresh) expr =
     let pre_doc, post_doc = Docs.pre_post docs in
     {
@@ -547,7 +549,7 @@ module Opn = struct
 end
 
 module Incl = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = No_attributes)
       ~tokens ?(docs = empty_docs)
     ?(kind = Structure) mexpr =
     let pre_doc, post_doc = Docs.pre_post docs in
@@ -566,7 +568,7 @@ end
 
 module Vb = struct
   let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr)
-        ?(attrs = []) ~tokens ?(docs = empty_docs)
+        ?(attrs = No_attributes) ~tokens ?(docs = empty_docs)
         ?(text = []) ?(params = []) ?(legacy_modes = No_modes) ?(modes = No_modes)
         ?value_constraint ?(ret_modes = No_modes) pat expr =
     let pre_doc, post_doc = Docs.pre_post docs in
@@ -589,7 +591,7 @@ module Vb = struct
 end
 
 module Ci = struct
-  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) ?(attrs = []) ~tokens
+  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) ?(attrs = No_attributes) ~tokens
         ?(docs = empty_docs) ?(text = [])
         ?(virt = Concrete) ?(params = []) name ?(value_params=[])
         ?constraint_ expr =
@@ -612,7 +614,7 @@ module Ci = struct
 end
 
 module Type = struct
-  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) ?(attrs = [])
+  let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr) ?(attrs = No_attributes)
         ~tokens ?(docs = empty_docs) ?(text = [])
       ?(params = [])
       ?(cstrs = [])
@@ -639,7 +641,7 @@ module Type = struct
      ptype_tokens = tokens;
     }
 
-  let constructor ?(loc = !default_loc) ?(attrs = []) ~tokens
+  let constructor ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens
         ?(info = empty_info)
         ?(vars = []) ?(args = Pcstr_tuple []) ?res name =
     let doc = Docs.info info in
@@ -662,7 +664,7 @@ module Type = struct
       pca_loc = loc;
     }
 
-  let field ?(loc = !default_loc) ?(attrs = []) ~tokens ?(info = empty_info)
+  let field ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens ?(info = empty_info)
         ?(mut = Immutable) ?(global=false) ?(modalities = No_modalities) name typ =
     {
      pld_name = name;
@@ -680,7 +682,7 @@ end
 
 (** Type extensions *)
 module Te = struct
-  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = [])
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = No_attributes)
       ~tokens ?(docs = empty_docs) ?(params = []) ?(priv = Public) path
       constructors =
     let pre_doc, post_doc = Docs.pre_post docs in
@@ -698,7 +700,7 @@ module Te = struct
     }
 
   let mk_exception ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr)
-      ?(attrs = []) ~tokens ?(docs = empty_docs) constructor =
+      ?(attrs = No_attributes) ~tokens ?(docs = empty_docs) constructor =
     let pre_doc, post_doc = Docs.pre_post docs in
     {
      ptyexn_pre_doc = pre_doc;
@@ -710,7 +712,7 @@ module Te = struct
      ptyexn_tokens = tokens;
     }
 
-  let constructor ?(loc = !default_loc) ?(attrs = []) ~tokens
+  let constructor ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens
         ?(info = empty_info) name kind =
     let doc = Docs.info info in
     {
@@ -722,7 +724,7 @@ module Te = struct
      pext_tokens = tokens;
     }
 
-  let decl ?(loc = !default_loc) ?(attrs = []) ~tokens
+  let decl ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens
          ?(info = empty_info) ?(vars = []) ?(args = Pcstr_tuple []) ?res name =
     let doc = Docs.info info in
     {
@@ -734,7 +736,7 @@ module Te = struct
      pext_tokens = tokens;
     }
 
-  let rebind ?(loc = !default_loc) ?(attrs = []) ~tokens
+  let rebind ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens
         ?(info = empty_info) name lid =
     let doc = Docs.info info in
     {
@@ -766,7 +768,7 @@ end
 
 (** Row fields *)
 module Rf = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) ~tokens ?(info = empty_info)desc =
+  let mk ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens ?(info = empty_info)desc =
     let doc = Docs.info info in
     {
       prf_desc = desc;
@@ -784,7 +786,7 @@ end
 
 (** Object fields *)
 module Of = struct
-  let mk ?(loc = !default_loc) ?(attrs=[]) ~tokens ?(info = empty_info) desc =
+  let mk ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens ?(info = empty_info) desc =
     {
       pof_desc = desc;
       pof_loc = loc;

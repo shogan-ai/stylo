@@ -13,8 +13,8 @@ let parens_exp ?(optional=false) exp =
   { pexp_desc = Pexp_parens { exp; optional }
   ; pexp_tokens = lparen_child_rparen ~optional exp.pexp_loc.loc_start
   ; pexp_loc = exp.pexp_loc
-  ; pexp_attributes = []
-  ; pexp_ext_attr = { pea_ext = None; pea_attrs = [] } }
+  ; pexp_attributes = No_attributes
+  ; pexp_ext_attr = { pea_ext = None; pea_attrs = No_attributes } }
 
 let map_desc ~recur _ desc =
   let parent_for_recursive_calls = Context.Expr desc in
@@ -50,7 +50,7 @@ let map ~recur (parent : Context.parent) exp =
       ; pexp_ext_attr =
           (* we can't attach ext_attrs to parens, so we can only rewrite when
              there are none *)
-          { pea_ext = None; pea_attrs = [] }
+          { pea_ext = None; pea_attrs = No_attributes }
       ; _ } ->
       let pexp_desc = Pexp_parens { exp = e; optional = false } in
       let pexp_tokens =

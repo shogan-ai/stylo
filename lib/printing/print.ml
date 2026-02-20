@@ -216,11 +216,14 @@ end = struct
     pp (if item then S.lbracket_atat else S.lbracket_at) attr_name
       attr_payload
 
-  let pp_list ?item l = group @@ separate_map (break 1) (pp ?item) l
+  let pp_list ?item = function
+    | No_attributes -> empty
+    | Attributes { attributes = l; _ } ->
+      group @@ separate_map (break 1) (pp ?item) l
 
   let attach ?(extra_nest=Fun.id) ?item ~attrs t =
     match attrs with
-    | [] -> t
+    | No_attributes -> t
     | _ -> group (t ^?^ extra_nest (pp_list ?item attrs))
 end
 
@@ -470,7 +473,7 @@ end = struct
     in
     group (S.squote ^^ opt_space ^^ string var_name)
 
-  let pp_var ?preceeding ?(attrs = []) var_name jkind =
+  let pp_var ?preceeding ?(attrs = No_attributes) var_name jkind =
     let quote_var = squote var_name in
     let var, pre_nest = Preceeding.group_with preceeding quote_var in
     let var = Attribute.attach ~extra_nest:pre_nest ~attrs var in
@@ -478,7 +481,7 @@ end = struct
     | None -> var
     | Some k -> var ^/^ pre_nest (S.colon ^/^ Jkind_annotation.pp k)
 
-  let pp_any ?preceeding ?(attrs = []) jkind =
+  let pp_any ?preceeding ?(attrs = No_attributes) jkind =
     let any, pre_nest = Preceeding.group_with preceeding S.underscore in
     let any = Attribute.attach ~extra_nest:pre_nest ~attrs any in
     match jkind with
@@ -521,7 +524,7 @@ end = struct
                        Ptyp_arrow
                          { domain=dom; codom_legacy_modes
                          ; codom_type; codom_modes }
-                   ; ptyp_attributes = [] ; _ }) ->
+                   ; ptyp_attributes = No_attributes ; _ }) ->
         let args, ret_ty =
           collect_args [dom] (codom_legacy_modes, codom_modes, codom_type)
         in
@@ -1231,7 +1234,7 @@ end = struct
     | Pexp_unboxed_tuple elts ->
       let flatness = flatness_tracker () in
       group ~flatness @@
-      pp_parens_tuple ~preceeding ~kind:`Unboxed ~attrs:[] flatness elts
+      pp_parens_tuple ~preceeding ~kind:`Unboxed ~attrs:No_attributes flatness elts
     | Pexp_construct (lid, arg) ->
       let lid, pre_nest =
         Preceeding.group_with preceeding @@ constr_longident lid.txt
@@ -1541,7 +1544,7 @@ end = struct
 
   and pp_else_branch = function
     | { pexp_ext_attr = ext_attrs
-      ; pexp_attributes = [] (* we'd need to be under parens to have attrs *)
+      ; pexp_attributes = No_attributes (* we'd need to be under parens to have attrs *)
       ; pexp_desc = Pexp_ifthenelse (e1, e2, e3)
       ; _ } ->
       pp_ite ~kw:(S.else_ ^/^ S.if_) ext_attrs e1 e2 e3
@@ -1553,8 +1556,8 @@ end = struct
       (* we print parenthesized branches specially, but tuples do not count as
          parenthesized branches! *)
       kw ^^ nest 2 (group (break 1 ^^ pp exp))
-    | { pexp_ext_attr = { pea_attrs = []; pea_ext = None }
-      ; pexp_attributes = []
+    | { pexp_ext_attr = { pea_attrs = No_attributes; pea_ext = None }
+      ; pexp_attributes = No_attributes
       ; pexp_desc = Pexp_parens { exp = e; optional = false }
       ; _ } ->
       group (kw ^/^ S.lparen) ^^ nest 2 (group (break 0 ^^ pp e ^^ S.rparen))
@@ -1591,8 +1594,8 @@ end = struct
   and pp_dot_open ~preceeding lid e =
     let lid, pre_nest = Preceeding.group_with preceeding (longident lid.txt) in
     group @@ match e with
-    | { pexp_ext_attr = { pea_attrs = []; pea_ext = None }
-      ; pexp_attributes = []
+    | { pexp_ext_attr = { pea_attrs = No_attributes; pea_ext = None }
+      ; pexp_attributes = No_attributes
       ; pexp_desc = Pexp_parens { exp = e; optional = false }
       ; _ } ->
       lid ^^ S.dot ^^ S.lparen ^^ break 0 ^^
@@ -2873,7 +2876,7 @@ end = struct
       ] in
       Value_binding.pp ~start vb ~add_in:false
 
-  and pp { pcl_ext_attrs; pcl_desc; pcl_attributes; pcl_loc = _ } =
+  and pp { pcl_ext_attrs; pcl_desc; pcl_attributes; pcl_loc=_; pcl_tokens=_ } =
     pp_desc pcl_ext_attrs pcl_desc
     |> Attribute.attach ~attrs:pcl_attributes
 end
@@ -3287,7 +3290,7 @@ end = struct
   and pp_apply m1 m2 =
     let m1 = pp m1 in
     match m2 with
-    | { pmod_attributes = []
+    | { pmod_attributes = No_attributes
       ; pmod_desc =
           Pmod_parens
             { pmod_attributes = attrs2
@@ -3313,7 +3316,7 @@ end = struct
       let stop = Attribute.attach stop ~attrs:pmod_attributes in
       Three_parts { start; main; stop }
     | Pmod_apply
-        (m1, { pmod_attributes = []
+        (m1, { pmod_attributes = No_attributes
              ; pmod_desc =
                  Pmod_parens
                    { pmod_attributes = attrs2
@@ -3373,7 +3376,7 @@ end = struct
 
   let pp_keeping_semi = Toplevel_items.Struct.pp_grouped_keeping_semi pp_item
 
-  let pp ?(attrs=[]) str =
+  let pp ?(attrs = No_attributes) str =
     let struct_ = Attribute.attach ~attrs S.struct_ in
     group (
       struct_ ^?^
@@ -3568,7 +3571,7 @@ end = struct
 
 
   let pp ?preceeding ?params_indent ?item ?(equal_sign = S.equals) ?pre_text ?pre_doc ~keyword
-        ?(params=[]) ?constraint_ ?rhs ?(attrs=[]) ?post_doc bound =
+        ?(params=[]) ?constraint_ ?rhs ?(attrs = No_attributes) ?post_doc bound =
     (* Here we assume that [preceeding] cannot be [Some _] at the same time as
        [pre_text] or [pre_doc]. *)
     pp ?preceeding ?params_indent ~equal_sign ~keyword ~params ?constraint_ ?rhs
@@ -3704,7 +3707,7 @@ end = struct
            noop.
            But I'd rather leave it than have two separate code paths depending
            on whether we're adding [in] or not. *)
-        [], Attribute.pp_list ~item:true pvb_attributes ^?^ S.in_
+        No_attributes, Attribute.pp_list ~item:true pvb_attributes ^?^ S.in_
     in
     layout ?preceeding
       ~keyword:kw_and_modes

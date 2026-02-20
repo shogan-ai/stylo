@@ -1,6 +1,10 @@
 open Ocaml_syntax
 open Parsetree
 
+let sort_attributes : attributes -> attributes = function
+  | No_attributes -> No_attributes
+  | Attributes a ->
+    Attributes { a with attributes = List.sort compare a.attributes }
 
 let cleaner =
   object

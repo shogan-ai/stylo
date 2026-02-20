@@ -19,7 +19,7 @@ module Error = struct
   let pp ppf : t -> unit = function
     | `Missing_children (ctxt, pos) ->
       Format.fprintf ppf
-        "@[<hov 2>%a:@ Missing tokens for subtree starting at position %d:%d@]@."
+        "@[<hov>%a:@ Missing tokens for subtree starting at position %d:%d@]@."
         pp_context ctxt
         pos.pos_lnum (pos.pos_cnum - pos.pos_bol)
     | `Extra_children (ctxt, tokens) ->
@@ -38,7 +38,7 @@ module Error = struct
         | true -> fprintf ppf "@;- ..."
       in
       Format.fprintf ppf
-        "@[<hov 2>%a:@ unexpected tokens:@[<v 2>%a%a@]@]@."
+        "@[<v>%a:@ @[<hov 2>Unexpected tokens:@ @[<hov>%a%a@]@]@]@."
         pp_context ctxt
         pp_tokens tokens
         pp_ellipsis truncated
@@ -92,13 +92,13 @@ let tokenizer = object
     let node_toks = l.tokens in
     combine_children "longident" ~loc:Location.none node_toks sub_tokens
 
-  method! modes : Parsetree.modes -> Tokens.seq list = function
+  method! modes = function
     | No_modes -> []
     | Modes m as modes ->
       let sub_tokens = super#modes modes in
       combine_children "modes" ~loc:m.loc m.tokens sub_tokens
 
-  method! modalities : Parsetree.modalities -> Tokens.seq list = function
+  method! modalities = function
     | No_modalities -> []
     | Modalities m as modalities ->
       let sub_tokens = super#modalities modalities in
@@ -107,6 +107,12 @@ let tokenizer = object
   method! attribute a =
     let sub_tokens = super#attribute a in
     combine_children "attribute" ~loc:a.attr_loc a.attr_tokens sub_tokens
+
+  method! attributes = function
+    | No_attributes -> []
+    | Attributes a as attributes ->
+      let sub_tokens = super#attributes attributes in
+      combine_children "attributes" ~loc:a.loc a.tokens sub_tokens
 
   method! extension e =
     let sub_tokens = super#extension e in
@@ -223,6 +229,11 @@ let tokenizer = object
     let sub_tokens = super#class_infos visit_elt ci in
     let node_toks = ci.pci_tokens in
     combine_children "class_infos" ~loc:ci.pci_loc node_toks sub_tokens
+
+  method! class_expr ce =
+    let sub_tokens = super#class_expr ce in
+    let node_toks = ce.pcl_tokens in
+    combine_children "class_expr" ~loc:ce.pcl_loc node_toks sub_tokens
 
   method! class_field cf =
     let sub_tokens = super#class_field cf in

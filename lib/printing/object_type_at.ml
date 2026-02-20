@@ -11,7 +11,7 @@ module End = struct
      ']' will be lexed independently. *)
 
   let rec of_core_type ct =
-    ct.ptyp_attributes = []
+    ct.ptyp_attributes = No_attributes
     &&
     match ct.ptyp_desc with
     | Ptyp_object (_, _) -> true
@@ -53,7 +53,7 @@ module End = struct
   ;;
 
   let of_constructor_decl cd =
-    cd.pcd_attributes = []
+    cd.pcd_attributes = No_attributes
     &&
     match cd with
     | { pcd_res = Some ct; _ } -> of_core_type ct
@@ -63,7 +63,7 @@ module End = struct
   ;;
 
   let of_type_declaration td =
-    td.ptype_attributes = []
+    td.ptype_attributes = No_attributes
     &&
     match td with
     | { ptype_cstrs = _ :: _ as cstrs; _ } ->
@@ -83,7 +83,7 @@ module End = struct
   ;;
 
   let of_extension_constructor ec =
-    ec.pext_attributes = []
+    ec.pext_attributes = No_attributes
     &&
     match ec.pext_kind with
     | Pext_decl (_, _, Some ret_ct) -> of_core_type ret_ct
@@ -93,12 +93,12 @@ module End = struct
   ;;
 
   let of_type_extension te =
-    te.ptyext_attributes = []
+    te.ptyext_attributes = No_attributes
     && of_extension_constructor List.(hd (rev te.ptyext_constructors))
   ;;
 
   let of_type_exception exn =
-    exn.ptyexn_attributes = []
+    exn.ptyexn_attributes = No_attributes
     && of_extension_constructor exn.ptyexn_constructor
   ;;
 
@@ -124,7 +124,7 @@ module End = struct
   ;;
 
   let of_value_description vd =
-    vd.pval_attributes = []
+    vd.pval_attributes = No_attributes
     && vd.pval_prim = []
     && vd.pval_modalities = No_modalities
     && of_core_type vd.pval_type

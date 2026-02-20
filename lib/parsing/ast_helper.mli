@@ -31,7 +31,7 @@ type lid = Longident.t with_loc
 type str = string with_loc
 type str_or_op = Longident.str_or_op with_loc
 type str_opt = string option with_loc
-type attrs = attribute list
+type attrs = attributes
 
 (** {1 Default locations} *)
 
@@ -76,7 +76,7 @@ end
 module Typ :
   sig
     val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> core_type_desc -> core_type
-    val attr: core_type -> attribute -> core_type
+(*     val attr: core_type -> attribute -> core_type *)
 
     val any: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> jkind_annotation option -> core_type
     val var: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> string -> jkind_annotation option
@@ -122,7 +122,7 @@ module Typ :
 module Pat:
   sig
     val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern_desc -> pattern
-    val attr:pattern -> attribute -> pattern
+(*     val attr:pattern -> attribute -> pattern *)
 
     val any: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> unit -> pattern
     val var: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> str_or_op -> pattern
@@ -160,7 +160,7 @@ module Pat:
 module Exp:
   sig
     val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> expression_desc -> expression
-    val attr: expression -> attribute -> expression
+(*     val attr: expression -> attribute -> expression *)
 
     val ident: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> expression
     val constant: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> constant -> expression
@@ -302,7 +302,7 @@ module Te:
 module Mty:
   sig
     val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_type_desc -> module_type
-    val attr: module_type -> attribute -> module_type
+(*     val attr: module_type -> attribute -> module_type *)
 
     val ident: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> module_type
     val alias: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> module_type
@@ -322,7 +322,7 @@ module Mty:
 module Mod:
   sig
     val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_expr_desc -> module_expr
-    val attr: module_expr -> attribute -> module_expr
+(*     val attr: module_expr -> attribute -> module_expr *)
 
     val ident: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> module_expr
     val structure: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> attrs ->
@@ -473,7 +473,7 @@ module Vb:
 module Cty:
   sig
     val mk: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> class_type_desc -> class_type
-    val attr: class_type -> attribute -> class_type
+(*     val attr: class_type -> attribute -> class_type *)
 
     val constr: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> core_type list -> lid -> class_type
     val signature: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> class_signature -> class_type
@@ -509,21 +509,21 @@ module Ctf:
 module Cl:
   sig
     val mk: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
-      class_expr_desc -> class_expr
-    val attr: class_expr -> attribute -> class_expr
+      tokens:Tokens.seq -> class_expr_desc -> class_expr
+(*     val attr: class_expr -> attribute -> class_expr *)
 
-    val constr: ?loc:loc -> ?attrs:attrs -> core_type list -> lid -> class_expr
-    val structure: ?loc:loc -> ?attrs:attrs -> class_structure -> class_expr
-    val fun_: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
+    val constr: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> core_type list -> lid -> class_expr
+    val structure: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> class_structure -> class_expr
+    val fun_: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs -> tokens:Tokens.seq ->
       pattern argument list -> class_expr -> class_expr
-    val apply: ?loc:loc -> ?attrs:attrs -> class_expr ->
+    val apply: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> class_expr ->
       expression argument list -> class_expr
-    val let_: ?loc:loc -> ?attrs:attrs -> rec_flag -> value_binding list ->
+    val let_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> rec_flag -> value_binding list ->
       class_expr -> class_expr
-    val constraint_: ?loc:loc -> ?attrs:attrs -> class_expr -> class_type ->
+    val constraint_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> class_expr -> class_type ->
       class_expr
-    val extension: ?loc:loc -> ?attrs:attrs -> extension -> class_expr
-    val open_: ?loc:loc -> ?attrs:attrs -> open_description -> class_expr
+    val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> class_expr
+    val open_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> open_description -> class_expr
                -> class_expr
   end
 
