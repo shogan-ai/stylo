@@ -172,6 +172,8 @@ module Doc = struct
   let pp_floating s =
     softline ^^ pp s ^^ softline
 
+  let pp_pre ds = softline ^^ softline ^^ pp ds
+
   let attach ?(possibly_ambiguous=true) ?(extra_nest=Fun.id)
         ?(text = []) ?pre_doc ?post_doc t =
     extra_nest (
@@ -182,7 +184,7 @@ module Doc = struct
         separate_map (break 1) pp text ^^
         softline ^^ softline
       end ^^
-      optional pp pre_doc
+      optional pp_pre pre_doc
     ) ^?/^
     match post_doc with
     | None -> t
