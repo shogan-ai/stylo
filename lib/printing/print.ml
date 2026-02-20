@@ -168,7 +168,7 @@ let include_kind = function
   | Functor -> S.functor_
 
 module Doc = struct
-  let pp = docstring
+  let pp (Docstring s) = docstring s
   let pp_floating s =
     softline ^^ pp s ^^ softline
 
@@ -3443,14 +3443,14 @@ and Layout_module_binding : sig
     -> ?params_indent:int
     -> ?item:bool
     -> ?equal_sign:t
-    -> ?pre_text:string list
-    -> ?pre_doc:string
+    -> ?pre_text:doc list
+    -> ?pre_doc:doc
     -> keyword:t
     -> ?params:t list
     -> ?constraint_:rhs
     -> ?rhs:rhs
     -> ?attrs:attributes
-    -> ?post_doc:string
+    -> ?post_doc:doc
     -> t
     -> t
 end = struct

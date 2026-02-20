@@ -43,21 +43,23 @@ let empty_ext_attr =
   { pea_ext = None; pea_attrs = No_attributes }
 
 module Docs = struct
+  let body_as_doc ds = Docstring (Docstrings.docstring_body ds)
+
   let text =
     List.filter_map (fun ds ->
       simplify_ds (Some ds)
-      |> Option.map Docstrings.docstring_body
+      |> Option.map body_as_doc
     )
 
   let pre_post docs =
     let pre_doc = simplify_ds docs.docs_pre in
     let post_doc = simplify_ds docs.docs_post in
-    Option.map Docstrings.docstring_body pre_doc,
-    Option.map Docstrings.docstring_body post_doc
+    Option.map body_as_doc pre_doc,
+    Option.map body_as_doc post_doc
 
   let info info =
     let info = simplify_ds info in
-    Option.map Docstrings.docstring_body info
+    Option.map body_as_doc info
 end
 
 module Ext = struct
@@ -290,7 +292,7 @@ module Sig = struct
       (fun ds ->
          let loc = docstring_loc ds in
          let ds_toks = Tokens.at (loc.loc_start, loc.loc_end) in
-         mk ~loc ~tokens:ds_toks (Psig_docstring ds.ds_body))
+         mk ~loc ~tokens:ds_toks (Psig_docstring (Docs.body_as_doc ds)))
       f_txt
 end
 
@@ -328,7 +330,7 @@ module Str = struct
       (fun ds ->
          let loc = docstring_loc ds in
          let ds_toks = Tokens.at (loc.loc_start, loc.loc_end) in
-         mk ~loc ~tokens:ds_toks (Pstr_docstring ds.ds_body))
+         mk ~loc ~tokens:ds_toks (Pstr_docstring (Docs.body_as_doc ds)))
       f_txt
 end
 
@@ -399,7 +401,7 @@ module Ctf = struct
       (fun ds ->
          let loc = docstring_loc ds in
          let ds_toks = Tokens.at (loc.loc_start, loc.loc_end) in
-         mk ~loc ~tokens:ds_toks (Pctf_docstring ds.ds_body))
+         mk ~loc ~tokens:ds_toks (Pctf_docstring (Docs.body_as_doc ds)))
       f_txt
 
 (*   let attr d a = {d with pctf_attributes = d.pctf_attributes @ [a]} *)
@@ -434,7 +436,7 @@ module Cf = struct
       (fun ds ->
          let loc = docstring_loc ds in
          let ds_toks = Tokens.at (loc.loc_start, loc.loc_end) in
-         mk ~loc ~tokens:ds_toks (Pcf_docstring ds.ds_body))
+         mk ~loc ~tokens:ds_toks (Pcf_docstring (Docs.body_as_doc ds)))
       f_txt
 
   let virtual_ ct = Cfk_virtual ct

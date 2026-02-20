@@ -43,7 +43,7 @@ val with_default_loc: loc -> (unit -> 'a) -> 'a
         of the provided function. *)
 
 module Docs : sig
-  val info : docstring option -> string option
+  val info : docstring option -> doc option
 end
 
 (** {1 Constants} *)
