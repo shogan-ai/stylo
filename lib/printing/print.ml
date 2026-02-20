@@ -2555,7 +2555,28 @@ end = struct
       ; type_kind td_flatness kind
       ]
 
+  (* In [type t = C (** cmt *)] the docstring is attached to [C], not [t].
+     To have it attached to [t] one must write [type t = C (**) (** cmt *)]
+     (or have any other docstring on C).
+
+     However, as in the compiler, empty docstrings do not get attached to the
+     syntax tree.
+     So here when the type has a "post doc" but not its last constructor, we
+     explicitely add an empty docstring to that constructor. *)
+  let add_empty_ds_if_needed td =
+    match td.ptype_post_doc, td.ptype_kind with
+    | Some _, Ptype_variant cds ->
+      begin match List.rev cds with
+      | { pcd_doc = None; _ } as last_cd :: rev_cds ->
+        let empty_ds = Some (Docstring "") in
+        let cds = List.rev ({ last_cd with pcd_doc = empty_ds } :: rev_cds) in
+        { td with ptype_kind = Ptype_variant cds }
+      | _ -> td
+      end
+    | _ -> td
+
   let pp ~start ?subst td =
+    let td = add_empty_ds_if_needed td in
     let flatness = flatness_tracker () in
     let kws =
       match start with

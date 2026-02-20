@@ -234,7 +234,13 @@ let directive t =
 
 (* FIXME *)
 let comment s = Comment (pseudo_of_string s)
-let docstring s = comment @@ "(**" ^ s ^ "*)"
+
+let docstring s =
+  comment @@
+  match s with
+  | "" -> "(**)"
+  | s -> "(**" ^ s ^ "*)"
+
 let comment s = comment @@ "(*" ^ s ^ "*)"
 
 
