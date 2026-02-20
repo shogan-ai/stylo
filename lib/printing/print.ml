@@ -2630,11 +2630,11 @@ end = struct
       begin match args, res with
         | Pcstr_tuple [], None -> empty
         | args, None ->
-            break 1 ^^ S.of_ ^/^ Constructor_argument.pp_args args
-          | Pcstr_tuple [], Some ct ->
-          break 1 ^^ S.colon ^/^ vars ^^ Core_type.pp ct
+          S.of_ ^/^ Constructor_argument.pp_args args
+        | Pcstr_tuple [], Some ct ->
+          S.colon ^/^ vars ^^ Core_type.pp ct
         | args, Some ct ->
-          break 1 ^^ S.colon ^/^ vars ^^
+          S.colon ^/^ vars ^^
           Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct
       end
     | Pext_rebind lid -> S.equals ^/^ constr_longident lid.txt
@@ -2642,7 +2642,7 @@ end = struct
   let pp { pext_name; pext_kind; pext_attributes; pext_doc;
            pext_loc = _; pext_tokens } =
     (if starts_with_pipe pext_tokens then S.pipe else empty) ^?^
-    constr_ident pext_name.txt ^/^ pp_kind pext_kind
+    constr_ident pext_name.txt ^?^ pp_kind pext_kind
     |> Attribute.attach ~attrs:pext_attributes
     |> Doc.attach ?post_doc:pext_doc
 end
@@ -2652,11 +2652,12 @@ and Type_exception : sig
 end = struct
   let pp { ptyexn_constructor ; ptyexn_attributes ; ptyexn_ext_attrs;
            ptyexn_pre_doc; ptyexn_post_doc; ptyexn_loc = _; ptyexn_tokens = _} =
-    Ext_attribute.decorate S.exception_ ptyexn_ext_attrs ^/^
-    Extension_constructor.pp ptyexn_constructor
+    group (
+      Ext_attribute.decorate S.exception_ ptyexn_ext_attrs ^/^
+      Extension_constructor.pp ptyexn_constructor
+    )
     |> Attribute.attach ~item:true ~attrs:ptyexn_attributes
     |> Doc.attach ?pre_doc:ptyexn_pre_doc ?post_doc:ptyexn_post_doc
-    |> group
 end
 
 (** {1 Class language} *)
