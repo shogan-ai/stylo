@@ -32,11 +32,11 @@ the output as in the input, that is between the same two tokens.
 
 Further reading:
 - the above only explains how to print comments, not how to "pretty" print.
-  Refer to the comments in [`bin/insert_comments.ml`](./bin/insert_comments.ml)
+  Refer to the comments in [`Comments.Insert`](./lib/comments/insert.ml)
   for details regarding spacing and layout.
 - the above is simplistic and can lead to a combinatorial explosion in presence
   of PPrint's [`ifflat`](https://cambium.inria.fr/~fpottier/pprint/doc/pprint/PPrint/index.html#val-ifflat) operator.
-  See the comments in [`printing/document/`](./printing/document/document.ml) for more details.
+  See the comments in [`lib/printing/document/`](./lib/printing/document/document.ml) for more details.
 
 ## Code style normalisation
 
