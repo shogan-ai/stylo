@@ -17,6 +17,12 @@ let cleaner =
 
     method! location () _ = Location.none
 
+    method! doc () _ =
+      (* By turning each docstring into an empty string, we still check that
+         docstrings are attached at the same place, while ignoring the actual
+         content (which will eventually have been reformated). *)
+      Docstring ""
+
     (* TODO: rename [Tokens.seq] to [Tokens.t], so the method gets the name
        [tokens] *)
     method! seq () _tokens = []

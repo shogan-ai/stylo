@@ -11,8 +11,6 @@ type 'a input = {
 
 (** Check that two strings parse to the same AST (modulo locations) *)
 
-val ignore_docstrings : bool ref
-
 val parse : 'ast input -> ('ast, [> `Input_parse_error of Errors.parser * exn ]) result
 
 val check_same_ast : 'cst -> 'cst input -> (unit, [> Errors.t ]) result

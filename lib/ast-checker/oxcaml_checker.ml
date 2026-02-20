@@ -3,13 +3,6 @@ open Parsetree
 
 let sort_attributes : attributes -> attributes = List.sort compare
 
-let normalize_cmt_spaces doc =
-  String.split_on_char ' ' doc
-  |> List.filter ((<>) "")
-  |> String.concat " "
-
-let ignore_docstrings = ref true
-
 let cleaner =
   let from_docstring attr =
     match attr.attr_name.txt with
@@ -31,31 +24,17 @@ let cleaner =
         if not (from_docstring attr) then
           attr.attr_payload
         else
-          match attr.attr_payload with
-          | PStr [ {
-            pstr_desc =
-              Pstr_eval
-                ({ pexp_desc= Pexp_constant Pconst_string (doc, loc, None)
-                 ; _ } as inner_exp,[]);
-            _
-          } as str ] ->
-            let doc = normalize_cmt_spaces doc in
-            let inner' =
-              { inner_exp with
-                pexp_desc = Pexp_constant (Pconst_string (doc, loc, None))
-              }
-            in
-            PStr [ { str with pstr_desc = Pstr_eval (inner', []) }]
-          | _ -> assert false
+          (* By turning each docstring into an empty string, we still check that
+             docstrings are attached at the same place, while ignoring the
+             actual content (which will eventually have been reformated). *)
+          let open Ast_helper in
+          let loc = Location.none in
+          let e_string = Exp.constant ~loc @@ Const.string ~loc "" in
+          PStr [Str.eval ~loc e_string]
       in
       super#attribute () { attr with attr_payload }
 
     method! attributes () attrs =
-      let attrs =
-        if not !ignore_docstrings
-        then attrs
-        else List.filter (fun a -> not (from_docstring a)) attrs
-      in
       super#attributes () ((* FIXME: why? *) sort_attributes attrs)
 
     method! pattern () p =
