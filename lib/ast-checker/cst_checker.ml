@@ -1,22 +1,9 @@
 open Ocaml_syntax
 open Parsetree
 
-let sort_attributes : attributes -> attributes = List.sort compare
-
-let normalize_cmt_spaces doc =
-  String.split_on_char ' ' doc
-  |> List.filter ((<>) "")
-  |> String.concat " "
-
-let ignore_docstrings = ref true
 
 let cleaner =
-  let from_docstring attr =
-    match attr.attr_name.txt with
-    | "ocaml" :: ("doc" | "text") :: [] -> true
-    | _ -> false
-  in
-  object(self)
+  object
     inherit [unit] Traversals_helpers.map_with_context
     inherit [unit] Traversals.map_with_context as super
 
@@ -26,44 +13,12 @@ let cleaner =
 
     method! location () _ = Location.none
 
-    (* FIXME: rename [Tokens.seq] to [Tokens.t], so the method gets the name
+    (* TODO: rename [Tokens.seq] to [Tokens.t], so the method gets the name
        [tokens] *)
     method! seq () _tokens = []
 
-    method! attribute () attr =
-      let attr_payload =
-        if not (from_docstring attr) then
-          attr.attr_payload
-        else
-          match attr.attr_payload with
-          | PStr ({ pst_items = [ {
-            pstr_desc =
-              Pstr_eval
-                ({ pexp_desc= Pexp_constant Pconst_string (doc, loc, none)
-                 ; _ } as inner_exp,[]);
-            _
-          } as item ]; _ } as str) ->
-            let doc = normalize_cmt_spaces doc in
-            let inner' =
-              { inner_exp with
-                pexp_desc = Pexp_constant (Pconst_string (doc, loc, none))
-              }
-            in
-            let item = { item with pstr_desc = Pstr_eval (inner', []) } in
-            let pst_tokens = self#seq () str.pst_tokens in
-            let str = { str with pst_items = [ item ]; pst_tokens } in
-            PStr str
-          | _ -> assert false
-      in
-      super#attribute () { attr with attr_payload }
-
     method! attributes () attrs =
-      let attrs =
-        if not !ignore_docstrings
-        then attrs
-        else List.filter (fun a -> not (from_docstring a)) attrs
-      in
-      super#attributes () ((* fixme: why? *) sort_attributes attrs)
+      super#attributes () ((* FIXME: why? *) sort_attributes attrs)
   end
 
 
