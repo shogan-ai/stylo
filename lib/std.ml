@@ -15,6 +15,9 @@
 
 
 module List = struct
+
+  (* Import from recent version of stdlib *)
+
   let take n l =
     let[@tail_mod_cons] rec aux n l =
       match n, l with
@@ -40,4 +43,22 @@ module List = struct
   let rec drop_while p = function
     | x::l when p x -> drop_while p l
     | rest -> rest
+
+  (* local additions *)
+
+  (** splits the list before the first element on which the predicate returns
+      false. *)
+  let split_at p l =
+    let rec aux = function
+      | x::l when p x ->
+        let taken, dropped = aux l in
+        x::taken, dropped
+      | rest -> [], rest
+    in
+    aux l
+
+  let rec map_last ~f = function
+    | [] -> []
+    | [ x ] -> [ f x ]
+    | x :: xs -> x :: map_last ~f xs
 end

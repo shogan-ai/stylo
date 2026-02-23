@@ -54,7 +54,7 @@ let map ~recur (parent : Context.parent) exp =
       ; _ } ->
       let pexp_desc = Pexp_parens { exp = e; optional = false } in
       let pexp_tokens =
-        Utils.search_and_replace [BEGIN, LPAREN; END, RPAREN] exp.pexp_tokens
+        Tokens.Seq.search_and_replace [BEGIN, LPAREN; END, RPAREN] exp.pexp_tokens
       in
       { exp with pexp_desc; pexp_tokens }
     | _ -> exp

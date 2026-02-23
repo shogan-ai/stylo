@@ -495,3 +495,32 @@ let is_token ?which t =
     | Some t -> tok = t
     end
   | _ -> false
+
+module Seq = struct
+  let split ~on:target =
+    Std.List.split_at (fun tok ->
+      match tok.desc with
+      | Token (t, _) when Raw.equals t target -> false
+      | _ -> true
+    )
+
+  let split_on_child = Std.List.split_at (fun tok -> not (is_child tok))
+
+  let search_and_replace pairs =
+    let replace rt =
+      try List.assoc rt pairs
+      with Not_found -> rt
+    in
+    List.map (fun tok ->
+      match tok.desc with
+      | Token (t, opt) -> { tok with desc = Token (replace t, opt) }
+      | Lexer_directive _ | Comment _ | Child_node -> tok
+    )
+
+  let without ~token =
+    List.filter (fun t ->
+      match t.desc with
+      | Token (rt, _opt) -> not (Raw.equals rt token)
+      | _ -> true
+    )
+end

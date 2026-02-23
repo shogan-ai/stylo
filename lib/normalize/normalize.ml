@@ -9,7 +9,7 @@ let from_docstring attr =
 let add_pipe_if_missing ?(mk_optional=false) tokens =
   let open Tokens in
   let desc = Token (BAR, mk_optional) in
-  match Utils.split ~on:BAR tokens with
+  match Tokens.Seq.split ~on:BAR tokens with
   | tokens, [] ->
     (* no pipe was present, insert one at the front *)
     { desc; pos = (List.hd tokens).pos } :: tokens

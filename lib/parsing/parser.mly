@@ -506,19 +506,11 @@ let attributes_patching sloc prev_tokens prev_attributes attr =
   *)
   let tokens = Tokens.at sloc in
   (* Everything that comes after the first Child_node (corresponding to [elt])
-     will be appended to the attributes tokens. *)
-  let attr_tokens =
-    let saw_child = ref false in
-    Std.List.drop_while (fun tok ->
-      if !saw_child
-      then (* we can stop now. *) false
-      else (saw_child := Tokens.is_child tok; true)
-    ) tokens
-  in
-  (* And any comment that comes before will be prepended to [elt]'s tokens. *)
-  let to_prepend =
-    Std.List.take_while (fun tok -> not @@ Tokens.is_child tok) tokens
-  in
+     will be appended to the attributes tokens.
+
+     And any comment that comes before will be prepended to [elt]'s tokens. *)
+  let to_prepend, child_then_attr_tokens = Tokens.Seq.split_on_child tokens in
+  let attr_tokens = List.tl child_then_attr_tokens in
   (* There is one subtlety however: if [elt] didn't have any attributes yet, we
      must append a Child_node to its tokens, this corresponds to the now present
      attributes. *)
@@ -553,18 +545,8 @@ let merge_attrs parent_tokens attrs1 attrs2 =
          remove one Child_node from the parent's tokens. *)
       let tokens =
         let rev_toks = List.rev parent_tokens in
-        let rev_tail =
-          Std.List.take_while (fun t -> not (Tokens.is_child t)) rev_toks
-        in
-        let rev_head =
-          let saw_child = ref false in
-          Std.List.drop_while (fun tok ->
-            if !saw_child
-            then (* we can stop now. *) false
-            else (saw_child := Tokens.is_child tok; true)
-          ) rev_toks
-        in
-        List.rev (rev_tail @ rev_head)
+        let rev_tail, rev_head = Tokens.Seq.split_on_child rev_toks in
+        List.rev (rev_tail @ List.tl rev_head)
       in
       let attrs =
         let attributes = a1.attributes @ a2.attributes in

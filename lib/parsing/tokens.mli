@@ -51,6 +51,19 @@ val is_child : elt -> bool
 val is_comment : elt -> bool
 val is_token : ?which:token -> elt -> bool
 
+module Seq : sig
+  val split : on:token -> seq -> seq * seq
+  (** [split ~on:tok tokens] splits [tokens] just before the first occurence of
+      [tok] *)
+
+  val split_on_child : seq -> seq * seq
+  (** [split_on_child l] splits [l] just before the first child node *)
+
+  val search_and_replace : (token * token) list -> seq -> seq
+
+  val without : token:token -> seq -> seq
+  (** removes all occurences of [token] from the given list of tokens *)
+end
 
 (** {1 Attaching to the Parsetree} *)
 

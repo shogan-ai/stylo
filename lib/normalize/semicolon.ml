@@ -42,7 +42,7 @@ let normalize_struct_semisemi str =
             walk_both items tokens
           | _ -> t :: walk_both items tokens
   in
-  let tokens_no_semi = Utils.without ~token:SEMISEMI str.pst_tokens in
+  let tokens_no_semi = Tokens.Seq.without ~token:SEMISEMI str.pst_tokens in
   let tokens_with_minimal_semi = walk_both str.pst_items tokens_no_semi in
   { str with pst_tokens = tokens_with_minimal_semi }
 
@@ -53,7 +53,7 @@ let nb_semis =
 
 let remove_last_semi tokens =
   let rev_tokens = List.rev tokens in
-  let before, last_semi_and_after = Utils.split ~on:SEMI rev_tokens in
+  let before, last_semi_and_after = Tokens.Seq.split ~on:SEMI rev_tokens in
   let rev_tokens_without_last_semi = before @ List.tl last_semi_and_after in
   List.rev rev_tokens_without_last_semi
 
@@ -92,7 +92,7 @@ let pat_no_trailing p =
     then p (* semis are separators, not terminators, nothing to do *)
     else
       let rev_tokens = List.rev p.ppat_tokens in
-      let before, last_semi_and_after = Utils.split ~on:SEMI rev_tokens in
+      let before, last_semi_and_after = Tokens.Seq.split ~on:SEMI rev_tokens in
       let rev_tokens_without_last_semi = before @ List.tl last_semi_and_after in
       let ppat_tokens = List.rev rev_tokens_without_last_semi in
       { p with ppat_tokens }
@@ -100,19 +100,19 @@ let pat_no_trailing p =
     p
 
 let strip_from_label_decl lbl =
-  { lbl with pld_tokens = Utils.without ~token:SEMI lbl.pld_tokens }
+  { lbl with pld_tokens = Tokens.Seq.without ~token:SEMI lbl.pld_tokens }
 
 let constructor_arguments = function
   | Pcstr_tuple _ as tuple -> tuple
   | Pcstr_record lbls ->
-    Pcstr_record (Utils.list_map_last ~f:strip_from_label_decl lbls)
+    Pcstr_record (Std.List.map_last ~f:strip_from_label_decl lbls)
 
 let type_kind_no_trailing = function
   | Ptype_record lbls ->
-    Ptype_record (Utils.list_map_last ~f:strip_from_label_decl lbls)
+    Ptype_record (Std.List.map_last ~f:strip_from_label_decl lbls)
   | Ptype_record_unboxed_product lbls ->
     Ptype_record_unboxed_product
-      (Utils.list_map_last ~f:strip_from_label_decl lbls)
+      (Std.List.map_last ~f:strip_from_label_decl lbls)
   | Ptype_variant _
   | Ptype_abstract
   | Ptype_open as kind -> kind
