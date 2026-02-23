@@ -167,12 +167,12 @@ let attach_before_comments state tokens doc =
     (* delay until flush hint or having left the group. *)
     tokens, doc, state
   else
-    match List.take_while is_comment_attaching_before tokens with
+    match Std.List.take_while is_comment_attaching_before tokens with
     | [] ->
       (* no comment to attach *)
       tokens, doc, state
     | to_append ->
-      let tokens = List.drop_while is_comment_attaching_before tokens in
+      let tokens = Std.List.drop_while is_comment_attaching_before tokens in
       let doc =
         let open Doc in
         group @@ List.fold_left (fun acc cmt ->

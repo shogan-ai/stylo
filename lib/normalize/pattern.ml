@@ -44,11 +44,11 @@ let remove_parens p =
   | Ppat_parens { pat = p'; optional = _ } ->
     (* FIXME: I'm pretty sure we are dropping attributes here *)
     let comments_before_p' =
-      List.take_while (fun t -> not (Tokens.is_child t)) p.ppat_tokens
+      Std.List.take_while (fun t -> not (Tokens.is_child t)) p.ppat_tokens
       |> List.filter Tokens.is_comment
     in
     let comments_after_p' =
-      List.drop_while (fun t -> not (Tokens.is_child t)) p.ppat_tokens
+      Std.List.drop_while (fun t -> not (Tokens.is_child t)) p.ppat_tokens
       |> List.tl
       |> List.filter Tokens.is_comment
     in

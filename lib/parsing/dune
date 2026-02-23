@@ -23,7 +23,7 @@
 (library
   (name ocaml_syntax)
   (modules_without_implementation asttypes)
-  (libraries menhirLib dbg_print config)
+  (libraries menhirLib dbg_print config std)
   (flags :standard -w -9-63 -open Dbg_print))
 
 (rule

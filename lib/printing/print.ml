@@ -3044,7 +3044,7 @@ end = struct
         (* The presence of modalities implies that the first [Child_node] in the
            signature's tokens does not map to a signature item. *)
         let saw_child = ref false in
-        List.drop_while (fun tok ->
+        Std.List.drop_while (fun tok ->
           if !saw_child
           then (* we can stop now. *) false
           else (saw_child := Tokens.is_child tok; true)

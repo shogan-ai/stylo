@@ -46,7 +46,7 @@ let ( + ) fst_opt snd =
   | Some fst ->
     let pre_doc = preceed snd.pre_doc ~by:fst in
     let space = snd.space in
-    let nest = Fun.compose snd.nest fst.nest in
+    let nest doc = fst.nest (snd.nest doc) in
     { pre_doc; space; nest }, fst.nest
 
 let group_with t doc =

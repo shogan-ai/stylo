@@ -25,7 +25,7 @@ module Error = struct
     | `Extra_children (ctxt, tokens) ->
       let truncated, tokens =
         if List.compare_length_with tokens 5 > 0
-        then true, List.take 5 tokens
+        then true, Std.List.take 5 tokens
         else false, tokens
       in
       let open Format in

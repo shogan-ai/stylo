@@ -62,7 +62,7 @@ let pp_lines lines =
     | [] -> acc
     | line :: lines ->
       let first_line = Document.is_empty acc in
-      let last_line = List.is_empty lines in
+      let last_line = lines = [] in
       let words = String.split_on_char ' ' line in
       let acc =
         if first_line

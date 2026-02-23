@@ -509,7 +509,7 @@ let attributes_patching sloc prev_tokens prev_attributes attr =
      will be appended to the attributes tokens. *)
   let attr_tokens =
     let saw_child = ref false in
-    List.drop_while (fun tok ->
+    Std.List.drop_while (fun tok ->
       if !saw_child
       then (* we can stop now. *) false
       else (saw_child := Tokens.is_child tok; true)
@@ -517,7 +517,7 @@ let attributes_patching sloc prev_tokens prev_attributes attr =
   in
   (* And any comment that comes before will be prepended to [elt]'s tokens. *)
   let to_prepend =
-    List.take_while (fun tok -> not @@ Tokens.is_child tok) tokens
+    Std.List.take_while (fun tok -> not @@ Tokens.is_child tok) tokens
   in
   (* There is one subtlety however: if [elt] didn't have any attributes yet, we
      must append a Child_node to its tokens, this corresponds to the now present
@@ -554,11 +554,11 @@ let merge_attrs parent_tokens attrs1 attrs2 =
       let tokens =
         let rev_toks = List.rev parent_tokens in
         let rev_tail =
-          List.take_while (fun t -> not (Tokens.is_child t)) rev_toks
+          Std.List.take_while (fun t -> not (Tokens.is_child t)) rev_toks
         in
         let rev_head =
           let saw_child = ref false in
-          List.drop_while (fun tok ->
+          Std.List.drop_while (fun tok ->
             if !saw_child
             then (* we can stop now. *) false
             else (saw_child := Tokens.is_child tok; true)
