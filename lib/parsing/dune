@@ -22,13 +22,13 @@
 
 (library
   (name ocaml_syntax)
-  (modules_without_implementation asttypes)
+  (modules_without_implementation asttypes parsetree)
   (libraries menhirLib dbg_print config std)
   (flags :standard -w -9-63 -open Dbg_print))
 
 (rule
   (target traversals.ml)
-  (deps location.mli tokens.ml longident.mli asttypes.mli parsetree.ml
+  (deps location.mli tokens.ml longident.mli asttypes.mli parsetree.mli
         parser_tokens.ml docstring.ml lexer_directive.ml)
   (action
     (with-stdout-to %{target}
