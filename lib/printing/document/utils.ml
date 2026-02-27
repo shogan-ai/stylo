@@ -1,5 +1,11 @@
 open Core
 
+let optional f v_opt =
+  match v_opt with
+  | None -> empty
+  | Some v -> f v
+
+
 let foldli f init l =
   snd @@ List.fold_left (fun (i, acc) elt ->
       let acc = f i acc elt in

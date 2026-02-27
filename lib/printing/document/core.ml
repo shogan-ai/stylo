@@ -232,6 +232,9 @@ let directive t =
   let t = softline ^^ group t ^^ softest_line in
   Directive (Complex (requirement t, t))
 
+
+let as_comment d = Comment (Complex (requirement d, d))
+
 (* FIXME *)
 let comment s = Comment (pseudo_of_string s)
 

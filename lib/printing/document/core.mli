@@ -141,6 +141,9 @@ val flush_comments
     engine runs, so it can be used to make elements preceeding the comments
     vanish, not just elements who follow them. *)
 
+val as_comment : t -> t
+(** [as_comment d] wraps [d] in [Comment].*)
+
 val comment : string -> t
 (** [comment s] wraps [s] with "(*" "*)" and produces a [Comment].*)
 

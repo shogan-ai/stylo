@@ -1,5 +1,8 @@
 open Document
 open Document.Utils
+
+module Doc = Docstring
+
 open Ocaml_syntax
 open Parsetree
 
@@ -7,11 +10,6 @@ module S = Syntax
 
 let parens d = (* fixme: nest 1?? *)
   group (S.lparen ^^ nest 1 d ^^ S.rparen)
-
-let optional f v_opt =
-  match v_opt with
-  | None -> empty
-  | Some v -> f v
 
 let is_semi = Tokens.is_token ~which:SEMI
 let nb_semis = List.fold_left (fun nb t -> if is_semi t then nb + 1 else nb) 0
@@ -166,32 +164,6 @@ let with_atat_modes ?(extra_nest=Fun.id) ~modes:l t =
 let include_kind = function
   | Structure -> empty
   | Functor -> S.functor_
-
-module Doc = struct
-  let pp (Docstring s) = docstring s
-  let pp_floating s =
-    softline ^^ pp s ^^ softline
-
-  let pp_pre ds = softline ^^ softline ^^ pp ds
-
-  let attach ?(possibly_ambiguous=true) ?(extra_nest=Fun.id)
-        ?(text = []) ?pre_doc ?post_doc t =
-    extra_nest (
-      begin match text with
-      | [] -> empty
-      | text ->
-        softline ^^ softline ^^
-        separate_map (break 1) pp text ^^
-        softline ^^ softline
-      end ^^
-      optional pp_pre pre_doc
-    ) ^?/^
-    match post_doc with
-    | None -> t
-    | Some s ->
-      group (t ^^ softest_break ^^ extra_nest (pp s)) ^^
-      if possibly_ambiguous then softline else empty
-end
 
 module rec Attribute : sig
   val pp : ?item:bool -> attribute -> t

@@ -12,5 +12,6 @@
   (depends
     (cmdliner (>= 2.1.0))
     menhir
+    odoc-parser
     ppxlib ; TODO: only require it in dev mode
     ))
