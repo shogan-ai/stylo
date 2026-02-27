@@ -10,7 +10,7 @@
   (name stylo)
   (synopsis "Styling O(x)Caml code")
   (depends
-    cmdliner
+    (cmdliner (>= 2.1.0))
     menhir
     ppxlib ; TODO: only require it in dev mode
     ))
