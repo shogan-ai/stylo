@@ -61,3 +61,24 @@
   (alias runtest)
   (action (diff %{dep:lexer_directives.out} %{dep:lexer_directives.snd-run})))
 
+(rule
+  (target odoc_markup.out)
+  (action
+    (with-stdout-to %{target}
+      (run ../../../bin/main.exe style --width 90 %{dep:odoc_markup.mli}))))
+
+(rule
+  (target odoc_markup.snd-run)
+  (action
+    (with-stdout-to %{target}
+      (run ../../../bin/main.exe style --width 90 %{dep:odoc_markup.out}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:odoc_markup.oxcamlformat-ref} %{dep:odoc_markup.out})))
+
+; idempotence check
+(rule
+  (alias runtest)
+  (action (diff %{dep:odoc_markup.out} %{dep:odoc_markup.snd-run})))
+
