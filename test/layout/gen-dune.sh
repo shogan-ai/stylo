@@ -1,38 +1,32 @@
 function check-file {
     local f="$1"
-    local name=$(basename $(basename $f ".mli") ".ml")
+    local name=$(basename "$f")
 
-    # In failing/ we always have a .oxcamlformat-ref file, to record what
-    # oxcamlformat does.
-    # But sometimes we also have a .ref file: this indicates that we deem
-    # acceptable to have a different output from oxcamlformat.
-    if [ -f "$name.ref" ]; then
-        ref="$name.ref"
-    else
-        ref="$name.oxcamlformat-ref"
-    fi
+    ref="$name.stylo"
+    out="$name.out"
 
     cat <<EOF
 (rule
-  (target $name.out)
+  (target $out)
   (action
     (with-stdout-to %{target}
-      (run ../../../bin/main.exe style --width 90 %{dep:$f}))))
+      (run %{project_root}/bin/main.exe style --width 90 %{dep:$f}))))
 
 (rule
   (target $name.snd-run)
   (action
-    (with-stdout-to %{target}
-      (run ../../../bin/main.exe style --width 90 %{dep:$name.out}))))
+    (with-stdin-from %{dep:$out}
+      (with-stdout-to %{target}
+        (run %{project_root}/bin/main.exe style --width 90 --stdin $name)))))
 
 (rule
   (alias runtest)
-  (action (diff %{dep:$ref} %{dep:$name.out})))
+  (action (diff %{dep:$ref} %{dep:$out})))
 
 ; idempotence check
 (rule
   (alias runtest)
-  (action (diff %{dep:$name.out} %{dep:$name.snd-run})))
+  (action (diff %{dep:$out} %{dep:$name.snd-run})))
 
 EOF
 }

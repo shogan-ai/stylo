@@ -235,10 +235,14 @@ v}
     @before 1.0 it was in b{^e}t{_a}
     @version -1 *)
 
-(** Comments in structure items {b support} {e markup}, t[{^o}][{_o}]. *)
-val foo : unit
+val foo : unit (** Comments in structure items {b support} {e markup}, t{^o}{_o}. *)
 
 (** Some modules to support references. *)
 
-module X : sig end
-module Y : sig end
+module X : sig
+
+end
+
+module Y : sig
+
+end
