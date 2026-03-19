@@ -109,6 +109,28 @@
   (action (diff %{dep:odoc_markup.mli.out} %{dep:odoc_markup.mli.snd-run})))
 
 (rule
+  (target odoc_markup_no_docstring.mli.out)
+  (action
+    (with-stdout-to %{target}
+      (run %{project_root}/bin/main.exe style --width 90 %{dep:odoc_markup_no_docstring.mli}))))
+
+(rule
+  (target odoc_markup_no_docstring.mli.snd-run)
+  (action
+    (with-stdin-from %{dep:odoc_markup_no_docstring.mli.out}
+      (with-stdout-to %{target}
+        (run %{project_root}/bin/main.exe style --width 90 --stdin odoc_markup_no_docstring.mli)))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:odoc_markup_no_docstring.mli.stylo} %{dep:odoc_markup_no_docstring.mli.out})))
+
+; idempotence check
+(rule
+  (alias runtest)
+  (action (diff %{dep:odoc_markup_no_docstring.mli.out} %{dep:odoc_markup_no_docstring.mli.snd-run})))
+
+(rule
   (target preceeding_and_comments.ml.out)
   (action
     (with-stdout-to %{target}
