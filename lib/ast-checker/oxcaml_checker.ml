@@ -6,7 +6,7 @@ let sort_attributes : attributes -> attributes = List.sort compare
 let cleaner =
   let from_docstring attr =
     match attr.attr_name.txt with
-    | "ocaml.doc" | "ocaml.txt"  -> true
+    | "ocaml.doc" | "ocaml.text"  -> true
     | _ -> false
   in
   object
@@ -26,7 +26,7 @@ let cleaner =
         else
           (* By turning each docstring into an empty string, we still check that
              docstrings are attached at the same place, while ignoring the
-             actual content (which will eventually have been reformated). *)
+             actual content (which has been reformated). *)
           let open Ast_helper in
           let loc = Location.none in
           let e_string = Exp.constant ~loc @@ Const.string ~loc "" in
