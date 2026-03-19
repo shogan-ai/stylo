@@ -346,7 +346,7 @@ module Odoc = struct
 end
 
 let docstring = function
-  | "" -> comment "(**)"
+  | "" -> as_comment (string "(**)")
   | text ->
     let ast =
       Odoc_parser.parse_comment ~location:Lexing.dummy_pos (*FIXME*) ~text
