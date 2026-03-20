@@ -4,6 +4,9 @@ open Ocaml_syntax
 open Parsetree
 
 module Odoc = struct
+  let process_ocaml_block : (string -> t option) ref =
+    ref (fun _ -> failwith "Odoc.process_ocaml_block: use before init")
+
   open Odoc_parser.Ast
 
   module Loc = Odoc_parser.Loc
@@ -148,16 +151,16 @@ module Odoc = struct
     )
 
   let code_block_content meta_opt content =
-    match
+    let is_ocaml =
       Option.map (fun m -> Loc.value m.language) meta_opt
       |> Option.value ~default:"ocaml"
       |> String.lowercase_ascii
-    with
-    | "ocaml" ->
-      (* FIXME: parse, print, etc *)
-      fancy_string (Loc.value content)
-    | _ ->
-      fancy_string (Loc.value content)
+      |> (=) "ocaml"
+    in
+    let source = Loc.value content in
+    match if is_ocaml then !process_ocaml_block source else None with
+    | Some res -> res
+    | None -> fancy_string source
 
   let code_block cb =
     let delim = optional string cb.delimiter in

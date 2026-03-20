@@ -149,6 +149,33 @@ module Pipeline = struct
     let* () = Check.same_ast ast_for_checker output in
     Ok output
 
+  type guessed_input = Guess : ('a, _) input_kind * 'a -> guessed_input
+
+  let try_parse source =
+    let try_parse src parse =
+      let lb = Lexing.from_string src in
+      try Some (parse lb)
+      with _ -> None
+    in
+    match try_parse source Parse.implementation with
+    | Some str -> Some (Guess (Impl, str))
+    | None ->
+      Option.map (fun sg -> Guess (Intf, sg)) (try_parse source Parse.interface)
+
+  let for_codeblock source =
+    match try_parse source with
+    | None -> None
+    | Some Guess (kind, cst) ->
+      match tokens_of_tree kind cst with
+      | Error _ -> None
+      | Ok tokens ->
+        let doc = build_doc kind cst in
+        match Comments.Insert.from_tokens tokens doc with
+        | Error _ -> None
+        | Ok doc -> Some doc
+
+  let () = Print.Doc.Odoc.process_ocaml_block := for_codeblock
+
   type error = [
     | Tokens_of_tree.Error.t
     | Check.error
