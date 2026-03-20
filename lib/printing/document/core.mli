@@ -144,12 +144,6 @@ val flush_comments
 val as_comment : t -> t
 (** [as_comment d] wraps [d] in [Comment].*)
 
-val comment : string -> t
-(** [comment s] wraps [s] with "(*" "*)" and produces a [Comment].*)
-
-val docstring : string -> t
-(** As [comment] but wraps with "(**" "*)" instead. *)
-
 (** {2 Lexer directive} *)
 
 val directive : t -> t

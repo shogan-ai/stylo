@@ -377,7 +377,7 @@ let append_trailing_comments (tokens, doc, _) =
         let doc =
           if !(c.explicitely_inserted)
           then doc
-          else Doc.Utils.(doc ^?^ Doc.comment c.text)
+          else Doc.Utils.(doc ^?^ fmt_comment c.text)
         in
         aux doc toks
       | Token _ -> raise (Error (Missing_token tok.pos))

@@ -235,16 +235,4 @@ let directive t =
 
 let as_comment d = Comment (Complex (requirement d, d))
 
-(* FIXME *)
-let comment s = Comment (pseudo_of_string s)
-
-let docstring s =
-  comment @@
-  match s with
-  | "" -> "(**)"
-  | s -> "(**" ^ s ^ "*)"
-
-let comment s = comment @@ "(*" ^ s ^ "*)"
-
-
 let is_empty = function Empty -> true | _ -> false
