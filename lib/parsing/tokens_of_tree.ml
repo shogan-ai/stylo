@@ -44,26 +44,90 @@ module Error = struct
         pp_ellipsis truncated
 end
 
+module Doubly_linked = struct
+  type t = {
+    mutable fst: cell;
+    mutable last: cell
+  }
+
+  and cell =
+    | Empty
+    | Elt of {
+        elt: Tokens.elt;
+        mutable prev: cell;
+        mutable next: cell;
+      }
+
+  let create () = { fst = Empty; last = Empty }
+
+  let to_list t =
+    let rec aux = function
+      | Empty -> []
+      | Elt e -> e.elt :: aux e.next
+    in
+    aux t.fst
+
+  let set_next ~next = function
+    | Empty -> ()
+    | Elt e -> e.next <- next
+
+  let snoc t elt =
+    let prev = t.last in
+    let cell = Elt { elt; prev; next = Empty; } in
+    set_next prev ~next:cell;
+    t.last <- cell;
+    match t.fst with
+    | Empty -> t.fst <- cell
+    | Elt _ -> ()
+
+  let concat t1 t2 =
+    match t1.last, t2.fst with
+    | _, Empty ->
+      t2.fst <- t1.fst;
+      t2.last <- t1.last
+    | Empty, _ ->
+      t1.fst <- t2.fst;
+      t1.last <- t2.last
+    | Elt last_1, Elt fst_2 ->
+      last_1.next <- t2.fst;
+      fst_2.prev <- t1.last;
+      t1.last <- t2.last;
+      t2.fst <- t1.fst
+
+  let flatten = function
+    | [] -> []
+    | x :: xs ->
+      List.iter (concat x) xs;
+      (* TODO: don't convert back to a list, update downstream instead *)
+      to_list x
+end
+
 exception Abort of Error.t
 
-let rec combine_children ctxt (top : Tokens.seq) children =
+let rec combine_children ctxt acc (top : Tokens.seq) children =
   match top, children with
-  | [], [] -> [] (* done *)
-  | [], _ -> raise (Abort (`Extra_children (ctxt, children)))
+  | [], [] -> ()
+  | [], _ ->
+    let children = List.map Doubly_linked.to_list children in
+    raise (Abort (`Extra_children (ctxt, children)))
   | { desc = Child_node; pos } :: _, [] ->
     raise (Abort (`Missing_children (ctxt, pos)))
   | { desc = Child_node; _ } :: tokens, child :: children ->
-    child @ combine_children ctxt tokens children
+    Doubly_linked.concat acc child;
+    combine_children ctxt acc tokens children
   | tok :: tokens, _ ->
-    tok :: combine_children ctxt tokens children
+    Doubly_linked.snoc acc tok;
+    combine_children ctxt acc tokens children
 
 let combine_children node_kind ~loc top children =
   let ctxt = { Error.node_kind ; pos = loc.Location.loc_start } in
-  [combine_children ctxt top children]
+  let dll = Doubly_linked.create () in
+  combine_children ctxt dll top children;
+  [dll]
 
 (* TODO: should be generated. *)
 let tokenizer = object
-  inherit [Tokens.seq list] Traversals.lift as super
+  inherit [Doubly_linked.t list] Traversals.lift as super
 
   (* The actual tokens. *)
   method tokens list = [ list ]
@@ -322,9 +386,9 @@ let mk_error : Error.t -> _ = function
 let structure str =
   match tokenizer#structure str with
   | exception Abort err -> mk_error err
-  | res -> Ok (List.flatten res)
+  | res -> Ok (Doubly_linked.flatten res)
 
 let signature sg =
   match tokenizer#signature sg with
   | exception Abort err -> mk_error err
-  | res -> Ok (List.flatten res)
+  | res -> Ok (Doubly_linked.flatten res)
