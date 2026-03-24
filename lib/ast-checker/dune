@@ -1,3 +1,4 @@
 (library
  (name ast_checker)
- (libraries ocaml_syntax oxcaml_frontend traversals_helpers))
+ (libraries ocaml_syntax oxcaml_frontend traversals_helpers camtrail)
+ (preprocess (pps camtrail.ppx)))

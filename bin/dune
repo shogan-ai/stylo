@@ -1,8 +1,9 @@
 (executable
   (name main)
   (public_name stylo)
-  (libraries cmdliner config stylo ocaml_syntax dbg_print)
+  (libraries cmdliner config stylo ocaml_syntax dbg_print camtrail)
   (modules :standard \ fuzzer_driver)
+  (preprocess (pps camtrail.ppx))
   (empty_module_interface_if_absent))
 
 (executable
