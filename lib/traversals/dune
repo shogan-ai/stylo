@@ -5,4 +5,6 @@
 
 (library
   (name traversals_helpers)
-  (modules traversals_helpers))
+  (modules traversals_helpers)
+  (libraries camtrail)
+  (preprocess (pps camtrail.ppx)))

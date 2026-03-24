@@ -23,8 +23,9 @@
 (library
   (name ocaml_syntax)
   (modules_without_implementation asttypes parsetree)
-  (libraries menhirLib dbg_print config std)
-  (flags :standard -w -9-63 -open Dbg_print))
+  (libraries menhirLib dbg_print config std camtrail)
+  (flags :standard -w -9-63 -open Dbg_print)
+  (preprocess (pps camtrail.ppx)))
 
 (rule
   (target traversals.ml)

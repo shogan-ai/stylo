@@ -1,4 +1,5 @@
 (library
   (name comments)
-  (libraries dbg_print document ocaml_syntax print odoc-parser)
-  (flags :standard -open Dbg_print))
+  (libraries dbg_print document ocaml_syntax print odoc-parser camtrail)
+  (flags :standard -open Dbg_print)
+  (preprocess (pps camtrail.ppx)))

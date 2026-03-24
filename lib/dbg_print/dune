@@ -1,2 +1,4 @@
 (library
-  (name dbg_print))
+  (name dbg_print)
+  (libraries camtrail)
+  (preprocess (pps camtrail.ppx)))

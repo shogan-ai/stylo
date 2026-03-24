@@ -1,4 +1,5 @@
 (library
   (name normalize)
-  (libraries ocaml_syntax dbg_print traversals_helpers std)
-  (flags :standard -open Dbg_print))
+  (libraries ocaml_syntax dbg_print traversals_helpers std camtrail)
+  (flags :standard -open Dbg_print)
+  (preprocess (pps camtrail.ppx)))
