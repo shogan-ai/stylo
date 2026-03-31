@@ -226,7 +226,7 @@ module Odoc = struct
   and heavy_list kind elts =
     let kind =
       match kind with
-      | `Ordered _ (* TODO: ?? *) -> "ol"
+      | `Ordered _ -> "ol"
       | `Unordered -> "ul"
     in
     let pp_elt e =
@@ -239,14 +239,32 @@ module Odoc = struct
     )
 
   and light_list kind elts =
-    let bullet =
-      string @@
-      match kind with
-      | `Ordered _ (* FIXME: ?? *) -> "+ "
-      | `Unordered -> "- "
+    let bullet item_num =
+      let str =
+        match kind with
+        | `Unordered -> "-"
+        | `Ordered None -> "+"
+        | `Ordered (Some (punct, num, _spacious)) ->
+          let letter i = Char.chr (Char.code 'a' + i) in
+          let num =
+            match num with
+            | `Number _ -> `Number (item_num + 1)
+            | `Lower_case _ -> `Lower_case (letter item_num)
+            | `Upper_case _ ->
+              `Upper_case (Char.uppercase_ascii (letter item_num))
+          in
+          print_list_number punct num
+      in
+      string (str ^ " ")
     in
-    let pp_elt e = group (bullet ^^ nest 2 @@ nestable_block_elements e) in
-    separate_map hardline pp_elt elts
+    let pp_elt i e = group (bullet i ^^ nest 2 @@ nestable_block_elements e) in
+    let sep =
+      match kind with
+      | `Ordered (Some (_, _, true)) -> hardline ^^ hardline
+      | _ -> hardline
+    in
+    List.mapi pp_elt elts
+    |> separate sep
 
   and heavy_table rows _align_infos_opt =
     let pp_cell (elts, kind) =
