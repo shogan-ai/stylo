@@ -10,23 +10,11 @@ function check-file {
   (target $out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --width 90 %{dep:$f}))))
-
-(rule
-  (target $name.snd-run)
-  (action
-    (with-stdin-from %{dep:$out}
-      (with-stdout-to %{target}
-        (run %{project_root}/bin/main.exe style --width 90 --stdin $name)))))
+      (run %{project_root}/bin/main.exe style --idempotence-check --width 90 %{dep:$f}))))
 
 (rule
   (alias runtest)
   (action (diff %{dep:$ref} %{dep:$out})))
-
-; idempotence check
-(rule
-  (alias runtest)
-  (action (diff %{dep:$out} %{dep:$name.snd-run})))
 
 EOF
 }
