@@ -32,8 +32,10 @@ function accept_diff {
 }
 
 function do_diff {
-    if [[ -x patdiff ]]; then
-        patdiff <(accept_diff $1) <(accept_diff $2)
+    if (which patdiff &>/dev/null); then
+        patdiff -alt-prev "$1" -alt-next "$2" \
+            <(accept_diff $1) <(accept_diff $2) | \
+            less -r
     else
         git diff --no-index <(accept_diff $1) <(accept_diff $2)
     fi
