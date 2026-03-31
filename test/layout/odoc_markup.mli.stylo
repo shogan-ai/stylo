@@ -80,12 +80,11 @@
 
     {[
         let foo = ()
-        (** There are some nested comments in here, but an unpaired comment
-            terminator would terminate the whole doc surrounding comment. It's
-            best to keep code blocks no wider than 72 characters. *)
+        (** There are some nested comments in here, but an unpaired comment terminator
+            would terminate the whole doc surrounding comment. It's best to keep code
+            blocks no wider than 72 characters. *)
 
-        let bar =
-          ignore foo
+        let bar = ignore foo
     ]}
     There are also verbatim blocks:
 

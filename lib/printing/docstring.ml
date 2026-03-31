@@ -167,8 +167,8 @@ module Odoc = struct
     let meta = (* FIXME: tags! *)
       optional (fun m -> string ("@" ^ Loc.value m.language)) cb.meta
     in
-    group (string "{" ^^ delim ^^ meta ^^ string "[") ^^
-    code_block_content cb.meta cb.content ^^
+    group (string "{" ^^ delim ^^ meta ^^ string "[") ^/^
+    nest 4 (group @@ code_block_content cb.meta cb.content) ^/^
     (* FIXME: output?! *)
     group (string "]" ^^ delim ^^ string "}")
 
