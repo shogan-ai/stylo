@@ -3,6 +3,8 @@ open Document.Utils
 open Ocaml_syntax
 open Parsetree
 
+open Jst_odoc_parser
+
 module Odoc = struct
   let process_ocaml_block : (string -> t option) ref =
     ref (fun _ -> failwith "Odoc.process_ocaml_block: use before init")
@@ -150,9 +152,11 @@ module Odoc = struct
         string "{" ^^ ref ^^ text ^^ string "}"
     )
 
+  let cb_meta_lang (lang, _metadata) = Loc.value lang
+
   let code_block_content meta_opt content =
     let is_ocaml =
-      Option.map (fun m -> Loc.value m.language) meta_opt
+      Option.map cb_meta_lang meta_opt
       |> Option.value ~default:"ocaml"
       |> String.lowercase_ascii
       |> (=) "ocaml"
@@ -162,15 +166,13 @@ module Odoc = struct
     | Some res -> res
     | None -> fancy_string source
 
-  let code_block cb =
-    let delim = optional string cb.delimiter in
+  let code_block (meta_opt, content) =
     let meta = (* FIXME: tags! *)
-      optional (fun m -> string ("@" ^ Loc.value m.language)) cb.meta
+      optional (fun meta -> string ("@" ^ cb_meta_lang meta)) meta_opt
     in
-    group (string "{" ^^ delim ^^ meta ^^ string "[") ^/^
-    nest 4 (group @@ code_block_content cb.meta cb.content) ^/^
-    (* FIXME: output?! *)
-    group (string "]" ^^ delim ^^ string "}")
+    group (string "{" ^^ meta ^^ string "[") ^/^
+    nest 4 (group @@ code_block_content meta_opt content) ^/^
+    group (string "]" ^^ string "}")
 
   let verbatim s =
     group (string "{v" ^^ fancy_string s ^^ string "v}")
@@ -224,7 +226,7 @@ module Odoc = struct
   and heavy_list kind elts =
     let kind =
       match kind with
-      | `Ordered -> "ol"
+      | `Ordered _ (* TODO: ?? *) -> "ol"
       | `Unordered -> "ul"
     in
     let pp_elt e =
@@ -240,7 +242,7 @@ module Odoc = struct
     let bullet =
       string @@
       match kind with
-      | `Ordered -> "+ "
+      | `Ordered _ (* FIXME: ?? *) -> "+ "
       | `Unordered -> "- "
     in
     let pp_elt e = group (bullet ^^ nest 2 @@ nestable_block_elements e) in

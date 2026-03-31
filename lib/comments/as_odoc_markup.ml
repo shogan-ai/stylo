@@ -1,3 +1,5 @@
+open Jst_odoc_parser
+
 let to_document ~startp text =
   let doc =
     Odoc_parser.parse_comment ~location:startp ~text
