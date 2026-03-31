@@ -175,7 +175,8 @@ module Odoc = struct
     group (string "]" ^^ string "}")
 
   let verbatim s =
-    group (string "{v" ^^ fancy_string s ^^ string "v}")
+    (* FIXME: indentation *)
+    group (string "{v" ^/^ fancy_string s ^/^ string "v}")
 
   let modules lst =
     group (
