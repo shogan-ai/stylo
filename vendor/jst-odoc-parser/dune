@@ -1,0 +1,6 @@
+(ocamllex lexer)
+
+(library
+ (name jst_odoc_parser)
+ (flags :standard -w -50)
+ (libraries astring camlp-streams))
