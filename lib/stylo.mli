@@ -70,7 +70,7 @@ module Pipeline : sig
 end
 
 val style_file :
-  _ input_kind -> fname:string -> string -> (string, Pipeline.error) result
+  _ input_kind -> fname:string -> string -> (string, [> Pipeline.error ]) result
 
 val style_fuzzer_line :
   lnum:int -> fname:string -> string -> (string, Pipeline.error) result

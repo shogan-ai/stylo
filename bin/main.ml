@@ -26,6 +26,14 @@ module Arg = struct
     |> flag
     |> value
 
+  let idempotence_check_arg_name = "idempotence-check"
+  let idempotence_check =
+    info [idempotence_check_arg_name]
+      ~doc:"Check that calling the tool again on the output produces the same \
+            result."
+    |> flag
+    |> value
+
   let tokens_checks =
     info ["tokens-checks"]
       ~doc:"Performs various tokens-related sanity checks."
@@ -122,21 +130,37 @@ let fuzzer_batch fn =
 
 type file_kind = Regular | Stdin
 
-let style_input fkind fname =
+let do_style is_mli fname source =
+  if is_mli
+  then Stylo.style_file Intf ~fname source
+  else Stylo.style_file Impl ~fname source
+
+let style_input check_idempotence fkind fname =
   let is_mli = Filename.check_suffix fname ".mli" in
   let source =
     match fkind with
     | Regular -> In_channel.(with_open_text fname input_all)
     | Stdin -> In_channel.input_all stdin
   in
-  if is_mli
-  then Stylo.style_file Intf ~fname source
-  else Stylo.style_file Impl ~fname source
+  let result = do_style is_mli fname source in
+  if not check_idempotence then
+    result
+  else
+    let (let*) = Result.bind in
+    let* fst_round = result in
+    if fst_round = source then
+      (* input might already have been formatted *)
+      result
+    else (* general case, we styled the input, next round ought to be a noop *)
+      let* snd_round = do_style is_mli fname fst_round in
+      if fst_round = snd_round
+      then result
+      else Error `Not_idempotent
 
-let style_files inplace fns =
+let style_files check_idempotence inplace fns =
   let has_error = ref false in
   List.iter (fun (fkind, fn) ->
-    match style_input fkind fn with
+    match style_input check_idempotence fkind fn with
     | exception exn ->
       let bt = Printexc.get_backtrace () in
       Format.eprintf "%s: %s" fn (Printexc.to_string exn);
@@ -145,7 +169,11 @@ let style_files inplace fns =
       else
         Format.eprintf "@.";
       has_error := true
-    | Error e ->
+    | Error `Not_idempotent ->
+      Format.eprintf
+        "%s: `--idempotence-check` failure: output is not stable@." fn;
+      has_error := true
+    | Error (#Stylo.Pipeline.error as e) ->
       Stylo.Pipeline.pp_error fn e;
       has_error := true
     | Ok output ->
@@ -181,6 +209,7 @@ let style_cmd =
   and+ stdin
   and+ inplace
   and+ ast_check
+  and+ idempotence_check
   and+ tokens_checks
   and+ debug
   and+ w = width in
@@ -199,8 +228,8 @@ let style_cmd =
     Format.eprintf "Can't pass both --%s and --%s.@."
       stdin_arg_name inplace_arg_name;
     Cmd.Exit.cli_error
-  | None, _ -> style_files inplace files
-  | Some fn, _ -> style_files inplace @@ (Stdin, fn) :: files
+  | None, _ -> style_files idempotence_check inplace files
+  | Some fn, _ -> style_files idempotence_check inplace @@ (Stdin, fn) :: files
 
 let main () =
   Cmd.group (Cmd.info "stylo") [fuzz_cmd; style_cmd]
