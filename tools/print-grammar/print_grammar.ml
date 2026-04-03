@@ -14,8 +14,50 @@ module G = MenhirSdk.Cmly_read.Read(struct
 
 open G.Surface
 
+(* Reverse engineer anonymous producers.
+   Minor bug in Menhir: the grammar is serialized post lambda-lifting. It shouldn't. *)
+
+let anonymous = Hashtbl.create 7
+
+let () =
+  List.iter begin fun (name, def) ->
+    if String.starts_with ~prefix:"__anonymous_" name then
+      Hashtbl.add anonymous name def
+  end (Syntax.rules before_expansion)
+
+let resolve_anonymous param =
+  (* Sanity checks *)
+  let valid_app param arg =
+    match Parameter.desc arg with
+    | App _ | Anonymous _ -> false
+    | Var arg -> String.equal param arg
+  in
+  let valid_rule rule args =
+    List.for_all2 valid_app (Rule.parameters rule) args
+  in
+  (* Check if anonymous *)
+  let desc = Parameter.desc param in
+  match desc with
+  | Var var ->
+    begin match Hashtbl.find_opt anonymous var with
+      | None -> desc
+      | Some rule ->
+        assert (valid_rule rule []);
+        Anonymous (Rule.branches rule)
+    end
+  | App (name, args) ->
+    begin match Hashtbl.find_opt anonymous name with
+      | None -> desc
+      | Some rule ->
+        assert (valid_rule rule args);
+        Anonymous (Rule.branches rule)
+    end
+  | Anonymous _ -> desc
+
+(* Print *)
+
 let rec print_parameter param =
-  match Parameter.desc param with
+  match resolve_anonymous param with
   | Var var -> print_string var
   | App (name, args) ->
     print_string name;
@@ -41,19 +83,21 @@ let print_branch branch =
   print_newline ()
 
 let print_rule (name, def) =
-  print_string name;
-  begin match Rule.parameters def with
-    | [] -> ()
-    | params ->
-      print_char '(';
-      List.iteri begin fun i n ->
-        if i > 0 then print_char ',';
-        print_string n
-      end params;
-      print_char ')';
-  end;
-  print_string ":\n";
-  List.iter print_branch (Rule.branches def);
-  print_newline ()
+  if not (Hashtbl.mem anonymous name) then (
+    print_string name;
+    begin match Rule.parameters def with
+      | [] -> ()
+      | params ->
+        print_char '(';
+        List.iteri begin fun i n ->
+          if i > 0 then print_char ',';
+          print_string n
+        end params;
+        print_char ')';
+    end;
+    print_string ":\n";
+    List.iter print_branch (Rule.branches def);
+    print_newline ()
+  )
 
 let () = List.iter print_rule (Syntax.rules before_expansion)
