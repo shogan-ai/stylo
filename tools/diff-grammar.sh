@@ -31,18 +31,22 @@ function accept_diff {
     hide_menhir_anonymous_fun_gensym_shifts
 }
 
+function print_rules {
+    dune exec ./tools/print-grammar/print_grammar.exe -- "$1"
+}
+
 function do_diff {
     if (which patdiff &>/dev/null); then
         patdiff -alt-prev "$1" -alt-next "$2" \
-            <(accept_diff $1) <(accept_diff $2) | \
+            <(print_rules $1) <(print_rules $2) | \
             less -r
     else
-        git diff --no-index <(accept_diff $1) <(accept_diff $2)
+        git diff --no-index <(print_rules $1) <(print_rules $2)
     fi
 }
 
-STYLOS="lib/parsing/raw_grammar.txt"
-OXCAMLS="vendor/oxcaml-frontend/raw_grammar.txt"
+STYLOS="lib/parsing/parser.cmly"
+OXCAMLS="vendor/oxcaml-frontend/parser.cmly"
 
 BUILD_DIR="_build/default/"
 
