@@ -374,4 +374,4 @@ let print_rule (name, parameters, branches) =
   List.iter print_branch branches;
   print_newline ()
 
-let () = List.iter print_rule !definitions
+let () = List.iter print_rule (List.sort (fun (a,_,_) (b,_,_) -> String.compare a b) !definitions)
