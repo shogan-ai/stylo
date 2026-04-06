@@ -31,17 +31,36 @@ function accept_diff {
     hide_menhir_anonymous_fun_gensym_shifts
 }
 
+INLINE="
+attrs_as_extattrs
+empty_list
+exp_unreachable
+ext_attributes
+ext_noattrs
+inherit_field
+inherit_field_semi
+labeled_tuple_element_noprec
+noext_attributes
+no_modalities
+no_modes
+str_not_op
+xlist
+optional_structure_standalone_expression
+"
+
 function print_rules {
-    dune exec ./tools/print-grammar/print_grammar.exe -- "$1"
+    dune exec ./tools/print-grammar/print_grammar.exe -- --inline "$INLINE" "$@"
 }
 
 function do_diff {
+    print_rules $1 > $1.txt
+    print_rules $2 > $2.txt
     if (which patdiff &>/dev/null); then
         patdiff -alt-prev "$1" -alt-next "$2" \
-            <(print_rules $1) <(print_rules $2) | \
+            $1.txt $2.txt | \
             less -r
     else
-        git diff --no-index <(print_rules $1) <(print_rules $2)
+        git diff --no-index --patience --word-diff=color $1.txt $2.txt
     fi
 }
 
