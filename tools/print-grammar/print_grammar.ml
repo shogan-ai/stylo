@@ -133,16 +133,17 @@ let () =
 let need_inlining =
   let names = ref StringSet.empty in
   let terms = ref TermSet.empty in
+  let is_ws = function
+    | ' ' | '\t' | '\n' -> true
+    | _ -> false
+  in
   let is_operator = function
     | ',' | '(' | ')' -> true
     | _ -> false
   in
-  let parse_term term =
-    if String.exists (function
-        | ' ' -> errorf "inlining term: ' ' not allowed in %S\n" term
-        | c -> is_operator c
-      ) term
-    then
+  let is_meta c = is_ws c || is_operator c in
+  let parse_spec term =
+    if String.exists is_meta term then
       let position = ref 0 in
       let tokens = ref [] in
       let flush pos =
@@ -151,7 +152,9 @@ let need_inlining =
         position := pos + 1
       in
       for i = 0 to String.length term - 1 do
-        if is_operator term.[i] then (
+        if is_ws term.[i] then
+          flush i
+        else if is_operator term.[i] then (
           flush i;
           tokens := String.make 1 term.[i] :: !tokens
         )
@@ -177,16 +180,23 @@ let need_inlining =
         | _ :: _ -> malformed ()
         | [] -> malformed ()
       in
-      match parse_param (List.rev !tokens) with
-      | term, [] -> term
-      | _, _ -> malformed ()
-    else App (term, false, [])
+      let rec parse_terms acc = function
+        | [] -> acc
+        | tokens ->
+          let (term, ("," :: rest | rest)) = parse_param tokens in
+          parse_terms (term :: acc) rest
+      in
+      parse_terms [] (List.rev !tokens)
+    else [App (term, false, [])]
   in
-  List.iter (fun term ->
-      match parse_term term with
-      | App (name, _, []) ->
-        names := StringSet.add name !names
-      | term -> terms := TermSet.add term !terms) !inlined_terms;
+  List.iter (fun spec ->
+      List.iter (fun term ->
+          match term with
+          | App (name, _, []) ->
+            names := StringSet.add name !names
+          | term -> terms := TermSet.add term !terms
+        ) (parse_spec spec)
+    ) !inlined_terms;
   let names = !names in
   let terms = !terms in
   function
