@@ -333,10 +333,17 @@ let rec print_parameter = function
     print_parameter arg;
     List.iter (fun arg' -> print_char ','; print_parameter arg') args;
     print_char ')';
+  | Anonymous [branch] ->
+    print_inline_branch 0 branch
   | Anonymous branches ->
     print_char '(';
     List.iteri print_inline_branch branches;
     print_char ')';
+
+and print_produceri i prod =
+  if i > 0 then
+    print_char ' ';
+  print_parameter prod
 
 and print_producer prod =
   print_char ' ';
@@ -344,7 +351,7 @@ and print_producer prod =
 
 and print_inline_branch i branch =
   if i > 0 then print_string " | ";
-  List.iter print_producer branch
+  List.iteri print_produceri branch
 
 let print_branch branch =
   print_string "|";
