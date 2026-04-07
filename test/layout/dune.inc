@@ -9,6 +9,16 @@
   (action (diff %{dep:comments_insertion.ml.stylo} %{dep:comments_insertion.ml.out})))
 
 (rule
+  (target docstring_placement.ml.out)
+  (action
+    (with-stdout-to %{target}
+      (run %{project_root}/bin/main.exe style --idempotence-check --width 90 %{dep:docstring_placement.ml}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:docstring_placement.ml.stylo} %{dep:docstring_placement.ml.out})))
+
+(rule
   (target ext_attributes.ml.out)
   (action
     (with-stdout-to %{target}

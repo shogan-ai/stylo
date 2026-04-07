@@ -64,13 +64,81 @@ let normalizer = object
     |> super#structure env
 
   method! value_binding _ vb =
+    let vb = Docstring_placement.value_binding vb in
     let parent_for_recursive_calls = Context.Value_binding vb in
     super#value_binding parent_for_recursive_calls vb
+
+  method! value_description env vd =
+    Docstring_placement.value_description vd
+    |> super#value_description env
 
   method! argument_desc f _ arg =
     let parent_for_recursive_calls = Context.Fun_param_or_arg in
     super#argument_desc f parent_for_recursive_calls arg
 
+  method! type_declaration env td =
+    Docstring_placement.type_declaration td
+    |> super#type_declaration env
+
+  method! type_extension env ext =
+    Docstring_placement.type_extension ext
+    |> super#type_extension env
+
+  method! type_exception env exn =
+    Docstring_placement.type_exception exn
+    |> super#type_exception env
+
+  method! class_type_field env cf =
+    Docstring_placement.class_type_field cf
+    |> super#class_type_field env
+
+  method! class_description env cd =
+    Docstring_placement.class_description cd
+    |> super#class_description env
+
+  method! class_declaration env cd =
+    Docstring_placement.class_declaration cd
+    |> super#class_declaration env
+
+  method! class_type_declaration env cd =
+    Docstring_placement.class_type_declaration cd
+    |> super#class_type_declaration env
+
+  method! class_field env x =
+    Docstring_placement.class_field x
+    |> super#class_field env
+
+  method! module_declaration env x =
+    Docstring_placement.module_declaration x
+    |> super#module_declaration env
+
+  method! module_substitution env x =
+    Docstring_placement.module_substitution x
+    |> super#module_substitution env
+
+  method! module_type_declaration env x =
+    Docstring_placement.module_type_declaration x
+    |> super#module_type_declaration env
+
+  method! open_description env x =
+    Docstring_placement.open_description x
+    |> super#open_description env
+
+  method! open_declaration env x =
+    Docstring_placement.open_declaration x
+    |> super#open_declaration env
+
+  method! include_description env x =
+    Docstring_placement.include_description x
+    |> super#include_description env
+
+  method! include_declaration env x =
+    Docstring_placement.include_declaration x
+    |> super#include_declaration env
+
+  method! module_binding env x =
+    Docstring_placement.module_binding x
+    |> super#module_binding env
 end
 
 let structure = normalizer#structure Other

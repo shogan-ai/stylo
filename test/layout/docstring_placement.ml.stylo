@@ -1,0 +1,160 @@
+module _ : sig
+
+  (** x ds *)
+  val x : int
+
+  (** prim ds *)
+  external prim : int -> int = "prim"
+
+  (** t ds *)
+  type t
+
+  (** u ds *)
+  and u
+
+  (** alias ds *)
+  type alias := t
+
+  (** ext ds *)
+  type ext = ..
+
+  (** ext ext ds *)
+  type
+  ext
+  +=
+  A
+  |
+  B
+
+  (** Exn ds *)
+  exception Exn
+
+  (** M ds *)
+  module M : sig
+
+  end
+
+  (** N ds *)
+  module rec N : sig
+
+  end
+
+  (** O ds *)
+  and O : sig
+
+  end
+
+  (** S ds *)
+  module type S
+
+  (** S2 ds *)
+  module type S2 := S
+
+  (** open ds *)
+  open M
+
+  (** include ds *)
+  include S
+
+  (** c1 ds *)
+  class c1 : object end
+
+  (** c2 ds *)
+  and c2 : t
+
+  (** ct1 ds *)
+  class type ct1 = t
+
+  (** ct2 ds *)
+  and ct2 =
+    object
+
+      (** inherit ds *)
+      inherit foo
+
+      (** v ds *)
+      val v : int
+
+      (** m ds *)
+      method m : int -> int
+    end
+end = struct
+
+  (** x ds *)
+  let x = 3
+
+  (** y ds *)
+  and y = ()
+  ;;
+
+  (** whatever ds *)
+  val whatever : int
+
+  (** prim ds *)
+  external prim : int -> int = "prim"
+
+  (** t ds *)
+  type t = <  >
+
+  (** u ds *)
+  and u
+
+  (** ext ds *)
+  type ext = ..
+
+  (** ext ext ds *)
+  type
+  ext
+  +=
+  A
+  |
+  B
+
+  (** Exn ds *)
+  exception Exn
+
+  (** M ds *)
+  module M = struct end
+
+  (** N ds *)
+  module rec N : sig
+
+  end = N
+
+  (** O ds *)
+  and O : sig
+
+  end = O
+
+  (** S ds *)
+  module type S
+
+  (** open ds *)
+  open M
+
+  (** c1 ds *)
+  class c1 = object end
+
+  (** c2 ds *)
+  and c2 = c1
+
+  (** ct1 ds *)
+  class type ct1 = t
+
+  (** ct2 ds *)
+  and ct2 =
+    object
+
+      (** inherit ds *)
+      inherit foo
+
+      (** v ds *)
+      val v : int
+
+      (** m ds *)
+      method m : int -> int
+    end
+
+  (** include ds *)
+  include M
+end
