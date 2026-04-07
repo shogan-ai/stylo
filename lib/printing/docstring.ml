@@ -5,6 +5,35 @@ open Parsetree
 
 open Jst_odoc_parser
 
+let striped_lines s =
+  let strip s =
+    let is_ws = function
+      | ' ' | '\t' | '\r' | '\n' -> true
+      | _ -> false
+    in
+    let loop_until_non_ws ~stop_at ~dir s =
+      let first, next_idx, past_end =
+        match dir with
+        | `From_start -> 0, succ, (fun i -> i >= stop_at)
+        | `From_end -> String.length s - 1, pred, (fun i -> i < stop_at)
+      in
+      let rec aux i =
+        if not (past_end i) && is_ws (String.get s i)
+        then aux (next_idx i)
+        else i
+      in
+      aux first
+    in
+    let end_ = loop_until_non_ws ~stop_at:0 ~dir:`From_end s in
+    let start = loop_until_non_ws ~stop_at:end_ ~dir:`From_start s in
+    String.sub s start (end_ - start + 1)
+  in
+  String.split_on_char '\n' s
+  |> Std.List.drop_while ((=) "")
+  |> List.rev_map strip
+  |> Std.List.drop_while ((=) "")
+  |> List.rev
+
 module Odoc = struct
   let process_ocaml_block : (string -> t option) ref =
     ref (fun _ -> failwith "Odoc.process_ocaml_block: use before init")
@@ -171,7 +200,7 @@ module Odoc = struct
       optional (fun meta -> string ("@" ^ cb_meta_lang meta)) meta_opt
     in
     group (string "{" ^^ meta ^^ string "[") ^/^
-    nest 4 (group @@ code_block_content meta_opt content) ^/^
+    nest 2 (group @@ code_block_content meta_opt content) ^/^
     group (string "]" ^^ string "}")
 
   let verbatim s =
@@ -180,13 +209,14 @@ module Odoc = struct
 
   let modules lst =
     group (
-      string "{!modules:" ^/^
-      separate_map (break 1) (located string) lst ^^
+      string "{!modules:" ^^ break 0 ^^
+      nest 2 (separate_map (break 1) (located string) lst) ^^
       string "}"
     )
 
   let math_block s =
-    group (string "{math " ^^ fancy_string s ^^ string "}")
+    let content = separate_map hardline string (striped_lines s) in
+    group (string "{math" ^/^ nest 2 content ^^ break 0 ^^ string "}")
 
   let media ref_kind href alt kind =
     let media_ref =
@@ -225,17 +255,17 @@ module Odoc = struct
     | `Media (kind, href, alt, media_kind) -> media kind href alt media_kind
 
   and heavy_list kind elts =
-    let kind =
+    let kind, item =
       match kind with
-      | `Ordered _ -> "ol"
-      | `Unordered -> "ul"
+      | `Ordered _ -> "ol", string "{li" (* should this become "{+"? meh. *)
+      | `Unordered -> "ul", string "{-"
     in
     let pp_elt e =
-      group (string "{li" ^/^ nest 2 (nestable_block_elements e) ^^ string "}")
+      group (item ^/^ nest 2 (nestable_block_elements e) ^^ string "}")
     in
     group (
       string "{" ^^ string kind ^/^
-      nest 2 (separate_map (break 1) pp_elt elts) ^^
+      nest 1 (separate_map (break 1) pp_elt elts) ^^
       string "}"
     )
 

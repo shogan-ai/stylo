@@ -81,12 +81,12 @@
     This is a code block:
 
     {[
-        let foo = ()
-        (** There are some nested comments in here, but an unpaired comment terminator
-            would terminate the whole doc surrounding comment. It's best to keep code
-            blocks no wider than 72 characters. *)
+      let foo = ()
+      (** There are some nested comments in here, but an unpaired comment terminator would
+          terminate the whole doc surrounding comment. It's best to keep code blocks no
+          wider than 72 characters. *)
 
-        let bar = ignore foo
+      let bar = ignore foo
     ]}
     There are also verbatim blocks:
 
@@ -111,16 +111,14 @@
     - creates two separate lists.
 
     {ul
-      {li
-        To get around this limitation, one
+     {-
+       To get around this limitation, one
 
-        can use explicitly-delimited lists.
-      }
-      {li This one is bulleted,}}
+       can use explicitly-delimited lists.
+     }
+     {- This one is bulleted,}}
     {ol {li but there is also the numbered variant.}}
-    {ul
-      {li {ul {li lists} {li can be nested} {li and can include references} {li {!foo}}}}}
-    *)
+    {ul {- {ul {- lists} {- can be nested} {- and can include references} {- {!foo}}}}} *)
 
 (** {1 Unicode}
 
@@ -144,16 +142,17 @@
 
     Math elements can be inline: {m \int_{-\infty}^\infty}, or blocks:
 
-    {math     % \f is defined as #1f(#2) using the macro
-    \newcommand{\f}[2]{#1f(#2)}
-    \f\relax{x} = \int_{-\infty}^\infty
-    \f\hat\xi\,e^{2 \pi i \xi x}
-    \,d\xi
+    {math
+      % \f is defined as #1f(#2) using the macro
+      \newcommand{\f}[2]{#1f(#2)}
+      \f\relax{x} = \int_{-\infty}^\infty
+      \f\hat\xi\,e^{2 \pi i \xi x}
+      \,d\xi
     }
     {1 Modules}
 
-    {!modules: X}
-    {!modules: X Y} *)
+    {!modules:X}
+    {!modules:X Y} *)
 
 (** {1 Tables}
 
