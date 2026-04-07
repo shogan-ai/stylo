@@ -264,32 +264,40 @@ let subst env =
   in
   aux
 
-let rec inline import abstract = function
-  | App (head, do_inline, args) when do_inline && not (List.mem head abstract) ->
+let rec inline import blocked abstract = function
+  | App (head, do_inline, args) as term
+    when do_inline
+      && not (List.mem head abstract)
+      && not (TermSet.mem term blocked) ->
     begin match Hashtbl.find_opt rules head with
       | None -> assert false
       | Some (parameters, branches) ->
         let env = List.combine parameters args in
+        let blocked = TermSet.add term blocked in
         let branches = List.map (List.map (subst env)) branches in
-        traverse_branches (inline import abstract) branches
+        traverse_branches (inline import blocked abstract) branches
     end
   | Anonymous branches ->
-    inline_branches import abstract branches
+    inline_branches import blocked abstract branches
   | term ->
-    [[inline_args import abstract term]]
+    [[inline_args import blocked abstract term]]
 
-and inline_args import abstract = function
+and inline_args import blocked abstract = function
   | Anonymous [[term]] ->
-    inline_args import abstract term
+    inline_args import blocked abstract term
   | Anonymous branches ->
-    Anonymous (inline_branches import abstract branches)
-  | App (head, do_inline, args) when do_inline && not (List.mem head abstract) ->
+    Anonymous (inline_branches import blocked abstract branches)
+  | App (head, do_inline, args) as term
+    when do_inline
+      && not (List.mem head abstract)
+      && not (TermSet.mem term blocked) ->
     begin match Hashtbl.find_opt rules head with
       | None -> assert false
       | Some (parameters, branches) ->
         let env = List.combine parameters args in
+        let blocked = TermSet.add term blocked in
         let branches = List.map (List.map (subst env)) branches in
-        match traverse_branches (inline import abstract) branches with
+        match traverse_branches (inline import blocked abstract) branches with
         | [[term]] ->
           term
         | branches -> Anonymous branches
@@ -297,10 +305,10 @@ and inline_args import abstract = function
   | App (head, do_inline, args) ->
     if not (List.mem head abstract) then
       import head;
-    App (head, do_inline, List.map (inline_args import abstract) args)
+    App (head, do_inline, List.map (inline_args import blocked abstract) args)
 
-and inline_branches import abstract branches =
-  traverse_branches (inline import abstract) branches
+and inline_branches import blocked abstract branches =
+  traverse_branches (inline import blocked abstract) branches
 
 (* Import definitions starting from entrypoints *)
 
@@ -317,7 +325,7 @@ let rec import_rule =
       Hashtbl.add imported name ();
       match Hashtbl.find_opt rules name with
       | Some (parameters, branches) ->
-        let branches = inline_branches import_rule parameters branches in
+        let branches = inline_branches import_rule TermSet.empty parameters branches in
         definitions := (name, parameters, branches) :: !definitions
       | None ->
         if not (List.mem_assoc name tokens) then
