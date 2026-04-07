@@ -165,14 +165,18 @@ let need_inlining =
       let rec parse_param = function
         | ("," | "(" | ")") :: _ -> malformed ()
         | name :: "(" :: rest ->
-          let params, rest = parse_params rest in
+          let params, rest = match rest with
+            | ")" :: rest -> ([], rest)
+            | rest -> parse_params rest
+          in
           (App (name, false, params), rest)
         | name :: rest ->
           (App (name, false, []), rest)
         | [] -> malformed ()
-      and parse_params = function
+      and parse_params tokens =
+        let param, rest = parse_param tokens in
+        match rest with
         | "," :: rest ->
-          let param, rest = parse_param rest in
           let params, rest = parse_params rest in
           (param :: params, rest)
         | ")" :: rest ->
