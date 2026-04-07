@@ -367,22 +367,37 @@ module Odoc = struct
         aux elts
     in
     aux elts
+
+  let try_parse text =
+    let res =
+      Odoc_parser.parse_comment ~location:Lexing.dummy_pos (*FIXME*) ~text
+    in
+    match Odoc_parser.warnings res with
+    | [] -> Some (Odoc_parser.ast res)
+    | _ -> None
 end
 
-let docstring = function
+let as_odoc_markup_if_no_warnings ~kind = function
   | "" -> as_comment (string "(**)")
   | text ->
-    let ast =
-      Odoc_parser.parse_comment ~location:Lexing.dummy_pos (*FIXME*) ~text
-      |> Odoc_parser.ast
+    let opening, indent =
+      match kind with
+      | `Docstring -> "(**", 4
+      | `Regular_comment -> "(*", 3
     in
     let doc =
-      string "(** " ^^ nest 4 (
-        Odoc.pp_ast ast ^^
-        group (break 1 ^^ string "*)")
-      )
+      match Odoc.try_parse text with
+      | None -> string opening ^^ fancy_string text ^^ string "*)"
+      | Some ast ->
+        (* odoc-parser strips leading whitespaces. *)
+        string (opening ^ " ") ^^ nest indent (
+          Odoc.pp_ast ast ^^
+          group (break 1 ^^ string "*)")
+        )
     in
     as_comment (group doc)
+
+let docstring = as_odoc_markup_if_no_warnings ~kind:`Docstring
 
 let pp (Docstring s) = docstring s
 let pp_floating s =

@@ -1,4 +1,4 @@
 (library
   (name comments)
-  (libraries dbg_print document ocaml_syntax print jst_odoc_parser)
+  (libraries dbg_print document ocaml_syntax print)
   (flags :standard -open Dbg_print))

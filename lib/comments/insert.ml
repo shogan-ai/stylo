@@ -3,7 +3,8 @@ open Ocaml_syntax
 module T = Tokens
 module Doc = Document
 
-let fmt_comment = As_odoc_markup.to_document ~startp:Lexing.dummy_pos
+let fmt_comment =
+  Print.Doc.as_odoc_markup_if_no_warnings ~kind:`Regular_comment
 
 module Error = struct
   type t =
