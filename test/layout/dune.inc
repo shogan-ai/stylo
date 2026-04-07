@@ -59,6 +59,16 @@
   (action (diff %{dep:odoc_markup_no_docstring.mli.stylo} %{dep:odoc_markup_no_docstring.mli.out})))
 
 (rule
+  (target odoc_markup_split.mli.out)
+  (action
+    (with-stdout-to %{target}
+      (run %{project_root}/bin/main.exe style --idempotence-check --width 90 %{dep:odoc_markup_split.mli}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:odoc_markup_split.mli.stylo} %{dep:odoc_markup_split.mli.out})))
+
+(rule
   (target preceeding_and_comments.ml.out)
   (action
     (with-stdout-to %{target}
