@@ -2550,7 +2550,7 @@ end = struct
     | Some _, Ptype_variant cds ->
       begin match List.rev cds with
       | { pcd_doc = None; _ } as last_cd :: rev_cds ->
-        let empty_ds = Some (Docstring "") in
+        let empty_ds = Some (Docstring ("", Lexing.dummy_pos)) in
         let cds = List.rev ({ last_cd with pcd_doc = empty_ds } :: rev_cds) in
         { td with ptype_kind = Ptype_variant cds }
       | _ -> td

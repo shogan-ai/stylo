@@ -413,16 +413,14 @@ module Odoc = struct
     in
     aux elts
 
-  let try_parse text =
-    let res =
-      Odoc_parser.parse_comment ~location:Lexing.dummy_pos (*FIXME*) ~text
-    in
+  let try_parse ~start_pos:location text =
+    let res = Odoc_parser.parse_comment ~location ~text in
     match Odoc_parser.warnings res with
     | [] -> Some (Odoc_parser.ast res)
     | _ -> None
 end
 
-let as_odoc_markup_if_no_warnings ~kind = function
+let as_odoc_markup_if_no_warnings ~kind ~(start_pos:Lexing.position) = function
   | "" -> as_comment (string "(**)")
   | text ->
     let opening, indent =
@@ -431,7 +429,10 @@ let as_odoc_markup_if_no_warnings ~kind = function
       | `Regular_comment -> "(*", 3
     in
     let doc =
-      match Odoc.try_parse text with
+      let start_pos =
+        { start_pos with pos_cnum = start_pos.pos_cnum + indent - 1 }
+      in
+      match Odoc.try_parse ~start_pos text with
       | None -> string opening ^^ fancy_string text ^^ string "*)"
       | Some ast ->
         (* odoc-parser strips leading whitespaces. *)
@@ -442,9 +443,10 @@ let as_odoc_markup_if_no_warnings ~kind = function
     in
     as_comment (group doc)
 
-let docstring = as_odoc_markup_if_no_warnings ~kind:`Docstring
+let docstring ~start_pos txt =
+  as_odoc_markup_if_no_warnings ~kind:`Docstring ~start_pos txt
 
-let pp (Docstring s) = docstring s
+let pp (Docstring (s, start_pos)) = docstring ~start_pos s
 let pp_floating s =
   softline ^^ pp s ^^ softline
 

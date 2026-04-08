@@ -43,7 +43,11 @@ let empty_ext_attr =
   { pea_ext = None; pea_attrs = No_attributes }
 
 module Docs = struct
-  let body_as_doc ds = Docstring (Docstrings.docstring_body ds)
+  let body_as_doc ds =
+    let open Docstrings in
+    let start_pos = (docstring_loc ds).loc_start in
+    let text = docstring_body ds in
+    Docstring (text, start_pos)
 
   let text =
     List.filter_map (fun ds ->

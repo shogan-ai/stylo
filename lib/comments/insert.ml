@@ -37,7 +37,7 @@ let consume_leading_comments =
       | Child_node -> assert false
       | Comment c when not !(c.explicitely_inserted) ->
         let acc =
-          let cmt = fmt_comment c.text in
+          let cmt = fmt_comment ~start_pos:first.pos c.text in
           match c.attachement with
           (* It looks like we might reorder comment if some [Floating] comments
              follow some [After] ones. But that cannot happen, by construction.
@@ -183,7 +183,7 @@ let attach_before_comments state tokens doc =
           | Comment c ->
             if !(c.explicitely_inserted)
             then acc
-            else acc ^^ group (break 1 ^^ fmt_comment c.text)
+            else acc ^^ group (break 1 ^^ fmt_comment ~start_pos:cmt.pos c.text)
           | _ -> assert false
         ) doc to_append
       in
@@ -378,7 +378,7 @@ let append_trailing_comments (tokens, doc, _) =
         let doc =
           if !(c.explicitely_inserted)
           then doc
-          else Doc.Utils.(doc ^?^ fmt_comment c.text)
+          else Doc.Utils.(doc ^?^ fmt_comment ~start_pos:tok.pos c.text)
         in
         aux doc toks
       | Token _ -> raise (Error (Missing_token tok.pos))
