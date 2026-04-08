@@ -183,7 +183,7 @@ module Odoc = struct
 
   let cb_meta_lang (lang, _metadata) = Loc.value lang
 
-  let code_block_content meta_opt content =
+  let maybe_ocaml_code_block meta_opt content =
     let is_ocaml =
       Option.map cb_meta_lang meta_opt
       |> Option.value ~default:"ocaml"
@@ -191,21 +191,35 @@ module Odoc = struct
       |> (=) "ocaml"
     in
     let source = Loc.value content in
-    match if is_ocaml then !process_ocaml_block source else None with
-    | Some res -> res
-    | None -> fancy_string source
+    if is_ocaml then !process_ocaml_block source else None
+
+  let possibly_multiline_verbatim_string (loc : Loc.span) s =
+    let multiline = loc.start.line < loc.end_.line in
+    if not multiline
+    then break 1, fancy_string s
+    else
+      (* HACK: adding a \n in [s] means we bypass the printing engine and that
+         line doesn't get indented. *)
+      empty, fancy_string ("\n" ^ s)
 
   let code_block (meta_opt, content) =
     let meta = (* FIXME: tags! *)
       optional (fun meta -> string ("@" ^ cb_meta_lang meta)) meta_opt
     in
-    group (string "{" ^^ meta ^^ string "[") ^/^
-    nest 2 (group @@ code_block_content meta_opt content) ^/^
+    let break, content =
+      match maybe_ocaml_code_block meta_opt content with
+      | Some res -> break 1, nest 2 (group res)
+      | None ->
+        let loc = Loc.location content in
+        possibly_multiline_verbatim_string loc (Loc.value content)
+    in
+    group (string "{" ^^ meta ^^ string "[") ^^ break ^^
+    content ^/^
     group (string "]" ^^ string "}")
 
-  let verbatim s =
-    (* FIXME: indentation *)
-    group (string "{v" ^/^ fancy_string s ^/^ string "v}")
+  let verbatim ~loc s =
+    let break, s = possibly_multiline_verbatim_string loc s in
+    group (string "{v" ^^ break ^^ s ^/^ string "v}")
 
   let modules lst =
     group (
@@ -238,14 +252,14 @@ module Odoc = struct
     | `With_text -> group (string "{" ^^ media_ref ^^ string alt ^^ string "}")
 
   let rec nestable_block_elements = function
-    | [ elt ] -> nestable_block_element empty elt.Loc.value
-    | elts ->
-      separate_map hardline (located (nestable_block_element softline)) elts
+    | [ elt ] -> nestable_block_element empty elt
+    | elts -> separate_map hardline (nestable_block_element softline) elts
 
-  and nestable_block_element extra_line = function
+  and nestable_block_element extra_line elt =
+    match Loc.value elt with
     | `Paragraph text -> inline_elements text ^^ extra_line
     | `Code_block cb -> code_block cb
-    | `Verbatim vb -> verbatim vb
+    | `Verbatim vb -> verbatim ~loc:(Loc.location elt) vb
     | `Modules mods -> modules mods
     | `List (kind, `Heavy, elts) -> heavy_list kind elts
     | `List (kind, `Light, elts) -> light_list kind elts ^^ extra_line
@@ -381,18 +395,19 @@ module Odoc = struct
       string "}"
     )
 
-  let block_element extra_line = function
+  let block_element extra_line located =
+    match Loc.value located with
     | `Heading hd -> heading hd ^^ extra_line
     | `Tag t -> tag t
     | #nestable_block_element as nbe ->
-      nestable_block_element extra_line nbe
+      nestable_block_element extra_line Loc.(at (location located) nbe)
 
   let pp_ast elts =
     let rec aux = function
       | [] -> empty
-      | [ elt ] -> block_element empty elt.Loc.value
+      | [ elt ] -> block_element empty elt
       | elt :: elts ->
-        block_element softline elt.Loc.value ^^
+        block_element softline elt ^^
         hardline ^^
         aux elts
     in

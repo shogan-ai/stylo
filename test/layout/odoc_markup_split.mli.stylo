@@ -90,7 +90,9 @@
     ]}
     There are also verbatim blocks:
 
-    {v The main difference is these don't get syntax highlighting. v} *)
+    {v
+The main difference is these don't get syntax highlighting.
+    v} *)
 
 (** {1 Lists}
 
