@@ -2436,18 +2436,14 @@ end = struct
       infos ^^ pre_nest (Core_type.pp ptp_typ)
 end
 
-and Type_declaration : sig
-  val pp_constraints : ptype_constraint list -> t
-
-  val pp_list :
-    ?subst:bool -> Asttypes.rec_flag -> type_declaration list -> t
+and Constructor_decl : sig
+  val pp : flatness -> Tokens.seq -> Longident.str_or_op loc ->
+    (string loc * jkind_annotation option) list ->
+    constructor_arguments -> core_type option -> attributes -> doc option -> t
 end = struct
-
-  let constructor_declaration td_flatness
-      { pcd_name; pcd_vars; pcd_args; pcd_res; pcd_attributes;
-        pcd_doc; pcd_loc = _; pcd_tokens } =
+  let pp td_flatness tokens name vars args res attrs post_doc =
     let pre_pipe =
-      match List.find Tokens.is_token pcd_tokens with
+      match List.find Tokens.is_token tokens with
       | { desc = Token (BAR, opt); _ } ->
         let pipe, space =
           if not opt
@@ -2459,32 +2455,46 @@ end = struct
         Some (Preceeding.mk pipe space ~indent:2)
       | _ -> None
     in
-    let pcd_vars =
-      match pcd_vars with
+    let vars =
+      match vars with
       | [] -> empty
-      | vars -> Core_type.pp_poly_bindings vars ^^ S.dot
+      | _ -> Core_type.pp_poly_bindings vars ^^ S.dot
     in
-    let name = group (constr_ident pcd_name.txt) in
+    let name = group (constr_ident name.txt) in
     let pipe_and_name, pre_nest = Preceeding.group_with pre_pipe name in
     let constr =
-      match pcd_args, pcd_res with
+      match args, res with
       | Pcstr_tuple [], None -> pipe_and_name
       | args, None ->
         group (pipe_and_name ^/^ pre_nest @@ nest 2 S.of_) ^/^
         pre_nest @@ nest 2 @@ Constructor_argument.pp_args args
       | Pcstr_tuple [], Some ct ->
         group (pipe_and_name ^/^ pre_nest @@ nest 2 S.colon) ^?^
-        pre_nest @@ nest 2 (pcd_vars ^?^ Core_type.pp ct)
+        pre_nest @@ nest 2 (vars ^?^ Core_type.pp ct)
       | args, Some ct ->
         group (pipe_and_name ^/^ pre_nest @@ nest 2 S.colon) ^?^
         pre_nest @@ nest 2 (
-          pcd_vars ^?^
+          vars ^?^
           Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct
         )
     in
-    Attribute.attach ~extra_nest:pre_nest ~attrs:pcd_attributes (group constr)
-    |> Doc.attach ~extra_nest:pre_nest ?post_doc:pcd_doc
+    Attribute.attach ~extra_nest:pre_nest ~attrs (group constr)
+    |> Doc.attach ~extra_nest:pre_nest ?post_doc
     |> group
+end
+
+and Type_declaration : sig
+  val pp_constraints : ptype_constraint list -> t
+
+  val pp_list :
+    ?subst:bool -> Asttypes.rec_flag -> type_declaration list -> t
+end = struct
+
+  let constructor_declaration td_flatness
+      { pcd_name; pcd_vars; pcd_args; pcd_res; pcd_attributes;
+        pcd_doc; pcd_loc = _; pcd_tokens } =
+    Constructor_decl.pp td_flatness pcd_tokens pcd_name pcd_vars pcd_args
+      pcd_res pcd_attributes pcd_doc
 
   let pp_variant td_flatness = function
     | [] -> S.pipe
@@ -2594,13 +2604,17 @@ end = struct
   let pp { ptyext_path; ptyext_params; ptyext_constructors; ptyext_private;
            ptyext_attributes; ptyext_ext_attrs; ptyext_pre_doc; ptyext_post_doc;
            ptyext_loc = _ ; ptyext_tokens }=
-    Ext_attribute.decorate S.type_ ptyext_ext_attrs ^/^
-    Type_constructor.pp_decl ptyext_tokens
-      ptyext_params (longident ptyext_path.txt)  ^/^
-    S.plus_equals ^/^
-    private_ ptyext_private ^?^
-    separate_map (break 1)
-      Extension_constructor.pp ptyext_constructors
+    let kw = Ext_attribute.decorate S.type_ ptyext_ext_attrs in
+    let tconstr =
+      Type_constructor.pp_decl ptyext_tokens
+        ptyext_params (longident ptyext_path.txt)
+    in
+    let cstrs =
+      separate_map (break 1) Extension_constructor.pp ptyext_constructors
+    in
+    flow (break 1)
+      (kw :: List.map (nest 2)
+               [ tconstr; S.plus_equals; private_ ptyext_private; cstrs ])
     |> Attribute.attach ~item:true ~attrs:ptyext_attributes
     |> Doc.attach ?pre_doc:ptyext_pre_doc ?post_doc:ptyext_post_doc
     |> group
@@ -2609,37 +2623,17 @@ end
 and Extension_constructor : sig
   val pp : extension_constructor -> t
 end = struct
-  let pp_kind = function
-    | Pext_decl (vars, args, res) ->
-      let vars =
-        match vars with
-        | [] -> empty
-        | lst ->
-          separate_map (break 1) (function
-            | var, None -> S.squote ^^ string var.txt
-            | var, Some j ->
-              S.lparen ^^ S.squote ^^ string var.txt ^/^ S.colon ^/^
-              Jkind_annotation.pp j ^^ S.rparen
-          ) lst ^^ S.dot ^^ break 1
-      in
-      begin match args, res with
-        | Pcstr_tuple [], None -> empty
-        | args, None ->
-          S.of_ ^/^ Constructor_argument.pp_args args
-        | Pcstr_tuple [], Some ct ->
-          S.colon ^/^ vars ^^ Core_type.pp ct
-        | args, Some ct ->
-          S.colon ^/^ vars ^^
-          Constructor_argument.pp_args args ^/^ S.rarrow ^/^ Core_type.pp ct
-      end
-    | Pext_rebind lid -> S.equals ^/^ constr_longident lid.txt
-
   let pp { pext_name; pext_kind; pext_attributes; pext_doc;
            pext_loc = _; pext_tokens } =
-    (if starts_with_pipe pext_tokens then S.pipe else empty) ^?^
-    constr_ident pext_name.txt ^?^ pp_kind pext_kind
-    |> Attribute.attach ~attrs:pext_attributes
-    |> Doc.attach ?post_doc:pext_doc
+    match pext_kind with
+    | Pext_decl (vars, args, res) ->
+      Constructor_decl.pp (flatness_tracker () (* FIXME: pass from caller *))
+        pext_tokens pext_name vars args res pext_attributes pext_doc
+    | Pext_rebind lid ->
+      (if starts_with_pipe pext_tokens then S.pipe else empty) ^?^
+      constr_ident pext_name.txt ^/^ S.equals ^/^ constr_longident lid.txt
+      |> Attribute.attach ~attrs:pext_attributes
+      |> Doc.attach ?post_doc:pext_doc
 end
 
 and Type_exception : sig
@@ -2647,11 +2641,12 @@ and Type_exception : sig
 end = struct
   let pp { ptyexn_constructor ; ptyexn_attributes ; ptyexn_ext_attrs;
            ptyexn_pre_doc; ptyexn_post_doc; ptyexn_loc = _; ptyexn_tokens = _} =
+    let extra_nest = nest 2 in
     group (
       Ext_attribute.decorate S.exception_ ptyexn_ext_attrs ^/^
-      Extension_constructor.pp ptyexn_constructor
+      nest 2 (Extension_constructor.pp ptyexn_constructor)
     )
-    |> Attribute.attach ~item:true ~attrs:ptyexn_attributes
+    |> Attribute.attach ~extra_nest ~item:true ~attrs:ptyexn_attributes
     |> Doc.attach ?pre_doc:ptyexn_pre_doc ?post_doc:ptyexn_post_doc
 end
 
