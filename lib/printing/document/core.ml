@@ -84,7 +84,7 @@ type t =
   | Empty
   | Directive of pseudo_token
   | Token of pseudo_token can_vanish
-  | Comment of pseudo_token
+  | Comment of { source_comment_id: int; doc: pseudo_token }
   | Comments_flushing_hint of {
       cmts_were_flushed: bool ref;
       floating_cmts_allowed: bool;
@@ -128,7 +128,7 @@ let requirement = function
   | Empty -> Req.of_int 0
   | Directive pt
   | Token { vanishing_cond = None; value = pt }
-  | Comment pt -> pseudo_token_req pt
+  | Comment { doc = pt; _ } -> pseudo_token_req pt
   | Whitespace { vanishing_cond = None; value = ws } -> ws_req ws
   | Token _
   | Comments_flushing_hint _
@@ -233,6 +233,8 @@ let directive t =
   Directive (Complex (requirement t, t))
 
 
-let as_comment d = Comment (Complex (requirement d, d))
+let as_comment ?id:(source_comment_id=(-1)) d =
+  let doc = Complex (requirement d, d) in
+  Comment { source_comment_id; doc }
 
 let is_empty = function Empty -> true | _ -> false

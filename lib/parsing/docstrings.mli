@@ -28,6 +28,8 @@ val init : unit -> unit
 (** Documentation comments *)
 type docstring = Docstring.t
 
+val gen_id : unit -> int
+
 (** Create a docstring *)
 val docstring : string -> Location.t -> int ref -> docstring
 

@@ -59,7 +59,11 @@ type constant =
       Suffixes except ['s'] are rejected by the typechecker.
   *)
 
-type doc = Docstring of string * Lexing.position
+type doc =
+  | Docstring of
+      { id: int
+      ; text: string
+      ; start_pos: Lexing.position }
 
 type modality = | Modality of string [@@unboxed]
 type modalities =

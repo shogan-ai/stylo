@@ -420,7 +420,8 @@ module Odoc = struct
     | _ -> None
 end
 
-let as_odoc_markup_if_no_warnings ~kind ~(start_pos:Lexing.position) = function
+let as_odoc_markup_if_no_warnings ~id ~kind ~(start_pos:Lexing.position) =
+  function
   | "" -> as_comment (string "(**)")
   | text ->
     let opening, indent =
@@ -441,12 +442,12 @@ let as_odoc_markup_if_no_warnings ~kind ~(start_pos:Lexing.position) = function
           group (break 1 ^^ string "*)")
         )
     in
-    as_comment (group doc)
+    as_comment ~id (group doc)
 
-let docstring ~start_pos txt =
-  as_odoc_markup_if_no_warnings ~kind:`Docstring ~start_pos txt
+let docstring ~id ~start_pos txt =
+  as_odoc_markup_if_no_warnings ~kind:`Docstring ~id ~start_pos txt
 
-let pp (Docstring (s, start_pos)) = docstring ~start_pos s
+let pp (Docstring { id; text; start_pos }) = docstring ~id ~start_pos text
 let pp_floating s =
   softline ^^ pp s ^^ softline
 

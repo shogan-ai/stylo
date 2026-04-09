@@ -3,8 +3,8 @@ open Ocaml_syntax
 module T = Tokens
 module Doc = Document
 
-let fmt_comment =
-  Print.Doc.as_odoc_markup_if_no_warnings ~kind:`Regular_comment
+let fmt_comment txt =
+  Print.Doc.as_odoc_markup_if_no_warnings ~id:(-1) ~kind:`Regular_comment txt
 
 module Error = struct
   type t =

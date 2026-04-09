@@ -53,7 +53,7 @@ type t = private
   | Token of pseudo_token can_vanish
   (** N.B. if the [vanishing_cond] is not [None], then [Token] must correspond
       to an "optional" token. *)
-  | Comment of pseudo_token
+  | Comment of { source_comment_id: int; doc: pseudo_token }
   | Comments_flushing_hint of {
       cmts_were_flushed: bool ref;
       floating_cmts_allowed: bool;
@@ -141,7 +141,7 @@ val flush_comments
     engine runs, so it can be used to make elements preceeding the comments
     vanish, not just elements who follow them. *)
 
-val as_comment : t -> t
+val as_comment : ?id:int -> t -> t
 (** [as_comment d] wraps [d] in [Comment].*)
 
 (** {2 Lexer directive} *)

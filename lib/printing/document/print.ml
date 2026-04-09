@@ -125,7 +125,7 @@ let rec pretty buf state indent flat = function
     when Condition.check (Some cond) ->
     state
   | Token { value = pseudo; _ }
-  | Comment pseudo -> pp_pseudo buf state indent flat pseudo
+  | Comment { doc = pseudo; _ } -> pp_pseudo buf state indent flat pseudo
   | Directive pseudo -> pp_pseudo buf state 0 flat pseudo
   | Whitespace { value = ws; _ } -> whitespace buf state indent flat ws
   | Cat (_, t1, t2) ->

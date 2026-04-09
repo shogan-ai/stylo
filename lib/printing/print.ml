@@ -2537,6 +2537,8 @@ end = struct
       ; type_kind td_flatness kind
       ]
 
+  (* FIXME: change the parser to no drop empty docstrings, so we don't
+     need this. *)
   (* In [type t = C (** cmt *)] the docstring is attached to [C], not [t].
      To have it attached to [t] one must write [type t = C (**) (** cmt *)]
      (or have any other docstring on C).
@@ -2550,7 +2552,9 @@ end = struct
     | Some _, Ptype_variant cds ->
       begin match List.rev cds with
       | { pcd_doc = None; _ } as last_cd :: rev_cds ->
-        let empty_ds = Some (Docstring ("", Lexing.dummy_pos)) in
+        let id = Docstrings.gen_id () in
+        let start_pos = Lexing.dummy_pos in
+        let empty_ds = Some (Docstring { id; text = ""; start_pos }) in
         let cds = List.rev ({ last_cd with pcd_doc = empty_ds } :: rev_cds) in
         { td with ptype_kind = Ptype_variant cds }
       | _ -> td
