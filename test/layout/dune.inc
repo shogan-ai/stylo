@@ -39,6 +39,16 @@
   (action (diff %{dep:flat_non_flat_groups_and_comments.ml.stylo} %{dep:flat_non_flat_groups_and_comments.ml.out})))
 
 (rule
+  (target flushhint_induced_reorderings.ml.out)
+  (action
+    (with-stdout-to %{target}
+      (run %{project_root}/bin/main.exe style --idempotence-check --width 90 %{dep:flushhint_induced_reorderings.ml}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:flushhint_induced_reorderings.ml.stylo} %{dep:flushhint_induced_reorderings.ml.out})))
+
+(rule
   (target lexer_directives.ml.out)
   (action
     (with-stdout-to %{target}
