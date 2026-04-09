@@ -29,6 +29,23 @@ end
 
 exception Error of Error.t
 
+type corresponding_doc =
+  | Absent
+  | Present_not_seen_yet
+  | Already_seen
+
+let already_seen : (int, unit) Hashtbl.t = Hashtbl.create 42
+
+let mark_as_seen id = Hashtbl.replace already_seen id ()
+
+let corresponding_doc_state cmt =
+  let id = !(cmt.T.corresponding_document_id) in
+  if id < 0
+  then Absent
+  else if Hashtbl.mem already_seen id
+  then Already_seen
+  else Present_not_seen_yet
+
 let explicitely_inserted cmt = !(cmt.T.corresponding_document_id) >= 0
 
 let consume_leading_comments =
@@ -263,11 +280,15 @@ let rec walk_both state seq doc =
     | _, Doc.Empty -> seq, doc, state
     | _, Doc.Whitespace _ -> seq, doc, no_space state
 
+    (* FIXME: [c] and [d] might not be the same comment... *)
     (* Skip explicitely inserted comments *)
-    | T.Comment c, Doc.Comment _ when explicitely_inserted c ->
+    | T.Comment c, Doc.Comment d when explicitely_inserted c ->
+      mark_as_seen d.source_comment_id;
       rest, doc, state
 
-    | _, Doc.Comment _ -> seq, doc, state
+    | _, Doc.Comment d ->
+      mark_as_seen d.source_comment_id;
+      seq, doc, state
 
     | T.Comment c, Doc.Token _ when explicitely_inserted c ->
       walk_both state rest doc
@@ -276,15 +297,23 @@ let rec walk_both state seq doc =
        considerations. *)
     | T.Comment c,
       Doc.Comments_flushing_hint fh ->
-      if explicitely_inserted c then (
+      begin match corresponding_doc_state c with
+      | Already_seen ->
         (* skip the first comment and loop back, there might be others
            following it that can be flushed. *)
         walk_both state rest doc
-      ) else (
+      | Present_not_seen_yet ->
+        (* [c] is already present in the document, but we haven't encountered it
+           yet.
+           We do not want to flush any other comment before seeing it as that
+           would lead to reordering. *)
+        seq, Doc.empty, state
+      | Absent ->
+        (* [c] (and perhaps the following comments) can be flushed. *)
         fh.cmts_were_flushed := true;
         flush_comments seq fh.floating_cmts_allowed ~before:fh.ws_before
           ~after:fh.ws_after state
-      )
+      end
 
     | _, Doc.Comments_flushing_hint _ ->
       (* No comments to insert, the hint vanishes. *)

@@ -1,12 +1,12 @@
 (** Module preamble. *)
 
 (* some comment. *)
-(**/**)
+(** /* *)
 
 (* hidden doc comments would go here *)
 
 include A
 
-(**/**)
+(** /* *)
 
 module B = C
