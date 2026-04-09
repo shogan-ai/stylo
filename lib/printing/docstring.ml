@@ -512,7 +512,15 @@ let pp (Docstring { id; text; start_pos }) = docstring ~id ~start_pos text
 let pp_floating s =
   softline ^^ pp s ^^ softline
 
-let pp_pre ds = softline ^^ softline ^^ pp ds
+let pp_pre ds =
+  (* We control comments between a docstring and the item it attaches to.
+     The flush hint allows us to lay it out like we do the docstring; otherwise
+     it might be inserted deeper in the document tree and break grouping. *)
+  let _, pre_flush_hint =
+    flush_comments ~pull_preceeding_comments:false ~floating_allowed:false
+      ~ws_before:softest_line ~ws_after:empty
+  in
+  softline ^^ softline ^^ pp ds ^^ pre_flush_hint
 
 let attach ?(possibly_ambiguous=true) ?(extra_nest=Fun.id)
       ?(text = []) ?pre_doc ?post_doc t =
