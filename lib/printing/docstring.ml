@@ -423,6 +423,7 @@ end
 let as_odoc_markup_if_no_warnings ~id ~kind ~(start_pos:Lexing.position) =
   function
   | "" -> as_comment (string "(**)")
+  | "/*" when kind = `Docstring -> as_comment ~id (string "(**/**)")
   | text ->
     let opening, indent =
       match kind with
