@@ -280,12 +280,7 @@ let rec walk_both state seq doc =
     | _, Doc.Empty -> seq, doc, state
     | _, Doc.Whitespace _ -> seq, doc, no_space state
 
-    (* FIXME: [c] and [d] might not be the same comment... *)
     (* Skip explicitely inserted comments *)
-    | T.Comment c, Doc.Comment d when explicitely_inserted c ->
-      mark_as_seen d.source_comment_id;
-      rest, doc, state
-
     | _, Doc.Comment d ->
       mark_as_seen d.source_comment_id;
       seq, doc, state
