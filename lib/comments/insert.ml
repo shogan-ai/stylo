@@ -29,13 +29,15 @@ end
 
 exception Error of Error.t
 
+let explicitely_inserted cmt = !(cmt.T.corresponding_document_id) >= 0
+
 let consume_leading_comments =
   let rec aux (floating, attached_after as acc) = function
     | [] -> acc, []
     | first :: rest ->
       match first.T.desc with
       | Child_node -> assert false
-      | Comment c when not !(c.explicitely_inserted) ->
+      | Comment c when not (explicitely_inserted c) ->
         let acc =
           let cmt = fmt_comment ~start_pos:first.pos c.text in
           match c.attachement with
@@ -162,7 +164,7 @@ let insert_directive doc ldir =
 
 let is_comment_attaching_before elt =
   match elt.T.desc with
-  | Comment c -> c.attachement = Before && not !(c.explicitely_inserted)
+  | Comment c -> c.attachement = Before && not (explicitely_inserted c)
   | _ -> false
 
 let attach_before_comments state tokens doc =
@@ -181,7 +183,7 @@ let attach_before_comments state tokens doc =
         group @@ List.fold_left (fun acc cmt ->
           match cmt.T.desc with
           | Comment c ->
-            if !(c.explicitely_inserted)
+            if explicitely_inserted c
             then acc
             else acc ^^ group (break 1 ^^ fmt_comment ~start_pos:cmt.pos c.text)
           | _ -> assert false
@@ -262,21 +264,19 @@ let rec walk_both state seq doc =
     | _, Doc.Whitespace _ -> seq, doc, no_space state
 
     (* Skip explicitely inserted comments *)
-    | T.Comment { explicitely_inserted; _ }, Doc.Comment _
-      when !explicitely_inserted ->
+    | T.Comment c, Doc.Comment _ when explicitely_inserted c ->
       rest, doc, state
 
     | _, Doc.Comment _ -> seq, doc, state
 
-    | T.Comment { explicitely_inserted; _ }, Doc.Token _
-      when !explicitely_inserted ->
+    | T.Comment c, Doc.Token _ when explicitely_inserted c ->
       walk_both state rest doc
 
     (* Comments flushing hint take precedence over attachement and nesting
        considerations. *)
-    | T.Comment { explicitely_inserted; _ },
+    | T.Comment c,
       Doc.Comments_flushing_hint fh ->
-      if !explicitely_inserted then (
+      if explicitely_inserted c then (
         (* skip the first comment and loop back, there might be others
            following it that can be flushed. *)
         walk_both state rest doc
@@ -294,8 +294,8 @@ let rec walk_both state seq doc =
     | T.Comment _, Doc.Token _ ->
       insert_comments_before_subtree seq state doc
 
-    | T.Comment { explicitely_inserted; _ }, Doc.Group (_, _, _, d)
-      when not !explicitely_inserted &&
+    | T.Comment c, Doc.Group (_, _, _, d)
+      when not (explicitely_inserted c) &&
            not (nest_before_leaf d) &&
            not (first_is_flushhint d) ->
       (* we can insert comments outside the group as they'll be at the same
@@ -381,7 +381,7 @@ let append_trailing_comments (tokens, doc, _) =
         aux Doc.Utils.(doc ^?^ format_directive d) toks
       | Comment c ->
         let doc =
-          if !(c.explicitely_inserted)
+          if explicitely_inserted c
           then doc
           else Doc.Utils.(doc ^?^ fmt_comment ~start_pos:tok.pos c.text)
         in

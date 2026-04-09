@@ -22,7 +22,7 @@ type attachment = Before | After | Floating
 type comment = {
   text: string;
   attachement: attachment;
-  explicitely_inserted: bool ref;
+  corresponding_document_id: int ref;
   (** this is used by {!Insert_comments} to not duplicate comments that were
       already explicitely inserted (e.g. docstrings). *)
 }

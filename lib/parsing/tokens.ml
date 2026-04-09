@@ -306,7 +306,7 @@ type attachment = Before | After | Floating
 type comment = {
   text: string;
   attachement: attachment;
-  explicitely_inserted: bool ref;
+  corresponding_document_id: int ref;
 }
 
 type desc =

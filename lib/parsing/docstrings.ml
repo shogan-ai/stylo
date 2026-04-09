@@ -27,11 +27,11 @@ let docstrings : docstring list ref = ref []
 
 (* Docstring constructors and destructors *)
 
-let docstring body loc inserted =
+let docstring body loc id =
   let ds =
     { ds_body = body;
       ds_loc = loc;
-      ds_explicitely_inserted = inserted;
+      ds_id = id;
       ds_attached = Unattached;
       ds_associated = Zero; }
   in
@@ -65,6 +65,12 @@ type text = docstring list
 let empty_text = []
 let empty_text_lazy = lazy []
 
+let gen_id =
+  let counter = ref ~-1 in
+  fun () ->
+    incr counter;
+    !counter
+
 (* Find the first non-info docstring in a list, attach it and return it *)
 let get_docstring ~info dsl =
   let rec loop = function
@@ -72,7 +78,7 @@ let get_docstring ~info dsl =
     | {ds_attached = Info; _} :: rest -> loop rest
     | ds :: _ ->
         ds.ds_attached <- if info then Info else Docs;
-        ds.ds_explicitely_inserted := true;
+        ds.ds_id := gen_id ();
         Some ds
   in
   loop dsl
@@ -84,7 +90,7 @@ let get_docstrings dsl =
     | {ds_attached = Info; _} :: rest -> loop acc rest
     | ds :: rest ->
         ds.ds_attached <- Docs;
-        ds.ds_explicitely_inserted := true;
+        ds.ds_id := gen_id ();
         loop (ds :: acc) rest
   in
     loop [] dsl

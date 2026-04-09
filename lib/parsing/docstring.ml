@@ -32,6 +32,6 @@ type ds_associated =
 type t =
   { ds_body: string;
     ds_loc: Location.t;
-    ds_explicitely_inserted: bool ref;
+    ds_id: int ref; (* starts at [-1], is set when the ds gets attached. *)
     mutable ds_attached: ds_attached;
     mutable ds_associated: ds_associated; }

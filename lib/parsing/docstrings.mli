@@ -29,7 +29,7 @@ val init : unit -> unit
 type docstring = Docstring.t
 
 (** Create a docstring *)
-val docstring : string -> Location.t -> bool ref -> docstring
+val docstring : string -> Location.t -> int ref -> docstring
 
 (** Register a docstring *)
 val register : docstring -> unit

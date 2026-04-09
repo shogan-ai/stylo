@@ -315,7 +315,7 @@ let wrap_comment_lexer comment lexbuf =
   reset_string_buffer ();
   s,
   { start_loc with Location.loc_end = end_loc.Location.loc_end },
-  ref false
+  ref ~-1
 
 let error lexbuf e = raise (Error(e, Location.curr lexbuf))
 let error_loc loc e = raise (Error(e, loc))
@@ -672,14 +672,14 @@ rule token = parse
   | '#'? "\'\'"
       { error lexbuf Empty_character_literal }
   | "(*"
-      { let s, loc, inserted = wrap_comment_lexer comment lexbuf in
-        COMMENT (s, loc, inserted) }
+      { let s, loc, id = wrap_comment_lexer comment lexbuf in
+        COMMENT (s, loc, id) }
   | "(**"
-      { let s, loc, inserted = wrap_comment_lexer comment lexbuf in
+      { let s, loc, id = wrap_comment_lexer comment lexbuf in
         if !handle_docstrings then
-          DOCSTRING (Docstrings.docstring s loc inserted)
+          DOCSTRING (Docstrings.docstring s loc id)
         else
-          COMMENT ("*" ^ s, loc, inserted)
+          COMMENT ("*" ^ s, loc, id)
       }
   | "(**" (('*'+) as stars)
       { let s, loc, inserted =
@@ -694,12 +694,12 @@ rule token = parse
       { let s, loc, inserted = wrap_comment_lexer comment lexbuf in
         COMMENT (s, loc, inserted) }
   | "(*" (('*'*) as stars) "*)"
-      { let inserted = ref false in
+      { let id = ref ~-1 in
         if !handle_docstrings && stars="" then
          (* (**) is an empty docstring *)
-          DOCSTRING(Docstrings.docstring "" (Location.curr lexbuf) inserted)
+          DOCSTRING(Docstrings.docstring "" (Location.curr lexbuf) id)
         else
-          COMMENT (stars, Location.curr lexbuf, inserted) }
+          COMMENT (stars, Location.curr lexbuf, id) }
   | "*)"
       { lexbuf.Lexing.lex_curr_pos <- lexbuf.Lexing.lex_curr_pos - 1;
         let curpos = lexbuf.lex_curr_p in
@@ -1211,7 +1211,7 @@ and skip_hash_bang = parse
     type cmt_info = {
       loc: Location.t;
       txt: string;
-      inserted: bool ref;
+      id: int ref;
     }
 
     type t = {
@@ -1220,8 +1220,8 @@ and skip_hash_bang = parse
       indent: Line_indent.t;
     }
 
-    let init before loc txt inserted =
-      let info = { loc; txt; inserted } in
+    let init before loc txt id =
+      let info = { loc; txt; id } in
       let indent = Line_indent.copy () in
       { before; indent; rev_cmts = [ info ] }
 
@@ -1257,18 +1257,18 @@ and skip_hash_bang = parse
             Before
           )
       in
-      List.iter (fun {loc; txt; inserted} ->
+      List.iter (fun {loc; txt; id} ->
         let cmt =
-          { Tokens.explicitely_inserted = inserted
+          { Tokens.corresponding_document_id = id
           ; text = txt
           ; attachement }
         in
         Tokens.add ~pos:loc.loc_start (Comment cmt)
       ) (List.rev t.rev_cmts)
 
-    let add t before loc txt inserted =
+    let add t before loc txt id =
       match t with
-      | None -> init before loc txt inserted
+      | None -> init before loc txt id
       | Some t ->
         (* If there is a blank line between the comment about to be staged and
            the previous ones, we decide their attachement separately (and so we
@@ -1276,9 +1276,9 @@ and skip_hash_bang = parse
            keep accumulating and we'll decide for the whole block. *)
         if before = BlankLine then (
           unstage before t;
-          init before loc txt inserted
+          init before loc txt id
         ) else (
-          let info = { loc; txt; inserted } in
+          let info = { loc; txt; id } in
           { t with rev_cmts = info :: t.rev_cmts }
         )
   end
@@ -1292,12 +1292,10 @@ and skip_hash_bang = parse
     let post_pos = lexeme_end_p lexbuf in
     let rec loop lines_for_comments lines_for_docstrings docs sc_opt lexbuf =
       match token_with_comments lexbuf with
-      | COMMENT (s, loc, inserted) ->
+      | COMMENT (s, loc, id) ->
           Line_indent.new_info lines_for_comments loc.loc_start;
           add_comment (s, loc);
-          let sc =
-            Staged_comments.add sc_opt lines_for_comments loc s inserted
-          in
+          let sc = Staged_comments.add sc_opt lines_for_comments loc s id in
           let lines_for_comments' = NoLine in
           let lines_for_docstrings' =
             match lines_for_docstrings with
@@ -1330,7 +1328,7 @@ and skip_hash_bang = parse
           let sc =
             Staged_comments.init lines_for_comments doc_loc
               (Docstrings.docstring_body doc)
-              doc.ds_explicitely_inserted
+              doc.ds_id
           in
           let docs' = acc_docstring lines_for_docstrings docs doc in
           loop NoLine NoLine docs' (Some sc) lexbuf
