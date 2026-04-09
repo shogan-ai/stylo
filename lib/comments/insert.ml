@@ -275,11 +275,16 @@ let rec walk_both state seq doc =
     (* Comments flushing hint take precedence over attachement and nesting
        considerations. *)
     | T.Comment { explicitely_inserted; _ },
-      Doc.Comments_flushing_hint fh
-      when not !explicitely_inserted ->
-      fh.cmts_were_flushed := true;
-      flush_comments seq fh.floating_cmts_allowed ~before:fh.ws_before
-        ~after:fh.ws_after state
+      Doc.Comments_flushing_hint fh ->
+      if !explicitely_inserted then (
+        (* skip the first comment and loop back, there might be others
+           following it that can be flushed. *)
+        walk_both state rest doc
+      ) else (
+        fh.cmts_were_flushed := true;
+        flush_comments seq fh.floating_cmts_allowed ~before:fh.ws_before
+          ~after:fh.ws_after state
+      )
 
     | _, Doc.Comments_flushing_hint _ ->
       (* No comments to insert, the hint vanishes. *)
