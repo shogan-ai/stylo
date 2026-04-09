@@ -1,4 +1,14 @@
 (rule
+  (target cinaps.ml.out)
+  (action
+    (with-stdout-to %{target}
+      (run %{project_root}/bin/main.exe style --idempotence-check --width 90 %{dep:cinaps.ml}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:cinaps.ml.stylo} %{dep:cinaps.ml.out})))
+
+(rule
   (target comments_insertion.ml.out)
   (action
     (with-stdout-to %{target}
@@ -47,6 +57,16 @@
 (rule
   (alias runtest)
   (action (diff %{dep:flushhint_induced_reorderings.ml.stylo} %{dep:flushhint_induced_reorderings.ml.out})))
+
+(rule
+  (target jst_comment_kinds.mli.out)
+  (action
+    (with-stdout-to %{target}
+      (run %{project_root}/bin/main.exe style --idempotence-check --width 90 %{dep:jst_comment_kinds.mli}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:jst_comment_kinds.mli.stylo} %{dep:jst_comment_kinds.mli.out})))
 
 (rule
   (target lexer_directives.ml.out)
