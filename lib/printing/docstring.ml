@@ -420,30 +420,90 @@ module Odoc = struct
     | _ -> None
 end
 
-let as_odoc_markup_if_no_warnings ~id ~kind ~(start_pos:Lexing.position) =
-  function
-  | "" -> as_comment (string "(**)")
-  | "/*" when kind = `Docstring -> as_comment ~id (string "(**/**)")
-  | text ->
-    let opening, indent =
-      match kind with
-      | `Docstring -> "(**", 4
-      | `Regular_comment -> "(*", 3
+type comment_kind =
+  | Verbatim of { opening: string; content: string }
+  | Cinaps of { opening: string; content: string; closing: string }
+  | Markup of { opening: string; content: string }
+
+let is_ws = function
+  | ' ' | '\t' | '\n' -> true
+  | _ -> false
+
+let ( .%[] ) s i = String.get s i
+
+let cinaps text =
+  let opening = "(*$" in
+  if text.%[String.length text - 1] = '$' then
+    let closing = "$*)" in
+    let content = String.sub text 2 (String.length text - 3) in
+    Cinaps { opening; content; closing }
+  else
+    let closing = "*)" in
+    let content = String.sub text 2 (String.length text - 2) in
+    Cinaps { opening; content; closing }
+
+let categorize kind content =
+  let default_opening =
+    match kind with
+    | `Docstring -> "(**"
+    | `Regular_comment -> "(*"
+  in
+  if String.for_all ((=) '*') content then
+    Verbatim { opening = "(*"; content }
+  else if String.for_all is_ws content then
+    (* Collapse to a single space. *)
+    Verbatim { opening = default_opening; content = " " }
+  else if kind = `Regular_comment && content.%[0] = '=' then
+    let content = String.sub content 1 (String.length content - 1) in
+    Verbatim { opening = "(*="; content }
+  else if content.%[0] = '$' then (
+    if String.length content >= 2 && is_ws content.%[1] then
+      cinaps content
+    else
+      Verbatim { opening = default_opening; content }
+  ) else if kind = `Docstring && content = "/*" then
+    Verbatim { opening = default_opening; content }
+  else
+    let opening, content =
+      if kind = `Regular_comment && content.%[0] = '_' then
+        let pos =
+          if String.length content >= 2 && is_ws content.%[1] then 2 else 1
+        in
+        "(*_", String.sub content pos (String.length content - pos)
+      else
+        default_opening, content
     in
-    let doc =
+    Markup { opening ; content }
+
+let print_verbatim opening content closing =
+  string opening ^^ fancy_string content ^^ string closing
+
+let print_doc opening ?(indent=String.length opening + 1) doc closing =
+  (* FIXME: pass opening as Preceeding... *)
+  string (opening ^ " ") ^^ nest indent (
+    doc ^^ group (break 1 ^^ string closing)
+  )
+
+let as_odoc_markup_if_no_warnings ~id ~kind ~(start_pos:Lexing.position) text =
+  let doc =
+    match categorize kind text with
+    | Verbatim { opening; content } ->
+      print_verbatim opening content "*)"
+    | Cinaps { opening; content; closing } ->
+      begin match !Odoc.process_ocaml_block content with
+      | Some doc -> print_doc opening doc closing
+      | None -> print_verbatim (opening ^ " ") content closing
+      end
+    | Markup { opening; content } ->
+      let indent = String.length opening + 1 in
       let start_pos =
         { start_pos with pos_cnum = start_pos.pos_cnum + indent - 1 }
       in
-      match Odoc.try_parse ~start_pos text with
-      | None -> string opening ^^ fancy_string text ^^ string "*)"
-      | Some ast ->
-        (* odoc-parser strips leading whitespaces. *)
-        string (opening ^ " ") ^^ nest indent (
-          Odoc.pp_ast ast ^^
-          group (break 1 ^^ string "*)")
-        )
-    in
-    as_comment ~id (group doc)
+      match Odoc.try_parse ~start_pos content with
+      | None -> print_verbatim opening content "*)"
+      | Some ast -> print_doc opening (Odoc.pp_ast ast) "*)"
+  in
+  as_comment ~id (group doc)
 
 let docstring ~id ~start_pos txt =
   as_odoc_markup_if_no_warnings ~kind:`Docstring ~id ~start_pos txt
