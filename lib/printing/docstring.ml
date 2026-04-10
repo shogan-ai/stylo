@@ -202,19 +202,21 @@ module Odoc = struct
          line doesn't get indented. *)
       empty, fancy_string ("\n" ^ s)
 
+  let indented_lines s =
+    String.split_on_char '\n' s
+    |> separate_map hardline string
+
   let code_block (meta_opt, content) =
     let meta = (* FIXME: tags! *)
       optional (fun meta -> string ("@" ^ cb_meta_lang meta)) meta_opt
     in
-    let break, content =
+    let content =
       match maybe_ocaml_code_block meta_opt content with
-      | Some res -> break 1, nest 2 (group res)
-      | None ->
-        let loc = Loc.location content in
-        possibly_multiline_verbatim_string loc (Loc.value content)
+      | Some res -> res
+      | None -> indented_lines (Loc.value content)
     in
-    group (string "{" ^^ meta ^^ string "[") ^^ break ^^
-    content ^/^
+    group (string "{" ^^ meta ^^ string "[") ^/^
+    nest 2 (group content) ^/^
     group (string "]" ^^ string "}")
 
   let verbatim ~loc s =
