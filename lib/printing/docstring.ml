@@ -305,24 +305,28 @@ module Odoc = struct
 
   and light_list kind elts =
     let bullet item_num =
-      let str =
-        match kind with
-        | `Unordered -> "-"
-        | `Ordered None -> "+"
-        | `Ordered (Some (punct, num, _spacious)) ->
-          let letter i = Char.chr (Char.code 'a' + i) in
-          let num =
-            match num with
-            | `Number _ -> `Number (item_num + 1)
-            | `Lower_case _ -> `Lower_case (letter item_num)
-            | `Upper_case _ ->
-              `Upper_case (Char.uppercase_ascii (letter item_num))
-          in
-          print_list_number punct num
-      in
-      string (str ^ " ")
+      match kind with
+      | `Unordered -> "-"
+      | `Ordered None -> "+"
+      | `Ordered (Some (punct, num, _spacious)) ->
+        let letter i = Char.chr (Char.code 'a' + i) in
+        let num =
+          match num with
+          | `Number _ -> `Number (item_num + 1)
+          | `Lower_case _ -> `Lower_case (letter item_num)
+          | `Upper_case _ ->
+            `Upper_case (Char.uppercase_ascii (letter item_num))
+        in
+        print_list_number punct num
     in
-    let pp_elt i e = group (bullet i ^^ nest 2 @@ nestable_block_elements e) in
+    let pp_elt i elt =
+      let bullet = bullet i in
+      (* TODO: precompute bullets for the whole list, so spacing stays the same
+         when we go from "9." to "10." *)
+      let indent = String.length bullet + 1 in
+      let elt = nestable_block_elements elt in
+      group (string (bullet ^ " ") ^^ nest indent elt)
+    in
     let sep =
       match kind with
       | `Ordered (Some (_, _, true)) -> hardline ^^ hardline
