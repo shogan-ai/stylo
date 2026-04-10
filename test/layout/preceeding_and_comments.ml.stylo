@@ -6,3 +6,99 @@ type t =
     B
   | C (* foo *)
   | D
+
+let a =
+  { { { a =
+          (let b = 3 in
+           b)
+      }
+      with
+      a =
+        (let b = 4 in
+         b)
+    }
+    with
+    a = 5
+  }
+;;
+
+let b =
+  {
+    (* foo
+
+       bar *)
+    {
+      {
+        a
+  =
+          (let b = 3 in
+           b)
+      }
+      with
+      a =
+        (let b = 4 in
+         b)
+    }
+    with
+    a = 5
+  }
+;;
+
+let c =
+  {
+    {
+      {
+      (* foo
+
+         bar *)
+        a
+  =
+          (let b = 3 in
+           b)
+      }
+      with
+      a =
+        (let b = 4 in
+         b)
+    }
+    with
+    a = 5
+  }
+;;
+
+let d =
+  {
+    {
+    (* foo
+
+       bar *)
+      {
+        a
+  =
+          (let b = 3 in
+           b)
+      }
+      with
+      a =
+        (let b = 4 in
+         b)
+    }
+    with
+    a = 5
+  }
+;;
+
+let a' =
+  { (* a *) { (* b *) { (* c *) a =
+          (let b = 3 in
+           b)
+      }
+      with
+      a =
+        (let b = 4 in
+         b)
+    }
+    with
+    a = 5
+  }
+;;
