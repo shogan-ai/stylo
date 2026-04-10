@@ -2,15 +2,17 @@ open Document
 
 type nest_fun = t -> t
 
-type nonrec t = {
+type chunk = {
   pre_doc: t;
   space: t;
   nest: nest_fun;
 }
 
+type t = chunk list * nest_fun
+
 let implied_nest = function
   | None -> Fun.id
-  | Some t -> t.nest
+  | Some (_, nest) -> nest
 
 let mk ?indent doc space =
   let indent =
@@ -27,7 +29,8 @@ let mk ?indent doc space =
     | Token { vanishing_cond; _ } -> vanishing_cond
     | _ -> None
   in
-  { pre_doc = doc; space; nest = nest ?vanish indent }
+  let chunk = { pre_doc = doc; space; nest = nest ?vanish indent } in
+  [chunk], chunk.nest
 
 let tight ?indent doc = mk doc empty ?indent
 let spaced ?indent doc = mk doc (break 1) ?indent
@@ -43,13 +46,16 @@ let preceed ~by:t doc =
 let ( + ) fst_opt snd =
   match fst_opt with
   | None -> snd, Fun.id
-  | Some fst ->
-    let pre_doc = preceed snd.pre_doc ~by:fst in
-    let space = snd.space in
-    let nest doc = fst.nest (snd.nest doc) in
-    { pre_doc; space; nest }, fst.nest
+  | Some (fst_chunks, fst_nest) ->
+    let (snd_chunks, snd_nest) = snd in
+    let chunks = snd_chunks @ fst_chunks in
+    let nest doc = fst_nest (snd_nest doc) in
+    (chunks, nest), fst_nest
 
 let group_with t doc =
   match t with
   | None -> doc, Fun.id
-  | Some t -> group (preceed doc ~by:t), t.nest
+  | Some (chunks, nest) ->
+    List.fold_left (fun doc chunk ->
+      group (preceed doc ~by:chunk)
+    ) doc chunks, nest
