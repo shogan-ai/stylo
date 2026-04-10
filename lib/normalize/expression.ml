@@ -41,9 +41,9 @@ let insert_pipe_if_missing ~after:kw =
   in
   seek
 
-let map ~recur (parent : Context.parent) exp =
+let map ~recur (parent : Context.parent) orig =
   (* local changes first *)
-  let exp = Semicolon.exp_no_trailing exp in
+  let exp = Semicolon.exp_no_trailing orig in
   let exp =
     match exp with
     | { pexp_desc = Pexp_begin_end (Some e)
@@ -68,6 +68,10 @@ let map ~recur (parent : Context.parent) exp =
     (* Add parens as necessary *)
     | _, Pexp_tuple _ ->
       parens_exp ~optional:true exp
+    | Expr Pexp_infix_apply { arg1; _ },
+      (Pexp_let _ | Pexp_let_open _ | Pexp_letexception _ | Pexp_letmodule _
+      | Pexp_letop _) when arg1 == orig ->
+      parens_exp exp
     (* Nothing to do in the general case. *)
     | _ -> exp
   in
