@@ -253,22 +253,40 @@ module Odoc = struct
     | `Simple -> media_ref
     | `With_text -> group (string "{" ^^ media_ref ^^ string alt ^^ string "}")
 
-  let rec nestable_block_elements = function
-    | [ elt ] -> nestable_block_element empty elt
-    | elts -> separate_map hardline (nestable_block_element softline) elts
+  let extra_spacing_between elt1 elt2 =
+    match Loc.value elt1, Loc.value elt2 with
+    | `Tag _, `Tag _ -> empty
+    | (`Heading _ | `Tag _), _
+    | _, (`Heading _ | `Tag _)
+    | `List (_, `Light, _), _
+    | `Paragraph _, `Paragraph _  -> softline
+    | _ -> empty
 
-  and nestable_block_element extra_line elt =
+  let rec nestable_block_elements = function
+    | [] -> empty
+    | [ elt ] -> nestable_block_element elt
+    | elt :: ((next :: _) as elts) ->
+      nestable_block_element elt
+      ^^ hardline ^^
+      extra_spacing_between (elt :> block_element with_location)
+        (next :> block_element with_location) ^^
+      nestable_block_elements elts
+
+  and nestable_block_element elt =
     match Loc.value elt with
-    | `Paragraph text -> inline_elements text ^^ extra_line
+    | `Paragraph text -> inline_elements text
     | `Code_block cb -> code_block cb
     | `Verbatim vb -> verbatim ~loc:(Loc.location elt) vb
     | `Modules mods -> modules mods
     | `List (kind, `Heavy, elts) -> heavy_list kind elts
-    | `List (kind, `Light, elts) -> light_list kind elts ^^ extra_line
+    | `List (kind, `Light, elts) -> light_list kind elts
+    | `Math_block mb -> math_block mb
+(*
+    (* Part of upstream's odoc, but not janestreet's odoc. *)
     | `Table ((rows, align), `Heavy) -> heavy_table rows align
     | `Table ((rows, align), `Light) -> light_table rows align
-    | `Math_block mb -> math_block mb
     | `Media (kind, href, alt, media_kind) -> media kind href alt media_kind
+*)
 
   and heavy_list kind elts =
     let kind, item =
@@ -397,20 +415,20 @@ module Odoc = struct
       string "}"
     )
 
-  let block_element extra_line located =
-    match Loc.value located with
-    | `Heading hd -> heading hd ^^ extra_line
+  let block_element elt =
+    match Loc.value elt with
+    | `Heading hd -> heading hd
     | `Tag t -> tag t
     | #nestable_block_element as nbe ->
-      nestable_block_element extra_line Loc.(at (location located) nbe)
+      nestable_block_element Loc.(at (location elt) nbe)
 
   let pp_ast elts =
     let rec aux = function
       | [] -> empty
-      | [ elt ] -> block_element empty elt
-      | elt :: elts ->
-        block_element softline elt ^^
-        hardline ^^
+      | [ elt ] -> block_element elt
+      | elt :: ((next :: _) as elts) ->
+        block_element elt ^^
+        hardline ^^ extra_spacing_between elt next ^^
         aux elts
     in
     aux elts
