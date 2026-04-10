@@ -255,21 +255,37 @@ module Odoc = struct
 
   let extra_spacing_between elt1 elt2 =
     match Loc.value elt1, Loc.value elt2 with
-    | `Tag _, `Tag _ -> empty
+    | `Tag _, `Tag _ -> false
     | (`Heading _ | `Tag _), _
     | _, (`Heading _ | `Tag _)
-    | `List (_, `Light, _), _
-    | `Paragraph _, `Paragraph _  -> softline
-    | _ -> empty
+    | `List (_, _, _), _
+    | `Paragraph _, `Paragraph _  -> true
+    | _ -> false
+
+  type belt = block_element with_location
+
+  let really_heavy = function
+    | `List (_, `Light, _) -> false
+    | `List (_, _, items) ->
+      let rec needs_blank_line = function
+        | [] | [ _ ] -> false
+        | head :: (next :: _ as tail) ->
+          extra_spacing_between (head :> belt) (next :> belt)
+          || needs_blank_line tail
+      in
+      List.exists needs_blank_line items
 
   let rec nestable_block_elements = function
     | [] -> empty
     | [ elt ] -> nestable_block_element elt
     | elt :: ((next :: _) as elts) ->
+      let spacing =
+        if extra_spacing_between (elt :> belt) (next :> belt)
+        then softline
+        else empty
+      in
       nestable_block_element elt
-      ^^ hardline ^^
-      extra_spacing_between (elt :> block_element with_location)
-        (next :> block_element with_location) ^^
+      ^^ hardline ^^ spacing ^^
       nestable_block_elements elts
 
   and nestable_block_element elt =
@@ -278,8 +294,10 @@ module Odoc = struct
     | `Code_block cb -> code_block cb
     | `Verbatim vb -> verbatim ~loc:(Loc.location elt) vb
     | `Modules mods -> modules mods
-    | `List (kind, `Heavy, elts) -> heavy_list kind elts
-    | `List (kind, `Light, elts) -> light_list kind elts
+    | `List (kind, _, elts) as list ->
+      if really_heavy list
+      then heavy_list kind elts
+      else light_list kind elts
     | `Math_block mb -> math_block mb
 (*
     (* Part of upstream's odoc, but not janestreet's odoc. *)
@@ -431,8 +449,13 @@ module Odoc = struct
       | [] -> empty
       | [ elt ] -> block_element elt
       | elt :: ((next :: _) as elts) ->
+        let spacing =
+          if extra_spacing_between elt next
+          then softline
+          else empty
+        in
         block_element elt ^^
-        hardline ^^ extra_spacing_between elt next ^^
+        hardline ^^ spacing ^^
         aux elts
     in
     aux elts
