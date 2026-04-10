@@ -1757,7 +1757,7 @@ end = struct
         pp ?preceeding arg
       | Some op ->
         assert (Option.is_none preceeding);
-        let op = pp_op op ^^ break 1 in
+        let op = pp_op op in
         match arg.pexp_desc with
         | Pexp_letop _ | Pexp_letexception _ | Pexp_letmodule _
         | Pexp_ifthenelse _ | Pexp_let _ | Pexp_match _
@@ -1765,9 +1765,9 @@ end = struct
           (* These are the last elements of the chain (otherwise they'd be under
              parens), we reproduce ocamlformat's choice of not indenting in
              those case. *)
-          group (op ^^ pp arg)
+          group (op ^/^ pp arg)
         | _ ->
-          pp ~preceeding:(Preceeding.tight (group op)) arg
+          pp ~preceeding:(Preceeding.spaced op) arg
     in
     match arg.pexp_desc with
     | Pexp_apply (f, args) when on_right ->

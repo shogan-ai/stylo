@@ -96,3 +96,11 @@ let a' =
     a = 5
   }
 ;;
+
+let this_exhibited_idempotence_issues =
+  foo
+  ^^ (* Some multiline
+
+        comment *)
+     bar
+;;

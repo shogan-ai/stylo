@@ -26,3 +26,9 @@ let d =
 let a' =
   { (* a *) { (* b *) { (* c *) a = (let b = 3 in b) } with a = (let b = 4 in b) } with a = 5 }
 
+let this_exhibited_idempotence_issues =
+  foo ^^
+  (* Some multiline
+
+     comment *)
+  bar
