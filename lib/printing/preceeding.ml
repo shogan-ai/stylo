@@ -38,7 +38,8 @@ let spaced ?indent doc = mk doc (break 1) ?indent
 let preceed ~by:t doc =
   let inserted, hint =
     flush_comments ~pull_preceeding_comments:true ~floating_allowed:false
-      ~ws_before:t.space ~ws_after:(break 1)
+      ~ws_before:(group ~margin:3 t.space) (* start the comment on same line. *)
+      ~ws_after:(break 1)
   in
   let space = vanishing_whitespace inserted t.space in
   t.pre_doc ^^ t.nest (hint ^^ space ^^ doc)

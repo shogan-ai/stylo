@@ -23,8 +23,7 @@ let a =
 ;;
 
 let b =
-  {
-    (* foo
+  { (* foo
 
        bar *)
     { { a
@@ -45,8 +44,7 @@ let b =
 let c =
   {
     {
-      {
-        (* foo
+      { (* foo
 
            bar *)
         a
@@ -66,8 +64,7 @@ let c =
 
 let d =
   {
-    {
-      (* foo
+    { (* foo
 
          bar *)
       { a
