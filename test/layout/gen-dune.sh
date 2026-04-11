@@ -2,6 +2,11 @@ function check-file {
     local f="$1"
     local name=$(basename "$f")
 
+    local width="90"
+    if [[ $(echo $name | cut -d. -f3) ]]; then
+        width=$(echo $name | cut -d. -f2)
+    fi
+
     ref="$name.stylo"
     out="$name.out"
 
@@ -10,7 +15,7 @@ function check-file {
   (target $out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --idempotence-check --width 90 %{dep:$f}))))
+      (run %{project_root}/bin/main.exe style --idempotence-check --width $width %{dep:$f}))))
 
 (rule
   (alias runtest)
