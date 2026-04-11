@@ -10,7 +10,6 @@ module Error = struct
   type t =
     | Output_longer_than_input of Doc.t
     | Missing_token of Lexing.position
-    | Optional_mismatch of Lexing.position
 
   let pp ppf : t -> unit = function
     | Output_longer_than_input doc ->
@@ -20,10 +19,6 @@ module Error = struct
     | Missing_token pos ->
       Format.fprintf ppf
         "token at position %d:%d absent from the output."
-        pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
-    | Optional_mismatch pos ->
-      Format.fprintf ppf
-        "printer changed optional status of token at position %d:%d."
         pos.pos_lnum (pos.pos_cnum - pos.pos_bol);
 end
 
@@ -266,8 +261,7 @@ let rec walk_both state seq doc =
   | first :: rest ->
     match first.T.desc, doc with
     (* Synchronized, advance *)
-    | T.Token (_, false), Doc.Token { vanishing_cond = None; value = p; _ }
-    | T.Token (_, true),  Doc.Token { vanishing_cond = Some _; value = p; _ } ->
+    | T.Token _, Doc.Token { value = p; _ } ->
       dprintf "assume %a synced at %d:%d with << %a >>@."
         Tokens.pp_elt first
         first.pos.pos_lnum
@@ -302,6 +296,7 @@ let rec walk_both state seq doc =
            yet.
            We do not want to flush any other comment before seeing it as that
            would lead to reordering. *)
+        fh.cmts_were_flushed := false;
         seq, Doc.empty, state
       | Absent ->
         (* [c] (and perhaps the following comments) can be flushed. *)
@@ -310,8 +305,9 @@ let rec walk_both state seq doc =
           ~after:fh.ws_after state
       end
 
-    | _, Doc.Comments_flushing_hint _ ->
+    | _, Doc.Comments_flushing_hint fh ->
       (* No comments to insert, the hint vanishes. *)
+      fh.cmts_were_flushed := false;
       seq, Doc.empty, state
 
     (* Comments missing in the doc, insert them *)
@@ -353,18 +349,10 @@ let rec walk_both state seq doc =
 
     | _, Doc.Nest (_, i, vanish, doc) ->
       let rest, doc, state' = walk_both (under_nest state) seq doc in
-      rest, Doc.nest ?vanish i doc, exit_nest state state'
+      rest, Doc.nest ~vanish i doc, exit_nest state state'
 
     | _, Doc.Group (_, margin, flatness, doc) ->
       traverse_group seq state margin flatness doc
-
-    | T.Token (_, false), Doc.Token { vanishing_cond = Some _; value = p; _ }
-    | T.Token (_, true),  Doc.Token { vanishing_cond = None; value = p; _ } ->
-      dprintf "OPTIONAL MISMATCH %a with %a@."
-        T.pp_elt first
-        Doc.pp_pseudo p;
-      raise (Error (Optional_mismatch first.pos))
-
 
     | (* [Child_node] doesn't appear in linearized token stream *)
       T.Child_node, _

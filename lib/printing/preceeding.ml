@@ -26,7 +26,7 @@ let mk ?indent doc space =
     match doc with
     | Cat (_, Token { vanishing_cond; _}, _)
     | Cat (_, _, Token { vanishing_cond; _})
-    | Token { vanishing_cond; _ } -> vanishing_cond
+    | Token { vanishing_cond; _ } -> Some vanishing_cond
     | _ -> None
   in
   let chunk = { pre_doc = doc; space; nest = nest ?vanish indent } in
@@ -41,7 +41,7 @@ let preceed ~by:t doc =
       ~ws_before:(group ~margin:3 t.space) (* start the comment on same line. *)
       ~ws_after:(break 1)
   in
-  let space = vanishing_whitespace ~assume_present:true inserted t.space in
+  let space = vanishing_whitespace inserted t.space in
   t.pre_doc ^^ t.nest (hint ^^ space ^^ doc)
 
 let ( + ) fst_opt snd =

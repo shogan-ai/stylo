@@ -24,7 +24,7 @@ module Condition : sig
 
   val flat : flatness -> t
 
-  val check : t option -> bool (* false when None *)
+  val check : t -> bool (* false when None *)
 end
 
 type softness =
@@ -40,8 +40,7 @@ type whitespace =
   | Non_breakable (** a simple space. *)
 
 type 'a can_vanish = {
-  vanishing_cond: Condition.t option;
-  assume_present: bool;
+  vanishing_cond: Condition.t;
   value: 'a;
 }
 (** Some leaves of the document can "vanish" under certain conditions.
@@ -64,7 +63,7 @@ type t = private
     }
   | Whitespace of whitespace can_vanish
   | Cat of Requirement.t * t * t
-  | Nest of Requirement.t * int * Condition.t option * t
+  | Nest of Requirement.t * int * Condition.t * t
   | Group of Requirement.t * int * flatness option * t
 
 and pseudo_token = private
@@ -109,12 +108,9 @@ val softest_break : t (* used between docstrings. *)
 
 (** {2 Optional documents} *)
 
-val vanishing_whitespace : ?assume_present:bool -> Condition.t -> t -> t
+val vanishing_whitespace : Condition.t -> t -> t
 (** Expects a whitespace document as input, and return the same kind of document
-    which additionally vanishes when the condition is met.
-
-    [assume_present] helps the engine predict whether the token will vanish or
-    not, which is helpful to have somewhat accurate requirement computation. *)
+    which additionally vanishes when the condition is met. *)
 
 val opt_token : ?ws_before:t -> ?ws_after:t -> Condition.t -> string -> t
 (** Produces a [Token] document which vanishes when the condition is met.
