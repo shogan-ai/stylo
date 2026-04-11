@@ -1133,6 +1133,7 @@ and Expression : sig
   val pp : ?preceeding:Preceeding.t -> expression -> t
 
   val pp_function_parts : ?preceeding:Preceeding.t -> expression -> t * t
+  val pp_exclave_parts : ?preceeding:Preceeding.t -> expression -> t * t
 end = struct
   let pp_op op =
     match op.pexp_desc with
@@ -1365,14 +1366,20 @@ end = struct
         pp_cons ?preceeding hd ^/^
         pre_nest (pp_cons ~on_right:true tl)
       )
-    | Pexp_exclave exp ->
-      let excl, pre_nest = Preceeding.group_with preceeding S.exclave__ in
-      excl ^/^ pre_nest @@ nest 2 (pp exp)
+    | Pexp_exclave exp -> pp_exclave ?preceeding exp
     | Pexp_mode_legacy (m, exp) ->
       let mode, pre_nest =
         Preceeding.group_with preceeding (mode_legacy m.txt)
       in
       mode ^/^ pre_nest @@ nest 2 (pp exp)
+
+  and pp_exclave_parts ?preceeding exp =
+    let excl, pre_nest = Preceeding.group_with preceeding S.exclave__ in
+    excl, pre_nest (pp exp)
+
+  and pp_exclave ?preceeding exp =
+    let kw, exp = pp_exclave_parts ?preceeding exp in
+    kw ^/^ exp
 
   and pp_let ~preceeding mf rf vbs body =
     let pre_nest = Preceeding.implied_nest preceeding in
@@ -3652,6 +3659,11 @@ end = struct
 
   let rhs e =
     match e.pexp_desc with
+    | Pexp_exclave e ->
+      (* N.B. if there were attributes we'd see [Pexp_parens] *)
+      let kw, exp = Expression.pp_exclave_parts e in
+      Layout_module_binding.Three_parts
+        { start = kw; main = exp; stop = empty }
     | Pexp_function ([], _, body) ->
       (* N.B. if there were attributes we'd see [Pexp_parens] *)
       Function_body.as_rhs body
