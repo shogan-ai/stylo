@@ -3630,7 +3630,7 @@ end = struct
         pre_nest @@ nest 2 main
       in
       group (
-        group bindings_and_main ^/^
+        group bindings_and_main ^?^
         pre_nest (stop ^?^ in_kw)
       )
     (* constraint and body *)
@@ -3652,7 +3652,7 @@ end = struct
         pre_nest @@ nest 2 main
       in
       group (
-        group bindings_cstr_main ^/^
+        group bindings_cstr_main ^?^
         pre_nest stop ^?^
         pre_nest in_kw
       )
