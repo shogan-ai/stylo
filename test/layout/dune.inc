@@ -19,6 +19,16 @@
   (action (diff %{dep:comments_insertion.ml.stylo} %{dep:comments_insertion.ml.out})))
 
 (rule
+  (target disappearing_and_requirement_update.15.ml.out)
+  (action
+    (with-stdout-to %{target}
+      (run %{project_root}/bin/main.exe style --idempotence-check --width 15 %{dep:disappearing_and_requirement_update.15.ml}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:disappearing_and_requirement_update.15.ml.stylo} %{dep:disappearing_and_requirement_update.15.ml.out})))
+
+(rule
   (target docstring_placement.ml.out)
   (action
     (with-stdout-to %{target}
