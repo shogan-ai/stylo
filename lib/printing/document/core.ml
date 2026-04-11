@@ -77,6 +77,7 @@ type whitespace =
 
 type 'a can_vanish = {
   vanishing_cond: Condition.t option;
+  assume_present: bool;
   value: 'a;
 }
 
@@ -127,9 +128,9 @@ let pseudo_token_req = function
 let requirement = function
   | Empty -> Req.of_int 0
   | Directive pt
-  | Token { vanishing_cond = None; value = pt }
+  | Token { assume_present = true; value = pt; _ }
   | Comment { doc = pt; _ } -> pseudo_token_req pt
-  | Whitespace { vanishing_cond = None; value = ws } -> ws_req ws
+  | Whitespace { assume_present = true; value = ws; _ } -> ws_req ws
   | Token _
   | Comments_flushing_hint _
   | Whitespace _ -> Req.of_int 0
@@ -137,12 +138,13 @@ let requirement = function
   | Nest (r, _, _, _)
   | Group (r, _, _, _) -> r
 
-let ws value = Whitespace { vanishing_cond = None; value }
+let ws value =
+  Whitespace { vanishing_cond = None; assume_present = true; value }
 
 let empty = Empty
 let string s =
   let value = Trivial (Req.of_int (strlen s), s) in
-  Token { vanishing_cond = None; value }
+  Token { vanishing_cond = None; assume_present = true; value }
 
 let break spaces = ws (Break (spaces, Hard))
 let soft_break spaces = ws (Break (spaces, Soft))
@@ -152,12 +154,16 @@ let softest_line = ws (Line_break Softest)
 let softest_break = ws (Break (1, Softest))
 
 let nbsp = ws Non_breakable
-let vanishing_whitespace cond = function
+
+let vanishing_whitespace ?(assume_present=false) cond = function
   | Empty -> Empty
-  | Whitespace { vanishing_cond = None; value } ->
-    Whitespace { vanishing_cond = Some cond; value }
-  | Whitespace { vanishing_cond = Some other_cond; value } ->
-    Whitespace { vanishing_cond = Some Condition.(cond || other_cond); value }
+  | Whitespace { vanishing_cond = None; value; _ } ->
+    Whitespace { vanishing_cond = Some cond; value; assume_present }
+  | Whitespace { vanishing_cond = Some other_cond; value; _ } ->
+    Whitespace
+      { vanishing_cond = Some Condition.(cond || other_cond)
+      ; value
+      ; assume_present }
   | _ -> invalid_arg "Document.vanishing_whitespace"
 
 let flush_comments ~pull_preceeding_comments:pull ~floating_allowed:float
@@ -190,7 +196,9 @@ let opt_token ?ws_before ?ws_after cond tok =
       |> Option.value ~default:empty
     in
     let value = Trivial (Req.of_int (strlen tok), tok) in
-    ws ws_before ^^ Token { vanishing_cond = Some cond; value } ^^ ws ws_after
+    ws ws_before ^^
+    Token { vanishing_cond = Some cond; value; assume_present = false } ^^
+    ws ws_after
 
 let nest ?vanish i t =
   match i, t with
@@ -223,10 +231,17 @@ let pseudo_of_string s =
     Trivial (Req.of_int (strlen s), s)
 
 
-let fancy_string s = Token { vanishing_cond = None; value = pseudo_of_string s }
+let fancy_string s =
+  Token
+    { vanishing_cond = None
+    ; value = pseudo_of_string s
+    ; assume_present = true }
 
 let formatted_string t =
-  Token { vanishing_cond = None; value = Complex (requirement t, t) }
+  Token
+    { vanishing_cond = None
+    ; value = Complex (requirement t, t)
+    ; assume_present = true }
 
 let directive t =
   let t = softline ^^ group t ^^ softest_line in

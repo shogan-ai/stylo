@@ -266,8 +266,8 @@ let rec walk_both state seq doc =
   | first :: rest ->
     match first.T.desc, doc with
     (* Synchronized, advance *)
-    | T.Token (_, false), Doc.Token { vanishing_cond = None; value = p }
-    | T.Token (_, true),  Doc.Token { vanishing_cond = Some _; value = p } ->
+    | T.Token (_, false), Doc.Token { vanishing_cond = None; value = p; _ }
+    | T.Token (_, true),  Doc.Token { vanishing_cond = Some _; value = p; _ } ->
       dprintf "assume %a synced at %d:%d with << %a >>@."
         Tokens.pp_elt first
         first.pos.pos_lnum
@@ -358,8 +358,8 @@ let rec walk_both state seq doc =
     | _, Doc.Group (_, margin, flatness, doc) ->
       traverse_group seq state margin flatness doc
 
-    | T.Token (_, false), Doc.Token { vanishing_cond = Some _; value = p }
-    | T.Token (_, true),  Doc.Token { vanishing_cond = None; value = p } ->
+    | T.Token (_, false), Doc.Token { vanishing_cond = Some _; value = p; _ }
+    | T.Token (_, true),  Doc.Token { vanishing_cond = None; value = p; _ } ->
       dprintf "OPTIONAL MISMATCH %a with %a@."
         T.pp_elt first
         Doc.pp_pseudo p;

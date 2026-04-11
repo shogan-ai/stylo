@@ -41,6 +41,7 @@ type whitespace =
 
 type 'a can_vanish = {
   vanishing_cond: Condition.t option;
+  assume_present: bool;
   value: 'a;
 }
 (** Some leaves of the document can "vanish" under certain conditions.
@@ -108,9 +109,12 @@ val softest_break : t (* used between docstrings. *)
 
 (** {2 Optional documents} *)
 
-val vanishing_whitespace : Condition.t -> t -> t
-(** Expects a non vanishing whitespace document as input, and return the same
-    kind of document which additionally vanishes when the condition is met. *)
+val vanishing_whitespace : ?assume_present:bool -> Condition.t -> t -> t
+(** Expects a whitespace document as input, and return the same kind of document
+    which additionally vanishes when the condition is met.
+
+    [assume_present] helps the engine predict whether the token will vanish or
+    not, which is helpful to have somewhat accurate requirement computation. *)
 
 val opt_token : ?ws_before:t -> ?ws_after:t -> Condition.t -> string -> t
 (** Produces a [Token] document which vanishes when the condition is met.
