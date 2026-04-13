@@ -512,10 +512,8 @@ end = struct
         match pre_m with
         | No_modes -> Core_type.pp ?preceeding ty
         | _ ->
-          let pre_modes, _ =
-            Preceeding.group_with preceeding (modes_legacy pre_m)
-          in
-          pre_modes ^/^ pre_nest (Core_type.pp ty)
+          let pre, _ = Preceeding.(preceeding + spaced (modes_legacy pre_m)) in
+          Core_type.pp ~preceeding:pre ty
       in
       with_modes ~modes:post_m pre_ty ~extra_nest:pre_nest
 
