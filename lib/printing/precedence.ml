@@ -17,12 +17,12 @@ let of_infix_op name =
   | ('+' | '-'), _ -> 8
 (*   | _, "::" -> 9 (* N.B. never used as represented by [Pexp_cons] *) *)
   | ('@' | '^'), _ -> 10
-  | (* needs to be checked before the line below, because the patterns overlap
-       ... *)
-    _, ("&" | "&&") -> 12
+  (* the next two cases need to be checked before the ones that follows them,
+     because the patterns overlap. *)
+  | _, ("&" | "&&") -> 12
+  | _, ("or" | "||") -> 13
   | ('=' | '<' | '>' | '|' | '&' | '$'), _
   | _, "!=" -> 11
-  | _, ("or" | "||") -> 13
   | _, ":=" -> 15
   | _ -> 99 (* pfffrt *)
 
