@@ -98,11 +98,11 @@ let rec first_is_flushhint ?pulls_before = function
     end
   | Token _ | Comment _ | Whitespace _ | Directive _ -> `no
   | Group (_, _, _, d) | Nest (_, _, _, d) ->
-    first_is_flushhint d
+    first_is_flushhint ?pulls_before d
   | Empty -> `maybe
   | Cat (_, d1, d2) ->
-    match first_is_flushhint d1 with
-    | `maybe -> first_is_flushhint d2
+    match first_is_flushhint ?pulls_before d1 with
+    | `maybe -> first_is_flushhint ?pulls_before d2
     | res -> res
 
 let first_is_flushhint ?pulls_before d =
