@@ -1601,7 +1601,7 @@ end = struct
       match pack_parts with
       | Single_part { equal_or_colon = _; body = me_and_ty } ->
         lparen_module ^/^ pre_nest (nest 2 me_and_ty ^^ S.rparen)
-      | Three_parts { equal_or_colon = _; start; main; stop } ->
+      | Three_parts { equal_or_colon = _; start; main; stop; _ } ->
         let flatness = flatness_tracker () in
         let single_line_start = Condition.flat flatness in
         let opt_nest = nest ~vanish:single_line_start 2 in
@@ -2229,7 +2229,8 @@ end = struct
     | Pfunction_cases (ext_attrs, cases) ->
       let kw, cases = pp_cases cases ext_attrs in
       Layout_module_binding.Three_parts
-        { equal_or_colon = S.equals; start = kw; main = cases; stop = empty }
+        { equal_or_colon = S.equals; indent_start = false;
+          start = kw; main = cases; stop = empty }
 end
 
 and Type_constraint : sig
@@ -2953,7 +2954,7 @@ end = struct
     | Pmty_signature sg ->
       let start, main, stop = Signature.pp_parts sg in
       let stop = Attribute.attach stop ~attrs:pmty_attributes in
-      Three_parts { equal_or_colon; start; main; stop }
+      Three_parts { equal_or_colon; indent_start = false; start; main; stop }
     | Pmty_typeof (attrs, me) ->
       let kws = S.module_ ^/^ S.type_ ^/^ S.of_ in
       let prefix = Attribute.attach ~attrs (group kws) in
@@ -2973,7 +2974,7 @@ end = struct
   let pp_named name mty =
     match Module_type.as_rhs mty with
     | Single_part mty -> group (name ^/^ S.colon ^/^ mty.body)
-    | Three_parts { equal_or_colon = _; start; main; stop } ->
+    | Three_parts { equal_or_colon = _; start; main; stop; _ } ->
       group (
         group (name ^/^ group (nest 2 S.colon ^/^ start)) ^/^
         nest 2 main ^/^
@@ -3333,7 +3334,7 @@ end = struct
             ; _ }
       ; _ } ->
       let start, main, stop = apply_struct m1 str attrs attrs2 in
-      start ^/^ main ^/^ stop
+      start ^/^ nest 2 main ^/^ stop
     | _ -> m1 ^/^ nest 2 (pp m2)
 
   and apply_struct m1 struct_ struct_attrs m2_attrs =
@@ -3346,7 +3347,6 @@ end = struct
       group ~flatness:first_line_tracker
         (break 1 ^^ extra_nest (S.lparen ^^ start))
     in
-    let main = nest 2 main in
     let stop =
       let internal_stop = Attribute.attach stop ~attrs:m2_attrs in
       internal_stop ^^ S.rparen
@@ -3361,31 +3361,7 @@ end = struct
     | Pmod_structure (attrs, str) ->
       let start, main, stop = Structure.pp_parts attrs str in
       let stop = Attribute.attach stop ~attrs:pmod_attributes in
-      Three_parts { equal_or_colon; start; main; stop }
-    (* FIXME: The intent of the following was to have:
-       {[
-         include Foo (struct
-           (* items *)
-         end)
-
-         module M = Foo (struct
-           (* items *)
-         end)
-
-         module M =
-           Foo (struct
-             (* items *)
-           end)
-       ]}
-
-       but that doesn't quite work, the last case is instead:
-       {[
-         module M =
-         Foo (struct
-           (* items *)
-         end)
-       ]}
-    *)
+      Three_parts { equal_or_colon; indent_start = false; start; main; stop }
     | Pmod_apply
         (m1, { pmod_attributes = No_attributes
              ; pmod_desc =
@@ -3395,7 +3371,7 @@ end = struct
                    ; _ }
              ; _ }) ->
       let start, main, stop = apply_struct (pp m1) str attrs attrs2 in
-      Three_parts { equal_or_colon; start; main; stop }
+      Three_parts { equal_or_colon; indent_start = true; start; main; stop }
     | _ -> Single_part { equal_or_colon; body = pp me }
 end
 
@@ -3492,7 +3468,8 @@ end
 and Layout_module_binding : sig
   type rhs =
     | Single_part of { equal_or_colon: t; body: t }
-    | Three_parts of { equal_or_colon: t; start: t; main: t; stop: t }
+    | Three_parts of
+        { equal_or_colon: t; indent_start: bool; start: t; main: t; stop: t }
     (** Meant for [struct/sig .. end]: we try to keep [start] on the same line
         as what preceeds it, [main] is indented, [stop] is not.
 
@@ -3521,7 +3498,8 @@ and Layout_module_binding : sig
 end = struct
   type rhs =
     | Single_part of { equal_or_colon: t; body: t }
-    | Three_parts of { equal_or_colon: t; start: t; main: t; stop: t }
+    | Three_parts of
+        { equal_or_colon: t; indent_start: bool; start: t; main: t; stop: t }
 
   let map_rhs_end f = function
     | Single_part r -> Single_part { r with body = f r.body }
@@ -3584,8 +3562,9 @@ end = struct
         pre_nest_2 equal;
         pre_nest_2 exp
       ]
-    | None, Some Three_parts { equal_or_colon; start; main; stop }
-    | Some Three_parts { equal_or_colon; start; main; stop }, None ->
+    | None, Some Three_parts { equal_or_colon; indent_start; start; main; stop }
+    | Some Three_parts { equal_or_colon; indent_start; start; main; stop }, None
+      ->
       (* [module M : sig (* items *) end],
          {[
            module M = struct
@@ -3598,16 +3577,18 @@ end = struct
              (* items *)
            end
          ]} *)
+      let pre_nest_N = if indent_start then pre_nest_2 else pre_nest in
       group (
         flow (break 1) [
           bindings;
           pre_nest_2 equal_or_colon;
-          pre_nest start; (* don't indent struct/sig if it's on its own line *)
+          pre_nest_N start; (* don't indent struct/sig if it's on its own line *)
         ] ^?^
         pre_nest_2 main ^?^
-        pre_nest stop
+        pre_nest_N stop
       )
-    | Some Three_parts { equal_or_colon = colon; start; main; stop },
+    | Some Three_parts
+        { equal_or_colon = colon; indent_start; start; main; stop },
       Some Single_part { equal_or_colon = equal; body } ->
       (* {[
            module M : sig
@@ -3620,53 +3601,61 @@ end = struct
            end =
              MODULE_EXPR
          ]} *)
+      let pre_nest_N = if indent_start then pre_nest_2 else pre_nest in
       group (
         flow (break 1) [
           bindings;
           pre_nest_2 colon;
-          pre_nest start; (* same as case above *)
+          pre_nest_N start; (* same as case above *)
         ] ^?^
         pre_nest_2 main ^?^
         flow (break 1) [
-          pre_nest stop;
+          pre_nest_N stop;
           pre_nest_2 equal;
           pre_nest_2 body
         ]
       )
     | Some Single_part { equal_or_colon = colon; body = typ },
-      Some Three_parts { equal_or_colon = equal; start; main; stop } ->
+      Some Three_parts
+        { equal_or_colon = equal; indent_start; start; main; stop } ->
+      let pre_nest_N = if indent_start then pre_nest_2 else pre_nest in
       group (
         flow (break 1) [
           bindings;
           pre_nest_2 colon;
           pre_nest_2 typ;
           pre_nest_2 equal;
-          pre_nest start; (* same as above *)
+          pre_nest_N start; (* same as above *)
         ] ^?^
         pre_nest_2 main ^?^
-        pre_nest stop
+        pre_nest_N stop
       )
     | Some Three_parts typ, Some Three_parts exp ->
+      let nestart b doc =
+        if b
+        then pre_nest_2 doc
+        else pre_nest doc
+      in
       let with_sig =
         (* Could fit on one line even if the whole binding doesn't *)
         group (
           flow (break 1) [
             bindings;
             pre_nest_2 typ.equal_or_colon;
-            pre_nest typ.start; (* same as above *)
+            nestart typ.indent_start typ.start; (* same as above *)
           ] ^?^
           pre_nest_2 typ.main ^?^
-          pre_nest typ.stop
+          nestart typ.indent_start typ.stop
         )
       in
       group (
         flow (break 1) [
           with_sig;
           pre_nest_2 exp.equal_or_colon;
-          pre_nest exp.start; (* likewise *)
+          nestart exp.indent_start exp.start; (* likewise *)
         ] ^?^
         pre_nest_2 exp.main ^?^
-        pre_nest exp.stop
+        nestart exp.indent_start exp.stop
       )
 
   let pp ?preceeding ?params_indent ?item ?pre_text ?pre_doc ~keyword
@@ -3720,7 +3709,7 @@ end = struct
         pre_nest (nest 2 body) ^?^
         pre_nest in_kw
       )
-    | None, Some Three_parts { equal_or_colon = equal; start; main; stop } ->
+    | None, Some Three_parts { equal_or_colon = equal; start; main; stop; _ } ->
       let bindings_and_main =
         group
           (bindings ^/^ pre_nest @@ nest 2 (group (equal ^/^ start))) ^/^
@@ -3740,7 +3729,8 @@ end = struct
         pre_nest (nest 2 exp) ^?^
         pre_nest in_kw
       )
-    | Some doc, Some Three_parts { equal_or_colon=equal; start; main; stop } ->
+    | Some doc, Some Three_parts
+                  { equal_or_colon=equal; start; main; stop; _ } ->
       let bindings_cstr_main =
         group (
           group (bindings ^/^ pre_nest @@ nest 2 doc) ^/^
@@ -3761,7 +3751,8 @@ end = struct
       (* N.B. if there were attributes we'd see [Pexp_parens] *)
       let kw, exp = Expression.pp_exclave_parts e in
       Layout_module_binding.Three_parts
-        { equal_or_colon; start = kw; main = exp; stop = empty }
+        { equal_or_colon; indent_start = false;
+          start = kw; main = exp; stop = empty }
     | Pexp_function ([], _, body) ->
       (* N.B. if there were attributes we'd see [Pexp_parens] *)
       Function_body.as_rhs body
