@@ -3332,15 +3332,26 @@ end = struct
             ; pmod_desc = Pmod_structure (attrs, str)
             ; _ }
       ; _ } ->
-      let start, main, stop = Structure.pp_parts attrs str in
-      let start = group (m1 ^/^ S.lparen ^^ start) in
-      let main = nest 2 main in
-      let stop =
-        let internal_stop = Attribute.attach stop ~attrs:attrs2 in
-        internal_stop ^^ S.rparen
-      in
+      let start, main, stop = apply_struct m1 str attrs attrs2 in
       start ^/^ main ^/^ stop
     | _ -> m1 ^/^ nest 2 (pp m2)
+
+  and apply_struct m1 struct_ struct_attrs m2_attrs =
+    let start, main, stop = Structure.pp_parts struct_attrs struct_ in
+    let first_line_tracker = flatness_tracker () in
+    let first_line_flat = Condition.flat first_line_tracker in
+    let extra_nest doc = nest ~vanish:first_line_flat 2 doc in
+    let start =
+      m1 ^^
+      group ~flatness:first_line_tracker
+        (break 1 ^^ extra_nest (S.lparen ^^ start))
+    in
+    let main = nest 2 main in
+    let stop =
+      let internal_stop = Attribute.attach stop ~attrs:m2_attrs in
+      internal_stop ^^ S.rparen
+    in
+    start, extra_nest main, extra_nest stop
 
   let as_rhs
         ({ pmod_desc; pmod_attributes; pmod_loc = _; pmod_tokens = _ } as me)
@@ -3351,6 +3362,30 @@ end = struct
       let start, main, stop = Structure.pp_parts attrs str in
       let stop = Attribute.attach stop ~attrs:pmod_attributes in
       Three_parts { equal_or_colon; start; main; stop }
+    (* FIXME: The intent of the following was to have:
+       {[
+         include Foo (struct
+           (* items *)
+         end)
+
+         module M = Foo (struct
+           (* items *)
+         end)
+
+         module M =
+           Foo (struct
+             (* items *)
+           end)
+       ]}
+
+       but that doesn't quite work, the last case is instead:
+       {[
+         module M =
+         Foo (struct
+           (* items *)
+         end)
+       ]}
+    *)
     | Pmod_apply
         (m1, { pmod_attributes = No_attributes
              ; pmod_desc =
@@ -3359,14 +3394,7 @@ end = struct
                    ; pmod_desc = Pmod_structure (attrs, str)
                    ; _ }
              ; _ }) ->
-      let start, main, stop = Structure.pp_parts attrs str in
-      let start = group (pp m1 ^/^ S.lparen ^^ start) in
-      let main = nest 2 main in
-      let stop =
-        let internal_stop = Attribute.attach stop ~attrs:attrs2 in
-        Attribute.attach (internal_stop ^^ S.rparen) ~attrs:pmod_attributes
-        |> nest 2
-      in
+      let start, main, stop = apply_struct (pp m1) str attrs attrs2 in
       Three_parts { equal_or_colon; start; main; stop }
     | _ -> Single_part { equal_or_colon; body = pp me }
 end
