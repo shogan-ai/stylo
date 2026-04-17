@@ -1599,9 +1599,9 @@ end = struct
     in
     group (
       match pack_parts with
-      | Single_part me_and_ty ->
+      | Single_part { equal_or_colon = _; body = me_and_ty } ->
         lparen_module ^/^ pre_nest (nest 2 me_and_ty ^^ S.rparen)
-      | Three_parts { start; main; stop } ->
+      | Three_parts { equal_or_colon = _; start; main; stop } ->
         let flatness = flatness_tracker () in
         let single_line_start = Condition.flat flatness in
         let opt_nest = nest ~vanish:single_line_start 2 in
@@ -2229,7 +2229,7 @@ end = struct
     | Pfunction_cases (ext_attrs, cases) ->
       let kw, cases = pp_cases cases ext_attrs in
       Layout_module_binding.Three_parts
-        { start = kw; main = cases; stop = empty }
+        { equal_or_colon = S.equals; start = kw; main = cases; stop = empty }
 end
 
 and Type_constraint : sig
@@ -2726,10 +2726,10 @@ end
 
 and Class_infos : sig
   val pp_list :
-    'a. ?equal_sign:t -> ('a -> t) -> keywords:t list ->
+    'a. ('a -> Layout_module_binding.rhs) -> keywords:t list ->
     'a class_infos list -> t
 end = struct
-  let pp ?equal_sign pp_expr ~keywords
+  let pp pp_expr ~keywords
       { pci_ext_attrs; pci_virt; pci_params; pci_name; pci_expr; pci_attributes;
         pci_value_params; pci_constraint; pci_loc = _; pci_tokens = _;
         pci_pre_text; pci_pre_doc; pci_post_doc } =
@@ -2745,37 +2745,49 @@ end = struct
       Type_constructor.pp_class_info_decl pci_params pci_name.txt
     in
     let open Layout_module_binding in
-    let mk_constraint ct = Single_part (S.colon ^/^ Class_type.pp ct) in
-    pp ?equal_sign
-      ~pre_text:pci_pre_text
+    let mk_constraint ct =
+      Single_part { equal_or_colon = S.colon; body = Class_type.pp ct }
+    in
+    pp ~pre_text:pci_pre_text
       ?pre_doc:pci_pre_doc
       ~keyword:(keywords ^?^ virtual_ pci_virt)
       bound_class_thingy
       ~params:value_params
       ?constraint_:(Option.map mk_constraint pci_constraint)
-      ~rhs:(Single_part (pp_expr pci_expr))
+      ~rhs:(pp_expr pci_expr)
       ~attrs:pci_attributes
       ~item:true (* [@@] expected for attributes, as for struct/sig items *)
       ?post_doc:pci_post_doc
 
-  let rec pp_list ?equal_sign pp_expr ~keywords = function
+  let rec pp_list pp_expr ~keywords = function
     | [] -> empty
     | x :: xs ->
-      pp ?equal_sign pp_expr ~keywords x ^?^
-      pp_list ?equal_sign pp_expr ~keywords:[S.and_] xs
+      pp pp_expr ~keywords x ^?^
+      pp_list pp_expr ~keywords:[S.and_] xs
 end
 
 and Class_description : sig
   val pp_list : class_description list -> t
 end = struct
-  let pp_list =
-    Class_infos.pp_list ~equal_sign:S.colon Class_type.pp ~keywords:[S.class_]
+  let pp_ct ct =
+    Layout_module_binding.Single_part {
+      equal_or_colon = S.colon;
+      body = Class_type.pp ct
+    }
+
+  let pp_list = Class_infos.pp_list pp_ct ~keywords:[S.class_]
 end
 
 and Class_type_declaration : sig
   val pp_list : class_type_declaration list -> t
 end = struct
-  let pp_list = Class_infos.pp_list Class_type.pp ~keywords:[S.class_; S.type_]
+  let pp_ct ct =
+    Layout_module_binding.Single_part {
+      equal_or_colon = S.equals;
+      body = Class_type.pp ct
+    }
+
+  let pp_list = Class_infos.pp_list pp_ct ~keywords:[S.class_; S.type_]
 end
 
 (** {2 Value expressions for the class language} *)
@@ -2885,7 +2897,12 @@ end
 and Class_declaration : sig
   val pp_list : class_declaration list -> t
 end = struct
-  let pp_list = Class_infos.pp_list Class_expr.pp ~keywords:[S.class_]
+  let pp_ce ce =
+    Layout_module_binding.Single_part
+      { equal_or_colon = S.equals
+      ; body = Class_expr.pp ce }
+
+  let pp_list = Class_infos.pp_list pp_ce ~keywords:[S.class_]
 end
 
 (** {1 Module language} *)
@@ -2931,19 +2948,22 @@ end = struct
 
   let as_rhs ({ pmty_desc; pmty_attributes; pmty_loc=_; pmty_tokens=_ } as mty)
     : Layout_module_binding.rhs =
+    let equal_or_colon = empty in (* context need to decided, caller will fix *)
     match pmty_desc with
     | Pmty_signature sg ->
       let start, main, stop = Signature.pp_parts sg in
       let stop = Attribute.attach stop ~attrs:pmty_attributes in
-      Three_parts { start; main; stop }
+      Three_parts { equal_or_colon; start; main; stop }
     | Pmty_typeof (attrs, me) ->
       let kws = S.module_ ^/^ S.type_ ^/^ S.of_ in
       let prefix = Attribute.attach ~attrs (group kws) in
       begin match Module_expr.as_rhs me with
-      | Single_part t -> Single_part (prefix ^/^ nest 2 t)
-      | Three_parts rhs -> Three_parts { rhs with start = prefix ^/^ rhs.start }
+      | Single_part t ->
+        Single_part { equal_or_colon; body = prefix ^/^ nest 2 t.body }
+      | Three_parts rhs ->
+        Three_parts { rhs with equal_or_colon; start = prefix ^/^ rhs.start }
       end
-    | _ -> Single_part (pp mty)
+    | _ -> Single_part { equal_or_colon; body = pp mty }
 end
 
 and Functor_parameter : sig
@@ -2952,8 +2972,8 @@ and Functor_parameter : sig
 end = struct
   let pp_named name mty =
     match Module_type.as_rhs mty with
-    | Single_part mty -> group (name ^/^ S.colon ^/^ mty)
-    | Three_parts { start; main; stop } ->
+    | Single_part mty -> group (name ^/^ S.colon ^/^ mty.body)
+    | Three_parts { equal_or_colon = _; start; main; stop } ->
       group (
         group (name ^/^ group (nest 2 S.colon ^/^ start)) ^/^
         nest 2 main ^/^
@@ -3071,22 +3091,23 @@ end = struct
       | No_modalities -> name
       | _ -> parens (with_modalities name ~modalities)
     in
-    let params, equal_sign, rhs =
+    let params, rhs =
       match pmd_body with
       | With_params (params, mty, modes) ->
         let rhs =
           Module_type.as_rhs mty
+          |> Layout_module_binding.set_punct S.colon
           |> Layout_module_binding.map_rhs_end (with_modes ~modes)
         in
         List.map Functor_parameter.pp params,
-        S.colon,
         rhs
       | Without_params (mty, modalities) ->
         let rhs =
           Module_type.as_rhs mty
+          |> Layout_module_binding.set_punct (equal_sign mty)
           |> Layout_module_binding.map_rhs_end (with_modalities ~modalities)
         in
-        [], equal_sign mty, rhs
+        [], rhs
     in
     Layout_module_binding.pp ~item:true
       ~params_indent:4
@@ -3094,7 +3115,6 @@ end = struct
       ~keyword:(separate (break 1) keywords)
       binding
       ~params
-      ~equal_sign
       ~rhs
       ~attrs:pmd_attributes
       ?post_doc:pmd_post_doc
@@ -3114,11 +3134,16 @@ and Module_substitution : sig
 end = struct
   let pp { pms_name; pms_manifest; pms_attributes; pms_ext_attrs;
            pms_pre_doc; pms_post_doc; pms_loc = _; pms_tokens = _ } =
-    Layout_module_binding.pp ~item:true ~equal_sign:S.colon_equals
+    let rhs =
+      Layout_module_binding.Single_part
+        { equal_or_colon = S.colon_equals
+        ; body = longident pms_manifest.txt }
+    in
+    Layout_module_binding.pp ~item:true
       ?pre_doc:pms_pre_doc
       ~keyword:(Ext_attribute.decorate S.module_ pms_ext_attrs)
       (string pms_name.txt)
-      ~rhs:(Layout_module_binding.Single_part (longident pms_manifest.txt))
+      ~rhs
       ~attrs:pms_attributes
       ?post_doc:pms_post_doc
 end
@@ -3129,12 +3154,18 @@ end = struct
   let pp ?(subst=false)
       { pmtd_name; pmtd_type; pmtd_attributes; pmtd_ext_attrs; pmtd_pre_doc;
         pmtd_post_doc; pmtd_loc = _; pmtd_tokens = _ } =
+    let rhs =
+      Option.map (fun mty ->
+        Module_type.as_rhs mty
+        |> Layout_module_binding.set_punct
+             (if subst then S.colon_equals else S.equals)
+      ) pmtd_type
+    in
     Layout_module_binding.pp ~item:true
       ?pre_doc:pmtd_pre_doc
       ~keyword:(S.module_ ^/^ Ext_attribute.decorate S.type_ pmtd_ext_attrs)
       (string pmtd_name.txt)
-      ~equal_sign:(if subst then S.colon_equals else S.equals)
-      ?rhs:(Option.map Module_type.as_rhs pmtd_type)
+      ?rhs
       ~attrs:pmtd_attributes
       ?post_doc:pmtd_post_doc
 end
@@ -3160,8 +3191,8 @@ end = struct
     let open_ =
       match pp_expr popen_expr with
       | Layout_module_binding.Single_part doc ->
-        group (keywords ^/^ pre_nest @@ nest 2 doc)
-      | Three_parts { start; main; stop } ->
+        group (keywords ^/^ pre_nest @@ nest 2 doc.body)
+      | Three_parts { start; main; stop; _ } ->
         group (keywords ^/^ pre_nest start) ^/^ pre_nest (
           nest 2 main ^/^
           stop
@@ -3175,7 +3206,10 @@ end
 and Open_description : sig
   val pp : open_description -> t
 end = struct
-  let pp = Open_infos.pp (fun lid -> Single_part (longident lid.txt))
+  let pp =
+    Open_infos.pp (fun lid ->
+      Single_part { equal_or_colon = empty; body = longident lid.txt }
+    )
 end
 
 and Open_declaration : sig
@@ -3198,8 +3232,9 @@ end = struct
     in
     let include_ =
       match pp_mod pincl_mod with
-      | Layout_module_binding.Single_part doc -> group (keywords ^/^ nest 2 doc)
-      | Three_parts { start; main; stop } ->
+      | Layout_module_binding.Single_part doc ->
+        group (keywords ^/^ nest 2 doc.body)
+      | Three_parts { start; main; stop; _ } ->
         group (keywords ^/^ start) ^/^
         nest 2 main ^/^
         stop
@@ -3310,11 +3345,12 @@ end = struct
   let as_rhs
         ({ pmod_desc; pmod_attributes; pmod_loc = _; pmod_tokens = _ } as me)
     : Layout_module_binding.rhs =
+    let equal_or_colon = S.equals in
     match pmod_desc with
     | Pmod_structure (attrs, str) ->
       let start, main, stop = Structure.pp_parts attrs str in
       let stop = Attribute.attach stop ~attrs:pmod_attributes in
-      Three_parts { start; main; stop }
+      Three_parts { equal_or_colon; start; main; stop }
     | Pmod_apply
         (m1, { pmod_attributes = No_attributes
              ; pmod_desc =
@@ -3331,8 +3367,8 @@ end = struct
         Attribute.attach (internal_stop ^^ S.rparen) ~attrs:pmod_attributes
         |> nest 2
       in
-      Three_parts { start; main; stop }
-    | _ -> Single_part (pp me)
+      Three_parts { equal_or_colon; start; main; stop }
+    | _ -> Single_part { equal_or_colon; body = pp me }
 end
 
 and Structure : sig
@@ -3427,8 +3463,8 @@ end
 
 and Layout_module_binding : sig
   type rhs =
-    | Single_part of t
-    | Three_parts of { start: t; main: t; stop: t }
+    | Single_part of { equal_or_colon: t; body: t }
+    | Three_parts of { equal_or_colon: t; start: t; main: t; stop: t }
     (** Meant for [struct/sig .. end]: we try to keep [start] on the same line
         as what preceeds it, [main] is indented, [stop] is not.
 
@@ -3438,11 +3474,12 @@ and Layout_module_binding : sig
   val map_rhs_end : (t -> t) -> rhs -> rhs
     (** either map the sole part, or the stop part *)
 
+  val set_punct : t (* equal or colon! *) -> rhs -> rhs
+
   val pp
     :  ?preceeding:Preceeding.t
     -> ?params_indent:int
     -> ?item:bool
-    -> ?equal_sign:t
     -> ?pre_text:doc list
     -> ?pre_doc:doc
     -> keyword:t
@@ -3455,25 +3492,19 @@ and Layout_module_binding : sig
     -> t
 end = struct
   type rhs =
-    | Single_part of t
-    | Three_parts of { start: t; main: t; stop: t }
+    | Single_part of { equal_or_colon: t; body: t }
+    | Three_parts of { equal_or_colon: t; start: t; main: t; stop: t }
 
   let map_rhs_end f = function
-    | Single_part d -> Single_part (f d)
+    | Single_part r -> Single_part { r with body = f r.body }
     | Three_parts r -> Three_parts { r with stop = f r.stop }
 
+  let set_punct equal_or_colon = function
+    | Single_part r -> Single_part { r with equal_or_colon }
+    | Three_parts r -> Three_parts { r with equal_or_colon }
 
-  (* Beware: [equal_sign] is never part of [rhs], we have to insert it
-     explicitely, whereas [constraint] sometimes include the "delimiter": a colon
-     or an at.
-     We could have had a [colon_sign] for symmetry, but pffff...
-
-     Also: "sometimes" == it does include it when it is [Single_part], but
-     doesn't for [Three_parts] as there it is always a colon, so we do it here.
-
-     The whole thing is kinda ugly. *)
   let pp ?preceeding ?(params_indent=2)
-        ~equal_sign ~keyword ~params ?constraint_ ?rhs bound =
+        ~keyword ~params ?constraint_ ?rhs bound =
     let keyword, pre_nest =
       Preceeding.group_with preceeding (group keyword)
     in
@@ -3488,93 +3519,133 @@ end = struct
             (fun p -> pre_nest @@ nest params_indent p) params
         )
     in
-    (* FIXME: the ':' and '=' (and friends) should be attached to what preceeds
-       them if we want to match oxcamlformat's janestreet style.
-       This is currently not doable as the colon is part of the constraint when
-       the constraint is Single_part. *)
+    let pre_nest_2 x = pre_nest (nest 2 x) in
+    (* In the following, we try to keep colons (or sometimes @@) and equals at
+       end of line. *)
     match constraint_, rhs with
     | None, None ->
       (* abstract module types *)
       bindings
-    | None, Some Single_part doc ->
+    | None, Some Single_part { equal_or_colon; body }
+    | Some Single_part { equal_or_colon; body }, None ->
+      (* [module A = B], [module M : S], etc. *)
+      group @@ flow (break 1) [
+        bindings;
+        pre_nest_2 equal_or_colon;
+        pre_nest_2 body
+      ]
+    | Some Single_part { equal_or_colon = colon; body = typ },
+      Some Single_part { equal_or_colon = equal; body = exp } ->
+      (* [module M : S = N],
+         {[
+           module M :
+             S with type foo = bar
+               with module M = N =
+             MODULE_EXPR
+         ]},
+         {[
+           module M :
+             (functor () ->
+                MODULE_TYPE) =
+             functor () -> MODULE_EXPR
+         ]} *)
+      group @@ flow (break 1) [
+        bindings;
+        pre_nest_2 colon;
+        pre_nest_2 typ;
+        pre_nest_2 equal;
+        pre_nest_2 exp
+      ]
+    | None, Some Three_parts { equal_or_colon; start; main; stop }
+    | Some Three_parts { equal_or_colon; start; main; stop }, None ->
+      (* [module M : sig (* items *) end],
+         {[
+           module M = struct
+             (* items *)
+           end
+         ]},
+         {[
+           module type M =
+           sig
+             (* items *)
+           end
+         ]} *)
       group (
-        group (bindings ^/^ pre_nest @@ nest 2 equal_sign) ^/^
-        pre_nest @@ nest 2 doc
-      )
-    | Some Single_part doc, None ->
-      group (bindings ^/^ pre_nest @@ nest 2 doc)
-    | Some Single_part typ, Some Single_part exp ->
-      group (
-        group (bindings ^/^ pre_nest @@ nest 2 (group (typ ^/^ equal_sign)))
-      ) ^/^
-      pre_nest @@ nest 2 exp
-    | None, Some Three_parts { start; main; stop } ->
-      let bindings_and_main =
-        group
-          (bindings ^/^ pre_nest @@ group (nest 2 equal_sign ^/^ start)) ^?^
-        pre_nest @@ nest 2 main
-      in
-      group (
-        group bindings_and_main ^?^
+        flow (break 1) [
+          bindings;
+          pre_nest_2 equal_or_colon;
+          pre_nest start; (* don't indent struct/sig if it's on its own line *)
+        ] ^?^
+        pre_nest_2 main ^?^
         pre_nest stop
       )
-    | Some Three_parts { start; main; stop }, None ->
-      let bindings_and_main =
-        group
-          (bindings ^/^ pre_nest @@ group (nest 2 S.colon ^/^ start)) ^/^
-        pre_nest @@ nest 2 main
-      in
+    | Some Three_parts { equal_or_colon = colon; start; main; stop },
+      Some Single_part { equal_or_colon = equal; body } ->
+      (* {[
+           module M : sig
+             (* items *)
+           end = MODULE_EXPR
+         ]},
+         {[
+           module M : sig
+             (* items *)
+           end =
+             MODULE_EXPR
+         ]} *)
       group (
-        group bindings_and_main ^/^
-        pre_nest stop
+        flow (break 1) [
+          bindings;
+          pre_nest_2 colon;
+          pre_nest start; (* same as case above *)
+        ] ^?^
+        pre_nest_2 main ^?^
+        flow (break 1) [
+          pre_nest stop;
+          pre_nest_2 equal;
+          pre_nest_2 body
+        ]
       )
-    | Some Three_parts { start; main; stop }, Some Single_part doc ->
-      let bindings_and_main =
-        group
-          (bindings ^/^ pre_nest @@ group (nest 2 S.colon ^/^ start)) ^/^
-        pre_nest @@ nest 2 main
-      in
-      let stop_and_rhs = group (stop ^/^ nest 2 equal_sign) ^/^ nest 2 doc in
+    | Some Single_part { equal_or_colon = colon; body = typ },
+      Some Three_parts { equal_or_colon = equal; start; main; stop } ->
       group (
-        group bindings_and_main ^/^
-        pre_nest (group stop_and_rhs)
-      )
-    | Some Single_part doc, Some Three_parts { start; main; stop } ->
-      let bindings_cstr_main =
-        group (
-          bindings ^/^
-          pre_nest @@ group (nest 2 (group (doc ^/^ equal_sign)) ^/^ start)
-        ) ^/^
-        pre_nest @@ nest 2 main
-      in
-      group (
-        group bindings_cstr_main ^/^
+        flow (break 1) [
+          bindings;
+          pre_nest_2 colon;
+          pre_nest_2 typ;
+          pre_nest_2 equal;
+          pre_nest start; (* same as above *)
+        ] ^?^
+        pre_nest_2 main ^?^
         pre_nest stop
       )
     | Some Three_parts typ, Some Three_parts exp ->
-      let bindings_and_typ =
+      let with_sig =
+        (* Could fit on one line even if the whole binding doesn't *)
         group (
-          bindings ^/^
-          pre_nest @@ nest 2 (group (S.colon ^/^ typ.start))
-        ) ^/^
-        pre_nest @@ nest 2 typ.main
-      in
-      let eq_and_exp =
-        group (typ.stop ^/^ equal_sign ^/^ exp.start) ^/^
-        nest 2 exp.main ^?^
-        exp.stop
+          flow (break 1) [
+            bindings;
+            pre_nest_2 typ.equal_or_colon;
+            pre_nest typ.start; (* same as above *)
+          ] ^?^
+          pre_nest_2 typ.main ^?^
+          pre_nest typ.stop
+        )
       in
       group (
-        group bindings_and_typ ^/^
-        pre_nest eq_and_exp
+        flow (break 1) [
+          with_sig;
+          pre_nest_2 exp.equal_or_colon;
+          pre_nest exp.start; (* likewise *)
+        ] ^?^
+        pre_nest_2 exp.main ^?^
+        pre_nest exp.stop
       )
 
-
-  let pp ?preceeding ?params_indent ?item ?(equal_sign = S.equals) ?pre_text ?pre_doc ~keyword
+  let pp ?preceeding ?params_indent ?item ?pre_text ?pre_doc ~keyword
         ?(params=[]) ?constraint_ ?rhs ?(attrs = No_attributes) ?post_doc bound =
     (* Here we assume that [preceeding] cannot be [Some _] at the same time as
        [pre_text] or [pre_doc]. *)
-    pp ?preceeding ?params_indent ~equal_sign ~keyword ~params ?constraint_ ?rhs
+    pp ?preceeding ?params_indent ~keyword ~params ?constraint_ ?rhs
       bound
     |> Attribute.attach ?item ~attrs
     |> Doc.attach ?text:pre_text ?pre_doc ?post_doc
@@ -3615,16 +3686,16 @@ end = struct
     | None, None -> bindings ^?^ pre_nest in_kw
     | Some doc, None -> group (bindings ^/^ pre_nest (nest 2 doc ^?^ in_kw))
     (* constraint-less *)
-    | None, Some Layout_module_binding.Single_part doc ->
+    | None, Some Layout_module_binding.Single_part { equal_or_colon; body } ->
       group (
-        group (bindings ^/^ pre_nest @@ nest 2 S.equals) ^/^
-        pre_nest (nest 2 doc) ^?^
+        group (bindings ^/^ pre_nest @@ nest 2 equal_or_colon) ^/^
+        pre_nest (nest 2 body) ^?^
         pre_nest in_kw
       )
-    | None, Some Three_parts { start; main; stop } ->
+    | None, Some Three_parts { equal_or_colon = equal; start; main; stop } ->
       let bindings_and_main =
         group
-          (bindings ^/^ pre_nest @@ nest 2 (group (S.equals ^/^ start))) ^/^
+          (bindings ^/^ pre_nest @@ nest 2 (group (equal ^/^ start))) ^/^
         pre_nest @@ nest 2 main
       in
       group (
@@ -3632,20 +3703,20 @@ end = struct
         pre_nest (stop ^?^ in_kw)
       )
     (* constraint and body *)
-    | Some typ, Some Single_part exp ->
+    | Some typ, Some Single_part { equal_or_colon = equal; body = exp } ->
       group (
         group (
           group (bindings ^/^ pre_nest @@ nest 2 typ) ^/^
-          pre_nest @@ nest 2 S.equals
+          pre_nest @@ nest 2 equal
         ) ^/^
         pre_nest (nest 2 exp) ^?^
         pre_nest in_kw
       )
-    | Some doc, Some Three_parts { start; main; stop } ->
+    | Some doc, Some Three_parts { equal_or_colon=equal; start; main; stop } ->
       let bindings_cstr_main =
         group (
           group (bindings ^/^ pre_nest @@ nest 2 doc) ^/^
-          pre_nest (nest 2 @@ group (S.equals ^/^ start))
+          pre_nest (nest 2 @@ group (equal ^/^ start))
         ) ^/^
         pre_nest @@ nest 2 main
       in
@@ -3656,12 +3727,13 @@ end = struct
       )
 
   let rhs e =
+    let equal_or_colon = S.equals in
     match e.pexp_desc with
     | Pexp_exclave e ->
       (* N.B. if there were attributes we'd see [Pexp_parens] *)
       let kw, exp = Expression.pp_exclave_parts e in
       Layout_module_binding.Three_parts
-        { start = kw; main = exp; stop = empty }
+        { equal_or_colon; start = kw; main = exp; stop = empty }
     | Pexp_function ([], _, body) ->
       (* N.B. if there were attributes we'd see [Pexp_parens] *)
       Function_body.as_rhs body
@@ -3672,8 +3744,9 @@ end = struct
       (* N.B. there can be attributes here in unexpected cases, for instance:
          [fun _ -> x; [@attr]] the semicolon make the attribute attach to the
          function, not the body. *)
-      Single_part (Attribute.attach fun_ ~attrs:e.pexp_attributes)
-    | _ -> Single_part (Expression.pp e)
+      let body = Attribute.attach fun_ ~attrs:e.pexp_attributes in
+      Single_part { equal_or_colon; body }
+    | _ -> Single_part { equal_or_colon; body = Expression.pp e }
 
   let pp ?preceeding ?(item=false) ~add_in ~start
         { pvb_legacy_modes; pvb_pat; pvb_modes; pvb_params; pvb_constraint;
@@ -3756,16 +3829,16 @@ and Module_binding : sig
   val pp_recmods : module_binding list -> t
 end = struct
   let modal_constraint constr mode_l : Layout_module_binding.rhs option =
-    match Option.map Module_type.as_rhs constr, mode_l with
+    let mty_as_rhs mty =
+      Module_type.as_rhs mty
+      |> Layout_module_binding.set_punct S.colon
+    in
+    match Option.map mty_as_rhs constr, mode_l with
     | None, No_modes -> None
-    | Some Three_parts { start; main; stop }, modes ->
-      Some (Three_parts { start; main; stop = with_modes stop ~modes })
-    | Some Single_part mty, modes ->
-      Some (Single_part (
-        S.colon ^/^ mty
-        |> with_modes ~modes
-      ))
-    | None, at_modes -> Some (Single_part (S.at ^/^ modes at_modes))
+    | Some rhs, modes ->
+      Some (Layout_module_binding.map_rhs_end (with_modes ~modes) rhs)
+    | None, at_modes ->
+      Some (Single_part { equal_or_colon = S.at; body = modes at_modes })
 
   let pp ?item ?preceeding ~keywords
       { pmb_ext_attrs; pmb_name = (name, name_modes); pmb_params;
