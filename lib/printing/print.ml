@@ -3386,6 +3386,7 @@ end = struct
          end)
        ]}
     *)
+(*
     | Pmod_apply
         (m1, { pmod_attributes = No_attributes
              ; pmod_desc =
@@ -3396,6 +3397,7 @@ end = struct
              ; _ }) ->
       let start, main, stop = apply_struct (pp m1) str attrs attrs2 in
       Three_parts { equal_or_colon; start; main; stop }
+*)
     | _ -> Single_part { equal_or_colon; body = pp me }
 end
 
