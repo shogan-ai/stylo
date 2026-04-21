@@ -63,7 +63,7 @@ let keyword_table =
     "include", INCLUDE;
     "inherit", INHERIT;
     "initializer", INITIALIZER;
-    "kind_abbrev_", KIND_ABBREV;
+    "kind_", KIND;
     "kind_of_", KIND_OF;
     "lazy", LAZY;
     "let", LET;
@@ -82,10 +82,13 @@ let keyword_table =
     "or", OR;
     "overwrite_", OVERWRITE;
 (*  "parser", PARSER; *)
+    "poly_", POLY;
     "private", PRIVATE;
     "rec", REC;
+    "repr_", REPR;
     "sig", SIG;
     "stack_", STACK;
+    "borrow_", BORROW;
     "struct", STRUCT;
     "then", THEN;
     "to", TO;
@@ -774,6 +777,8 @@ rule token = parse
   | ")"  { RPAREN }
   | "#(" { HASHLPAREN }
   | "#{" { HASHLBRACE }
+  | "#false" { HASHFALSE }
+  | "#true" { HASHTRUE }
   | "*"  { STAR }
   | ","  { COMMA }
   | "->" { MINUSGREATER }
