@@ -438,6 +438,11 @@ and Core_type : sig
     :  ?preceeding:Preceeding.t
     -> (string loc * jkind_annotation option) list
     -> t
+
+  val pp_repr_bindings
+    :  ?preceeding:Preceeding.t
+    -> string loc list
+    -> t
 end = struct
     let squote var_name =
     let opt_space =
@@ -475,6 +480,19 @@ end = struct
       let v, pre_nest = Preceeding.group_with preceeding (pp_bound v) in
       let vs = List.map (fun v -> pre_nest (pp_bound v)) vs in
       flow (break 1) (v :: vs)
+
+  let pp_repr_bindings ?preceeding bound_vars =
+    let pp_bound var_name =
+      let quote_var = squote var_name.Location.txt in
+      parens (S.repr__ ^/^ quote_var)
+    in
+    match bound_vars with
+    | [] -> assert false
+    | v :: vs ->
+      let v, pre_nest = Preceeding.group_with preceeding (pp_bound v) in
+      let vs = List.map (fun v -> pre_nest (pp_bound v)) vs in
+      flow (break 1) (v :: vs)
+
 
   module Arrow = struct
     type printer = ?preceeding:Preceeding.t -> unit -> t
@@ -636,6 +654,10 @@ end = struct
     | Ptyp_poly (bound_vars, ty) ->
       let pre_nest = Preceeding.implied_nest preceeding in
       let pre_vars = pp_poly_bindings ?preceeding bound_vars in
+      group (pre_vars ^^ break 0 ^^ pre_nest S.dot) ^/^ pre_nest (pp ty)
+    | Ptyp_repr (bound_vars, ty) ->
+      let pre_nest = Preceeding.implied_nest preceeding in
+      let pre_vars = pp_repr_bindings ?preceeding bound_vars in
       group (pre_vars ^^ break 0 ^^ pre_nest S.dot) ^/^ pre_nest (pp ty)
     | Ptyp_package (ext_attrs, pkg) -> package_type ?preceeding ext_attrs pkg
     | Ptyp_open (lid, ct) ->
@@ -838,6 +860,12 @@ end = struct
       )
     | Ppat_constant c ->
       Preceeding.group_with preceeding (constant c)
+      |> fst
+    | Ppat_unboxed_unit ->
+      Preceeding.group_with preceeding (S.hash_lparen ^^ S.rparen)
+      |> fst
+    | Ppat_unboxed_bool b ->
+      Preceeding.group_with preceeding (if b then S.hashtrue else S.hashfalse)
       |> fst
     | Ppat_interval (c1,c2) ->
       group (constant c1 ^/^ S.dotdot ^/^ constant c2)
@@ -1183,6 +1211,12 @@ end = struct
     | Pexp_constant c ->
       Preceeding.group_with preceeding (constant c)
       |> fst
+    | Pexp_unboxed_unit ->
+      Preceeding.group_with preceeding (S.hash_lparen ^^ S.rparen)
+      |> fst
+    | Pexp_unboxed_bool b ->
+      Preceeding.group_with preceeding (if b then S.hashtrue else S.hashfalse)
+      |> fst
     | Pexp_let (mf, rf, vbs, body) -> pp_let ~preceeding mf rf vbs body
     | Pexp_function _ -> pp_function ~preceeding exp
     | Pexp_prefix_apply (op, arg) ->
@@ -1319,6 +1353,9 @@ end = struct
     | Pexp_unreachable  ->
       let dot, _ = Preceeding.group_with preceeding S.dot in
       dot ^^ break 1 (* prevents unintentional conversion into DOTOP *)
+    | Pexp_borrow e ->
+      let borrow__, pre_nest = Preceeding.group_with preceeding S.borrow__ in
+      borrow__ ^/^ pre_nest @@ nest 2 (pp e)
     | Pexp_stack e ->
       let stack__, pre_nest = Preceeding.group_with preceeding S.stack__ in
       stack__ ^/^ pre_nest @@ nest 2 (pp e)
@@ -1908,22 +1945,6 @@ and Block_access : sig
 end = struct
   let pp = function
   | Baccess_field lid -> S.dot ^^ longident lid.txt
-  | Baccess_array (mut, idx_kind, e) ->
-    let dot_or_dotop =
-      match mut with
-      | Mutable -> S.dot
-      | Immutable -> string ".:"
-    in
-    let idx_kind =
-      match idx_kind with
-      | Index_int -> empty
-      | Index_unboxed_int8 -> string "s"
-      | Index_unboxed_int16 -> string "S"
-      | Index_unboxed_int32 -> string "l"
-      | Index_unboxed_int64 -> string "L"
-      | Index_unboxed_nativeint -> string "n"
-    in
-    dot_or_dotop ^^ idx_kind ^^ parens (Expression.pp e)
   | Baccess_block (mut, e) ->
     S.dot ^^
     begin match mut with
@@ -2317,15 +2338,20 @@ end = struct
     then fancy_string "{|%s|}" s
     else stringf "%S" s
 
-  let pp { pval_pre_doc; pval_ext_attrs; pval_name; pval_type; pval_modalities;
-           pval_prim; pval_attributes; pval_post_doc; pval_loc = _ ;
-           pval_tokens = _ ; } =
+  let pp { pval_pre_doc; pval_ext_attrs; pval_poly; pval_name; pval_type;
+           pval_modalities; pval_prim; pval_attributes; pval_post_doc;
+           pval_loc = _ ; pval_tokens = _ ; } =
     let kw =
       match pval_prim with
       | [] -> S.val_
       | _ -> S.external_
     in
-    let kw = Ext_attribute.decorate kw pval_ext_attrs in
+    let kw =
+      group (
+        Ext_attribute.decorate kw pval_ext_attrs
+        ^?^ if pval_poly then S.poly_ else empty
+      )
+    in
     let flatness = flatness_tracker () in
     group ~flatness (
       group (kw ^/^ str_or_op pval_name.txt) ^/^ nest 2 (
@@ -3025,10 +3051,7 @@ end = struct
     | Psig_attribute attr -> Attribute.pp_floating attr
     | Psig_docstring s -> Doc.pp s
     | Psig_extension te -> Extension.pp_toplevel te
-    | Psig_kind_abbrev (name, k) ->
-      S.kind_abbrev__ ^/^ string name.txt ^/^ S.equals ^/^
-        Jkind_annotation.pp k
-      |> group
+    | Psig_jkind jd -> Jkind_declaration.pp jd
 
   let pp_item it = pp_item_desc it.psig_desc
 
@@ -3435,10 +3458,7 @@ end = struct
     | Pstr_extension te ->
       Extension.pp_toplevel te
       |> group
-    | Pstr_kind_abbrev (name, k) ->
-      S.kind_abbrev__ ^/^ string name.txt ^/^ S.equals ^/^
-      Jkind_annotation.pp k
-      |> group
+    | Pstr_jkind jd -> Jkind_declaration.pp jd
 
   let pp_keeping_semi = Toplevel_items.Struct.pp_grouped_keeping_semi pp_item
 
@@ -3779,13 +3799,17 @@ end = struct
     | _ -> Single_part { equal_or_colon; body = Expression.pp e }
 
   let pp ?preceeding ?(item=false) ~add_in ~start
-        { pvb_legacy_modes; pvb_pat; pvb_modes; pvb_params; pvb_constraint;
+        { pvb_legacy_modes; pvb_is_poly; pvb_pat; pvb_modes; pvb_params;
+          pvb_constraint;
           pvb_ret_modes; pvb_expr; pvb_attributes; pvb_pre_text; pvb_pre_doc;
           pvb_post_doc; pvb_loc = _; pvb_tokens = _; pvb_ext_attrs } =
     let start =
       match start with
       | [] -> assert false
       | first_kw :: other_kws ->
+        let other_kws =
+          if pvb_is_poly then other_kws @ [ S.poly_ ] else other_kws
+        in
         let decorated =
           Ext_attribute.decorate_value_binding first_kw pvb_ext_attrs
         in
@@ -3917,7 +3941,10 @@ and Jkind_annotation : sig
 end = struct
   let rec pp_desc = function
     | Pjk_default -> S.underscore
-    | Pjk_abbreviation s -> string s
+    | Pjk_abbreviation (lid, axes) ->
+      flow (break 1)
+        (longident lid.txt ::
+         List.map (fun a -> string a.Location.txt) axes)
     | Pjk_mod (jk, ms) -> pp jk ^/^ S.mod_ ^/^ modes ms
     | Pjk_with (jk, ct, modalities) ->
       pp jk ^/^
@@ -3932,9 +3959,24 @@ end = struct
       separate_map (break 1 ^^ S.ampersand ^^ break 1) pp jks
     | Pjk_parens jkd -> parens (pp_desc jkd)
 
-  and pp jk = pp_desc jk.pjkind_desc
+  and pp jk = pp_desc jk.pjka_desc
 
   let pp jk = group (pp jk)
+end
+
+and Jkind_declaration : sig
+  val pp : jkind_declaration -> t
+end = struct
+  let pp { pjkind_ext_attrs; pjkind_name; pjkind_manifest; pjkind_attributes;
+           pjkind_loc = _; pjkind_tokens = _ } =
+    let kw = Ext_attribute.decorate S.kind_ pjkind_ext_attrs in
+    Attribute.attach ~item:true ~attrs:pjkind_attributes (
+      kw ^/^ string pjkind_name.txt ^?^
+      match pjkind_manifest with
+      | None -> empty
+      | Some annot -> S.equals ^/^ Jkind_annotation.pp annot
+    )
+    |> group
 end
 
 (* FIXME: TODO? *)

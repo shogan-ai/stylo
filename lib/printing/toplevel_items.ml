@@ -149,7 +149,7 @@ module Struct = struct
     | Pstr_class _, Pstr_class _
     | Pstr_class_type _, Pstr_class_type _
     | Pstr_extension _, Pstr_extension _
-    | Pstr_kind_abbrev _, Pstr_kind_abbrev _
+    | Pstr_jkind _, Pstr_jkind _
     | Pstr_docstring _, Pstr_docstring _
     | Pstr_attribute _, Pstr_attribute _ ->
       true
@@ -169,7 +169,7 @@ module Struct = struct
       | Pstr_include _
       | Pstr_attribute _
       | Pstr_extension _
-      | Pstr_kind_abbrev _
+      | Pstr_jkind _
       | Pstr_docstring _), _ ->
       false
 
@@ -211,7 +211,7 @@ module Sig = struct
     | Psig_class _, Psig_class _
     | Psig_class_type _, Psig_class_type _
     | Psig_extension _, Psig_extension _
-    | Psig_kind_abbrev _, Psig_kind_abbrev _
+    | Psig_jkind _, Psig_jkind _
     | Psig_docstring _, Psig_docstring _
     | Psig_attribute _, Psig_attribute _ ->
       true
@@ -232,7 +232,7 @@ module Sig = struct
       | Psig_include _
       | Psig_attribute _
       | Psig_extension _
-      | Psig_kind_abbrev _
+      | Psig_jkind _
       | Psig_docstring _), _ ->
       false
 
