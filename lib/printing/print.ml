@@ -3969,7 +3969,7 @@ and Jkind_declaration : sig
 end = struct
   let pp { pjkind_ext_attrs; pjkind_name; pjkind_manifest; pjkind_attributes;
            pjkind_loc = _; pjkind_tokens = _ } =
-    let kw = Ext_attribute.decorate S.kind_ pjkind_ext_attrs in
+    let kw = Ext_attribute.decorate S.kind__ pjkind_ext_attrs in
     Attribute.attach ~item:true ~attrs:pjkind_attributes (
       kw ^/^ string pjkind_name.txt ^?^
       match pjkind_manifest with
