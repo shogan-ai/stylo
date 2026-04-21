@@ -418,6 +418,7 @@ let val_of_let_bindings ~loc lbs =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
+           ~poly:lb.lb_body.lbb_is_poly
            ~ext_attr:lb.lb_ext_attrs
            ~tokens:lb.lb_toks
            ~legacy_modes:lb.lb_body.lbb_legacy_modes
@@ -706,6 +707,7 @@ The precedences must be listed from low to high.
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
           NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR
           LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN UNDERSCORE
+          HASHFALSE HASHTRUE
 
 
 /* Entry points */
@@ -1353,10 +1355,8 @@ structure_item:
   | mkstr(
       floating_attribute
         { Pstr_attribute $1 }
-    | kind_abbreviation_decl
-        { let name, jkind = $1 in
-          Pstr_kind_abbrev (name, jkind)
-        }
+    | jkind_decl
+        { Pstr_jkind $1 }
     | primitive_declaration
         { pstr_primitive $1 }
     | value_description
@@ -1667,10 +1667,8 @@ signature_item:
   | mksig(
       floating_attribute
         { Psig_attribute $1 }
-     | kind_abbreviation_decl
-        { let name, jkind = $1 in
-          Psig_kind_abbrev (name, jkind)
-        }
+     | jkind_decl
+        { Psig_jkind $1 }
     | value_description
         { psig_value $1 }
     | primitive_declaration
@@ -2005,6 +2003,7 @@ value:
           { pvb_pre_text = [];
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
+            pvb_is_poly = false;
             pvb_pat = pat;
             pvb_legacy_modes = No_modes; pvb_modes = No_modes; pvb_params = [];
             pvb_constraint = None; pvb_ret_modes = No_modes;
@@ -2028,6 +2027,7 @@ value:
           { pvb_pre_text = [];
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
+            pvb_is_poly = false;
             pvb_pat = pat;
             pvb_legacy_modes = No_modes; pvb_modes = No_modes; pvb_params = [];
             pvb_constraint = Some t; pvb_ret_modes = No_modes;
@@ -2052,6 +2052,7 @@ method_:
           { pvb_pre_text = [];
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
+            pvb_is_poly = false;
             pvb_pat = pat;
             pvb_legacy_modes = No_modes; pvb_modes = No_modes; pvb_params = params;
             pvb_constraint = tc; pvb_ret_modes = ret_modes;
@@ -2073,6 +2074,7 @@ method_:
           { pvb_pre_text = [];
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
+            pvb_is_poly = false;
             pvb_pat = pat;
             pvb_legacy_modes = No_modes; pvb_modes = No_modes; pvb_params = [];
             pvb_constraint = Some constr; pvb_ret_modes = No_modes;
@@ -2093,6 +2095,7 @@ method_:
           { pvb_pre_text = [];
             pvb_pre_doc = None;
             pvb_ext_attrs = $2;
+            pvb_is_poly = false;
             pvb_pat = pat;
             pvb_legacy_modes = No_modes; pvb_modes = No_modes; pvb_params = [];
             pvb_constraint = Some constr; pvb_ret_modes = No_modes;
@@ -2590,6 +2593,8 @@ fun_expr:
   | simple_expr nonempty_llist(labeled_simple_expr)
       { mkexp ~loc:$sloc (Pexp_apply($1, $2)) }
   | stack(simple_expr) %prec below_HASH { $1 }
+  | BORROW simple_expr %prec below_HASH
+      { mkexp ~loc:$sloc (Pexp_borrow $2) }
   | labeled_tuple %prec below_COMMA
       { mkexp ~loc:$sloc (Pexp_tuple $1) }
   | maybe_stack (
@@ -2768,37 +2773,11 @@ comprehension_clause:
 block_access:
   | DOT mkrhs(label_longident)
     { Baccess_field $2 }
-  | DOT _p=LPAREN i=seq_expr RPAREN
-    { Baccess_array (Mutable, Index_int, i) }
-  | DOTOP _p=LPAREN i=seq_expr RPAREN
-    {
-      match $1 with
-      | ":" -> Baccess_array (Immutable, Index_int, i)
-      | _ -> syntax_error () (* FIXME *)
-(*           raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
-*)
-    }
   | DOT ident _p=LPAREN i=seq_expr RPAREN
     {
       match $2 with
-      | "L" -> Baccess_array (Mutable, Index_unboxed_int64, i)
-      | "l" -> Baccess_array (Mutable, Index_unboxed_int32, i)
-      | "S" -> Baccess_array (Mutable, Index_unboxed_int16, i)
-      | "s" -> Baccess_array (Mutable, Index_unboxed_int8, i)
-      | "n" -> Baccess_array (Mutable, Index_unboxed_nativeint, i)
       | "idx_imm" -> Baccess_block (Immutable, i)
       | "idx_mut" -> Baccess_block (Mutable, i)
-      | _ -> syntax_error () (* FIXME *)
-(*         raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p)))) *)
-    }
-  | DOTOP ident _p=LPAREN i=seq_expr RPAREN
-    {
-      match $1, $2 with
-      | ":", "L" -> Baccess_array (Immutable, Index_unboxed_int64, i)
-      | ":", "l" -> Baccess_array (Immutable, Index_unboxed_int32, i)
-      | ":", "S" -> Baccess_array (Immutable, Index_unboxed_int16, i)
-      | ":", "s" -> Baccess_array (Immutable, Index_unboxed_int8, i)
-      | ":", "n" -> Baccess_array (Immutable, Index_unboxed_nativeint, i)
       | _ -> syntax_error () (* FIXME *)
 (*         raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p)))) *)
     }
@@ -2811,6 +2790,12 @@ block_access:
       { Pexp_ident ($1) }
   | mkrhs(constr_longident) %prec prec_constant_constructor
       { Pexp_construct($1, None) }
+  | HASHLPAREN RPAREN
+      { Pexp_unboxed_unit }
+  | HASHFALSE
+      { Pexp_unboxed_bool false }
+  | HASHTRUE
+      { Pexp_unboxed_bool true }
   | name_tag %prec prec_constant_constructor
       { Pexp_variant($1, None) }
   | op(PREFIXOP { Op $1 }) simple_expr
@@ -2951,6 +2936,7 @@ let_binding_body_no_punning:
       { let (legacy_modes, v, modes) = $1 in
         let params, tc, ret_modes, e = $2 in
         { lbb_legacy_modes = legacy_modes;
+          lbb_is_poly = false;
           lbb_modes = modes; lbb_pat = v; lbb_params = params;
           lbb_constraint = tc; lbb_ret_modes = ret_modes; lbb_expr = Some e } }
   | let_ident_with_modes constraint_ EQUAL seq_expr
@@ -2966,6 +2952,7 @@ let_binding_body_no_punning:
           ) typ
         in
         { lbb_legacy_modes = legacy_modes; lbb_modes = modes0;
+          lbb_is_poly = false;
           lbb_pat = v; lbb_params = []; lbb_constraint = t;
           lbb_ret_modes = modes1; lbb_expr = Some $4 }
       }
@@ -2973,6 +2960,7 @@ let_binding_body_no_punning:
       { let legacy_modes, v, modes0 = $1 in
         let typ, modes1 = $3 in
         { lbb_legacy_modes = legacy_modes;
+          lbb_is_poly = false;
           lbb_modes = modes0;
           lbb_pat = v; lbb_params = [];
           lbb_constraint =
@@ -3000,6 +2988,7 @@ let_binding_body_no_punning:
       {
         let legacy_modes, v, modes0 = $1 in
         { lbb_legacy_modes = legacy_modes;
+          lbb_is_poly = false;
           lbb_modes = modes0;
           lbb_pat = v; lbb_params = [];
           lbb_constraint =
@@ -3008,21 +2997,24 @@ let_binding_body_no_punning:
        }
   | pattern_no_exn EQUAL seq_expr
       { { lbb_legacy_modes = No_modes; lbb_modes = No_modes; lbb_pat = $1; lbb_params = [];
+          lbb_is_poly = false;
           lbb_constraint = None; lbb_ret_modes = No_modes; lbb_expr = Some $3 } }
   | simple_pattern_not_ident pvc_modes EQUAL seq_expr
       {
         let pvc, modes = $2 in
         { lbb_legacy_modes = No_modes; lbb_modes = No_modes; lbb_pat = $1; lbb_params = [];
+          lbb_is_poly = false;
           lbb_constraint = pvc; lbb_ret_modes = modes; lbb_expr = Some $4 }
       }
 ;
 let_binding_body:
-  | let_binding_body_no_punning
-      { $1 }
+  | poly_flag = poly_flag lbb = let_binding_body_no_punning
+      { { lbb with lbb_is_poly = poly_flag } }
 /* BEGIN AVOID */
-  | val_ident %prec below_HASH
+  | poly_flag = poly_flag val_ident %prec below_HASH
       { { lbb_legacy_modes = No_modes; lbb_modes = No_modes;
-          lbb_pat = mkpatvar ~loc:$loc $1;
+          lbb_is_poly = poly_flag;
+          lbb_pat = mkpatvar ~loc:$loc($2) $2;
           lbb_params = []; lbb_constraint = None; lbb_ret_modes = No_modes;
           lbb_expr = None } }
   (* The production that allows puns is marked so that [make list-parse-errors]
@@ -3480,6 +3472,12 @@ simple_pattern_not_ident:
       { Ppat_interval ($1, $3) }
   | mkrhs(constr_longident)
       { Ppat_construct($1, None) }
+  | HASHLPAREN RPAREN
+      { Ppat_unboxed_unit }
+  | HASHFALSE
+      { Ppat_unboxed_bool false }
+  | HASHTRUE
+      { Ppat_unboxed_bool true }
   | name_tag
       { Ppat_variant($1, None) }
   | hash mkrhs(type_longident)
@@ -3574,6 +3572,7 @@ simple_delimited_pattern:
 value_description:
   VAL
   ext_attrs = ext_attributes
+  poly_flag = poly_flag
   id = mkrhs(val_ident)
   COLON
   ty = possibly_poly(core_type)
@@ -3581,7 +3580,7 @@ value_description:
   attrs = post_item_attributes
     { let loc = make_loc $sloc in
       let docs, sloc = symbol_docs $sloc in
-      Val.mk id ty ~attrs ~modalities ~loc ~docs ~ext_attrs
+      Val.mk id ty ~poly:poly_flag ~attrs ~modalities ~loc ~docs ~ext_attrs
         ~tokens:(Tokens.at sloc)
     }
 ;
@@ -3747,8 +3746,8 @@ jkind_desc:
   | jkind_annotation WITH core_type optional_atat_modalities_expr {
       Pjk_with ($1, $3, $4)
     }
-  | ident {
-      Pjk_abbreviation $1
+  | mkrhs(type_longident) mkrhs(LIDENT)* {
+      Pjk_abbreviation ($1, $2)
     }
   | KIND_OF ty=core_type {
       Pjk_kind_of ty
@@ -3774,7 +3773,7 @@ reverse_product_jkind :
 
 jkind_annotation: (* : jkind_annotation *)
   jkind_desc {
-    { pjkind_loc = make_loc $sloc; pjkind_desc = $1; pjkind_tokens = Tokens.at $sloc }
+    { pjka_loc = make_loc $sloc; pjka_desc = $1; pjka_tokens = Tokens.at $sloc }
   }
 ;
 
@@ -3782,11 +3781,23 @@ jkind_constraint:
   COLON jkind_annotation { $2 }
 ;
 
-kind_abbreviation_decl:
-  KIND_ABBREV abbrev=mkrhs(LIDENT) EQUAL jkind=jkind_annotation {
-    (abbrev, jkind)
-  }
+%inline jkind_manifest:
+  | /* empty */ { None }
+  | EQUAL jkind=jkind_annotation { Some jkind }
 ;
+
+jkind_decl:
+  KIND
+  ext_attrs=attrs_as_extattrs
+  pjkind_name=mkrhs(LIDENT)
+  pjkind_manifest=jkind_manifest
+  attrs=post_item_attributes
+    {
+      let pjkind_loc = make_loc $sloc in
+      { pjkind_name; pjkind_manifest; pjkind_attributes = attrs; pjkind_loc
+      ; pjkind_ext_attrs = ext_attrs
+      ; pjkind_tokens = Tokens.at $sloc }
+    }
 
 %inline type_param_with_jkind:
   name=tyvar_name_or_underscore
@@ -4079,19 +4090,35 @@ with_type_binder:
     | LPAREN QUOTE tyvar=mkrhs(ident) COLON jkind=jkind_annotation RPAREN
       { (tyvar, Some jkind) }
 ;
+%inline typevar_repr: (* : string with_loc *)
+  LPAREN REPR QUOTE mkrhs(ident) RPAREN
+    { $4 }
+;
 %inline typevar_list:
   (* : (string with_loc * jkind_annotation option) list *)
   nonempty_llist(typevar)
+    { $1 }
+;
+%inline typevar_repr_list:
+  (* : string with_loc list *)
+  nonempty_llist(typevar_repr)
     { $1 }
 ;
 %inline poly(X):
   typevar_list DOT X
     { ($1, $3) }
 ;
+%inline repr(X):
+  typevar_repr_list DOT X
+    { ($1, $3) }
+;
 %inline strictly_poly(X):
 | poly(X)
     { let bound_vars, inner_type = $1 in
       mktyp ~loc:$sloc (Ptyp_poly (bound_vars, inner_type)) }
+| repr(X)
+    { let bound_vars, inner_type = $1 in
+      mktyp ~loc:$sloc (Ptyp_repr (bound_vars, inner_type)) }
 ;
 
 possibly_poly(X):
@@ -4408,6 +4435,13 @@ optional_atat_modalities_expr:
     LPAREN bound_vars = typevar_list DOT inner_type = core_type RPAREN
       { let poly_loc = $startpos(bound_vars), $endpos(inner_type) in
         let poly = mktyp ~loc:poly_loc (Ptyp_poly (bound_vars, inner_type)) in
+        Ptyp_parens poly }
+    )
+    { $1 }
+  | mktyp(
+    LPAREN bound_vars = typevar_repr_list DOT inner_type = core_type RPAREN
+      { let poly_loc = $startpos(bound_vars), $endpos(inner_type) in
+        let poly = mktyp ~loc:poly_loc (Ptyp_repr (bound_vars, inner_type)) in
         Ptyp_parens poly }
     )
     { $1 }
@@ -4955,6 +4989,10 @@ mutable_flag:
     /* empty */                                 { Immutable }
   | MUTABLE                                     { Mutable }
 ;
+poly_flag:
+    /* empty */                                 { false }
+  | POLY                                        { true }
+;
 mutable_or_global_flag:
     /* empty */
     { Immutable, false }
@@ -5032,6 +5070,7 @@ single_attr_id:
   | AS { "as" }
   | ASSERT { "assert" }
   | BEGIN { "begin" }
+  | BORROW { "borrow_" }
   | CLASS { "class" }
   | CONSTRAINT { "constraint" }
   | DO { "do" }
@@ -5064,6 +5103,7 @@ single_attr_id:
   | OF { "of" }
   | OPEN { "open" }
   | OR { "or" }
+  | POLY { "poly_" }
   | PRIVATE { "private" }
   | REC { "rec" }
   | SIG { "sig" }

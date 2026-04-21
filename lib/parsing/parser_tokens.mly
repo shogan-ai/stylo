@@ -20,6 +20,7 @@
 %token BARBAR                 "||"
 %token BARRBRACKET            "|]"
 %token BEGIN                  "begin"
+%token BORROW                 "borrow_"
 %token <char * string> CHAR  "'a'" (* just an example *)
 %token <char * string>
        HASH_CHAR              "#'a'" (* just an example *)
@@ -58,6 +59,8 @@
 %token GREATERRBRACKET        ">]"
 %token HASHLPAREN             "#("
 %token HASHLBRACE             "#{"
+%token HASHFALSE              "#false"
+%token HASHTRUE               "#true"
 %token IF                     "if"
 %token IN                     "in"
 %token INCLUDE                "include"
@@ -75,7 +78,7 @@
 %token INITIALIZER            "initializer"
 %token <string * char option> INT      "42"  (* just an example *)
 %token <string * char option> HASH_INT "#42l" (* just an example *)
-%token KIND_ABBREV            "kind_abbrev_"
+%token KIND                   "kind_"
 %token KIND_OF                "kind_of_"
 %token <string> LABEL         "~label:" (* just an example *)
 %token LAZY                   "lazy"
@@ -120,6 +123,7 @@
 %token PLUS                   "+"
 %token PLUSDOT                "+."
 %token PLUSEQ                 "+="
+%token POLY                   "poly_"
 %token <string> PREFIXOP      "!+" (* chosen with care; see above *)
 %token PRIVATE                "private"
 %token QUESTION               "?"
@@ -128,6 +132,7 @@
 %token RBRACKET               "]"
 %token RBRACKETGREATER        "]>"
 %token REC                    "rec"
+%token REPR                   "repr_"
 %token RPAREN                 ")"
 %token SEMI                   ";"
 %token SEMISEMI               ";;"

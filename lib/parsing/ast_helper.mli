@@ -240,7 +240,7 @@ module Val:
   sig
     val mk: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
       tokens:Tokens.seq -> ?docs:docs -> ?prim:string list ->
-      ?modalities:modalities -> str_or_op -> core_type ->
+      ?poly:bool -> ?modalities:modalities -> str_or_op -> core_type ->
       value_description
   end
 
@@ -461,7 +461,8 @@ module Vb:
   sig
     val mk: ?loc: loc -> ?ext_attr:ext_attribute -> ?attrs:attrs ->
       tokens:Tokens.seq -> ?docs:docs -> ?text:text ->
-      ?params:function_param list -> ?legacy_modes:modes -> ?modes:modes ->
+      ?params:function_param list -> ?legacy_modes:modes -> ?poly:bool ->
+      ?modes:modes ->
       ?value_constraint:value_constraint -> ?ret_modes:modes -> pattern ->
       expression option -> value_binding
   end

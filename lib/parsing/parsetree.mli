@@ -258,6 +258,7 @@ and core_type_desc =
   | Ptyp_quote of core_type (** [<[T]>] *)
   | Ptyp_splice of core_type (** [$T] *)
   | Ptyp_of_kind of jkind_annotation (** [(type : k)] *)
+  | Ptyp_repr of string loc list * core_type
   | Ptyp_extension of extension  (** [[%id]]. *)
   | Ptyp_parens of core_type
 
@@ -326,6 +327,8 @@ and pattern_desc =
 
            Other forms of interval are recognized by the parser
            but rejected by the type-checker. *)
+  | Ppat_unboxed_unit (** [#()] *)
+  | Ppat_unboxed_bool of bool (** [#false] or [#true] *)
   | Ppat_tuple of pattern argument list * closed_flag
       (** [Ppat_tuple(pl, Closed)] represents
           - [(P1, ..., Pn)]       when [pl] is [(None, P1);...;(None, Pn)]
@@ -460,6 +463,8 @@ and expression_desc =
       (** [match E0 with P1 -> E1 | ... | Pn -> En] *)
   | Pexp_try of expression * case list
       (** [try E0 with P1 -> E1 | ... | Pn -> En] *)
+  | Pexp_unboxed_unit (** [#()] *)
+  | Pexp_unboxed_bool of bool (** [#false] or [#true] *)
   | Pexp_tuple of expression argument list
       (** [Pexp_tuple(el)] represents
           - [(E1, ..., En)]
@@ -585,6 +590,8 @@ and expression_desc =
   | Pexp_cons of expression * expression
   | Pexp_exclave of expression
   | Pexp_mode_legacy of mode loc * expression
+  | Pexp_borrow of expression
+    (** borrow_ exp *)
 
 and 'a record_field =
   { field_name: Longident.t loc;
@@ -719,12 +726,6 @@ and function_constraint =
 and block_access =
   | Baccess_field of Longident.t loc
       (** [.foo] *)
-  | Baccess_array of mutable_flag * index_kind * expression
-      (** Mutable array accesses: [.(E)], [.L(E)], [.l(E)], [.n(E)]
-          Immutable array accesses: [.:(E)], [.:L(E)], [.:l(E)], [.:n(E)]
-
-          Indexed by [int], [int64#], [int32#], or [nativeint#], respectively.
-      *)
   | Baccess_block of mutable_flag * expression
       (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)]
           (usually followed by unboxed accesses, to deepen the index).
@@ -782,6 +783,7 @@ and value_description =
     {
      pval_pre_doc: doc option;
      pval_ext_attrs: ext_attribute;
+     pval_poly: bool; (** val poly_ *)
      pval_name: Longident.str_or_op loc;
      pval_type: core_type;
      pval_modalities : modalities;
@@ -985,6 +987,18 @@ and extension_constructor_kind =
        *)
   | Pext_rebind of Longident.t loc
   (** [Pext_rebind(D)] re-export the constructor [D] with the new name [C] *)
+
+and jkind_declaration =
+  {
+    pjkind_ext_attrs: ext_attribute;
+    pjkind_name : string loc;
+    pjkind_manifest : jkind_annotation option;
+    pjkind_attributes : attributes;
+    pjkind_loc : Location.t;
+    pjkind_tokens : Tokens.seq;
+  }
+  (** [kind_ name] or [kind_ name = k] *)
+
 
 (** {1 Class language} *)
 (** {2 Type expressions for the class language} *)
@@ -1273,8 +1287,7 @@ and signature_item_desc =
       (** [class type ct1 = ... and ... and ctn = ...] *)
   | Psig_attribute of attribute  (** [[\@\@\@id]] *)
   | Psig_extension of toplevel_extension
-  | Psig_kind_abbrev of string loc * jkind_annotation
-      (** [kind_abbrev_ name = k] *)
+  | Psig_jkind of jkind_declaration (** [kind_ name] or [kind_ name = k] *)
   | Psig_docstring of doc
 
 and module_declaration_body =
@@ -1483,8 +1496,7 @@ and structure_item_desc =
   | Pstr_include of include_declaration  (** [include ME] *)
   | Pstr_attribute of attribute  (** [[\@\@\@id]] *)
   | Pstr_extension of toplevel_extension
-  | Pstr_kind_abbrev of string loc * jkind_annotation
-      (** [kind_abbrev_ name = k] *)
+  | Pstr_jkind of jkind_declaration (** [kind_ name] or [kind_ name = k] *)
   | Pstr_docstring of doc
 
 and value_constraint =
@@ -1508,6 +1520,7 @@ and value_binding =
     pvb_pre_text: doc list;
     pvb_pre_doc: doc option;
     pvb_ext_attrs: ext_attribute;
+    pvb_is_poly: bool; (** [let poly_ ] *)
     pvb_legacy_modes: modes;
     pvb_pat: pattern;
     pvb_modes: modes;
@@ -1540,7 +1553,15 @@ and module_binding =
 
 and jkind_annotation_desc =
   | Pjk_default
-  | Pjk_abbreviation of string
+  (* CR layouts-scannable: Scannable axes annotations only currently parse on
+     abbreviations, not on products/etc. It could be desirable for these
+     annotations to parse in more places with a warning (ex: for generated
+     code). This change should only be made if necessary (and after the
+     ignored-kind-modifier warning is enabled), since it adds confusion. *)
+  | Pjk_abbreviation of Longident.t loc * string loc list
+  (** [Pjk_abbreviation(A, [SA1; ...; SAn])] represents the layout
+      [A SA1 ... SAn] where [A] is some abbreviation (like [value])
+      and each [SAi] is a scannable axis annotation (like [non_pointer]) *)
   (* CR layouts v2.8: [mod] can have only layouts on the left, not
      full kind annotations. We may want to narrow this type some. *)
   | Pjk_mod of jkind_annotation * modes
@@ -1550,9 +1571,9 @@ and jkind_annotation_desc =
   | Pjk_parens of jkind_annotation_desc
 
 and jkind_annotation =
-  { pjkind_loc : Location.t
-  ; pjkind_desc : jkind_annotation_desc
-  ; pjkind_tokens : Tokens.seq
+  { pjka_loc : Location.t
+  ; pjka_desc : jkind_annotation_desc
+  ; pjka_tokens : Tokens.seq
   }
 
 (** {1 Toplevel} *)

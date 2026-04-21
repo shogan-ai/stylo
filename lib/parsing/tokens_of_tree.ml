@@ -312,8 +312,13 @@ let tokenizer = object
 
   method! jkind_annotation jk =
     let sub_tokens = super#jkind_annotation jk in
+    let node_toks = jk.pjka_tokens in
+    combine_children "jkind_annotation" ~loc:jk.pjka_loc node_toks sub_tokens
+
+  method! jkind_declaration jk =
+    let sub_tokens = super#jkind_declaration jk in
     let node_toks = jk.pjkind_tokens in
-    combine_children "jkind_annotation" ~loc:jk.pjkind_loc node_toks sub_tokens
+    combine_children "jkind_declaration" ~loc:jk.pjkind_loc node_toks sub_tokens
 end
 
 let mk_error : Error.t -> _ = function

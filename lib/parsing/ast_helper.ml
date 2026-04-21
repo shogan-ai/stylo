@@ -453,12 +453,13 @@ end
 
 module Val = struct
   let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = No_attributes)
-        ~tokens ?(docs = empty_docs) ?(prim = []) ?(modalities=No_modalities)
-        name typ =
+        ~tokens ?(docs = empty_docs) ?(prim = []) ?(poly = false)
+        ?(modalities=No_modalities) name typ =
     let pre_doc, post_doc = Docs.pre_post docs in
     {
      pval_pre_doc = pre_doc;
      pval_ext_attrs = ext_attrs;
+     pval_poly = poly;
      pval_name = name;
      pval_type = typ;
      pval_attributes = attrs;
@@ -576,7 +577,8 @@ end
 module Vb = struct
   let mk ?(loc = !default_loc) ?(ext_attr=empty_ext_attr)
         ?(attrs = No_attributes) ~tokens ?(docs = empty_docs)
-        ?(text = []) ?(params = []) ?(legacy_modes = No_modes) ?(modes = No_modes)
+        ?(text = []) ?(params = []) ?(legacy_modes = No_modes)
+        ?(poly = false) ?(modes = No_modes)
         ?value_constraint ?(ret_modes = No_modes) pat expr =
     let pre_doc, post_doc = Docs.pre_post docs in
     {
@@ -584,6 +586,7 @@ module Vb = struct
      pvb_pre_doc = pre_doc;
      pvb_ext_attrs = ext_attr;
      pvb_legacy_modes = legacy_modes;
+     pvb_is_poly = poly;
      pvb_pat = pat;
      pvb_params = params;
      pvb_expr = expr;
