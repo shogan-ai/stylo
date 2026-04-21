@@ -11,6 +11,7 @@ module Raw = struct
   | BARBAR  -> "BARBAR"
   | BARRBRACKET  -> "BARRBRACKET"
   | BEGIN  -> "BEGIN"
+  | BORROW  -> "BORROW"
   | CHAR _ -> "CHAR"
   | HASH_CHAR _ -> "HASH_CHAR"
   | CLASS  -> "CLASS"
@@ -46,8 +47,10 @@ module Raw = struct
   | GREATER  -> "GREATER"
   | GREATERRBRACE  -> "GREATERRBRACE"
   | GREATERRBRACKET  -> "GREATERRBRACKET"
+  | HASHFALSE  -> "HASHFALSE"
   | HASHLPAREN  -> "HASHLPAREN"
   | HASHLBRACE  -> "HASHLBRACE"
+  | HASHTRUE  -> "HASHTRUE"
   | IF  -> "IF"
   | IN  -> "IN"
   | INCLUDE  -> "INCLUDE"
@@ -65,7 +68,7 @@ module Raw = struct
   | INITIALIZER  -> "INITIALIZER"
   | INT _ -> "INT"
   | HASH_INT _ -> "HASH_INT"
-  | KIND_ABBREV  -> "KIND_ABBREV"
+  | KIND  -> "KIND_"
   | KIND_OF  -> "KIND_OF"
   | LABEL _ -> "LABEL"
   | LAZY  -> "LAZY"
@@ -109,6 +112,7 @@ module Raw = struct
   | PLUS  -> "PLUS"
   | PLUSDOT  -> "PLUSDOT"
   | PLUSEQ  -> "PLUSEQ"
+  | POLY  -> "POLY"
   | PREFIXOP _ -> "PREFIXOP"
   | PRIVATE  -> "PRIVATE"
   | QUESTION  -> "QUESTION"
@@ -117,6 +121,7 @@ module Raw = struct
   | RBRACKET  -> "RBRACKET"
   | RBRACKETGREATER  -> "RBRACKETGREATER"
   | REC  -> "REC"
+  | REPR  -> "REPR"
   | RPAREN  -> "RPAREN"
   | SEMI  -> "SEMI"
   | SEMISEMI  -> "SEMISEMI"
@@ -161,6 +166,7 @@ module Raw = struct
   | BARBAR , BARBAR -> true
   | BARRBRACKET , BARRBRACKET -> true
   | BEGIN , BEGIN -> true
+  | BORROW , BORROW -> true
   | CHAR _, CHAR _-> true
   | HASH_CHAR _, HASH_CHAR _-> true
   | CLASS , CLASS -> true
@@ -196,8 +202,10 @@ module Raw = struct
   | GREATER , GREATER -> true
   | GREATERRBRACE , GREATERRBRACE -> true
   | GREATERRBRACKET , GREATERRBRACKET -> true
+  | HASHFALSE , HASHFALSE -> true
   | HASHLPAREN , HASHLPAREN -> true
   | HASHLBRACE , HASHLBRACE -> true
+  | HASHTRUE , HASHTRUE -> true
   | IF , IF -> true
   | IN , IN -> true
   | INCLUDE , INCLUDE -> true
@@ -215,7 +223,7 @@ module Raw = struct
   | INITIALIZER , INITIALIZER -> true
   | INT _, INT _-> true
   | HASH_INT _, HASH_INT _-> true
-  | KIND_ABBREV , KIND_ABBREV -> true
+  | KIND, KIND -> true
   | KIND_OF , KIND_OF -> true
   | LABEL _, LABEL _-> true
   | LAZY , LAZY -> true
@@ -259,6 +267,7 @@ module Raw = struct
   | PLUS , PLUS -> true
   | PLUSDOT , PLUSDOT -> true
   | PLUSEQ , PLUSEQ -> true
+  | POLY , POLY -> true
   | PREFIXOP _, PREFIXOP _-> true
   | PRIVATE , PRIVATE -> true
   | QUESTION , QUESTION -> true
@@ -267,6 +276,7 @@ module Raw = struct
   | RBRACKET , RBRACKET -> true
   | RBRACKETGREATER , RBRACKETGREATER -> true
   | REC , REC -> true
+  | REPR , REPR -> true
   | RPAREN , RPAREN -> true
   | SEMI , SEMI -> true
   | SEMISEMI , SEMISEMI -> true
