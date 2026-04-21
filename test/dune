@@ -13,8 +13,14 @@
           --avoid DOLLAR --avoid LESSLBRACKET --avoid RBRACKETGREATER
           ; HASH_CHAR is present in our grammar but not in the one the fuzzer is
           ; built against.
+          --terminal "BORROW=borrow_"
           --terminal "HASH_CHAR=#'a'"
+          --terminal "HASHFALSE=#false"
+          --terminal "HASHTRUE=#true"
+          --terminal "KIND=kind_"
           --terminal "LEXER_DIRECTIVE=#syntax foo on"
+          --terminal "POLY=poly"
+          --terminal "REPR=repr_"
           ))))
 
 (rule
@@ -29,6 +35,12 @@
           --focus DOLLAR --focus LESSLBRACKET --focus RBRACKETGREATER
           ; HASH_CHAR is present in our grammar but not in the one the fuzzer is
           ; built against.
+          --terminal "BORROW=borrow_"
           --terminal "HASH_CHAR=#'a'"
+          --terminal "HASHFALSE=#false"
+          --terminal "HASHTRUE=#true"
+          --terminal "KIND=kind_"
           --terminal "LEXER_DIRECTIVE=#syntax foo on"
+          --terminal "POLY=poly"
+          --terminal "REPR=repr_"
           ))))
