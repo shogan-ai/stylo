@@ -542,11 +542,24 @@ let merge_attrs parent_tokens attrs1 attrs2 =
       parent_tokens, attrs
   | Attributes a1, Attributes a2 ->
       (* We're taking two subtrees and merging them into one, so we need to
-         remove one Child_node from the parent's tokens. *)
+         remove one Child_node from the parent's tokens.
+
+         Also, if there were any tokens (e.g. a semicolon, a comment) between a1
+         and a2, we need to change theur location to account for the move.
+         Otherwise the tokens ordering preservation check will complain. *)
       let tokens =
         let rev_toks = List.rev parent_tokens in
         let rev_tail, rev_head = Tokens.Seq.split_on_child rev_toks in
-        List.rev (rev_tail @ List.tl rev_head)
+        let rev_head_no_child = List.tl rev_head in
+        let relocated_rev_head =
+          match Tokens.Seq.split_on_child rev_head_no_child with
+          | [], _ -> rev_head_no_child
+          | rev_tokens_between_attrs, rev_head ->
+            let pos = a2.loc.loc_end in
+            List.map (fun t -> { t with Tokens.pos }) rev_tokens_between_attrs
+            @ rev_head
+        in
+        List.rev (rev_tail @ relocated_rev_head)
       in
       let attrs =
         let attributes = a1.attributes @ a2.attributes in
