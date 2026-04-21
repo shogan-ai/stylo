@@ -54,7 +54,7 @@ underlying portion of the token stream (the relevant code is in
 [`normalize`](./normalize)).
 To facilitate that rewrite, the attaches to each CST node the list of tokens it
 "consumed" to produce that particular node, and the tokens used to produce the
-node's children are represented using [`Tokens.Child_node`](parsing/tokens.ml).
+node's children are represented using [`Tokens.Child_node`](lib/parsing/tokens.ml).
 
 For comment's insertion purposes instead of using the input tokens, we just
 flatten / stitch back together these token lists which we retrieve from the
