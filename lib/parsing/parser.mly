@@ -445,6 +445,7 @@ let expr_of_let_bindings ~loc lbs body =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
+           ~poly:lb.lb_body.lbb_is_poly
            ~ext_attr:lb.lb_ext_attrs
            ~tokens:lb.lb_toks
            ~legacy_modes:lb.lb_body.lbb_legacy_modes
@@ -469,6 +470,7 @@ let class_of_let_bindings ~loc lbs body =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
+           ~poly:lb.lb_body.lbb_is_poly
            ~ext_attr:lb.lb_ext_attrs
            ~tokens:lb.lb_toks
            ~legacy_modes:lb.lb_body.lbb_legacy_modes

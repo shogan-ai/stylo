@@ -1176,6 +1176,8 @@ end = struct
   let rec needs_space_if_prefixed e =
     match e.pexp_desc with
     (* We force a space before # *)
+    | Pexp_unboxed_unit
+    | Pexp_unboxed_bool _
     | Pexp_unboxed_tuple _
     | Pexp_record_unboxed_product _
     | Pexp_constant
@@ -3979,7 +3981,7 @@ and Jkind_declaration : sig
 end = struct
   let pp { pjkind_ext_attrs; pjkind_name; pjkind_manifest; pjkind_attributes;
            pjkind_loc = _; pjkind_tokens = _ } =
-    let kw = Ext_attribute.decorate S.kind_ pjkind_ext_attrs in
+    let kw = Ext_attribute.decorate S.kind__ pjkind_ext_attrs in
     Attribute.attach ~item:true ~attrs:pjkind_attributes (
       kw ^/^ string pjkind_name.txt ^?^
       match pjkind_manifest with
