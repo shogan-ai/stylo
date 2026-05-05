@@ -237,7 +237,8 @@ module Mty = struct
 
   let ident ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_ident a)
   let alias ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_alias a)
-  let signature ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pmty_signature a)
+  let signature ?loc ?attrs ~tokens a x =
+    mk ?loc ?attrs ~tokens (Pmty_signature (a, x))
   let functor_ ?loc ?attrs ~tokens ?(ret_mode=No_modes) a b c =
     mk ?loc ?attrs ~tokens (Pmty_functor (a, b, c,ret_mode))
   let with_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pmty_with (a, b))

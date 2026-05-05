@@ -1213,7 +1213,7 @@ and module_type =
 
 and module_type_desc =
   | Pmty_ident of Longident.t loc  (** [Pmty_ident(S)] represents [S] *)
-  | Pmty_signature of signature  (** [sig ... end] *)
+  | Pmty_signature of attributes * signature  (** [sig[@attrs] ... end] *)
   | Pmty_functor of attributes * functor_parameter list * module_type * modes
       (** [functor(X : MT1 @@ modes) -> MT2 @ modes] *)
   | Pmty_functor_type of functor_parameter list * module_type * modes

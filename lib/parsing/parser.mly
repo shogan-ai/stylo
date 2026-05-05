@@ -1562,7 +1562,7 @@ open_description:
 
 module_type_atomic:
   | SIG attrs = attributes s = signature END
-      { mkmty ~loc:$sloc ~attrs (Pmty_signature s) }
+      { mkmty ~loc:$sloc (Pmty_signature (attrs, s)) }
   | SIG attributes signature error
       { unclosed "sig" $loc($1) "end" $loc($4) }
   | STRUCT error

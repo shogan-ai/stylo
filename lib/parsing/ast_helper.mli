@@ -306,7 +306,7 @@ module Mty:
 
     val ident: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> module_type
     val alias: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> module_type
-    val signature: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> signature -> module_type
+    val signature: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> attrs -> signature -> module_type
     val functor_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?ret_mode:modes ->
       attributes -> functor_parameter list -> module_type -> module_type
     val with_: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> module_type ->

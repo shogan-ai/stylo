@@ -2923,7 +2923,7 @@ and Module_type : sig
 end = struct
   let rec pp_desc = function
     | Pmty_ident lid -> longident lid.txt
-    | Pmty_signature sg -> Signature.pp sg
+    | Pmty_signature (attrs, sg) -> Signature.pp ~attrs sg
     | Pmty_functor (attrs, fps, mty, modes) ->
       Attribute.attach ~attrs S.functor_ ^/^
       separate_map (break 1) Functor_parameter.pp fps ^/^ S.rarrow ^/^
@@ -2958,8 +2958,8 @@ end = struct
     : Layout_module_binding.rhs =
     let equal_or_colon = empty in (* context need to decided, caller will fix *)
     match pmty_desc with
-    | Pmty_signature sg ->
-      let start, main, stop = Signature.pp_parts sg in
+    | Pmty_signature (attrs, sg) ->
+      let start, main, stop = Signature.pp_parts ~attrs sg in
       let stop = Attribute.attach stop ~attrs:pmty_attributes in
       Three_parts { equal_or_colon; start; main; stop }
     | Pmty_typeof (attrs, me) ->
@@ -3008,8 +3008,8 @@ end = struct
 end
 
 and Signature : sig
-  val pp : signature -> t
-  val pp_parts : signature -> t * t * t
+  val pp : ?attrs:attributes -> signature -> t
+  val pp_parts : ?attrs:attributes -> signature -> t * t * t
 
   val pp_interface : signature -> t
 end = struct
@@ -3057,13 +3057,14 @@ end = struct
     Toplevel_items.Sig.pp_grouped_keeping_semi pp_item (psg_items, items_tokens)
 
 
-  let pp_parts sg =
-    group (with_modalities S.sig_ ~modalities:sg.psg_modalities),
+  let pp_parts ?(attrs = No_attributes) sg =
+    let sig_ = Attribute.attach ~attrs S.sig_ in
+    group (with_modalities sig_ ~modalities:sg.psg_modalities),
     softest_line ^^ pp_keeping_semi sg,
     S.end_
 
-  let pp sg =
-    let sig_with_mods, items, end_ = pp_parts sg in
+  let pp ?attrs sg =
+    let sig_with_mods, items, end_ = pp_parts ?attrs sg in
     prefix sig_with_mods items ^/^ end_
 
 
