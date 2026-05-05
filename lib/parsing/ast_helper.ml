@@ -374,7 +374,8 @@ module Cty = struct
 (*   let attr d a = {d with pcty_attributes = d.pcty_attributes @ [a]} *)
 
   let constr ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pcty_constr (a, b))
-  let signature ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pcty_signature a)
+  let signature ?loc ?attrs ~tokens a b =
+    mk ?loc ?attrs ~tokens (Pcty_signature (a, b))
   let arrow ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pcty_arrow (a, b))
   let extension ?loc ?attrs ~tokens a = mk ?loc ?attrs ~tokens (Pcty_extension a)
   let open_ ?loc ?attrs ~tokens a b = mk ?loc ?attrs ~tokens (Pcty_open (a, b))

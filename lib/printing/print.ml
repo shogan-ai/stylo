@@ -2681,7 +2681,7 @@ end = struct
   let rec pp_desc ct =
     match ct.pcty_desc with
     | Pcty_constr (args, lid) -> Type_constructor.pp_class_constr args lid.txt
-    | Pcty_signature cs -> pp_signature cs
+    | Pcty_signature (attrs, cs) -> pp_signature attrs cs
     | Pcty_arrow (arrow_arg, rhs) ->
       let args, rhs = collect_arrow_args [arrow_arg] rhs in
       Core_type.Arrow.pp (flatness_tracker () (* never flat? *)) [] args
@@ -2693,9 +2693,9 @@ end = struct
     | Pcty_open (od, ct) ->
       S.let_ ^/^ Open_description.pp od ^/^ S.in_ ^/^ pp ct
 
-  and pp_signature { pcsig_self; pcsig_fields } =
+  and pp_signature attrs { pcsig_self; pcsig_fields } =
     let obj_with_self =
-      S.object_ ^^
+      Attribute.attach ~attrs S.object_ ^^
       match pcsig_self with
       | None -> empty
       | Some pcsig_self -> parens (Core_type.pp pcsig_self)

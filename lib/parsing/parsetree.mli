@@ -1003,7 +1003,7 @@ and class_type_desc =
   | Pcty_constr of core_type list * Longident.t loc
       (** - [c]
             - [['a1, ..., 'an] c] *)
-  | Pcty_signature of class_signature  (** [object ... end] *)
+  | Pcty_signature of attributes * class_signature  (** [object ... end] *)
   | Pcty_arrow of arrow_arg * class_type
       (** [Pcty_arrow(lbl, T, CT)] represents:
             - [T -> CT]

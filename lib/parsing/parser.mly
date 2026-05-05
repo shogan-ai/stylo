@@ -2142,7 +2142,7 @@ class_signature:
         { Pcty_extension $1 }
     ) { $1 }
   | OBJECT attributes class_sig_body END
-      { mkcty ~loc:$sloc ~attrs:$2 (Pcty_signature $3) }
+      { mkcty ~loc:$sloc (Pcty_signature ($2, $3)) }
   | OBJECT attributes class_sig_body error
       { unclosed "object" $loc($1) "end" $loc($4) }
   | cs=class_signature attribute

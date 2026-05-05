@@ -476,7 +476,8 @@ module Cty:
 (*     val attr: class_type -> attribute -> class_type *)
 
     val constr: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> core_type list -> lid -> class_type
-    val signature: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> class_signature -> class_type
+    val signature: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
+      attributes -> class_signature -> class_type
     val arrow: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> arrow_arg ->
       class_type -> class_type
     val extension: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> extension -> class_type
