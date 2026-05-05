@@ -375,7 +375,8 @@ end = struct
     let delims =
       Parens {
         omit_when_single_param =
-          params <> [] && not (lparen_before_child tokens)
+          params <> [] &&
+          not (List.exists (Tokens.is_token ~which:LPAREN) tokens)
       }
     in
     pp ~pp_arg:Type_param.pp delims params name
