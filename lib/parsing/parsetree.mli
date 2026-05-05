@@ -801,7 +801,9 @@ and value_description =
 (** {2 Type declarations} *)
 
 and ptype_param = {
-  ptp_typ: core_type;
+  ptp_name: string option;
+  ptp_attributes: attributes;
+  ptp_jkind: jkind_annotation option;
   ptp_infos: variance * injectivity;
   ptp_tokens: Tokens.seq;
 }

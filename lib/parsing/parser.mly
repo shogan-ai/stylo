@@ -3806,44 +3806,34 @@ kind_abbreviation_decl:
   attrs=attributes
   COLON
   jkind=jkind_annotation
-    { match name with
-      | None -> mktyp ~loc:$sloc ~attrs (Ptyp_any (Some jkind))
-      | Some name -> mktyp ~loc:$sloc ~attrs (Ptyp_var (name, Some jkind)) }
+    { { ptp_name = name
+      ; ptp_attributes = attrs
+      ; ptp_jkind = Some jkind
+      (* The next two fields are patched by "the caller". *)
+      ; ptp_infos = (NoVariance, NoInjectivity)
+      ; ptp_tokens = [] } }
 ;
 
 parenthesized_type_parameter:
     type_parameter { $1 }
   | type_variance type_param_with_jkind
-    { let typ = $2 in
-      let infos = $1 in
-      let tokens = Tokens.at $sloc in
-      { ptp_typ = typ; ptp_infos = infos; ptp_tokens = tokens } }
+    { { $2 with ptp_infos = $1; ptp_tokens = Tokens.at $sloc } }
 ;
 
 type_parameter:
     type_variance ty=type_variable attributes
-      { let typ =
-          (* We are "patching" the type to add attributes, we must also patch
-             the tokens attached to the type to account for the new tokens
-             relative to the attributes. *)
-           let typ_tokens = Tokens.at ($startpos(ty), $endpos) in
-           let ptyp_tokens =
-             Tokens.replace_first_child typ_tokens ~subst:ty.ptyp_tokens
-           in
-           { ty with ptyp_tokens; ptyp_attributes = $3 }
-        in
-        let infos = $1 in
-        let tokens = Tokens.at $sloc in
-        { ptp_typ = typ; ptp_infos = infos; ptp_tokens = tokens } }
+      { { ptp_name = ty
+        ; ptp_attributes = $3
+        ; ptp_jkind = None
+        ; ptp_infos = $1
+        ; ptp_tokens = Tokens.at $sloc } }
 ;
 
 %inline type_variable:
-  mktyp(
-    QUOTE tyvar = ident
-      { Ptyp_var (tyvar, None) }
-  | UNDERSCORE
-      { Ptyp_any None }
-  ) { $1 }
+  QUOTE tyvar = ident
+    { Some tyvar }
+| UNDERSCORE
+    { None }
 ;
 
 %inline tyvar_name_or_underscore:

@@ -438,8 +438,13 @@ and Core_type : sig
     :  ?preceeding:Preceeding.t
     -> (string loc * jkind_annotation option) list
     -> t
+
+  val pp_var : ?preceeding:Preceeding.t -> ?attrs:attributes -> string ->
+    jkind_annotation option -> t
+  val pp_any : ?preceeding:Preceeding.t -> ?attrs:attributes ->
+    jkind_annotation option -> t
 end = struct
-    let squote var_name =
+  let squote var_name =
     let opt_space =
       if String.length var_name >= 2 && String.get var_name 1 = '\''
       then break 1
@@ -2432,13 +2437,16 @@ end = struct
       else S.minus ^^ S.bang
   )
 
-
-  let pp ?preceeding { ptp_typ; ptp_infos; ptp_tokens } =
-    match pp_infos ptp_tokens ptp_infos with
-    | Empty -> Core_type.pp ?preceeding ptp_typ
-    | infos ->
-      let infos, pre_nest = Preceeding.group_with preceeding infos in
-      infos ^^ pre_nest (Core_type.pp ptp_typ)
+  let pp ?preceeding
+        { ptp_name; ptp_attributes; ptp_jkind; ptp_infos; ptp_tokens } =
+    let preceeding =
+      match pp_infos ptp_tokens ptp_infos with
+      | Empty -> preceeding
+      | infos -> Some (fst Preceeding.(preceeding + tight infos))
+    in
+    match ptp_name with
+    | None -> Core_type.pp_any ?preceeding ~attrs:ptp_attributes ptp_jkind
+    | Some s -> Core_type.pp_var ?preceeding ~attrs:ptp_attributes s ptp_jkind
 end
 
 and Constructor_decl : sig
