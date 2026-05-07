@@ -182,19 +182,21 @@ module Pipeline = struct
     | Comments.Insert.error
   ]
 
-  let pp_error fname : error -> unit =
+  let pp_error ppf fname : error -> unit =
     let open Ast_checker in
     let open Tokenisation_check in
     function
-    | `Comments_dropped as e -> Comments_comparison.pp_error e
-    | (`Reordered _ | `Incomplete_flattening _) as e -> Ordering.pp_error e
+    | `Comments_dropped as e ->
+      Format.fprintf ppf "%s: %a" fname
+        Comments_comparison.pp_error e
+    | (`Reordered _ | `Incomplete_flattening _) as e -> Ordering.pp_error ppf e
     | `Comment_insertion_error e ->
-      Format.eprintf "%s: ERROR: %a@." fname
+      Format.fprintf ppf "%s: ERROR: %a@." fname
         Comments.Insert.Error.pp e
     | (`Input_parse_error _ | `Output_parse_error _ | `Ast_changed _) as e ->
-      Ast_checker.Errors.pp_error e
+      Ast_checker.Errors.pp_error ppf e
     | (`Missing_children _ | `Extra_children _) as e ->
-      Tokens_of_tree.Error.pp Format.err_formatter e
+      Tokens_of_tree.Error.pp ppf e
 end
 
 let style_file kind ~fname source =

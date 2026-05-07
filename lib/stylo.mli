@@ -66,7 +66,7 @@ module Pipeline : sig
 
   val run : ?normalize:bool -> _ input -> (string, error) result
 
-  val pp_error : string -> error -> unit
+  val pp_error : Format.formatter -> string -> error -> unit
 end
 
 val style_file :
