@@ -111,15 +111,15 @@ let parse (type a) (input : a input) wrap_exn : (a, _) result =
       | Intf -> Parse.interface lb
     )
   with exn ->
-    Error (wrap_exn exn)
+    Error (wrap_exn lb.lex_start_p lb.lex_curr_p exn)
 
 let clean (type a) (kind : a input_kind) (ast : a) : a =
   match kind with
   | Impl -> cleaner#structure () ast
   | Intf -> cleaner#signature () ast
 
-let input_wrap exn = `Input_parse_error (Errors.Oxcaml's, exn)
-let output_wrap exn = `Output_parse_error (Errors.Oxcaml's, exn)
+let input_wrap startp endp exn = `Input_parse_error (Errors.Oxcaml's, startp, endp, exn)
+let output_wrap _ _ exn = `Output_parse_error (Errors.Oxcaml's, exn)
 
 let (let*) = Result.bind
 

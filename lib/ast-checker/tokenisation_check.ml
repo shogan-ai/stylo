@@ -52,5 +52,5 @@ module Comments_comparison = struct
     let nb_after = List.fold_left incr_if_cmt 0 after in
     if nb_before = nb_after
     then Ok ()
-    else Error `Comments_dropped
+    else (Error `Comments_dropped)
 end

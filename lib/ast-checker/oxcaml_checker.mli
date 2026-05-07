@@ -11,6 +11,6 @@ type 'a input = {
 
 (** Check that two strings parse to the same AST (modulo locations) *)
 
-val parse : 'ast input -> ('ast, [> `Input_parse_error of Errors.parser * exn ]) result
+val parse : 'ast input -> ('ast, [> `Input_parse_error of Errors.parser * Lexing.position * Lexing.position * exn ]) result
 
 val check_same_ast : 'cst -> 'cst input -> (unit, [> Errors.t ]) result
