@@ -89,7 +89,7 @@ let fuzzer_batch fn =
       match Stylo.style_fuzzer_line ~fname:fn ~lnum:i entrypoint_and_src with
       | Ok _ -> loop_lines (i + 1) ic
 
-      | Error `Input_parse_error (_, Ocaml_syntax.Parser_types.Failwith _) ->
+      | Error `Input_parse_error (_, _, _, Ocaml_syntax.Parser_types.Failwith _) ->
         (* ignoring error thrown from semantic actions. *)
         loop_lines (i + 1) ic
 

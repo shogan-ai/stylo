@@ -45,7 +45,9 @@ end
 module Pipeline : sig
   val parse
     :  ('cst, _) input
-    -> ('cst, [> `Input_parse_error of Ast_checker.Errors.parser * exn]) result
+    -> ('cst, [> `Input_parse_error of Ast_checker.Errors.parser *
+                                       Lexing.position *
+                                       Lexing.position * exn]) result
 
   val normalize : ('cst, _) input_kind -> 'cst -> 'cst
 

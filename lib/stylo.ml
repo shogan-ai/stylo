@@ -88,7 +88,8 @@ module Pipeline = struct
         | Intf -> Parse.interface lb
       )
     with exn ->
-      Error (`Input_parse_error (Ast_checker.Errors.Stylo's,  exn))
+      Error (`Input_parse_error
+               (Ast_checker.Errors.Stylo's, lb.lex_start_p, lb.lex_curr_p, exn))
 
   let normalize (type cst ast) (kind: (cst, ast) input_kind) (cst: cst) : cst =
     match kind with
@@ -194,7 +195,7 @@ module Pipeline = struct
       Format.fprintf ppf "%s: ERROR: %a@." fname
         Comments.Insert.Error.pp e
     | (`Input_parse_error _ | `Output_parse_error _ | `Ast_changed _) as e ->
-      Ast_checker.Errors.pp_error ppf e
+      Ast_checker.Errors.pp_error ppf fname e
     | (`Missing_children _ | `Extra_children _) as e ->
       Tokens_of_tree.Error.pp ppf e
 end
