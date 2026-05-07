@@ -13,14 +13,14 @@ module Ordering = struct
     | `Reordered of Lexing.position * Tokens.elt * Tokens.elt
   ]
 
-  let pp_error : error -> unit = function
+  let pp_error ppf : error -> unit = function
     | `Incomplete_flattening pos ->
-      Format.eprintf
+      Format.fprintf ppf
         "@[<hov>@[<h>File %s, line %d,@ column %d:@]@ \
          Incomplete retokenisation of CST.@."
         pos.pos_fname pos.pos_lnum (column pos)
     | `Reordered (pos, t1, t2) ->
-      Format.eprintf
+      Format.fprintf ppf
         "@[<hov>@[<h>File %s, line %d,@ column %d:@]@ \
          Tokens %a and %a have been swapped.@."
         pos.pos_fname pos.pos_lnum (column pos)
@@ -43,8 +43,8 @@ module Comments_comparison = struct
   type error = [ `Comments_dropped ]
 
   (* TODO: improve reporting *)
-  let pp_error (`Comments_dropped : error) =
-    Format.eprintf "Some comments were dropped during normalization"
+  let pp_error ppf (`Comments_dropped : error) =
+    Format.fprintf ppf "Some comments were dropped during normalization"
 
   let same_number before after =
     let incr_if_cmt nb t = if Tokens.is_comment t then nb + 1 else nb in

@@ -112,7 +112,7 @@ let fuzzer_batch fn =
            Eventually we might want to go further, but while we try to fix the
            errors, there's not much point. *)
         let fname = fn ^ ":" ^ string_of_int i in
-        Stylo.Pipeline.pp_error fname e;
+        Stylo.Pipeline.pp_error Format.err_formatter fname e;
         has_errors := true
 
       | exception exn ->
@@ -174,7 +174,7 @@ let style_files check_idempotence inplace fns =
         "%s: `--idempotence-check` failure: output is not stable@." fn;
       has_error := true
     | Error (#Stylo.Pipeline.error as e) ->
-      Stylo.Pipeline.pp_error fn e;
+      Stylo.Pipeline.pp_error Format.err_formatter fn e;
       has_error := true
     | Ok output ->
       let pp oc =

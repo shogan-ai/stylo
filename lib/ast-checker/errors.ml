@@ -17,23 +17,22 @@ let report_parse_error ppf exn =
   | None ->
     Format.fprintf ppf "%s" (Printexc.to_string exn)
 
-let pp_error : t -> _ = function
+let pp_error ppf : t -> _ = function
   | `Ast_changed (parser, fname) ->
-    Format.eprintf "%s: %cst changed@." fname
+    Format.fprintf ppf "%s: %cst changed@." fname
       (if parser = Stylo's then 'c' else 'a')
   | `Input_parse_error (Stylo's, exn) ->
-    Format.eprintf "@[<v>Input doesn't parse:@;%s@]@."
+    Format.fprintf ppf "@[<v>Input doesn't parse:@;%s@]@."
       (Printexc.to_string exn)
   | `Input_parse_error (Oxcaml's, exn) ->
-    Format.eprintf
+    Format.fprintf ppf
       "@[<v>Input doesn't parse with upstream's parser:@;@[<hov 2>%a@]@]@."
       report_parse_error exn
   | `Output_parse_error (Stylo's, exn) ->
-    Format.eprintf "@[<v>Output doesn't reparse:@;%s@]@."
+    Format.fprintf ppf "@[<v>Output doesn't reparse:@;%s@]@."
       (Printexc.to_string exn)
   | `Output_parse_error (Oxcaml's, exn) ->
-    Format.eprintf
+    Format.fprintf ppf
       "@[<v>Error while parsing the output with upstream's parser:@;\
        @[<hov 2>%a@]@]@."
       report_parse_error exn
-
