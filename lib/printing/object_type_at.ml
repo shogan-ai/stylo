@@ -17,6 +17,7 @@ module End = struct
     | Ptyp_object (_, _) -> true
     | Ptyp_arrow { codom_type = rhs; codom_modes = No_modes; _ }
     | Ptyp_poly (_, rhs)
+    | Ptyp_repr (_, rhs)
       -> of_core_type rhs
     | Ptyp_tuple lst -> of_core_type (snd (List.hd (List.rev lst)))
     | Ptyp_any _
@@ -37,7 +38,7 @@ module End = struct
   ;;
 
   let rec of_jkind_annotation jk =
-    match jk.pjkind_desc with
+    match jk.pjka_desc with
     | Pjk_with (_, ct, No_modalities) | Pjk_kind_of ct -> of_core_type ct
     | Pjk_product (_ :: _ as jks) -> of_jkind_annotation List.(hd @@ rev jks)
     | Pjk_default
@@ -47,6 +48,12 @@ module End = struct
     | Pjk_product []
     | Pjk_parens _ -> false
   ;;
+
+  let of_jkind_declaration jd =
+    jd.pjkind_attributes = No_attributes &&
+    match jd.pjkind_manifest with
+    | None -> false
+    | Some jka -> of_jkind_annotation jka
 
   let of_constructor_argument ca =
     ca.pca_modalities = No_modalities && of_core_type ca.pca_type
@@ -107,7 +114,7 @@ module End = struct
     | Pstr_type (_, tds) -> of_type_declarations tds
     | Pstr_typext te -> of_type_extension te
     | Pstr_exception exn -> of_type_exception exn
-    | Pstr_kind_abbrev (_, jk) -> of_jkind_annotation jk
+    | Pstr_jkind jk -> of_jkind_declaration jk
     | Pstr_eval _
     | Pstr_value _
     | Pstr_primitive _
@@ -136,7 +143,7 @@ module End = struct
     | Psig_type (_, decls) | Psig_typesubst decls -> of_type_declarations decls
     | Psig_typext te -> of_type_extension te
     | Psig_exception exn -> of_type_exception exn
-    | Psig_kind_abbrev (_, jk) -> of_jkind_annotation jk
+    | Psig_jkind jk -> of_jkind_declaration jk
     | Psig_attribute _
     | Psig_extension _
     | Psig_docstring _
@@ -179,6 +186,7 @@ module Start = struct
     | Ptyp_alias (ct, _, _) | Ptyp_tuple ((_, ct) :: _) -> of_core_type ct
     | Ptyp_tuple []
     | Ptyp_poly _
+    | Ptyp_repr _
     | Ptyp_any _
     | Ptyp_var _
     | Ptyp_parens _
