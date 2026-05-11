@@ -28,3 +28,9 @@ base-command --count 1000 > report.md
 
 Check OxCaml grammar: add `--oxcaml` to previous commands.
 Reduce examples before reporting: add `--reduce`
+
+Check specific constructions:
+
+```
+base-command --focus '_* LPAREN _* RPAREN _*'
+```
