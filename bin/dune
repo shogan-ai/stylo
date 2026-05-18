@@ -2,7 +2,13 @@
   (name main)
   (public_name stylo)
   (libraries cmdliner config stylo ocaml_syntax dbg_print)
-  (modules :standard \ fuzzer_driver)
+  (modules main)
+  (empty_module_interface_if_absent))
+
+(executable
+  (name dump_tokens)
+  (libraries cmdliner stylo ocaml_syntax document)
+  (modules dump_tokens)
   (empty_module_interface_if_absent))
 
 (executable
