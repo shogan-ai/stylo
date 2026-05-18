@@ -58,6 +58,8 @@ type t = {
     unspecified. *)
 val compare : t -> t -> int
 
+val compare_position : Lexing.position -> Lexing.position -> int
+
 val none : t
 (** An arbitrary value of type [t]; describes an empty ghost range. *)
 

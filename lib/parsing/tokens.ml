@@ -492,7 +492,11 @@ let attach_leading_and_trailing tokens =
 
 let reset = Indexed_list.reset_global
 
-let is_child t = t.desc = Child_node
+let is_child ?pos t =
+  t.desc = Child_node &&
+  match pos with
+  | None -> true
+  | Some pos -> Location.compare_position pos t.pos = 0
 
 let is_comment t =
   match t.desc with
@@ -516,7 +520,8 @@ module Seq = struct
       | _ -> true
     )
 
-  let split_on_child = Std.List.split_at (fun tok -> not (is_child tok))
+  let split_on_child ?pos =
+    Std.List.split_at (fun tok -> not (is_child ?pos tok))
 
   let search_and_replace pairs =
     let replace rt =
@@ -536,3 +541,5 @@ module Seq = struct
       | _ -> true
     )
 end
+
+let is_child t = is_child t

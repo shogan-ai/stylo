@@ -56,8 +56,9 @@ module Seq : sig
   (** [split ~on:tok tokens] splits [tokens] just before the first occurence of
       [tok] *)
 
-  val split_on_child : seq -> seq * seq
-  (** [split_on_child l] splits [l] just before the first child node *)
+  val split_on_child : ?pos:Lexing.position -> seq -> seq * seq
+  (** [split_on_child ?pos l] splits [l] just before the child node at [pos] if
+      given, or the first child node encountered *)
 
   val search_and_replace : (token * token) list -> seq -> seq
 
