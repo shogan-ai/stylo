@@ -23,6 +23,16 @@ let merge_attrs parent_tokens attrs1 attrs2 =
       in
       tokens, attrs
 
+let without_child ?at:pos flattened_child_tokens tokens =
+  match Tokens.Seq.split_on_child ?pos tokens with
+  | _, [] ->
+    (* We expected to find a Child_node at the given position, otherwise where
+       did we get [flattened_child_tokens] from? *)
+    assert false
+  | before, _child :: after ->
+    let cmts_of_child = List.filter Tokens.is_comment flattened_child_tokens in
+    before @ cmts_of_child @ after
+
 let no_ext_attrs = function
   | { pea_ext = None; pea_attrs = No_attributes } -> true
   | _ -> false
@@ -214,31 +224,94 @@ let pattern p =
   | _ ->
     p
 
+(* TODO: - modes on arrow arguments! *)
+
+let get_modes_tokens m = Result.get_ok (Tokens_of_tree.modes m)
+
 let argument a =
   (* Legacy modes, when present, are the first Child_node of the argument
      tokens. (Cf. parser.mly) *)
-  let drop_first_child tokens =
-    let before, rem = Tokens.Seq.split_on_child tokens in
-    before @ List.tl rem
-  in
   match a.parg_desc with
   | Parg_unlabelled ({ legacy_modes = Modes _; _ } as arg_info) ->
+    let modes_tokens = get_modes_tokens arg_info.legacy_modes in
     { a with
       parg_desc = Parg_unlabelled { arg_info with legacy_modes = No_modes };
-      parg_tokens = drop_first_child a.parg_tokens }
+      parg_tokens = without_child modes_tokens a.parg_tokens }
   | Parg_labelled ({ legacy_modes = Modes _; _ } as arg_info) ->
+    let modes_tokens = get_modes_tokens arg_info.legacy_modes in
     { a with
       parg_desc = Parg_labelled { arg_info with legacy_modes = No_modes };
-      parg_tokens = drop_first_child a.parg_tokens }
+      parg_tokens = without_child modes_tokens a.parg_tokens }
   | _ -> a
 
 let value_binding vb =
   match vb.pvb_legacy_modes with
   | No_modes -> vb
-  | Modes m ->
-    let before, rem =
-      Tokens.Seq.split_on_child ~pos:m.loc.loc_start vb.pvb_tokens
-    in
+  | Modes m as modes ->
+    let modes_toks = get_modes_tokens modes in
     { vb with
       pvb_legacy_modes = No_modes;
-      pvb_tokens = before @ List.tl rem }
+      pvb_tokens = without_child ~at:m.loc.loc_start modes_toks vb.pvb_tokens }
+
+let is_curry_attr attr = attr.attr_name.txt = ["extension"; "curry"]
+let has_curry_attr = function
+  | No_attributes -> false
+  | Attributes a -> List.exists is_curry_attr a.attributes
+
+let without_curry_attr attrs =
+  match attrs with
+  | No_attributes -> attrs
+  | Attributes { attributes; loc; tokens } ->
+    match List.find_opt is_curry_attr attributes with
+    | None -> attrs
+    | Some { attr_loc; _ } ->
+      let not_curry a = not (is_curry_attr a) in
+      let attributes = List.filter not_curry attributes in
+      let tokens =
+        (* N.B. there could a comment inside the [@extension.curry] attribute
+           ... but I think we're ok with dropping it. *)
+        let before, rem =
+          Tokens.Seq.split_on_child ~pos:attr_loc.loc_start tokens
+        in
+        before @ List.tl rem
+      in
+      Attributes { attributes; loc; tokens }
+
+let get_jkind_annotation_tokens jk =
+  Result.get_ok (Tokens_of_tree.jkind_annotation jk)
+
+let core_type ct =
+  match ct.ptyp_desc with
+  | Ptyp_arrow _ when has_curry_attr ct.ptyp_attributes ->
+    let attrs = without_curry_attr ct.ptyp_attributes in
+    { ct with ptyp_attributes = attrs }
+  | Ptyp_unboxed_tuple cts ->
+    { ct with
+      ptyp_desc = Ptyp_tuple cts;
+      ptyp_tokens =
+        Tokens.Seq.search_and_replace [HASHLPAREN, LPAREN] ct.ptyp_tokens }
+  | Ptyp_any Some jk ->
+    let jk_toks = get_jkind_annotation_tokens jk in
+    { ct with
+      ptyp_desc = Ptyp_any None;
+      ptyp_tokens =
+        without_child ~at:jk.pjka_loc.loc_start jk_toks ct.ptyp_tokens }
+  | Ptyp_var (name, Some jk) ->
+    let jk_toks = get_jkind_annotation_tokens jk in
+    { ct with
+      ptyp_desc = Ptyp_var (name, None);
+      ptyp_tokens =
+        without_child ~at:jk.pjka_loc.loc_start jk_toks ct.ptyp_tokens }
+  | Ptyp_alias (aliased_ty, None, Some erasable_jkind) ->
+    (* N.B. with the current grammar, there can't be attributes on alias_type,
+       so we can just return the child node.
+
+       We do take care to keep the comments (they all move to the end). *)
+    let alias_comments = List.filter Tokens.is_comment ct.ptyp_tokens in
+    let jk_comments =
+      List.filter Tokens.is_comment (get_jkind_annotation_tokens erasable_jkind)
+    in
+    { aliased_ty with
+      ptyp_tokens = aliased_ty.ptyp_tokens @ alias_comments @ jk_comments }
+  | _ ->
+    ct

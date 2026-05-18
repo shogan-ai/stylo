@@ -355,5 +355,8 @@ let flatten_or_error
   | exception Error err -> mk_error err
   | res -> Ok (List.concat_map (fun t -> t.tokens) res)
 
-let structure str = flatten_or_error tokenizer#structure str
-let signature sg = flatten_or_error tokenizer#signature sg
+let structure = flatten_or_error tokenizer#structure
+let signature = flatten_or_error tokenizer#signature
+
+let modes = flatten_or_error tokenizer#modes
+let jkind_annotation = flatten_or_error tokenizer#jkind_annotation
