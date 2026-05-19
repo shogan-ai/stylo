@@ -415,21 +415,21 @@ and Core_type : sig
 
     val components
       :  core_type
-      -> ((string loc * jkind_annotation option) list
+      -> (bound_ty_var list
           * arrow_arg list
           * (modes * modes * core_type)) option
 
     val pp
       :  ?preceeding:Preceeding.t
       -> flatness
-      -> (string loc * jkind_annotation option) list
+      -> bound_ty_var list
       -> arrow_arg list
       -> pp_rhs:printer
       -> t
 
     val pp_for_descr
       :  flatness
-      -> (string loc * jkind_annotation option) list
+      -> bound_ty_var list
       -> arrow_arg list
       -> pp_rhs:printer
       -> t
@@ -437,7 +437,7 @@ and Core_type : sig
 
   val pp_poly_bindings
     :  ?preceeding:Preceeding.t
-    -> (string loc * jkind_annotation option) list
+    -> bound_ty_var list
     -> t
 
   val pp_var : ?preceeding:Preceeding.t -> ?attrs:attributes -> string ->
@@ -474,7 +474,7 @@ end = struct
     | Some k -> any ^/^ pre_nest (S.colon ^/^ Jkind_annotation.pp k)
 
   let pp_poly_bindings ?preceeding bound_vars =
-    let pp_bound (var, jkind) =
+    let pp_bound {pbtv_name = var; pbtv_kind = jkind; _ } =
       let var_and_kind = pp_var var.Location.txt jkind in
       match jkind with
       | None -> var_and_kind
@@ -1109,7 +1109,7 @@ end = struct
     | None -> name
     | Some ([], arg_pat) ->
       name ^/^ pre_nest @@ nest 2 (pp arg_pat)
-    | Some ([newtype, Some jkind], arg_pat)
+    | Some ([{ pbtv_name = newtype; pbtv_kind = Some jkind; _}], arg_pat)
       when not (has_leading LPAREN ~after:TYPE tokens) ->
       (* We could decide to "normalize" this case.
          Here we are careful because we don't want to trigger if the user wrote
@@ -1121,7 +1121,7 @@ end = struct
         pp arg_pat
       )
     | Some (bindings, arg_pat) ->
-      let binding (newtype, jkind) =
+      let binding {pbtv_name = newtype; pbtv_kind = jkind; _ } =
         match jkind with
         | None -> string newtype.txt
         | Some jkind -> parens (pp_annotated_newtype newtype jkind)
@@ -2231,17 +2231,23 @@ end
 and Function_param : sig
   val pp : function_param -> t
   val pp_desc : function_param_desc -> t
+
+  (* TODO: extract to a [Newtype] module which also includes other polyvars
+     printers. *)
+  val pp_newtype : ?needs_parens:bool -> bound_ty_var -> t
 end = struct
-  let pp_newtype ?(needs_parens=true) = function
-    | name, None -> string name.txt
-    | name, Some jkind ->
-      let doc = string name.txt ^/^ S.colon ^/^ Jkind_annotation.pp jkind in
+  let pp_newtype ?(needs_parens=true) { pbtv_name; pbtv_kind; _} =
+    let name = string pbtv_name.txt in
+    match pbtv_kind with
+    | None -> name
+    | Some jkind ->
+      let doc = name ^/^ S.colon ^/^ Jkind_annotation.pp jkind in
       if needs_parens then parens doc else doc
 
   let pp_desc = function
     | Pparam_val arg -> Argument.pp Pattern.pp arg
-    | Pparam_newtype (name, jkind) ->
-      parens (S.type_ ^/^ pp_newtype ~needs_parens:false (name, jkind))
+    | Pparam_newtype newtype ->
+      parens (S.type_ ^/^ pp_newtype ~needs_parens:false newtype)
     | Pparam_newtypes lst ->
       parens (S.type_ ^/^ separate_map (break 1) pp_newtype lst)
 
@@ -2497,7 +2503,7 @@ end
 
 and Constructor_decl : sig
   val pp : flatness -> Tokens.seq -> Longident.str_or_op loc ->
-    (string loc * jkind_annotation option) list ->
+    bound_ty_var list ->
     constructor_arguments -> core_type option -> attributes -> doc option -> t
 end = struct
   let pp td_flatness tokens name vars args res attrs post_doc =
@@ -3524,15 +3530,9 @@ end = struct
     | Pvc_constraint { locally_abstract_univars = []; typ } ->
       S.colon ^/^ nest 2 @@ Core_type.pp typ
     | Pvc_constraint { locally_abstract_univars = vars; typ } ->
-      let pp_var (name, jkind) =
-        match jkind with
-        | None -> string name.txt
-        | Some j ->
-          parens (string name.txt ^/^ S.colon ^/^ Jkind_annotation.pp j)
-      in
       group (
         S.colon ^/^ nest 2 (
-          group (S.type_ ^/^ separate_map (break 1) pp_var vars ^^ S.dot)
+          group (S.type_ ^/^ separate_map (break 1) Function_param.pp_newtype vars ^^ S.dot)
         )
       ) ^/^
       nest 2 (Core_type.pp typ)

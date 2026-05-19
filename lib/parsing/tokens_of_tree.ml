@@ -154,6 +154,11 @@ let tokenizer = object
     let node_toks = ct.ptyp_tokens in
     combine_children "core_type" ~loc:ct.ptyp_loc node_toks sub_tokens
 
+  method! bound_ty_var bv =
+    let sub_tokens = super#bound_ty_var bv in
+    let node_toks = bv.pbtv_tokens in
+    combine_children "bound_ty_var" ~loc:bv.pbtv_loc node_toks sub_tokens
+
   method! row_field p =
     let sub_tokens = super#row_field p in
     let node_toks = p.prf_tokens in

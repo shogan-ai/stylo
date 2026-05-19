@@ -99,7 +99,7 @@ module Typ :
     val variant: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> row_field list -> closed_flag
                  -> label list option -> core_type
     val poly: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
-      (str * jkind_annotation option) list -> core_type -> core_type
+      bound_ty_var list -> core_type -> core_type
 (*
     val package: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> lid -> (lid * core_type) list
                  -> core_type
@@ -136,7 +136,7 @@ module Pat:
                        -> pattern argument list -> closed_flag
                        -> pattern
     val construct: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
-      lid -> ((str * jkind_annotation option) list * pattern) option -> pattern
+      lid -> (bound_ty_var list * pattern) option -> pattern
     val variant: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> label -> pattern option -> pattern
     val record: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> pattern record_field list -> closed_flag
                 -> pattern
@@ -258,7 +258,7 @@ module Type:
 
     val constructor: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq ->
       ?info:info ->
-      ?vars:(str * jkind_annotation option) list ->
+      ?vars:bound_ty_var list ->
       ?args:constructor_arguments -> ?res:core_type ->
       str_or_op ->
       constructor_declaration
@@ -288,7 +288,7 @@ module Te:
       extension_constructor
 
     val decl: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?info:info ->
-      ?vars:(str * jkind_annotation option) list ->
+      ?vars:bound_ty_var list ->
       ?args:constructor_arguments -> ?res:core_type ->
       str_or_op ->
       extension_constructor

@@ -224,7 +224,7 @@ and core_type_desc =
                       when [flag]   is {{!Asttypes.closed_flag.Closed}[Closed]},
                        and [labels] is [Some ["X";"Y"]].
          *)
-  | Ptyp_poly of (string loc * jkind_annotation option) list * core_type
+  | Ptyp_poly of bound_ty_var list * core_type
       (** ['a1 ... 'an. T]
           [('a1 : k1) ... ('an : kn). T]
 
@@ -266,6 +266,12 @@ and core_type_desc =
   | Ptyp_repr of string loc list * core_type
   | Ptyp_extension of extension  (** [[%id]]. *)
   | Ptyp_parens of core_type
+
+and bound_ty_var =
+  { pbtv_name : string loc
+  ; pbtv_kind : jkind_annotation option
+  ; pbtv_loc  : Location.t
+  ; pbtv_tokens: Tokens.seq }
 
 and arg_label = Asttypes.arg_label =
     Nolabel
@@ -355,9 +361,7 @@ and pattern_desc =
           - If Closed, [n >= 2]
           - If Open, [n >= 1]
         *)
-  | Ppat_construct of
-      Longident.t loc
-      * ((string loc * jkind_annotation option) list * pattern) option
+  | Ppat_construct of Longident.t loc * (bound_ty_var list * pattern) option
       (** [Ppat_construct(C, args)] represents:
             - [C]               when [args] is [None],
             - [C P]             when [args] is [Some ([], P)]
@@ -669,8 +673,8 @@ and function_param_desc =
       Note: If [E0] is provided, only
       {{!Asttypes.arg_label.Optional}[Optional]} is allowed.
   *)
-  | Pparam_newtype of string loc * jkind_annotation option
-  | Pparam_newtypes of (string loc * jkind_annotation option) list
+  | Pparam_newtype of bound_ty_var
+  | Pparam_newtypes of bound_ty_var list
   (** [Pparam_newtype x] represents the parameter [(type x)].
       [x] carries the location of the identifier, whereas the [pparam_loc]
       on the enclosing [function_param] node is the location of the [(type x)]
@@ -895,7 +899,7 @@ and label_declaration =
 and constructor_declaration =
     {
      pcd_name: Longident.str_or_op loc;
-     pcd_vars: (string loc * jkind_annotation option) list;
+     pcd_vars: bound_ty_var list;
       (** jkind annotations are [C : ('a : kind1) ('a2 : kind2). ...] *)
      pcd_args: constructor_arguments;
      pcd_res: core_type option;
@@ -971,7 +975,7 @@ and type_exception =
 (** Definition of a new exception ([exception E]). *)
 
 and extension_constructor_kind =
-  | Pext_decl of (string loc * jkind_annotation option) list
+  | Pext_decl of bound_ty_var list
                  * constructor_arguments * core_type option
       (** [Pext_decl(existentials, c_args, t_opt)]
           describes a new extension constructor. It can be:
@@ -1512,7 +1516,7 @@ and structure_item_desc =
 
 and value_constraint =
   | Pvc_constraint of {
-      locally_abstract_univars:(string loc * jkind_annotation option) list;
+      locally_abstract_univars:bound_ty_var list;
       typ:core_type;
     }
   | Pvc_coercion of {ground:core_type option; coercion:core_type }

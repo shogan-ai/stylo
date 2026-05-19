@@ -89,6 +89,12 @@ let mkcty ~loc ?attrs d =
   let tokens = Tokens.at loc in
   Cty.mk ~loc:(make_loc loc) ?attrs ~tokens d
 
+let mkbtv loc name jkind =
+  { pbtv_name = name
+  ; pbtv_kind = jkind
+  ; pbtv_loc = make_loc loc
+  ; pbtv_tokens = Tokens.at loc }
+
 let mkwc loc wc_desc =
   { wc_desc; wc_loc = make_loc loc; wc_tokens = Tokens.at loc }
 
@@ -3171,7 +3177,7 @@ fun_param_as_list:
       }
   | LPAREN TYPE mkrhs(LIDENT) COLON jkind_annotation RPAREN
       { [ { pparam_loc = make_loc $sloc;
-            pparam_desc = Pparam_newtype ($3, Some $5)
+            pparam_desc = Pparam_newtype (mkbtv $sloc $3 (Some $5))
           }
         ]
       }
@@ -3331,9 +3337,9 @@ newtypes: (* : (string with_loc * jkind_annotation option) list *)
     { $1 }
 
 newtype: (* : string with_loc * jkind_annotation option *)
-    mkrhs(LIDENT)                     { $1, None }
+    mkrhs(LIDENT)                     { mkbtv $sloc $1 None }
   | LPAREN name=mkrhs(LIDENT) COLON jkind=jkind_annotation RPAREN
-      { name, Some jkind }
+      { mkbtv $sloc name (Some jkind) }
 
 /* Patterns */
 
@@ -3467,7 +3473,10 @@ pattern_gen:
     | constr=mkrhs(constr_longident)
         LPAREN TYPE ty=mkrhs(LIDENT) COLON jkind=jkind_annotation RPAREN
         pat=simple_pattern
-        { Ppat_construct(constr, Some ([(ty,Some jkind)], pat)) }
+        { let bound_var =
+            mkbtv ($startpos(ty), $endpos(jkind)) ty (Some jkind)
+          in
+          Ppat_construct(constr, Some ([bound_var], pat)) }
     | name_tag pattern %prec prec_constr_appl
         { Ppat_variant($1, Some $2) }
     ) { $1 }
@@ -4143,9 +4152,9 @@ with_type_binder:
 
 %inline typevar: (* : string with_loc * jkind_annotation option *)
     QUOTE mkrhs(ident)
-      { ($2, None) }
+      { mkbtv $sloc $2 None }
     | LPAREN QUOTE tyvar=mkrhs(ident) COLON jkind=jkind_annotation RPAREN
-      { (tyvar, Some jkind) }
+      { mkbtv $sloc tyvar (Some jkind) }
 ;
 %inline typevar_repr: (* : string with_loc *)
   LPAREN REPR QUOTE mkrhs(ident) RPAREN
