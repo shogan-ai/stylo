@@ -315,3 +315,16 @@ let core_type ct =
       ptyp_tokens = aliased_ty.ptyp_tokens @ alias_comments @ jk_comments }
   | _ ->
     ct
+
+let bound_ty_var bv =
+  match bv.pbtv_kind with
+  | None -> bv
+  | Some jk ->
+    let jk_toks = get_jkind_annotation_tokens jk in
+    let tokens =
+      bv.pbtv_tokens
+      |> Tokens.Seq.without ~token:LPAREN
+      |> Tokens.Seq.without ~token:RPAREN
+      |> without_child ~at:jk.pjka_loc.loc_start jk_toks
+    in
+    { bv with pbtv_kind = None; pbtv_tokens = tokens }
