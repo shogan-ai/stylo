@@ -2357,7 +2357,7 @@ end = struct
     let kw =
       group (
         Ext_attribute.decorate kw pval_ext_attrs
-        ^?^ if pval_poly then S.poly_ else empty
+        ^?^ if pval_poly then S.poly__ else empty
       )
     in
     let flatness = flatness_tracker () in
@@ -3820,7 +3820,7 @@ end = struct
       | [] -> assert false
       | first_kw :: other_kws ->
         let other_kws =
-          if pvb_is_poly then other_kws @ [ S.poly_ ] else other_kws
+          if pvb_is_poly then other_kws @ [ S.poly__ ] else other_kws
         in
         let decorated =
           Ext_attribute.decorate_value_binding first_kw pvb_ext_attrs

@@ -19,7 +19,7 @@
           --terminal "HASHTRUE=#true"
           --terminal "KIND=kind_"
           --terminal "LEXER_DIRECTIVE=#syntax foo on"
-          --terminal "POLY=poly"
+          --terminal "POLY=poly_"
           --terminal "REPR=repr_"
           ))))
 
@@ -41,6 +41,6 @@
           --terminal "HASHTRUE=#true"
           --terminal "KIND=kind_"
           --terminal "LEXER_DIRECTIVE=#syntax foo on"
-          --terminal "POLY=poly"
+          --terminal "POLY=poly_"
           --terminal "REPR=repr_"
           ))))
