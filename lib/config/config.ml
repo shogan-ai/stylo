@@ -7,3 +7,5 @@ let check_normalization_kept_comments = ref false
 let check_same_ast = ref false
 
 let dbg_dump = ref false
+
+let erase_jane_syntax = ref false

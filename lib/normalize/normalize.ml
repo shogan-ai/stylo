@@ -17,7 +17,7 @@ let add_pipe_if_missing ?(mk_optional=false) tokens =
     (* ensure the pipe is optional/mandatory as requested *)
     leading_comments @ { pipe with desc } :: following_tokens
 
-let normalizer = object
+class style_normalizer = object
   inherit [Context.parent] Traversals_helpers.map_with_context
   inherit [Context.parent] Traversals.map_with_context as super
 
@@ -141,5 +141,45 @@ let normalizer = object
     |> super#module_binding env
 end
 
-let structure = normalizer#structure Other
-let signature = normalizer#signature Other
+class eraser = object
+  inherit style_normalizer as super
+
+  method! expression ctxt expr =
+    Erase_jane_syntax.expression expr
+    |> super#expression ctxt
+
+  method! pattern ctxt pat =
+    Erase_jane_syntax.pattern pat
+    |> super#pattern ctxt
+
+  method! argument f ctxt arg =
+    Erase_jane_syntax.argument arg
+    |> super#argument f ctxt
+
+  method! value_binding ctxt vb =
+    Erase_jane_syntax.value_binding vb
+    |> super#value_binding ctxt
+
+  method! core_type ctxt ct =
+    Erase_jane_syntax.core_type ct
+    |> super#core_type ctxt
+
+  method! bound_ty_var ctxt bv =
+    Erase_jane_syntax.bound_ty_var bv
+    |> super#bound_ty_var ctxt
+
+  method! type_declaration ctxt td =
+    Erase_jane_syntax.type_declaration td
+    |> super#type_declaration ctxt
+end
+
+let style_normalizer = new style_normalizer
+let eraser = new eraser
+
+let normalizer () =
+  if !Config.erase_jane_syntax
+  then eraser
+  else style_normalizer
+
+let structure st = (normalizer ())#structure Other st
+let signature sg = (normalizer ())#signature Other sg

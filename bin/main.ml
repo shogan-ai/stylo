@@ -73,6 +73,12 @@ module Arg = struct
     info ~doc ["debug"]
     |> flag
     |> value
+
+  let erase_jst_syntax =
+    info ["erase-jane-syntax"]
+      ~doc:"Erase OxCaml extensions from the output"
+    |> flag
+    |> value
 end
 
 let fuzzer_batch fn =
@@ -212,11 +218,13 @@ let style_cmd =
   and+ idempotence_check
   and+ tokens_checks
   and+ debug
+  and+ erase_jst_syntax
   and+ w = width in
   Config.(
     width := w;
     check_same_ast := ast_check;
     dbg_dump := debug;
+    erase_jane_syntax := erase_jst_syntax;
     if tokens_checks then (
       check_retokenisation := true;
       check_normalization_kept_comments := true;
