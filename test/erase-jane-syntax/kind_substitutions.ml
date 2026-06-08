@@ -149,11 +149,11 @@ module type S_disabled = S with kind_     k     =
        & kind_of_ ttttttttttt
               & _)
    mod    mmmmm     mmmmmm
-[@@ocamlformat "disable"]
+(* [@@ocamlformat "disable"] *)
 
 module type S_disabled' = S with kind_     k     :=
         (kkkkkkkk
        & kind_of_ ttttttttttt
               & _)
    mod    mmmmm     mmmmmm
-[@@ocamlformat "disable"]
+(* [@@ocamlformat "disable"] *)
