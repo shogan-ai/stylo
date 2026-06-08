@@ -314,6 +314,7 @@ let core_type ct =
     { aliased_ty with
       ptyp_tokens = aliased_ty.ptyp_tokens @ alias_comments @ jk_comments }
   | _ ->
+    (* FIXME: [Ptyp_of_kind] *)
     ct
 
 let bound_ty_var bv =
@@ -328,3 +329,59 @@ let bound_ty_var bv =
       |> without_child ~at:jk.pjka_loc.loc_start jk_toks
     in
     { bv with pbtv_kind = None; pbtv_tokens = tokens }
+
+let jkind_to_attr jk =
+  let rec desc_to_attr = function
+    | Pjk_parens desc -> desc_to_attr desc
+    | Pjk_abbreviation
+        ({txt =
+            { desc = Lident Str ("immediate" | "immediate64" as s)
+            ; tokens = lid_toks }; loc}, []) ->
+      let attr =
+        let empty_payload : structure =
+          { pst_items = []; pst_loc = loc; pst_tokens = [] }
+        in
+        let tokens = Tokens.replace_first_child ~subst:lid_toks jk.pjka_tokens in
+        Ast_helper.Attr.mk ~loc:jk.pjka_loc ~tokens
+          (Location.mkloc [s] loc) (PStr empty_payload)
+      in
+      Some attr
+    | _ -> None
+  in
+  desc_to_attr jk.pjka_desc
+
+let type_declaration td =
+  match td.ptype_jkind_annotation with
+  | None -> td
+  | Some jk ->
+    match jkind_to_attr jk with
+    | None ->
+      (* Easy case: remove the subtree, keeping its comments *)
+      let jk_tokens = get_jkind_annotation_tokens jk in
+      let tokens =
+        without_child ~at:jk.pjka_loc.loc_start jk_tokens td.ptype_tokens
+      in
+      { td with ptype_tokens = tokens }
+    | Some attr ->
+      (* More work: converted to an attr, add it to the list.
+
+         [Comment] tokens from the jkind are now stored in [attr] so we can
+         blindly remove the [Child_node] corresponding to [jk]. *)
+      let tokens = without_child ~at:jk.pjka_loc.loc_start [] td.ptype_tokens in
+      let attrs, tokens =
+        let child =
+          { Tokens.desc = Child_node; pos = attr.attr_loc.loc_start }
+        in
+        match td.ptype_attributes with
+        | Attributes { attributes; loc; tokens = attrs_tokens } ->
+          Attributes {
+            attributes = attr :: attributes;
+            loc;
+            tokens = child :: attrs_tokens
+          }, tokens
+        | No_attributes ->
+          Attributes
+            { attributes = [attr]; loc = attr.attr_loc; tokens = [child] },
+          tokens @ [child]
+      in
+      { td with ptype_attributes = attrs; ptype_tokens = tokens }
