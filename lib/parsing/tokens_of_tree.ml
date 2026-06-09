@@ -11,7 +11,7 @@ module Error = struct
     ; pos: Lexing.position }
 
   let pp_context ppf { node_kind; pos } =
-    Format.fprintf ppf "File %s, on %s at line %d column %d:"
+    Format.fprintf ppf "File %s, on %s at line %d column %d"
       pos.pos_fname
       node_kind
       pos.pos_lnum (pos.pos_cnum - pos.pos_bol)
