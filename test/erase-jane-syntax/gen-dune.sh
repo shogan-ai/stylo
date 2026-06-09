@@ -12,8 +12,12 @@ function check-file {
       (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:$f}))))
 
 (rule
-  (alias runtest)
+  (alias diff-$f)
   (action (diff %{dep:$ref} %{dep:$out})))
+
+(alias
+  (name runtest)
+  (deps (alias diff-$f)))
 
 EOF
 }
