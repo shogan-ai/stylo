@@ -49,25 +49,85 @@ let fold_into ~parent parent_kw_tok child =
   in
   { child with pexp_tokens = tokens; pexp_attributes = merged_attributes }
 
-let dummy_pos_lid pos =
-  let mk_ident_tok ?(uppercase=true) s =
-    let tok : Parser_tokens.token = if uppercase then UIDENT s else LIDENT s in
-    { Tokens.desc = Token (tok, false); pos }
-  in
-  let mk_ldot ?uppercase lid s =
-    let tokens =
-      [ { Tokens.desc = Child_node; pos }
-      ; { desc = Token (DOT, false); pos }
-      ; mk_ident_tok ?uppercase s ]
+module Implicit_source_pos = struct
+  let mk_lexing_lident ~pos lident =
+    let mk_ident_tok ?(uppercase=true) s =
+      let tok : Parser_tokens.token = if uppercase then UIDENT s else LIDENT s in
+      { Tokens.desc = Token (tok, false); pos }
     in
-    { Longident.desc = Ldot (lid, Str s); tokens }
-  in
-  let stdlib =
-    let str = "Stdlib" in
-    { Longident.desc = Lident (Str str); tokens = [mk_ident_tok str] }
-  in
-  let lexing = mk_ldot stdlib "Lexing" in
-  mk_ldot ~uppercase:false lexing "dummy_pos"
+    let mk_ldot ?uppercase lid s =
+      let tokens =
+        [ { Tokens.desc = Child_node; pos }
+        ; { desc = Token (DOT, false); pos }
+        ; mk_ident_tok ?uppercase s ]
+      in
+      { Longident.desc = Ldot (lid, Str s); tokens }
+    in
+    let stdlib =
+      let str = "Stdlib" in
+      { Longident.desc = Lident (Str str); tokens = [mk_ident_tok str] }
+    in
+    let lexing = mk_ldot stdlib "Lexing" in
+    mk_ldot ~uppercase:false lexing lident
+
+  let dummy_pos_lid pos = mk_lexing_lident ~pos "dummy_pos"
+  let position_lid pos = mk_lexing_lident ~pos "position"
+
+  let is_call_pos : extension -> bool = function
+    | { txt = ["call_pos"]; _ }, PStr { pst_items = []; _ }, _ -> true
+    | _ -> false
+
+  let is_src_pos : extension -> bool = function
+    | { txt = ["src_pos"]; _ }, PStr { pst_items = []; _ }, _ -> true
+    | _ -> false
+
+  let mk_typ typ =
+    match typ.ptyp_desc with
+    | Ptyp_extension
+        ({ txt = ["call_pos"]; _ },
+         PStr { pst_items = []; pst_tokens; _ },
+         ext_tokens) ->
+      let comments =
+        List.filter Tokens.is_comment pst_tokens @
+        List.filter Tokens.is_comment ext_tokens
+      in
+      let pos = typ.ptyp_loc.loc_start in
+      let lid = position_lid pos in
+      let lid_loc = Location.mkloc lid typ.ptyp_loc in
+      let tokens = { Tokens.desc = Child_node; pos } :: comments in
+      { typ with
+        ptyp_desc = Ptyp_constr ([], lid_loc);
+        ptyp_tokens = tokens }
+    | _ -> assert false
+
+  let mk_default ~loc ~attrs pst_tokens ext_tokens =
+    let comments =
+      List.filter Tokens.is_comment pst_tokens @
+      List.filter Tokens.is_comment ext_tokens
+    in
+    let pos = loc.Location.loc_start in
+    let lid = dummy_pos_lid pos in
+    let lid_loc = Location.mkloc lid loc in
+    let tokens = { Tokens.desc = Child_node; pos } :: comments in
+    { pexp_ext_attr = { pea_ext = None; pea_attrs = No_attributes };
+      pexp_desc = Pexp_ident lid_loc;
+      pexp_loc = loc;
+      pexp_attributes = attrs;
+      pexp_tokens = tokens }
+
+  let default_of_exp e =
+    match e.pexp_desc with
+    | Pexp_extension (_, PStr { pst_tokens; _ }, ext_tokens) ->
+      mk_default ~loc:e.pexp_loc ~attrs:e.pexp_attributes pst_tokens ext_tokens
+    | _ -> assert false
+
+  let default_of_typ typ =
+    match typ.ptyp_desc with
+    | Ptyp_extension (_, PStr { pst_tokens; _ }, ext_tokens) ->
+      mk_default ~loc:typ.ptyp_loc ~attrs:typ.ptyp_attributes
+        pst_tokens ext_tokens
+    | _ -> assert false
+end
 
 let token_of_legacy_mode (m : mode Location.loc) : Parser_tokens.token =
   match m.txt with
@@ -144,21 +204,8 @@ let expression e =
       pexp_desc = Pexp_field (e, fn);
       pexp_tokens =
         Tokens.Seq.search_and_replace [DOTHASH, DOT] e.pexp_tokens }
-  | Pexp_extension
-      ({ txt = ["src_pos"]; _ },
-       PStr { pst_items = []; pst_tokens; _ },
-       ext_tokens) ->
-    let comments =
-      List.filter Tokens.is_comment pst_tokens @
-      List.filter Tokens.is_comment ext_tokens
-    in
-    let pos = e.pexp_loc.loc_start in
-    let lid = dummy_pos_lid pos in
-    let lid_loc = Location.mkloc lid e.pexp_loc in
-    let tokens = { Tokens.desc = Child_node; pos } :: comments in
-    { e with
-      pexp_desc = Pexp_ident lid_loc;
-      pexp_tokens = tokens }
+  | Pexp_extension ext when Implicit_source_pos.is_src_pos ext ->
+    Implicit_source_pos.default_of_exp e
   | _ ->
     e
 
@@ -228,21 +275,129 @@ let pattern p =
 
 let get_modes_tokens m = Result.get_ok (Tokens_of_tree.modes m)
 
-let argument a =
-  (* Legacy modes, when present, are the first Child_node of the argument
-     tokens. (Cf. parser.mly) *)
-  match a.parg_desc with
-  | Parg_unlabelled ({ legacy_modes = Modes _; _ } as arg_info) ->
-    let modes_tokens = get_modes_tokens arg_info.legacy_modes in
-    { a with
-      parg_desc = Parg_unlabelled { arg_info with legacy_modes = No_modes };
-      parg_tokens = without_child modes_tokens a.parg_tokens }
-  | Parg_labelled ({ legacy_modes = Modes _; _ } as arg_info) ->
-    let modes_tokens = get_modes_tokens arg_info.legacy_modes in
-    { a with
-      parg_desc = Parg_labelled { arg_info with legacy_modes = No_modes };
-      parg_tokens = without_child modes_tokens a.parg_tokens }
-  | _ -> a
+module Argument = struct
+  let erase_legacy_modes a =
+    (* Legacy modes, when present, are the first Child_node of the argument
+       tokens. (Cf. parser.mly) *)
+    match a.parg_desc with
+    | Parg_unlabelled ({ legacy_modes = Modes _; _ } as arg_info) ->
+      let modes_tokens = get_modes_tokens arg_info.legacy_modes in
+      { a with
+        parg_desc = Parg_unlabelled { arg_info with legacy_modes = No_modes };
+        parg_tokens = without_child modes_tokens a.parg_tokens }
+    | Parg_labelled ({ legacy_modes = Modes _; _ } as arg_info) ->
+      let modes_tokens = get_modes_tokens arg_info.legacy_modes in
+      { a with
+        parg_desc = Parg_labelled { arg_info with legacy_modes = No_modes };
+        parg_tokens = without_child modes_tokens a.parg_tokens }
+    | _ -> a
+
+  let cleanup_parens a =
+    match a.parg_desc with
+    | Parg_unlabelled
+        { legacy_modes=No_modes; typ_constraint=None; modes=No_modes; _ }
+    | Parg_labelled
+        { legacy_modes=No_modes; typ_constraint=None; modes=No_modes;
+          default=None; _ }
+        ->
+      { a with
+        parg_tokens =
+          a.parg_tokens
+          |> Tokens.Seq.without ~token:LPAREN
+          |> Tokens.Seq.without ~token:RPAREN }
+    | _ -> a
+
+  let rewrite_call_pos_ext a =
+    match a.parg_desc with
+    | Parg_labelled
+        ({ optional = false
+         ; typ_constraint =
+             Some Pconstraint ({ ptyp_desc = Ptyp_extension ext; _ } as typ)
+         ; maybe_punned = None
+         ; _ } as arg_info)
+      when Implicit_source_pos.is_call_pos ext ->
+      let default = Implicit_source_pos.default_of_typ typ in
+      let parg_desc =
+        Parg_labelled
+          { arg_info with
+            optional = true
+          ; typ_constraint = None
+          ; default = Some default }
+      in
+      let parg_tokens =
+        (* Not strictly necessary, but cleaner. Also might be helpful when
+           looking at the rewritten tokens stream during debug sessions. *)
+        Tokens.Seq.search_and_replace
+          [ TILDE, QUESTION
+          ; COLON, EQUAL ]
+          a.parg_tokens
+      in
+      { a with parg_desc; parg_tokens }
+    | Parg_labelled
+        ({ optional = false
+         ; typ_constraint = None
+         ; maybe_punned =
+             Some
+               ({ ppat_desc =
+                    Ppat_constraint
+                      (p, Some ({ ptyp_desc = Ptyp_extension ext; _} as typ), m)
+                ; _ } as pat)
+         ; _ } as arg_info)
+      when Implicit_source_pos.is_call_pos ext ->
+      let default = Implicit_source_pos.default_of_typ typ in
+      let not_punned, extruded_child_node =
+        match Tokens.Seq.split ~on:COLON pat.ppat_tokens with
+        | sub_pat_tokens, _colon :: child_node :: following_tokens ->
+          { pat with
+            ppat_desc = Ppat_constraint (p, None, m)
+          ; ppat_tokens = sub_pat_tokens @ following_tokens },
+          child_node
+        | _ -> assert false
+      in
+      let parg_desc =
+        Parg_labelled
+          { arg_info with
+            optional = true
+          ; maybe_punned = Some not_punned
+          ; default = Some default }
+      in
+      let parg_tokens =
+        let open Tokens in
+        match
+          a.parg_tokens
+          |> Seq.search_and_replace
+               (* Not strictly necessary, but cleaner. Also might be helpful when
+                  looking at the rewritten tokens stream during debug sessions. *)
+               [ LABEL arg_info.name, OPTLABEL arg_info.name
+               ; TILDE, QUESTION ]
+          |> Seq.split_on_child ~pos:pat.ppat_loc.loc_start
+        with
+        | before, pat_child_node :: after ->
+          before @
+          { desc = Token (LPAREN, false); pos = pat.ppat_loc.loc_start } ::
+          pat_child_node ::
+          { desc = Token (EQUAL, false); pos = extruded_child_node.pos } ::
+          extruded_child_node ::
+          { desc = Token (RPAREN, false); pos = pat.ppat_loc.loc_end } ::
+          after
+        | _ -> assert false
+      in
+      { a with parg_desc; parg_tokens }
+    | _ -> a
+
+  let generic_erase a =
+    erase_legacy_modes a
+    |> cleanup_parens
+
+  (* Additionnaly remove [%call_pos] from:
+     - Pcl_fun
+     - pci_value_params
+     - Pparam_val *)
+  let erase_function_param a =
+    erase_legacy_modes a
+    |> rewrite_call_pos_ext
+    |> cleanup_parens
+end
 
 let value_binding vb =
   match vb.pvb_legacy_modes with
@@ -279,6 +434,21 @@ let without_curry_attr attrs =
 
 let get_jkind_annotation_tokens jk =
   Result.get_ok (Tokens_of_tree.jkind_annotation jk)
+
+let arrow_arg aa =
+  (* TODO: modes *)
+  let typ = aa.aa_type in
+  match aa.aa_lbl, typ.ptyp_desc with
+  | Labelled lbl, Ptyp_extension ext when Implicit_source_pos.is_call_pos ext ->
+    let aa_type = Implicit_source_pos.mk_typ typ in
+    { aa with
+      aa_type;
+      aa_lbl = Optional lbl;
+      aa_tokens =
+        { Tokens.desc = Token (QUESTION, false); pos = aa.aa_loc.loc_start }
+        :: aa.aa_tokens }
+  | _ ->
+    aa
 
 let core_type ct =
   match ct.ptyp_desc with

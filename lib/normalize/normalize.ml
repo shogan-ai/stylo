@@ -153,12 +153,43 @@ class eraser = object
     |> super#pattern ctxt
 
   method! argument f ctxt arg =
-    Erase_jane_syntax.argument arg
+    Erase_jane_syntax.Argument.generic_erase arg
     |> super#argument f ctxt
+
+  (* TODO: dedicated helper funs in [Erase_jane_syntax] for the next 3. *)
+  method! function_param_desc ctxt d =
+    let d =
+      match d with
+      | Pparam_val a ->
+        Pparam_val (Erase_jane_syntax.Argument.erase_function_param a)
+      | _ -> d
+    in
+    super#function_param_desc ctxt d
+
+  method! class_infos f ctxt ci =
+    super#class_infos f ctxt
+      { ci with
+        pci_value_params =
+          List.map Erase_jane_syntax.Argument.erase_function_param
+            ci.pci_value_params }
+
+  method! class_expr_desc ctxt ced =
+    let ced =
+      match ced with
+      | Pcl_fun (ps, ce) ->
+        let ps = List.map Erase_jane_syntax.Argument.erase_function_param ps in
+        Pcl_fun (ps, ce)
+      | _ -> ced
+    in
+    super#class_expr_desc ctxt ced
 
   method! value_binding ctxt vb =
     Erase_jane_syntax.value_binding vb
     |> super#value_binding ctxt
+
+  method! arrow_arg ctxt aa =
+    Erase_jane_syntax.arrow_arg aa
+    |> super#arrow_arg ctxt
 
   method! core_type ctxt ct =
     Erase_jane_syntax.core_type ct
