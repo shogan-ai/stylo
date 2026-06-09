@@ -465,13 +465,15 @@ let core_type ct =
     { ct with
       ptyp_desc = Ptyp_any None;
       ptyp_tokens =
-        without_child ~at:jk.pjka_loc.loc_start jk_toks ct.ptyp_tokens }
+        without_child ~at:jk.pjka_loc.loc_start jk_toks ct.ptyp_tokens
+        |> Tokens.Seq.without ~token:COLON }
   | Ptyp_var (name, Some jk) ->
     let jk_toks = get_jkind_annotation_tokens jk in
     { ct with
       ptyp_desc = Ptyp_var (name, None);
       ptyp_tokens =
-        without_child ~at:jk.pjka_loc.loc_start jk_toks ct.ptyp_tokens }
+        without_child ~at:jk.pjka_loc.loc_start jk_toks ct.ptyp_tokens
+        |> Tokens.Seq.without ~token:COLON }
   | Ptyp_alias (aliased_ty, None, Some erasable_jkind) ->
     (* N.B. with the current grammar, there can't be attributes on alias_type,
        so we can just return the child node.
@@ -496,6 +498,7 @@ let bound_ty_var bv =
       bv.pbtv_tokens
       |> Tokens.Seq.without ~token:LPAREN
       |> Tokens.Seq.without ~token:RPAREN
+      |> Tokens.Seq.without ~token:COLON
       |> without_child ~at:jk.pjka_loc.loc_start jk_toks
     in
     { bv with pbtv_kind = None; pbtv_tokens = tokens }
