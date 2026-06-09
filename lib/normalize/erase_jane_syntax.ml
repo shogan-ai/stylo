@@ -190,10 +190,24 @@ let expression e =
       pexp_desc = Pexp_construct (lid_loc, None);
       pexp_tokens = exp_tokens }
   | Pexp_unboxed_tuple fields ->
-    { e with
-      pexp_desc = Pexp_tuple fields;
-      pexp_tokens =
-        Tokens.Seq.search_and_replace [HASHLPAREN, LPAREN] e.pexp_tokens }
+    (* For the sake of simplicity: keep it in parens *)
+    begin match Tokens.Seq.split ~on:HASHLPAREN e.pexp_tokens with
+    | before_hlp, hlp :: after_hlp ->
+      let inner_tokens, lp_and_after = Tokens.Seq.split ~on:RPAREN after_hlp in
+      let inner =
+        { pexp_desc = Pexp_tuple fields
+        ; pexp_loc = e.pexp_loc
+        ; pexp_ext_attr = { pea_ext = None; pea_attrs = No_attributes }
+        ; pexp_attributes = No_attributes
+        ; pexp_tokens = inner_tokens }
+      in
+      { e with
+        pexp_desc = Pexp_parens { exp = inner; optional = false };
+        pexp_tokens =
+          before_hlp @ { hlp with desc = Token (LPAREN, false) } ::
+          { desc = Child_node; pos = e.pexp_loc.loc_start } :: lp_and_after }
+    | _ -> assert false
+    end
   | Pexp_record_unboxed_product (re, fields) ->
     { e with
       pexp_desc = Pexp_record (re, fields);
@@ -259,10 +273,24 @@ let pattern p =
       ppat_desc = Ppat_construct (lid_loc, None);
       ppat_tokens = pat_tokens }
   | Ppat_unboxed_tuple (fields, cf) ->
-    { p with
-      ppat_desc = Ppat_tuple (fields, cf);
-      ppat_tokens =
-        Tokens.Seq.search_and_replace [HASHLPAREN, LPAREN] p.ppat_tokens }
+    (* As in expressions, we keep parentheses *)
+    begin match Tokens.Seq.split ~on:HASHLPAREN p.ppat_tokens with
+    | before_hlp, hlp :: after_hlp ->
+      let inner_tokens, lp_and_after = Tokens.Seq.split ~on:RPAREN after_hlp in
+      let inner =
+        { ppat_desc = Ppat_tuple (fields, cf)
+        ; ppat_loc = p.ppat_loc
+        ; ppat_ext_attr = { pea_ext = None; pea_attrs = No_attributes }
+        ; ppat_attributes = No_attributes
+        ; ppat_tokens = inner_tokens }
+      in
+      { p with
+        ppat_desc = Ppat_parens { pat = inner; optional = false };
+        ppat_tokens =
+          before_hlp @ { hlp with desc = Token (LPAREN, false) } ::
+          { desc = Child_node; pos = p.ppat_loc.loc_start } :: lp_and_after }
+    | _ -> assert false
+    end
   | Ppat_record_unboxed_product (fields, cf) ->
     { p with
       ppat_desc = Ppat_record (fields, cf);
@@ -456,10 +484,22 @@ let core_type ct =
     let attrs = without_curry_attr ct.ptyp_attributes in
     { ct with ptyp_attributes = attrs }
   | Ptyp_unboxed_tuple cts ->
-    { ct with
-      ptyp_desc = Ptyp_tuple cts;
-      ptyp_tokens =
-        Tokens.Seq.search_and_replace [HASHLPAREN, LPAREN] ct.ptyp_tokens }
+    begin match Tokens.Seq.split ~on:HASHLPAREN ct.ptyp_tokens with
+    | before_hlp, hlp :: after_hlp ->
+      let inner_tokens, lp_and_after = Tokens.Seq.split ~on:RPAREN after_hlp in
+      let inner =
+        { ptyp_desc = Ptyp_tuple cts
+        ; ptyp_loc = ct.ptyp_loc
+        ; ptyp_attributes = No_attributes
+        ; ptyp_tokens = inner_tokens }
+      in
+      { ct with
+        ptyp_desc = Ptyp_parens inner;
+        ptyp_tokens =
+          before_hlp @ { hlp with desc = Token (LPAREN, false) } ::
+          { desc = Child_node; pos = ct.ptyp_loc.loc_start } :: lp_and_after }
+    | _ -> assert false
+    end
   | Ptyp_any Some jk ->
     let jk_toks = get_jkind_annotation_tokens jk in
     { ct with
