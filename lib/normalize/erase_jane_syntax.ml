@@ -463,6 +463,10 @@ let without_curry_attr attrs =
 let get_jkind_annotation_tokens jk =
   Result.get_ok (Tokens_of_tree.jkind_annotation jk)
 
+let get_jkind_annotation_comments jk =
+  get_jkind_annotation_tokens jk
+  |> List.filter Tokens.is_comment
+
 let arrow_arg aa =
   (* TODO: modes *)
   let typ = aa.aa_type in
@@ -501,18 +505,18 @@ let core_type ct =
     | _ -> assert false
     end
   | Ptyp_any Some jk ->
-    let jk_toks = get_jkind_annotation_tokens jk in
+    let jk_coms = get_jkind_annotation_comments jk in
     { ct with
       ptyp_desc = Ptyp_any None;
       ptyp_tokens =
-        without_child ~at:jk.pjka_loc.loc_start jk_toks ct.ptyp_tokens
+        without_child ~at:jk.pjka_loc.loc_start jk_coms ct.ptyp_tokens
         |> Tokens.Seq.without ~token:COLON }
   | Ptyp_var (name, Some jk) ->
-    let jk_toks = get_jkind_annotation_tokens jk in
+    let jk_coms = get_jkind_annotation_comments jk in
     { ct with
       ptyp_desc = Ptyp_var (name, None);
       ptyp_tokens =
-        without_child ~at:jk.pjka_loc.loc_start jk_toks ct.ptyp_tokens
+        without_child ~at:jk.pjka_loc.loc_start jk_coms ct.ptyp_tokens
         |> Tokens.Seq.without ~token:COLON }
   | Ptyp_alias (aliased_ty, None, Some erasable_jkind) ->
     (* N.B. with the current grammar, there can't be attributes on alias_type,
@@ -520,9 +524,7 @@ let core_type ct =
 
        We do take care to keep the comments (they all move to the end). *)
     let alias_comments = List.filter Tokens.is_comment ct.ptyp_tokens in
-    let jk_comments =
-      List.filter Tokens.is_comment (get_jkind_annotation_tokens erasable_jkind)
-    in
+    let jk_comments = get_jkind_annotation_comments erasable_jkind in
     { aliased_ty with
       ptyp_tokens = aliased_ty.ptyp_tokens @ alias_comments @ jk_comments }
   | _ ->
@@ -533,13 +535,13 @@ let bound_ty_var bv =
   match bv.pbtv_kind with
   | None -> bv
   | Some jk ->
-    let jk_toks = get_jkind_annotation_tokens jk in
     let tokens =
       bv.pbtv_tokens
       |> Tokens.Seq.without ~token:LPAREN
       |> Tokens.Seq.without ~token:RPAREN
       |> Tokens.Seq.without ~token:COLON
-      |> without_child ~at:jk.pjka_loc.loc_start jk_toks
+      |> without_child ~at:jk.pjka_loc.loc_start
+           (get_jkind_annotation_comments jk)
     in
     { bv with pbtv_kind = None; pbtv_tokens = tokens }
 
@@ -554,7 +556,13 @@ let jkind_to_attr jk =
         let empty_payload : structure =
           { pst_items = []; pst_loc = loc; pst_tokens = [] }
         in
-        let tokens = Tokens.replace_first_child ~subst:lid_toks jk.pjka_tokens in
+        let tokens =
+          let open Tokens in
+          { desc = Token (LBRACKETATAT, false); pos = loc.loc_start } ::
+          Tokens.replace_first_child ~subst:lid_toks jk.pjka_tokens @
+          { desc = Child_node (* empty payload *); pos = loc.loc_end } ::
+          { desc = Token (RBRACKET, false); pos = loc.loc_end } :: []
+        in
         Ast_helper.Attr.mk ~loc:jk.pjka_loc ~tokens
           (Location.mkloc [s] loc) (PStr empty_payload)
       in
@@ -570,17 +578,21 @@ let type_declaration td =
     match jkind_to_attr jk with
     | None ->
       (* Easy case: remove the subtree, keeping its comments *)
-      let jk_tokens = get_jkind_annotation_tokens jk in
+      let jk_comments = get_jkind_annotation_comments jk in
       let tokens =
-        without_child ~at:jk.pjka_loc.loc_start jk_tokens td.ptype_tokens
+        without_child ~at:jk.pjka_loc.loc_start jk_comments td.ptype_tokens
+        |> Tokens.Seq.without ~token:COLON
       in
-      { td with ptype_tokens = tokens }
+      { td with ptype_jkind_annotation = None; ptype_tokens = tokens }
     | Some attr ->
       (* More work: converted to an attr, add it to the list.
 
          [Comment] tokens from the jkind are now stored in [attr] so we can
          blindly remove the [Child_node] corresponding to [jk]. *)
-      let tokens = without_child ~at:jk.pjka_loc.loc_start [] td.ptype_tokens in
+      let tokens =
+        without_child ~at:jk.pjka_loc.loc_start [] td.ptype_tokens
+        |> Tokens.Seq.without ~token:COLON
+      in
       let attrs, tokens =
         let child =
           { Tokens.desc = Child_node; pos = attr.attr_loc.loc_start }
@@ -597,4 +609,7 @@ let type_declaration td =
             { attributes = [attr]; loc = attr.attr_loc; tokens = [child] },
           tokens @ [child]
       in
-      { td with ptype_attributes = attrs; ptype_tokens = tokens }
+      { td with
+        ptype_jkind_annotation = None;
+        ptype_attributes = attrs;
+        ptype_tokens = tokens }
