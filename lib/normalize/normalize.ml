@@ -199,6 +199,10 @@ class eraser = object
     Erase_jane_syntax.bound_ty_var bv
     |> super#bound_ty_var ctxt
 
+  method! ptype_param ctxt p =
+    Erase_jane_syntax.ptype_param p
+    |> super#ptype_param ctxt
+
   method! type_declaration ctxt td =
     Erase_jane_syntax.type_declaration td
     |> super#type_declaration ctxt

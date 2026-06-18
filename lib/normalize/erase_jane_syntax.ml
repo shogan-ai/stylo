@@ -527,6 +527,15 @@ let core_type ct =
     let jk_comments = get_jkind_annotation_comments erasable_jkind in
     { aliased_ty with
       ptyp_tokens = aliased_ty.ptyp_tokens @ alias_comments @ jk_comments }
+  | Ptyp_alias (aliased_ty, alias, Some jk) ->
+    let jk_coms = get_jkind_annotation_comments jk in
+    { ct with
+      ptyp_desc = Ptyp_alias (aliased_ty, alias, None);
+      ptyp_tokens =
+        without_child ~at:jk.pjka_loc.loc_start jk_coms ct.ptyp_tokens
+        |> Tokens.Seq.without ~token:LPAREN
+        |> Tokens.Seq.without ~token:RPAREN
+        |> Tokens.Seq.without ~token:COLON }
   | _ ->
     (* FIXME: [Ptyp_of_kind] *)
     ct
@@ -549,6 +558,17 @@ let bound_ty_var bv =
            (get_jkind_annotation_comments jk)
     in
     { bv with pbtv_kind = None; pbtv_tokens = tokens }
+
+let ptype_param p =
+  match p.ptp_jkind with
+  | None -> p
+  | Some jk ->
+    let tokens =
+      Tokens.Seq.without ~token:COLON p.ptp_tokens
+      |> without_child ~at:jk.pjka_loc.loc_start
+           (get_jkind_annotation_comments jk)
+    in
+    { p with ptp_jkind = None; ptp_tokens = tokens }
 
 let jkind_to_attr jk =
   let rec desc_to_attr = function
