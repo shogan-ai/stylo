@@ -536,10 +536,15 @@ let bound_ty_var bv =
   | None -> bv
   | Some jk ->
     let tokens =
-      bv.pbtv_tokens
-      |> Tokens.Seq.without ~token:LPAREN
-      |> Tokens.Seq.without ~token:RPAREN
-      |> Tokens.Seq.without ~token:COLON
+      let base =
+        if List.exists (Tokens.is_token ~which:TYPE) bv.pbtv_tokens
+        then (* newtype, keep parens *) bv.pbtv_tokens
+        else
+          bv.pbtv_tokens
+          |> Tokens.Seq.without ~token:LPAREN
+          |> Tokens.Seq.without ~token:RPAREN
+      in
+      Tokens.Seq.without ~token:COLON base
       |> without_child ~at:jk.pjka_loc.loc_start
            (get_jkind_annotation_comments jk)
     in
