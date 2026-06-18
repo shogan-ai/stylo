@@ -213,9 +213,9 @@ let expression e =
       pexp_desc = Pexp_record (re, fields);
       pexp_tokens =
         Tokens.Seq.search_and_replace [HASHLBRACE, LBRACE] e.pexp_tokens }
-  | Pexp_unboxed_field (e, fn) ->
+  | Pexp_unboxed_field (re, fn) ->
     { e with
-      pexp_desc = Pexp_field (e, fn);
+      pexp_desc = Pexp_field (re, fn);
       pexp_tokens =
         Tokens.Seq.search_and_replace [DOTHASH, DOT] e.pexp_tokens }
   | Pexp_extension ext when Implicit_source_pos.is_src_pos ext ->
