@@ -230,6 +230,11 @@ let tokenizer = object
     let node_toks = cd.pcd_tokens in
     combine_children "constructor_declaration" ~loc:cd.pcd_loc node_toks sub_tokens
 
+  method! constructor_argument ca =
+    let sub_tokens = super#constructor_argument ca in
+    let node_toks = ca.pca_tokens in
+    combine_children "constructor_argument" ~loc:ca.pca_loc node_toks sub_tokens
+
   method! type_extension te =
     let sub_tokens = super#type_extension te in
     let node_toks = te.ptyext_tokens in

@@ -915,6 +915,7 @@ and constructor_argument =
     pca_type: core_type;
     pca_modalities: modalities;
     pca_loc: Location.t;
+    pca_tokens: Tokens.seq;
   }
 
 and constructor_arguments =

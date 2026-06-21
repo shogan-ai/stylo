@@ -668,12 +668,14 @@ module Type = struct
      pcd_tokens = tokens;
     }
 
-  let constructor_arg ?(loc = !default_loc) ~global ?(modalities = No_modalities) typ =
+  let constructor_arg ?(loc = !default_loc) ~tokens ~global
+        ?(modalities = No_modalities) typ =
     {
       pca_global = global;
       pca_modalities = modalities;
       pca_type = typ;
       pca_loc = loc;
+      pca_tokens = tokens;
     }
 
   let field ?(loc = !default_loc) ?(attrs = No_attributes) ~tokens ?(info = empty_info)

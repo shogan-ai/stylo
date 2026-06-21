@@ -2451,7 +2451,7 @@ and Constructor_argument : sig
 
   val pp_args : constructor_arguments -> t
 end = struct
-  let pp { pca_global; pca_modalities; pca_type; pca_loc = _ } =
+  let pp { pca_global; pca_modalities; pca_type; pca_loc = _; pca_tokens = _ } =
     (if pca_global then S.global__ else empty) ^?^
     Core_type.pp pca_type
     |> with_modalities ~modalities:pca_modalities

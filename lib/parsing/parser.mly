@@ -4031,6 +4031,7 @@ generalized_constructor_arguments:
 %inline constructor_argument:
   gbl=global_flag cty=atomic_type modalities=optional_atat_modalities_expr {
     Type.constructor_arg cty ~global:gbl ~modalities ~loc:(make_loc $sloc)
+      ~tokens:(Tokens.at $sloc)
   }
 ;
 

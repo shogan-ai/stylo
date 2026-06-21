@@ -263,8 +263,8 @@ module Type:
       str_or_op ->
       constructor_declaration
 
-    val constructor_arg: ?loc:loc -> global:bool -> ?modalities:modalities -> core_type ->
-      constructor_argument
+    val constructor_arg: ?loc:loc -> tokens:Tokens.seq -> global:bool
+      -> ?modalities:modalities -> core_type -> constructor_argument
 
     val field: ?loc:loc -> ?attrs:attrs -> tokens:Tokens.seq -> ?info:info ->
       ?mut:mutable_flag -> ?global:bool -> ?modalities:modalities ->
