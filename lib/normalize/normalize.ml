@@ -204,7 +204,7 @@ class eraser = object
     |> super#ptype_param ctxt
 
   method! type_declaration ctxt td =
-    Erase_jane_syntax.type_declaration td
+    Erase_jane_syntax.Type_declaration.erase td
     |> super#type_declaration ctxt
 
   method! value_description ctxt vd =

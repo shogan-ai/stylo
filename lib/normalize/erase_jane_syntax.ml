@@ -392,6 +392,7 @@ module Argument = struct
     { a with parg_desc = desc; parg_tokens = tokens }
 
   let cleanup_parens a =
+    (* FIXME: incorrect when the pattern is non-trivial, e.g. (Some x). *)
     match a.parg_desc with
     | Parg_unlabelled
         { legacy_modes=No_modes; typ_constraint=None; modes=No_modes; _ }
@@ -721,48 +722,63 @@ let jkind_to_attr jk =
   in
   desc_to_attr jk.pjka_desc
 
-let type_declaration td =
-  match td.ptype_jkind_annotation with
-  | None -> td
-  | Some jk ->
-    match jkind_to_attr jk with
-    | None ->
-      (* Easy case: remove the subtree, keeping its comments *)
-      let jk_comments = get_jkind_annotation_comments jk in
-      let tokens =
-        without_child ~at:jk.pjka_loc.loc_start jk_comments td.ptype_tokens
-        |> Tokens.Seq.without ~token:COLON
-      in
-      { td with ptype_jkind_annotation = None; ptype_tokens = tokens }
-    | Some attr ->
-      (* More work: converted to an attr, add it to the list.
-
-         [Comment] tokens from the jkind are now stored in [attr] so we can
-         blindly remove the [Child_node] corresponding to [jk]. *)
-      let tokens =
-        without_child ~at:jk.pjka_loc.loc_start [] td.ptype_tokens
-        |> Tokens.Seq.without ~token:COLON
-      in
-      let attrs, tokens =
-        let child =
-          { Tokens.desc = Child_node; pos = attr.attr_loc.loc_start }
+module Type_declaration = struct
+  let erase_jkind_annot td =
+    match td.ptype_jkind_annotation with
+    | None -> td
+    | Some jk ->
+      match jkind_to_attr jk with
+      | None ->
+        (* Easy case: remove the subtree, keeping its comments *)
+        let jk_comments = get_jkind_annotation_comments jk in
+        let tokens =
+          without_child ~at:jk.pjka_loc.loc_start jk_comments td.ptype_tokens
+          |> Tokens.Seq.without ~token:COLON
         in
-        match td.ptype_attributes with
-        | Attributes { attributes; loc; tokens = attrs_tokens } ->
-          Attributes {
-            attributes = attr :: attributes;
-            loc;
-            tokens = child :: attrs_tokens
-          }, tokens
-        | No_attributes ->
-          Attributes
-            { attributes = [attr]; loc = attr.attr_loc; tokens = [child] },
-          tokens @ [child]
-      in
+        { td with ptype_jkind_annotation = None; ptype_tokens = tokens }
+      | Some attr ->
+        (* More work: converted to an attr, add it to the list.
+
+           [Comment] tokens from the jkind are now stored in [attr] so we can
+           blindly remove the [Child_node] corresponding to [jk]. *)
+        let tokens =
+          without_child ~at:jk.pjka_loc.loc_start [] td.ptype_tokens
+          |> Tokens.Seq.without ~token:COLON
+        in
+        let attrs, tokens =
+          let child =
+            { Tokens.desc = Child_node; pos = attr.attr_loc.loc_start }
+          in
+          match td.ptype_attributes with
+          | Attributes { attributes; loc; tokens = attrs_tokens } ->
+            Attributes {
+              attributes = attr :: attributes;
+              loc;
+              tokens = child :: attrs_tokens
+            }, tokens
+          | No_attributes ->
+            Attributes
+              { attributes = [attr]; loc = attr.attr_loc; tokens = [child] },
+            tokens @ [child]
+        in
+        { td with
+          ptype_jkind_annotation = None;
+          ptype_attributes = attrs;
+          ptype_tokens = tokens }
+
+  let no_unboxed_rec td =
+    match td.ptype_kind with
+    | Ptype_record_unboxed_product lbls ->
       { td with
-        ptype_jkind_annotation = None;
-        ptype_attributes = attrs;
-        ptype_tokens = tokens }
+        ptype_kind = Ptype_record lbls;
+        ptype_tokens =
+          Tokens.Seq.search_and_replace [HASHLBRACE, LBRACE] td.ptype_tokens }
+    | _ -> td
+
+  let erase td =
+    no_unboxed_rec td
+    |> erase_jkind_annot
+end
 
 let value_description vd =
   { vd with
