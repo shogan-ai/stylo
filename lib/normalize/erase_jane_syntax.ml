@@ -851,3 +851,9 @@ module Constructor_argument = struct
     erase_modalities ca
     |> global_to_at_globalized
 end
+
+let signature sg =
+  let tokens = Modalities.remove_from_tokens sg.psg_modalities sg.psg_tokens in
+  { sg with
+    psg_modalities = No_modalities;
+    psg_tokens = tokens }

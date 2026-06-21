@@ -218,6 +218,10 @@ class eraser = object
   method! label_declaration ctxt lbl =
     Erase_jane_syntax.Label_declaration.erase lbl
     |> super#label_declaration ctxt
+
+  method! signature ctxt sg =
+    Erase_jane_syntax.signature sg
+    |> super#signature ctxt
 end
 
 let style_normalizer = new style_normalizer
