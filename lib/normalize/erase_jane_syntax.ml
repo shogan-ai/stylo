@@ -150,6 +150,23 @@ module Implicit_source_pos = struct
     | _ -> assert false
 end
 
+module Constant = struct
+  let rewrite parent_tokens = function
+    | Pconst_unboxed_float (sign, lit, modifier) ->
+      Pconst_float (sign, lit, modifier),
+      Tokens.Seq.search_and_replace
+        [ HASH_FLOAT (lit, modifier)
+        , FLOAT (lit, modifier) ]
+        parent_tokens
+    | Pconst_unboxed_integer (sign, lit, modifier) ->
+      Pconst_integer (sign, lit, Some modifier),
+      Tokens.Seq.search_and_replace
+        [ HASH_INT (lit, Some modifier)
+        , INT (lit, Some modifier) ]
+        parent_tokens
+    | c -> c, parent_tokens
+end
+
 let token_of_legacy_mode (m : mode Location.loc) : Parser_tokens.token =
   match m.txt with
   | Mode "local" -> LOCAL
@@ -191,6 +208,11 @@ let expression e =
     { e with
       pexp_desc = Pexp_construct (lid_loc, None);
       pexp_tokens = exp_tokens }
+  | Pexp_constant c ->
+    let boxed_c, tokens = Constant.rewrite e.pexp_tokens c in
+    { e with
+      pexp_desc = Pexp_constant boxed_c;
+      pexp_tokens = tokens }
   | Pexp_unboxed_bool b ->
     let unboxed, boxed, name =
       let open Parser_tokens in
@@ -285,6 +307,19 @@ let pattern p =
     { p with
       ppat_desc = Ppat_construct (lid_loc, None);
       ppat_tokens = exp_tokens }
+  | Ppat_constant c ->
+    let boxed_c, tokens = Constant.rewrite p.ppat_tokens c in
+    { p with
+      ppat_desc = Ppat_constant boxed_c;
+      ppat_tokens = tokens }
+  | Ppat_interval (c1, c2) ->
+    (* N.B. we thread [tokens] as the code might be ill-typed, e.g. the pattern
+       could be [#1 .. #3.14]. *)
+    let boxed_c1, tokens = Constant.rewrite p.ppat_tokens c1 in
+    let boxed_c2, tokens = Constant.rewrite tokens c2 in
+    { p with
+      ppat_desc = Ppat_interval (boxed_c1, boxed_c2);
+      ppat_tokens = tokens }
   | Ppat_unboxed_bool b ->
     let unboxed, boxed, name =
       let open Parser_tokens in
@@ -540,6 +575,20 @@ module Arrow_arg = struct
     |> erase_modes
 end
 
+let rec unboxed_type { Longident.desc; tokens } : Longident.t =
+  match desc with
+  | Lident Str_trailing_hash s ->
+    { desc = Lident (Str s);
+      tokens = Tokens.Seq.without ~token:HASH_SUFFIX tokens }
+  | Ldot (lid, Str_trailing_hash s) ->
+    let lid = unboxed_type lid in
+    { desc = Ldot (lid, Str s);
+      tokens = Tokens.Seq.without ~token:HASH_SUFFIX tokens }
+  | Lident _ -> { desc; tokens }
+  | Ldot (lid, s) -> { desc = Ldot (unboxed_type lid, s); tokens }
+  | Lapply (l1, l2) ->
+    { desc = Lapply (unboxed_type l1, unboxed_type l2); tokens }
+
 let core_type ct =
   match ct.ptyp_desc with
   | Ptyp_arrow at ->
@@ -603,6 +652,8 @@ let core_type ct =
         |> Tokens.Seq.without ~token:LPAREN
         |> Tokens.Seq.without ~token:RPAREN
         |> Tokens.Seq.without ~token:COLON }
+  | Ptyp_constr (params, t) ->
+    { ct with ptyp_desc = Ptyp_constr (params, Location.map unboxed_type t) }
   | _ ->
     (* FIXME: [Ptyp_of_kind] *)
     ct
