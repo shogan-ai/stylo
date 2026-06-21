@@ -188,7 +188,7 @@ class eraser = object
     |> super#value_binding ctxt
 
   method! arrow_arg ctxt aa =
-    Erase_jane_syntax.arrow_arg aa
+    Erase_jane_syntax.Arrow_arg.erase aa
     |> super#arrow_arg ctxt
 
   method! core_type ctxt ct =
@@ -206,6 +206,18 @@ class eraser = object
   method! type_declaration ctxt td =
     Erase_jane_syntax.type_declaration td
     |> super#type_declaration ctxt
+
+  method! value_description ctxt vd =
+    Erase_jane_syntax.value_description vd
+    |> super#value_description ctxt
+
+  method! constructor_argument ctxt ca =
+    Erase_jane_syntax.Constructor_argument.erase ca
+    |> super#constructor_argument ctxt
+
+  method! label_declaration ctxt lbl =
+    Erase_jane_syntax.Label_declaration.erase lbl
+    |> super#label_declaration ctxt
 end
 
 let style_normalizer = new style_normalizer
