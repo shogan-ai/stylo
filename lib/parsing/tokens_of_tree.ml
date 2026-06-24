@@ -1,5 +1,10 @@
 (** {1 Flattening to a sequence of tokens } *)
 
+type tokens_from_subtree = {
+  origin: string;
+  tokens: Tokens.seq;
+}
+
 module Error = struct
   type context =
     { node_kind: string
@@ -12,58 +17,78 @@ module Error = struct
       pos.pos_lnum (pos.pos_cnum - pos.pos_bol)
 
   type t = [
-    | `Missing_children of context * Lexing.position
-    | `Extra_children of context * Tokens.seq list
+    | `CST_tokens_mismatch of context * Tokens.seq * tokens_from_subtree list
   ]
 
+  let pp_bounded_tokens ~limit ppf seq =
+    let did_truncate, seq =
+      if List.compare_length_with seq limit > 0
+      then true, Std.List.take limit seq
+      else false, seq
+    in
+    let open Format in
+    fprintf ppf "@[<hov>%a%a@]"
+      (pp_print_list ~pp_sep:pp_print_space Tokens.pp_elt) seq
+      (fun ppf () ->
+         (if did_truncate then fprintf else ifprintf) ppf "@ ...") ()
+
+  let pp_tokens_from_subtree ppf t =
+    Format.fprintf ppf "@[<hov 4>%a@ (for %S subtree)@]"
+      (pp_bounded_tokens ~limit:5) t.tokens t.origin
+
+  let pp_subtrees ~limit ppf l =
+    let did_truncate, l =
+      if List.compare_length_with l limit > 0
+      then true, Std.List.take limit l
+      else false, l
+    in
+    let open Format in
+    pp_print_list ~pp_sep:pp_print_space
+      (fun ppf -> fprintf ppf "- %a" pp_tokens_from_subtree)
+      ppf l;
+    if did_truncate then fprintf ppf "@ - ..."
+
   let pp ppf : t -> unit = function
-    | `Missing_children (ctxt, pos) ->
+    | `CST_tokens_mismatch (ctxt, node_tokens, subtokens) ->
+      let expected_children =
+        List.fold_left (fun nb t -> if Tokens.is_child t then nb + 1 else nb)
+          0 node_tokens
+      in
+      let limit = 10 in
       Format.fprintf ppf
-        "@[<hov>%a:@ Missing tokens for subtree starting at position %d:%d@]@."
+        "@[<v>%a:@ @[<hov>Mismatch between@ this node's tokens skeleton@ \
+         and the tokens retrieved@ from the subtrees.@]@;\
+         @[<hov 2>Current node tokens skeleton@ (%d expected subtrees):@;%a@]@;\
+         @[<hov 2>Tokens sequences@ for %d subtrees:@;@[<v>%a@]@]@."
         pp_context ctxt
-        pos.pos_lnum (pos.pos_cnum - pos.pos_bol)
-    | `Extra_children (ctxt, tokens) ->
-      let truncated, tokens =
-        if List.compare_length_with tokens 5 > 0
-        then true, Std.List.take 5 tokens
-        else false, tokens
-      in
-      let open Format in
-      let pp_tokens =
-        let pp_sep ppf () = fprintf ppf "@;- " in
-        pp_print_list ~pp_sep Tokens.pp_seq
-      in
-      let pp_ellipsis ppf = function
-        | false -> ()
-        | true -> fprintf ppf "@;- ..."
-      in
-      Format.fprintf ppf
-        "@[<v>%a:@ @[<hov 2>Unexpected tokens:@ @[<hov>%a%a@]@]@]@."
-        pp_context ctxt
-        pp_tokens tokens
-        pp_ellipsis truncated
+        expected_children
+        (pp_bounded_tokens ~limit) node_tokens
+        (List.length subtokens)
+        (pp_subtrees ~limit) subtokens
 end
 
-exception Abort of Error.t
+exception Abort
+exception Error of Error.t
 
-let rec combine_children ctxt (top : Tokens.seq) children =
+let rec combine_children (top : Tokens.seq) children =
   match top, children with
   | [], [] -> [] (* done *)
-  | [], _ -> raise (Abort (`Extra_children (ctxt, children)))
-  | { desc = Child_node; pos } :: _, [] ->
-    raise (Abort (`Missing_children (ctxt, pos)))
+  | [], _ -> raise Abort
+  | { desc = Child_node; _ } :: _, [] -> raise Abort
   | { desc = Child_node; _ } :: tokens, child :: children ->
-    child @ combine_children ctxt tokens children
+    child.tokens @ combine_children tokens children
   | tok :: tokens, _ ->
-    tok :: combine_children ctxt tokens children
+    tok :: combine_children tokens children
 
 let combine_children node_kind ~loc top children =
-  let ctxt = { Error.node_kind ; pos = loc.Location.loc_start } in
-  [combine_children ctxt top children]
+  try [{ origin = node_kind; tokens = combine_children top children }]
+  with Abort ->
+    let ctxt = { Error.node_kind ; pos = loc.Location.loc_start } in
+    raise (Error (`CST_tokens_mismatch (ctxt, top, children)))
 
 (* TODO: should be generated. *)
 let tokenizer = object
-  inherit [Tokens.seq list] Traversals.lift as super
+  inherit [tokens_from_subtree list] Traversals.lift as super
 
   (* The actual tokens. *)
   method tokens list = [ list ]
@@ -322,14 +347,13 @@ let tokenizer = object
 end
 
 let mk_error : Error.t -> _ = function
-  | (`Missing_children _ | `Extra_children _) as e -> Error e
+  | (`CST_tokens_mismatch _) as e -> Result.error e
 
-let structure str =
-  match tokenizer#structure str with
-  | exception Abort err -> mk_error err
-  | res -> Ok (List.flatten res)
+let flatten_or_error
+  : 'a. ('a -> tokens_from_subtree list) -> 'a -> (Tokens.seq, _) result = fun fn elt ->
+  match fn elt with
+  | exception Error err -> mk_error err
+  | res -> Ok (List.concat_map (fun t -> t.tokens) res)
 
-let signature sg =
-  match tokenizer#signature sg with
-  | exception Abort err -> mk_error err
-  | res -> Ok (List.flatten res)
+let structure str = flatten_or_error tokenizer#structure str
+let signature sg = flatten_or_error tokenizer#signature sg

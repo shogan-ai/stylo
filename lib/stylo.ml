@@ -196,7 +196,7 @@ module Pipeline = struct
         Comments.Insert.Error.pp e
     | (`Input_parse_error _ | `Output_parse_error _ | `Ast_changed _) as e ->
       Ast_checker.Errors.pp_error ppf fname e
-    | (`Missing_children _ | `Extra_children _) as e ->
+    | (`CST_tokens_mismatch _) as e ->
       Tokens_of_tree.Error.pp ppf e
 end
 
