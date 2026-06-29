@@ -18,6 +18,7 @@ module End = struct
     | Ptyp_arrow { codom_type = rhs; codom_modes = No_modes; _ }
     | Ptyp_poly (_, rhs)
     | Ptyp_repr (_, rhs)
+    | Ptyp_newlayout (_, rhs)
       -> of_core_type rhs
     | Ptyp_tuple lst -> of_core_type (snd (List.hd (List.rev lst)))
     | Ptyp_any _
@@ -187,6 +188,7 @@ module Start = struct
     | Ptyp_tuple []
     | Ptyp_poly _
     | Ptyp_repr _
+    | Ptyp_newlayout _
     | Ptyp_any _
     | Ptyp_var _
     | Ptyp_parens _

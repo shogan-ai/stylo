@@ -499,6 +499,13 @@ end = struct
       let vs = List.map (fun v -> pre_nest (pp_bound v)) vs in
       flow (break 1) (v :: vs)
 
+  let pp_newlayout_bindings ?preceeding = function
+    | [] -> assert false
+    | v :: vs ->
+      let string s = string s.Location.txt in
+      let v, pre_nest = Preceeding.group_with preceeding (string v) in
+      let vs = List.map (fun v -> pre_nest (string v)) vs in
+      flow (break 1) (v :: vs)
 
   module Arrow = struct
     type printer = ?preceeding:Preceeding.t -> unit -> t
@@ -665,6 +672,11 @@ end = struct
       let pre_nest = Preceeding.implied_nest preceeding in
       let pre_vars = pp_repr_bindings ?preceeding bound_vars in
       group (pre_vars ^^ break 0 ^^ pre_nest S.dot) ^/^ pre_nest (pp ty)
+    | Ptyp_newlayout (bound_vars, ty) ->
+      let pre_nest = Preceeding.implied_nest preceeding in
+      let pre_vars = pp_newlayout_bindings ?preceeding bound_vars in
+      group (S.layout__ ^/^ pre_vars ^^ break 0 ^^ pre_nest S.dot) ^/^
+      pre_nest (pp ty)
     | Ptyp_package (ext_attrs, pkg) -> package_type ?preceeding ext_attrs pkg
     | Ptyp_open (lid, ct) ->
       let space =
@@ -3307,6 +3319,9 @@ end = struct
     | Pwith_modtype (lid, mty) ->
       S.module_ ^/^ S.type_ ^/^ longident lid.txt ^/^ S.equals ^/^
       Module_type.pp mty
+    | Pwith_jkind (lid, jk) ->
+      S.kind__ ^/^ longident lid.txt ^/^ S.equals ^/^
+      Jkind_annotation.pp jk
     | Pwith_modtypesubst (lid, mty) ->
       S.module_ ^/^ S.type_ ^/^ longident lid.txt ^/^ S.colon_equals ^/^
       Module_type.pp mty
@@ -3318,6 +3333,9 @@ end = struct
     | Pwith_modsubst (lid1, lid2) ->
       S.module_ ^/^ longident lid1.txt ^/^ S.colon_equals ^/^
       longident lid2.txt
+    | Pwith_jkindsubst (lid, jk) ->
+      S.kind__ ^/^ longident lid.txt ^/^ S.colon_equals ^/^
+      Jkind_annotation.pp jk
 end
 
 (** {2 Value expressions for the module language} *)
