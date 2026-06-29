@@ -673,10 +673,11 @@ end = struct
       let pre_vars = pp_repr_bindings ?preceeding bound_vars in
       group (pre_vars ^^ break 0 ^^ pre_nest S.dot) ^/^ pre_nest (pp ty)
     | Ptyp_newlayout (bound_vars, ty) ->
-      let pre_nest = Preceeding.implied_nest preceeding in
-      let pre_vars = pp_newlayout_bindings ?preceeding bound_vars in
-      group (S.layout__ ^/^ pre_vars ^^ break 0 ^^ pre_nest S.dot) ^/^
-      pre_nest (pp ty)
+      let preceeding, pre_nest =
+        Preceeding.(preceeding + spaced S.layout__ ~indent:2)
+      in
+      let pre_vars = pp_newlayout_bindings ~preceeding bound_vars in
+      group (pre_vars ^^ break 0 ^^ pre_nest S.dot) ^/^ pre_nest (pp ty)
     | Ptyp_package (ext_attrs, pkg) -> package_type ?preceeding ext_attrs pkg
     | Ptyp_open (lid, ct) ->
       let space =
@@ -1667,11 +1668,15 @@ end = struct
     )
 
 
-  and pp_constraint ~preceeding e ct_opt modes =
+  and pp_constraint ~preceeding e ct_opt mode_l =
     let pre_lparen, pre_nest = Preceeding.(preceeding + tight S.lparen) in
     let colon_constr =
-      optional (Core_type.pp ~preceeding:(Preceeding.spaced S.colon)) ct_opt
-      |> with_modes ~modes
+      match ct_opt, mode_l with
+      | None, No_modes -> empty (* doesn't actually happen *)
+      | None, l -> group (S.colon ^/^ S.at) ^/^ nest 4 (modes l)
+      | Some ct, modes ->
+        Core_type.pp ~preceeding:(Preceeding.spaced S.colon) ct
+        |> with_modes ~modes
     in
     group (
       pp ~preceeding:pre_lparen e ^/^
