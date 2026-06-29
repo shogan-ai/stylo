@@ -263,6 +263,12 @@ let expression e =
         Tokens.Seq.search_and_replace [DOTHASH, DOT] e.pexp_tokens }
   | Pexp_extension ext when Implicit_source_pos.is_src_pos ext ->
     Implicit_source_pos.default_of_exp e
+  | Pexp_constraint (ce, None, modes) ->
+    { e with
+      pexp_desc = Pexp_parens { exp = ce; optional = false };
+      pexp_tokens =
+        Modes.remove_from_tokens modes e.pexp_tokens
+        |> Tokens.Seq.without ~token:COLON }
   | Pexp_constraint (ce, ct, modes) ->
     { e with
       pexp_desc = Pexp_constraint (ce, ct, No_modes);
