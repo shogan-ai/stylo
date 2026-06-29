@@ -253,6 +253,11 @@ and core_type_desc =
            - As the {!core_type} of a
            {{!function_param_desc.Pparam_val}[Param_val]}.
          *)
+  | Ptyp_newlayout of string loc list * core_type
+      (** [layout_ a b c. T]
+
+           Introduces locally abstract layouts into scope.
+         *)
   | Ptyp_package of ext_attribute * package_type  (** [(module S)]. *)
   | Ptyp_open of Longident.t loc * core_type (** [M.(T)] *)
   | Ptyp_quote of core_type (** [<[T]>] *)
@@ -574,8 +579,8 @@ and expression_desc =
           - [CLAUSES] is a series of [comprehension_clause].
     *)
   | Pexp_overwrite of expression * expression (** overwrite_ exp with exp *)
-  | Pexp_quote of expression (** runtime metaprogramming quotations <[E]> *)
-  | Pexp_splice of expression (** runtime metaprogramming splicing $(E) *)
+  | Pexp_quote of expression (** [<[E]>] *)
+  | Pexp_splice of expression (** [$(E)] *)
   | Pexp_hole (** _ *)
   | Pexp_index_op of {
       kind: paren_kind;
@@ -1406,12 +1411,16 @@ and with_constraint_desc =
       (** [with module X.Y = Z] *)
   | Pwith_modtype of Longident.t loc * module_type
       (** [with module type X.Y = Z] *)
+  | Pwith_jkind of Longident.t loc * jkind_annotation
+      (** [with kind_ X.k = ...] *)
   | Pwith_modtypesubst of Longident.t loc * module_type
       (** [with module type X.Y := sig end] *)
   | Pwith_typesubst of ptype_params * Longident.t loc * core_type
       (** [with type X.t := ..., same format as [Pwith_type]] *)
   | Pwith_modsubst of Longident.t loc * Longident.t loc
       (** [with module X.Y := Z] *)
+  | Pwith_jkindsubst of Longident.t loc * jkind_annotation
+      (** [with kind_ X.k := ...] *)
 
 (** {2 Value expressions for the module language} *)
 

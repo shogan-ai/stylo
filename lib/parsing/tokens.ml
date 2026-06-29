@@ -72,6 +72,7 @@ module Raw = struct
   | KIND_OF  -> "KIND_OF"
   | LABEL _ -> "LABEL"
   | LAZY  -> "LAZY"
+  | LAYOUT  -> "LAYOUT"
   | LBRACE  -> "LBRACE"
   | LBRACELESS  -> "LBRACELESS"
   | LBRACKET  -> "LBRACKET"
@@ -227,6 +228,7 @@ module Raw = struct
   | KIND_OF , KIND_OF -> true
   | LABEL _, LABEL _-> true
   | LAZY , LAZY -> true
+  | LAYOUT , LAYOUT -> true
   | LBRACE , LBRACE -> true
   | LBRACELESS , LBRACELESS -> true
   | LBRACKET , LBRACKET -> true
