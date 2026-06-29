@@ -78,13 +78,11 @@ module Expressions = struct
   let x = (expr : (typ1 -> typ2) @ mode1 mode2)
   let x = (expr : typ1 * typ2 @ mode1 mode2)
 
-(*
   (* mode-only constraints without a type *)
   let x = (expr : @ mode1)
   let x = (expr : @ mode1 mode2)
   let x = f (expr : @ mode1)
   let x = (expr : @ mode1).field
-*)
 
   (* mode constraints in expressions *)
   let x =
@@ -268,7 +266,6 @@ module Expressions = struct
     }
   ;;
 
-(*
   (* mode-only constraints in expressions *)
   let x =
     { let1 =
@@ -431,7 +428,6 @@ module Expressions = struct
     ; infix1 = (x + y : @ mode)
     }
   ;;
-*)
 end
 
 module Arrow_params = struct
