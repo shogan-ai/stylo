@@ -30,3 +30,5 @@ val signature : signature -> (Tokens.seq, [> Error.t ]) result
 
 val modes : modes -> (Tokens.seq, [> Error.t ]) result
 val jkind_annotation : jkind_annotation -> (Tokens.seq, [> Error.t ]) result
+val signature_item : signature_item -> (Tokens.seq, [> Error.t ]) result
+val structure_item : structure_item -> (Tokens.seq, [> Error.t ]) result

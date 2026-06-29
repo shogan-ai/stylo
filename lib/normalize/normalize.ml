@@ -222,6 +222,10 @@ class eraser = object
   method! signature ctxt sg =
     Erase_jane_syntax.signature sg
     |> super#signature ctxt
+
+  method! structure ctxt st =
+    Erase_jane_syntax.structure st
+    |> super#structure ctxt
 end
 
 let style_normalizer = new style_normalizer

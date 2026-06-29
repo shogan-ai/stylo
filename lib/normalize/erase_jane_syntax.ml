@@ -874,8 +874,79 @@ module Constructor_argument = struct
     |> global_to_at_globalized
 end
 
+module Synced_progress = struct
+  (** Synced traversal of sig/struct items and the corresponding tokens.
+      So individual items can be removed from a sig/struct. *)
+
+
+  (* not using Tokens.Seq.split_on_child as it's more efficient to accumulate
+     tokens in reverse order and call reverse once at the end. *)
+  let next_child =
+    let rec aux acc lst =
+      match lst with
+      | [] -> acc, []
+      | x :: _ when Tokens.is_child x -> acc, lst
+      | x :: xs -> aux (x :: acc) xs
+    in
+    aux []
+
+  let filter ~drop items tokens =
+    let rec aux rev_items_prefix rev_tokens_prefix tokens items =
+      match items, tokens with
+      | _ :: _, [] -> assert false
+      | [], _ ->
+        List.rev rev_items_prefix, List.rev_append rev_tokens_prefix tokens
+      | item :: items, curr_child :: following_tokens ->
+        let rev_before_next, tail = next_child following_tokens in
+        begin match drop item with
+        | Some cmt_tokens_of_removed_subtree ->
+          let rev_before_next, tail = next_child following_tokens in
+          let rev_prefix =
+            rev_tokens_prefix
+            |> List.rev_append cmt_tokens_of_removed_subtree
+            |> List.append rev_before_next
+          in
+          aux rev_items_prefix rev_prefix tail items
+        | None ->
+          aux (item :: rev_items_prefix)
+            (rev_before_next @ curr_child :: rev_tokens_prefix)
+            tail items
+        end
+    in
+    let rev_tokens_prefix, tokens_from_first_item = next_child tokens in
+    aux [] rev_tokens_prefix tokens_from_first_item items
+end
+
 let signature sg =
   let tokens = Modalities.remove_from_tokens sg.psg_modalities sg.psg_tokens in
+  let items, tokens =
+    Synced_progress.filter sg.psg_items tokens ~drop:(fun si ->
+      match si.psig_desc with
+      | Psig_jkind _ ->
+        Tokens_of_tree.signature_item si
+        |> Result.get_ok
+        |> List.filter Tokens.is_comment
+        |> Option.some
+      | _ -> None
+    )
+  in
   { sg with
+    psg_items = items;
     psg_modalities = No_modalities;
     psg_tokens = tokens }
+
+let structure st =
+  let items, tokens =
+    Synced_progress.filter st.pst_items st.pst_tokens ~drop:(fun si ->
+      match si.pstr_desc with
+      | Pstr_jkind _ ->
+        Tokens_of_tree.structure_item si
+        |> Result.get_ok
+        |> List.filter Tokens.is_comment
+        |> Option.some
+      | _ -> None
+    )
+  in
+  { st with
+    pst_items = items;
+    pst_tokens = tokens }

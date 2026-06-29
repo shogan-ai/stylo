@@ -370,3 +370,5 @@ let signature = flatten_or_error tokenizer#signature
 
 let modes = flatten_or_error tokenizer#modes
 let jkind_annotation = flatten_or_error tokenizer#jkind_annotation
+let signature_item = flatten_or_error tokenizer#signature_item
+let structure_item = flatten_or_error tokenizer#structure_item
