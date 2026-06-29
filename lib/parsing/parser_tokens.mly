@@ -140,6 +140,7 @@
 %token HASH_SUFFIX            "# "
 %token <string> HASHOP        "##" (* just an example *)
 %token SIG                    "sig"
+%token LAYOUT                 "layout_"
 %token STACK                  "stack_"
 %token STAR                   "*"
 %token <string * Location.t * string option>

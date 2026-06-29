@@ -301,6 +301,14 @@ let mkexp_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
       mk ~loc (Pexp_coerce(e, t1, t2))
      | Modes _ -> not_expecting loc "mode annotations"
 
+let mkexp_opt_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
+  match t, modes with
+  | None, No_modes -> e
+  | None, _ ->
+     let mk = if ghost then ghexp_constraint else mkexp_constraint in
+     mk ~loc ~exp:e ~cty:None ~modes
+  | Some c, _ -> mkexp_type_constraint_with_modes ~ghost ~loc ~modes e c
+
 (* Helper functions for desugaring array indexing operators *)
 
 let paren_to_strings = function
@@ -2634,9 +2642,9 @@ spliceable_expr:
       { mkexp ~loc:$sloc (Pexp_parens { exp = $2; optional = false }) }
   | LPAREN seq_expr error
       { unclosed "(" $loc($1) ")" $loc($3) }
-  | LPAREN seq_expr type_constraint_with_modes RPAREN
+  | LPAREN seq_expr opt_type_constraint_with_modes RPAREN
       { let (t, m) = $3 in
-        mkexp_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2 t }
+        mkexp_opt_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2 t }
   | mkrhs(val_longident)
       { mkexp ~loc:$sloc (Pexp_ident ($1)) }
   | error
@@ -2648,9 +2656,9 @@ simple_expr:
       { mkexp ~loc:$sloc (Pexp_parens { exp = $2; optional = false }) }
   | LPAREN seq_expr error
       { unclosed "(" $loc($1) ")" $loc($3) }
-  | LPAREN seq_expr type_constraint_with_modes RPAREN
+  | LPAREN seq_expr opt_type_constraint_with_modes RPAREN
       { let (t, m) = $3 in
-        mkexp_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2 t }
+        mkexp_opt_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2 t }
   | indexop_expr(DOT { None }, seq_expr { [$1] }, { None })
       { mkexp ~loc:$sloc $1 }
   (* Immutable array indexing is a regular operator, so it doesn't need its own
@@ -3301,6 +3309,13 @@ type_constraint:
   | COLONGREATER error                          { syntax_error() }
 ;
 
+%inline opt_type_constraint_with_modes:
+  | type_constraint_with_modes
+    { let ty, modes = $1 in
+      Some ty, modes }
+  | COLON at_mode_expr
+    { None, $2 }
+
 %inline constraint_:
   | type_constraint_with_modes
     { let ty, modes = $1 in
@@ -3747,8 +3762,14 @@ type_parameters:
       { ps }
 ;
 
-jkind_desc:
-    jkind_annotation MOD mkrhs(LIDENT)+ { (* LIDENTs here are for modes *)
+(* This grammar is parameterized by itself so that we can sometimes include with
+   kinds and sometimes not. It would be nice if the typechecker could be solely
+   responsible for ruling out with kinds in positions where they may not appear,
+   but in practice they create problems for parsing around "with kind_"
+   constraints, as both use the word "with". *)
+jkind_desc_gen(self):
+    jkind_annotation_gen(self) MOD mkrhs(LIDENT)+ {
+      (* LIDENTs here are for modes *)
       let modes =
         List.map
           (fun {txt; loc} -> {txt = Mode txt; loc})
@@ -3758,36 +3779,61 @@ jkind_desc:
       let tokens = Tokens.at modes_loc in
       Pjk_mod ($1, Modes { modes; loc = make_loc modes_loc; tokens })
     }
-  | jkind_annotation WITH core_type optional_atat_modalities_expr {
-      Pjk_with ($1, $3, $4)
-    }
   | mkrhs(type_longident) mkrhs(LIDENT)* {
       Pjk_abbreviation ($1, $2)
     }
-  | KIND_OF ty=core_type {
+  | KIND_OF ty=core_type %prec below_LBRACKETAT {
       Pjk_kind_of ty
     }
   | UNDERSCORE {
       Pjk_default
     }
-  | reverse_product_jkind %prec below_AMPERSAND {
+  | reverse_product_jkind_gen(self) %prec below_AMPERSAND {
       Pjk_product (List.rev $1)
     }
-  | LPAREN jkind_desc RPAREN {
+  | LPAREN self RPAREN {
       Pjk_parens $2
     }
 ;
 
-reverse_product_jkind :
-  | jkind1 = jkind_annotation AMPERSAND jkind2 = jkind_annotation %prec prec_unboxed_product_kind
-      { [jkind2; jkind1] }
-  | jkinds = reverse_product_jkind
+reverse_product_jkind_gen(self) :
+  | jkind1 = jkind_annotation_gen(self)
     AMPERSAND
-    jkind = jkind_annotation %prec prec_unboxed_product_kind
+    jkind2 = jkind_annotation_gen(self) %prec prec_unboxed_product_kind
+      { [jkind2; jkind1] }
+  | jkinds = reverse_product_jkind_gen(self)
+    AMPERSAND
+    jkind = jkind_annotation_gen(self) %prec prec_unboxed_product_kind
     { jkind :: jkinds }
+;
+
+jkind_annotation_gen(self) :
+  self {
+    { pjka_loc = make_loc $sloc; pjka_desc = $1; pjka_tokens = Tokens.at $sloc }
+  }
+;
+(* Full jkind grammar - including with kinds *)
+jkind_desc:
+    jkind_annotation_gen(jkind_desc)
+    WITH core_type optional_atat_modalities_expr {
+      Pjk_with ($1, $3, $4)
+    }
+  | jkind_desc_gen(jkind_desc) { $1 }
+;
 
 jkind_annotation: (* : jkind_annotation *)
   jkind_desc {
+    { pjka_loc = make_loc $sloc; pjka_desc = $1; pjka_tokens = Tokens.at $sloc }
+  }
+;
+
+(* jkind grammar without WITH - used in [with_constraint] *)
+jkind_desc_no_with_kinds:
+  jkind_desc_gen(jkind_desc_no_with_kinds) { $1 }
+;
+
+jkind_annotation_no_with_kinds:
+  jkind_desc_no_with_kinds {
     { pjka_loc = make_loc $sloc; pjka_desc = $1; pjka_tokens = Tokens.at $sloc }
   }
 ;
@@ -4081,6 +4127,12 @@ with_constraint:
       { mkwc $sloc @@ Pwith_modtype (l, rhs) }
   | MODULE TYPE l=mkrhs(mty_longident) COLONEQUAL rhs=module_type
       { mkwc $sloc @@ Pwith_modtypesubst (l, rhs) }
+  | KIND lid=mkrhs(label_longident) EQUAL
+    jka=jkind_annotation_no_with_kinds
+      { mkwc $sloc @@ Pwith_jkind (lid, jka) }
+  | KIND lid=mkrhs(label_longident) COLONEQUAL
+    jka=jkind_annotation_no_with_kinds
+      { mkwc $sloc @@ Pwith_jkindsubst (lid, jka) }
 ;
 with_type_binder:
     EQUAL          { Public }
@@ -4109,21 +4161,31 @@ with_type_binder:
   nonempty_llist(typevar_repr)
     { $1 }
 ;
+%inline newlayouts:
+  (* : string with_loc list *)
+  nonempty_llist(mkrhs(ident))
+    { $1 }
+;
 %inline poly(X):
   typevar_list DOT X
-    { ($1, $3) }
+    { let bound_vars, inner_type = $1, $3 in
+      mktyp ~loc:$sloc (Ptyp_poly (bound_vars, inner_type)) }
 ;
 %inline repr(X):
   typevar_repr_list DOT X
-    { ($1, $3) }
+    { let bound_vars, inner_type = $1, $3 in
+      mktyp ~loc:$sloc (Ptyp_repr (bound_vars, inner_type)) }
+;
+%inline lpoly(X):
+  LAYOUT newlayouts DOT X
+    { let bound_vars, inner_type = $2, $4 in
+      mktyp ~loc:$sloc (Ptyp_newlayout (bound_vars, inner_type)) }
 ;
 %inline strictly_poly(X):
-| poly(X)
-    { let bound_vars, inner_type = $1 in
-      mktyp ~loc:$sloc (Ptyp_poly (bound_vars, inner_type)) }
-| repr(X)
-    { let bound_vars, inner_type = $1 in
-      mktyp ~loc:$sloc (Ptyp_repr (bound_vars, inner_type)) }
+| poly(X) { $1 }
+| repr(X) { $1 }
+| lpoly(X) { $1 }
+| lpoly(poly(X)) { $1 }
 ;
 
 possibly_poly(X):
@@ -4445,9 +4507,16 @@ optional_atat_modalities_expr:
     { $1 }
   | mktyp(
     LPAREN bound_vars = typevar_repr_list DOT inner_type = core_type RPAREN
-      { let poly_loc = $startpos(bound_vars), $endpos(inner_type) in
-        let poly = mktyp ~loc:poly_loc (Ptyp_repr (bound_vars, inner_type)) in
-        Ptyp_parens poly }
+      { let repr_loc = $startpos(bound_vars), $endpos(inner_type) in
+        let repr = mktyp ~loc:repr_loc (Ptyp_repr (bound_vars, inner_type)) in
+        Ptyp_parens repr }
+    )
+    { $1 }
+  | mktyp(
+    LPAREN LAYOUT bound_vars = newlayouts DOT inner_type = core_type RPAREN
+      { let layout_loc = $startpos($2), $endpos(inner_type) in
+        let layout = mktyp ~loc:layout_loc (Ptyp_newlayout (bound_vars, inner_type)) in
+        Ptyp_parens layout }
     )
     { $1 }
   | ty = tuple_type
@@ -5095,6 +5164,7 @@ single_attr_id:
   | INCLUDE { "include" }
   | INHERIT { "inherit" }
   | INITIALIZER { "initializer" }
+  | LAYOUT { "layout_" }
   | LAZY { "lazy" }
   | LET { "let" }
   | LOCAL { "local_" }
@@ -5111,6 +5181,7 @@ single_attr_id:
   | POLY { "poly_" }
   | PRIVATE { "private" }
   | REC { "rec" }
+  | REPR { "repr_" }
   | SIG { "sig" }
   | STRUCT { "struct" }
   | THEN { "then" }
