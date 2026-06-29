@@ -19,8 +19,10 @@
           --terminal "HASHTRUE=#true"
           --terminal "KIND=kind_"
           --terminal "LEXER_DIRECTIVE=#syntax foo on"
+          --terminal "ONCE=once_"
           --terminal "POLY=poly_"
           --terminal "REPR=repr_"
+          --terminal "UNIQUE=unique_"
           ))))
 
 (rule
@@ -41,6 +43,8 @@
           --terminal "HASHTRUE=#true"
           --terminal "KIND=kind_"
           --terminal "LEXER_DIRECTIVE=#syntax foo on"
+          --terminal "ONCE=once_"
           --terminal "POLY=poly_"
           --terminal "REPR=repr_"
+          --terminal "UNIQUE=unique_"
           ))))
