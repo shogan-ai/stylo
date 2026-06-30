@@ -226,6 +226,10 @@ class eraser = object
   method! structure ctxt st =
     Erase_jane_syntax.structure st
     |> super#structure ctxt
+
+  method! module_type ctxt sg =
+    Erase_jane_syntax.module_type sg
+    |> super#module_type ctxt
 end
 
 let style_normalizer = new style_normalizer

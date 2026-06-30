@@ -3,12 +3,9 @@ open Parsetree
 
 let merge_attrs parent_tokens attrs1 attrs2 =
   match attrs1, attrs2 with
+  | No_attributes, attrs
   | attrs, No_attributes ->
       parent_tokens, attrs
-  | No_attributes, Attributes a ->
-    (* Parent didn't have any attributes, we need to add a Child_node. *)
-    parent_tokens @ [{ Tokens.desc = Child_node; pos = a.loc.loc_start }],
-    Attributes a
   | Attributes a1, Attributes a2 ->
       (* We're taking two subtrees and merging them into one, so we need to
          remove one Child_node from the parent's tokens. *)
@@ -934,6 +931,87 @@ let signature sg =
     psg_items = items;
     psg_modalities = No_modalities;
     psg_tokens = tokens }
+
+let no_kind_constraint wc toks =
+  let remove_stale_ands toks =
+    (* annoying case:
+       {[
+         S with kind (* cmt0 *) and type
+            and kind (* cmt1 *) and type
+            and (* cmt2 *) kind
+       ]}
+       once the kind constraints are removed we end up with:
+       {[
+         S with (* cmt0 *) and type and (* cmt1 *) and type and (* cmt2 *)
+       ]}
+
+       We could do a fwd pass and then remove a potential last dangling and, but
+       that would give us
+       {[
+         S with (* cmt0 *) type and (* cmt1 *) type (* cmt2 *)
+       ]}
+
+       Whereas the following gives:
+       {[
+         S with (* cmt0 *) type (* cmt1 *) and type (* cmt2 *)
+       ]}
+       (which I believe to be more correct).
+
+       Admittedly, this is splitting hairs.
+    *)
+    let rec aux first = function
+      | [] -> true, []
+      | t :: ts ->
+        match t.Tokens.desc with
+        | Child_node ->
+          let _, ts = aux false ts in
+          false, t :: ts
+        | Token (AND, _) ->
+          let drop, ts = aux first ts in
+          true, if drop || first then ts else t :: ts
+        | _ ->
+          let drop, ts = aux first ts in
+          drop, t :: ts
+    in
+    let _, tokens = aux true toks in
+    tokens
+  in
+  let constrs, tokens =
+    Synced_progress.filter ~drop:(fun (wc : with_constraint) ->
+      match wc.wc_desc with
+      | Pwith_jkind _
+      | Pwith_jkindsubst _ ->
+        Tokens_of_tree.with_constraint wc
+        |> Result.get_ok
+        |> List.filter Tokens.is_comment
+        |> Option.some
+      | _ ->
+        None
+    ) wc toks
+  in
+  constrs, remove_stale_ands tokens
+
+let module_type mt =
+  match mt.pmty_desc with
+  | Pmty_with (mty, wcs) ->
+    begin match Tokens.Seq.split ~on:WITH mt.pmty_tokens with
+    | _, [] -> assert false
+    | pre, with_ :: suff ->
+      match no_kind_constraint wcs suff with
+      | [], suff ->
+        let tokens, merged_attributes =
+          merge_attrs (pre @ suff) mt.pmty_attributes mty.pmty_attributes
+        in
+        { mty with
+          pmty_attributes = merged_attributes;
+          pmty_tokens =
+            Tokens.replace_first_child ~subst:mty.pmty_tokens tokens }
+      | wcs, suff ->
+        { mt with
+          pmty_desc = Pmty_with (mty, wcs);
+          pmty_tokens = pre @ with_ :: suff }
+    end
+  | _ -> mt
 
 let structure st =
   let items, tokens =
