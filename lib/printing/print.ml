@@ -1933,8 +1933,16 @@ end = struct
   and pp_field ?preceeding ?(unboxed=false) e lid =
     let dot = if unboxed then S.dothash else S.dot in
     let pre_nest = Preceeding.implied_nest preceeding in
+    let space =
+      match e.pexp_desc with
+      | Pexp_constant Pconst_integer (_, _, None) ->
+        (* We need a space here otherwise this would lex as an invalid
+           literal. *)
+        nbsp
+      | _ -> empty
+    in
     group (
-      pp ?preceeding e ^^ dot ^^ pre_nest (longident lid.txt)
+      pp ?preceeding e ^^ space ^^ dot ^^ pre_nest (longident lid.txt)
     )
 
   and pp_setfield ?preceeding e1 lid e2 =
