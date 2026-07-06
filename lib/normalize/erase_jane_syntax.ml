@@ -1036,6 +1036,20 @@ let no_kind_constraint wc toks =
   in
   constrs, remove_stale_ands tokens
 
+let functor_parameter fp =
+  match fp.pfp_desc with
+  | Unit
+  | Named (_, _, No_modes)
+  | Unnamed (_, No_modes) -> fp
+  | Named (name, mty, modes) ->
+    { fp with
+      pfp_desc = Named (name, mty, No_modes);
+      pfp_tokens = Modes.remove_from_tokens modes fp.pfp_tokens }
+  | Unnamed (mty, modes) ->
+    { fp with
+      pfp_desc = Unnamed (mty, No_modes);
+      pfp_tokens = Modes.remove_from_tokens modes fp.pfp_tokens }
+
 let module_type mt =
   match mt.pmty_desc with
   | Pmty_functor (attrs, params, mty, modes) ->

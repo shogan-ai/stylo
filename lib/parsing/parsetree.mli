@@ -1250,6 +1250,13 @@ and module_type_desc =
   | Pmty_parens of module_type
 
 and functor_parameter =
+  {
+    pfp_desc : functor_parameter_desc;
+    pfp_loc : Location.t;
+    pfp_tokens : Tokens.seq;
+  }
+
+and functor_parameter_desc =
   | Unit  (** [()] *)
   | Named of string option loc * module_type * modes
       (** [Named(name, MT)] represents:

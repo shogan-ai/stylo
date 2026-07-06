@@ -1211,11 +1211,15 @@ parse_any_longident:
 functor_arg:
     (* An anonymous and untyped argument. *)
     LPAREN RPAREN
-      { Unit }
+      { { pfp_desc = Unit
+        ; pfp_loc = make_loc $sloc
+        ; pfp_tokens = Tokens.at $sloc } }
   | (* An argument accompanied with an explicit type. *)
     LPAREN x = mkrhs(module_name) COLON mty_mm = module_type_with_optional_modes RPAREN
       { let mty, mm = mty_mm in
-        Named (x, mty, mm) }
+        { pfp_desc = Named (x, mty, mm)
+        ; pfp_loc = make_loc $sloc
+        ; pfp_tokens = Tokens.at $sloc } }
 ;
 
 module_name:
@@ -1623,7 +1627,12 @@ module_type:
         %prec below_WITH
         { let mty0, mm0 = $1 in
           let mty1, mm1 = $3 in
-          Pmty_functor_type([Unnamed (mty0, mm0)], mty1, mm1) }
+          let param =
+            { pfp_desc = Unnamed (mty0, mm0)
+            ; pfp_loc = make_loc $loc($1)
+            ; pfp_tokens = Tokens.at $loc($1) }
+          in
+          Pmty_functor_type([param], mty1, mm1) }
     | module_type WITH separated_nonempty_llist(AND, with_constraint)
         { Pmty_with($1, $3) }
     | extension

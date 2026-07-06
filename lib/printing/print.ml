@@ -3040,7 +3040,8 @@ end = struct
         stop
       )
 
-  let pp = function
+  let pp { pfp_desc; pfp_loc = _; pfp_tokens = _ } =
+    match pfp_desc with
     | Unit -> empty
     | Named (lbl, mty, modes) ->
       let name =
@@ -3054,7 +3055,8 @@ end = struct
   let pp fp = parens (pp fp)
 
   let pp_type = function
-    | Unnamed (mty, modes) -> with_modes (Module_type.pp mty) ~modes
+    | { pfp_desc = Unnamed (mty, modes); _ } ->
+      with_modes (Module_type.pp mty) ~modes
     | fp -> pp fp
 
 end

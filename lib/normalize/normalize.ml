@@ -246,6 +246,10 @@ class eraser = object
   method! module_expr ctxt me =
     Erase_jane_syntax.module_expr me
     |> super#module_expr ctxt
+
+  method! functor_parameter ctxt sg =
+    Erase_jane_syntax.functor_parameter sg
+    |> super#functor_parameter ctxt
 end
 
 let style_normalizer = new style_normalizer

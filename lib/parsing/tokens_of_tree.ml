@@ -359,6 +359,12 @@ let tokenizer = object
     let sub_tokens = super#module_name visit_modities mn in
     let (name,_,node_toks) = mn in
     combine_children "module_name" ~loc:name.loc node_toks sub_tokens
+
+  method! functor_parameter fp =
+    let sub_tokens = super#functor_parameter fp in
+    let node_toks = fp.pfp_tokens in
+    combine_children "functor_parameter" ~loc:fp.pfp_loc node_toks sub_tokens
+
 end
 
 let mk_error : Error.t -> _ = function
