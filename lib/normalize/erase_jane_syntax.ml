@@ -1,12 +1,22 @@
 open Ocaml_syntax
 open Parsetree
 
-let merge_attrs parent_tokens attrs1 attrs2 =
-  match attrs1, attrs2 with
-  | No_attributes, attrs
-  | attrs, No_attributes ->
+module Attrs = struct
+  let add parent_tokens parent_attrs attrs =
+    match parent_attrs, attrs with
+    | Attributes _, _
+    | _, No_attributes -> assert false
+    | No_attributes, Attributes a ->
+      (* Parent didn't have any attributes, we need to add a Child_node. *)
+      parent_tokens @ [{ Tokens.desc = Child_node; pos = a.loc.loc_start }],
+      Attributes a
+
+  let merge parent_tokens attrs1 attrs2 =
+    match attrs1, attrs2 with
+    | No_attributes, attrs
+    | attrs, No_attributes ->
       parent_tokens, attrs
-  | Attributes a1, Attributes a2 ->
+    | Attributes a1, Attributes a2 ->
       (* We're taking two subtrees and merging them into one, so we need to
          remove one Child_node from the parent's tokens. *)
       let tokens =
@@ -22,6 +32,7 @@ let merge_attrs parent_tokens attrs1 attrs2 =
         Attributes { attributes; loc; tokens }
       in
       tokens, attrs
+end
 
 let without_child ?at:pos flattened_child_tokens tokens =
   match Tokens.Seq.split_on_child ?pos tokens with
@@ -40,7 +51,7 @@ let no_ext_attrs = function
 let fold_into ~parent parent_kw_tok child =
   assert (no_ext_attrs parent.pexp_ext_attr);
   let parent_tokens, merged_attributes =
-    merge_attrs parent.pexp_tokens parent.pexp_attributes child.pexp_attributes
+    Attrs.merge parent.pexp_tokens parent.pexp_attributes child.pexp_attributes
   in
   let tokens =
     parent_tokens
@@ -810,7 +821,9 @@ module Globalized = struct
       in
       let globalized_typ =
         let tokens, attrs =
-          merge_attrs global_typ.ptyp_tokens global_typ.ptyp_attributes
+          (* We're only called on field decls and cstr arguments, which do not
+             accept attr on the typ part, so we can safely use [Attrs.add]. *)
+          Attrs.add global_typ.ptyp_tokens global_typ.ptyp_attributes
             globalized_attr
         in
         { global_typ with ptyp_attributes = attrs; ptyp_tokens = tokens }
@@ -1000,7 +1013,7 @@ let module_type mt =
       match no_kind_constraint wcs suff with
       | [], suff ->
         let tokens, merged_attributes =
-          merge_attrs (pre @ suff) mt.pmty_attributes mty.pmty_attributes
+          Attrs.merge (pre @ suff) mt.pmty_attributes mty.pmty_attributes
         in
         { mty with
           pmty_attributes = merged_attributes;
