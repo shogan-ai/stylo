@@ -678,3 +678,36 @@ module Regressions = struct
 
   class t = let x, y = x in object end
 end
+
+module All_forms_of_module_defs : sig
+  include Something @@ moda1 moda2
+
+  (* Module decl without params (explicit functor types don't count) accepts
+     modalities *)
+
+  module (F1 @@ moda1 moda2) :
+    ()
+    (X : S @ mode1 mode2)
+    ->
+    S @ mode3 mode4
+    @@ moda3 moda4
+
+  module (F2 @@ moda1 moda2) :
+    functor
+    ()
+    (X : S @ mode1 moda2)
+    ->
+    S @ mode3 mode4
+    @@ moda3 moda4
+
+  module (Al @@ moda1 moda2) = Ias @@ moda3 moda4
+
+  (* Can't have on madalities on recursive module names however *)
+  module rec M1 : S1 @@ moda1 moda2 and M2 : S2 @@ moda3 moda4
+
+  (* With params it doesn't *)
+
+  module (F3 @@ moda1 moda2) (X : S @ mode1 mode2) : S @ mode3 mode4
+end = struct
+  module (M1 @ mode1 mod2) (X : S @ mode3 mode4) = (N @ mode3 mode4)
+end
