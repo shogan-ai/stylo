@@ -3132,7 +3132,7 @@ end = struct
     | Pmty_alias _ -> S.equals
     | _ -> S.colon
 
-  let pp keywords { pmd_name = (name, modalities); pmd_body; pmd_attributes;
+  let pp keywords { pmd_name = (name, modalities, _); pmd_body; pmd_attributes;
                     pmd_ext_attrs; pmd_pre_text; pmd_pre_doc; pmd_post_doc;
                     pmd_loc = _; pmd_tokens = _ } =
     let keywords =
@@ -3930,7 +3930,7 @@ end = struct
       Some (Single_part { equal_or_colon = S.at; body = modes at_modes })
 
   let pp ?item ?preceeding ~keywords
-      { pmb_ext_attrs; pmb_name = (name, name_modes); pmb_params;
+      { pmb_ext_attrs; pmb_name = (name, name_modes, _); pmb_params;
         pmb_constraint; pmb_modes; pmb_expr; pmb_attributes; pmb_pre_text;
         pmb_pre_doc; pmb_post_doc; pmb_loc = _; pmb_tokens = _ } =
     let kw =

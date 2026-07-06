@@ -223,13 +223,29 @@ class eraser = object
     Erase_jane_syntax.signature sg
     |> super#signature ctxt
 
+  method! signature_item ctxt si =
+    Erase_jane_syntax.signature_item si
+    |> super#signature_item ctxt
+
   method! structure ctxt st =
     Erase_jane_syntax.structure st
     |> super#structure ctxt
 
-  method! module_type ctxt sg =
-    Erase_jane_syntax.module_type sg
+  method! module_type ctxt mty =
+    Erase_jane_syntax.module_type mty
     |> super#module_type ctxt
+
+  method! module_declaration ctxt md =
+    Erase_jane_syntax.module_declaration md
+    |> super#module_declaration ctxt
+
+  method! module_binding ctxt mb =
+    Erase_jane_syntax.module_binding mb
+    |> super#module_binding ctxt
+
+  method! module_expr ctxt me =
+    Erase_jane_syntax.module_expr me
+    |> super#module_expr ctxt
 end
 
 let style_normalizer = new style_normalizer

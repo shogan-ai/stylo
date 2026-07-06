@@ -354,6 +354,11 @@ let tokenizer = object
     let sub_tokens = super#jkind_declaration jk in
     let node_toks = jk.pjkind_tokens in
     combine_children "jkind_declaration" ~loc:jk.pjkind_loc node_toks sub_tokens
+
+  method! module_name visit_modities mn =
+    let sub_tokens = super#module_name visit_modities mn in
+    let (name,_,node_toks) = mn in
+    combine_children "module_name" ~loc:name.loc node_toks sub_tokens
 end
 
 let mk_error : Error.t -> _ = function

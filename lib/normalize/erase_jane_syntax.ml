@@ -67,6 +67,18 @@ module Modes = struct
     | Modes { loc; tokens = modes_tokens; _ } ->
       without_child ~at:loc.loc_start
         (List.filter Tokens.is_comment modes_tokens) tokens
+
+  let remove_from_name name =
+    match name with
+    | _, No_modes, _ -> name
+    | name_loc, Modes { loc; tokens; _ }, name_tokens ->
+      let tokens =
+        without_child ~at:loc.loc_start
+          (List.filter Tokens.is_comment tokens) name_tokens
+        |> Tokens.Seq.without ~token:LPAREN
+        |> Tokens.Seq.without ~token:RPAREN
+      in
+      name_loc, No_modes, tokens
 end
 
 module Modalities = struct
@@ -76,6 +88,18 @@ module Modalities = struct
     | Modalities { loc; tokens = modes_tokens; _ } ->
       without_child ~at:loc.loc_start
         (List.filter Tokens.is_comment modes_tokens) tokens
+
+  let remove_from_name name =
+    match name with
+    | _, No_modalities, _ -> name
+    | name_loc, Modalities { loc; tokens; _ }, name_tokens ->
+      let tokens =
+        without_child ~at:loc.loc_start
+          (List.filter Tokens.is_comment tokens) name_tokens
+        |> Tokens.Seq.without ~token:LPAREN
+        |> Tokens.Seq.without ~token:RPAREN
+      in
+      name_loc, No_modalities, tokens
 end
 
 module Implicit_source_pos = struct
@@ -927,6 +951,14 @@ module Synced_progress = struct
     aux [] rev_tokens_prefix tokens_from_first_item items
 end
 
+let signature_item si =
+  match si.psig_desc with
+  | Psig_include (id, modas) ->
+    { si with
+      psig_desc = Psig_include (id, No_modalities);
+      psig_tokens = Modalities.remove_from_tokens modas si.psig_tokens }
+  | _ -> si
+
 let signature sg =
   let tokens = Modalities.remove_from_tokens sg.psg_modalities sg.psg_tokens in
   let items, tokens =
@@ -1006,6 +1038,14 @@ let no_kind_constraint wc toks =
 
 let module_type mt =
   match mt.pmty_desc with
+  | Pmty_functor (attrs, params, mty, modes) ->
+    { mt with
+      pmty_desc = Pmty_functor (attrs, params, mty, No_modes);
+      pmty_tokens = Modes.remove_from_tokens modes mt.pmty_tokens }
+  | Pmty_functor_type (params, mty, modes) ->
+    { mt with
+      pmty_desc = Pmty_functor_type (params, mty, No_modes);
+      pmty_tokens = Modes.remove_from_tokens modes mt.pmty_tokens }
   | Pmty_with (mty, wcs) ->
     begin match Tokens.Seq.split ~on:WITH mt.pmty_tokens with
     | _, [] -> assert false
@@ -1025,6 +1065,38 @@ let module_type mt =
           pmty_tokens = pre @ with_ :: suff }
     end
   | _ -> mt
+
+let module_declaration md =
+  let pmd_name = Modalities.remove_from_name md.pmd_name in
+  let pmd_body, pmd_tokens =
+    match md.pmd_body with
+    | With_params (params, mty, modes) ->
+        With_params (params, mty, No_modes),
+        Modes.remove_from_tokens modes md.pmd_tokens
+    | Without_params (mty, modas) ->
+        Without_params (mty, No_modalities),
+        Modalities.remove_from_tokens modas md.pmd_tokens
+  in
+  { md with
+    pmd_name;
+    pmd_body;
+    pmd_tokens }
+
+let module_binding mb =
+  let pmb_name = Modes.remove_from_name mb.pmb_name in
+  let pmb_tokens = Modes.remove_from_tokens mb.pmb_modes mb.pmb_tokens in
+  { mb with
+    pmb_name;
+    pmb_modes = No_modes;
+    pmb_tokens }
+
+let module_expr me =
+  match me.pmod_desc with
+  | Pmod_constraint (e, mt, modes) ->
+    { me with
+      pmod_desc = Pmod_constraint (e, mt, No_modes);
+      pmod_tokens = Modes.remove_from_tokens modes me.pmod_tokens }
+  | _ -> me
 
 let structure st =
   let items, tokens =

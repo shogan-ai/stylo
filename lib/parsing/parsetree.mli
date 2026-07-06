@@ -1306,12 +1306,14 @@ and module_declaration_body =
   | With_params of functor_parameter list * module_type * modes
   | Without_params of module_type * modalities
 
+and 'a module_name = string option loc * 'a * Tokens.seq
+
 and module_declaration =
     {
      pmd_pre_text: doc list;
      pmd_pre_doc: doc option;
      pmd_ext_attrs: ext_attribute;
-     pmd_name: string option loc * modalities;
+     pmd_name: modalities module_name;
      pmd_body: module_declaration_body;
      pmd_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
      pmd_post_doc: doc option;
@@ -1555,7 +1557,7 @@ and module_binding =
      pmb_pre_text: doc list;
      pmb_pre_doc: doc option;
      pmb_ext_attrs: ext_attribute;
-     pmb_name: string option loc * modes;
+     pmb_name: modes module_name;
      pmb_params: functor_parameter list;
      pmb_constraint: module_type option;
      pmb_modes: modes;

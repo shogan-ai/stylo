@@ -1228,8 +1228,8 @@ module_name:
 ;
 
 module_name_modal(at_modal_expr, no_modal_expr):
-  | mkrhs(module_name) no_modal_expr { $1, $2 }
-  | LPAREN mkrhs(module_name) at_modal_expr RPAREN { $2, $3 }
+  | mkrhs(module_name) no_modal_expr { $1, $2, Tokens.at $sloc }
+  | LPAREN mkrhs(module_name) at_modal_expr RPAREN { $2, $3, Tokens.at $sloc }
 
 (* -------------------------------------------------------------------------- *)
 
@@ -1824,7 +1824,8 @@ module_subst:
     let loc = make_loc $sloc in
     let docs, sloc = symbol_docs $sloc in
     let body = Without_params (mty, modalities) in
-    Md.mk ~ext_attrs (name, No_modalities) body ~attrs ~loc ~docs
+    let md_name = (name, No_modalities, Tokens.at $loc(name)) in
+    Md.mk ~ext_attrs md_name body ~attrs ~loc ~docs
       ~tokens:(Tokens.at sloc)
   }
 ;
@@ -1842,7 +1843,8 @@ module_subst:
     (* FIXME: extend sloc with text! *)
     let text = symbol_text $symbolstartpos in
     let body = Without_params (mty, modalities) in
-    Md.mk ~ext_attrs (name, No_modalities) body ~attrs ~loc ~text ~docs
+    let md_name = (name, No_modalities, Tokens.at $loc(name)) in
+    Md.mk ~ext_attrs md_name body ~attrs ~loc ~text ~docs
       ~tokens:(Tokens.at sloc)
   }
 ;

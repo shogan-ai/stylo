@@ -412,7 +412,7 @@ module Md:
   sig
     val mk: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
       tokens:Tokens.seq -> ?docs:docs -> ?text:text ->
-      str_opt * modalities -> module_declaration_body -> module_declaration
+      str_opt * modalities * Tokens.seq -> module_declaration_body -> module_declaration
   end
 
 (** Module substitutions *)
@@ -436,7 +436,7 @@ module Mb:
   sig
     val mk: ?loc:loc -> ?ext_attr:ext_attribute -> ?attrs:attrs ->
       tokens:Tokens.seq -> ?docs:docs -> ?text:text ->
-      str_opt * modes -> functor_parameter list -> module_type option ->
+      str_opt * modes * Tokens.seq -> functor_parameter list -> module_type option ->
       modes -> module_expr -> module_binding
   end
 
