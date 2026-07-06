@@ -3188,7 +3188,9 @@ fun_param_as_list:
       }
   | LPAREN TYPE mkrhs(LIDENT) COLON jkind_annotation RPAREN
       { [ { pparam_loc = make_loc $sloc;
-            pparam_desc = Pparam_newtype (mkbtv $sloc $3 (Some $5))
+            pparam_desc =
+              Pparam_newtype
+                (mkbtv ($startpos($3), $endpos($5)) $3 (Some $5))
           }
         ]
       }

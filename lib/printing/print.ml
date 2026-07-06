@@ -896,7 +896,7 @@ end = struct
         Preceeding.(preceeding + tight ~indent:1 S.hash_lparen)
       in
       pp_tuple ~preceeding:pre_hash_lparen cf elts ^^ S.rparen
-    | Ppat_construct (lid, arg) -> pp_construct ~preceeding p.ppat_tokens lid arg
+    | Ppat_construct (lid, arg) -> pp_construct ~preceeding lid arg
     | Ppat_variant (lbl, arg) -> pp_variant ~preceeding lbl arg
     | Ppat_record (fields, cf) ->
       pp_record ~preceeding (nb_semis p.ppat_tokens) cf fields
@@ -1098,36 +1098,17 @@ end = struct
     | Closed -> pats
     | Open -> comma_join pats S.dotdot
 
-  and pp_construct ~preceeding tokens name arg_opt =
+  and pp_construct ~preceeding name arg_opt =
     let name, pre_nest =
       Preceeding.group_with preceeding (constr_longident name.txt)
-    in
-    let pp_annotated_newtype nt jkind =
-      string nt.txt ^/^ S.colon ^/^ Jkind_annotation.pp jkind
     in
     match arg_opt with
     | None -> name
     | Some ([], arg_pat) ->
       name ^/^ pre_nest @@ nest 2 (pp arg_pat)
-    | Some ([{ pbtv_name = newtype; pbtv_kind = Some jkind; _}], arg_pat)
-      when not (has_leading LPAREN ~after:TYPE tokens) ->
-      (* We could decide to "normalize" this case.
-         Here we are careful because we don't want to trigger if the user wrote
-         {[
-           Constr (type (a : jk)) arg
-         ]} *)
-      name ^/^ pre_nest @@ nest 2 (
-        parens (S.type_ ^/^ pp_annotated_newtype newtype jkind) ^/^
-        pp arg_pat
-      )
     | Some (bindings, arg_pat) ->
-      let binding {pbtv_name = newtype; pbtv_kind = jkind; _ } =
-        match jkind with
-        | None -> string newtype.txt
-        | Some jkind -> parens (pp_annotated_newtype newtype jkind)
-      in
       name ^/^ pre_nest @@ nest 2 (
-        parens (S.type_ ^/^ flow_map (break 1) binding bindings) ^/^
+        parens (S.type_ ^/^ flow_map (break 1) Newtype.pp bindings) ^/^
         pp arg_pat
       )
 
@@ -2236,30 +2217,35 @@ end = struct
       post
 end
 
-and Function_param : sig
-  val pp : function_param -> t
-  val pp_desc : function_param_desc -> t
-
-  (* TODO: extract to a [Newtype] module which also includes other polyvars
-     printers. *)
-  val pp_newtype : ?needs_parens:bool -> bound_ty_var -> t
+and Newtype : sig
+  val pp : bound_ty_var -> t
 end = struct
-  let pp_newtype ?(needs_parens=true) { pbtv_name; pbtv_kind; _} =
+  let pp { pbtv_name; pbtv_kind; pbtv_tokens; _ } =
+    let needs_parens =
+      List.exists (Tokens.is_token ~which:LPAREN) pbtv_tokens
+    in
     let name = string pbtv_name.txt in
     match pbtv_kind with
     | None -> name
     | Some jkind ->
       let doc = name ^/^ S.colon ^/^ Jkind_annotation.pp jkind in
       if needs_parens then parens doc else doc
+end
+
+and Function_param : sig
+  val pp : function_param -> t
+  val pp_desc : function_param_desc -> t
+end = struct
 
   let pp_desc = function
     | Pparam_val arg -> Argument.pp Pattern.pp arg
     | Pparam_newtype newtype ->
-      parens (S.type_ ^/^ pp_newtype ~needs_parens:false newtype)
+      parens (S.type_ ^/^ Newtype.pp newtype)
     | Pparam_newtypes lst ->
-      parens (S.type_ ^/^ separate_map (break 1) pp_newtype lst)
+      parens (S.type_ ^/^ separate_map (break 1) Newtype.pp lst)
 
-  let pp fp = pp_desc fp.pparam_desc
+  let pp fp =
+    pp_desc fp.pparam_desc
 end
 
 and Function_body : sig
@@ -3542,7 +3528,7 @@ end = struct
     | Pvc_constraint { locally_abstract_univars = vars; typ } ->
       group (
         S.colon ^/^ nest 2 (
-          group (S.type_ ^/^ separate_map (break 1) Function_param.pp_newtype vars ^^ S.dot)
+          group (S.type_ ^/^ separate_map (break 1) Newtype.pp vars ^^ S.dot)
         )
       ) ^/^
       nest 2 (Core_type.pp typ)
