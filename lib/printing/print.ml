@@ -3764,7 +3764,7 @@ end = struct
     in
     match constraint_, rhs with
     (* let-punned *)
-    | None, None -> bindings ^?^ pre_nest in_kw
+    | None, None -> group (bindings ^?^ pre_nest in_kw)
     | Some doc, None -> group (bindings ^/^ pre_nest (nest 2 doc ^?^ in_kw))
     (* constraint-less *)
     | None, Some Layout_module_binding.Single_part { equal_or_colon; body } ->
