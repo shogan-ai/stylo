@@ -60,46 +60,49 @@ let fold_into ~parent parent_kw_tok child =
   in
   { child with pexp_tokens = tokens; pexp_attributes = merged_attributes }
 
-module Modes = struct
-  let remove_from_tokens modes tokens =
-    match modes with
-    | No_modes -> tokens
-    | Modes { loc; tokens = modes_tokens; _ } ->
-      without_child ~at:loc.loc_start
-        (List.filter Tokens.is_comment modes_tokens) tokens
+module Modes_and_modas = struct
+  let remove_from_tokens tokens = function
+    | None -> tokens
+    | Some (m_loc, m_tokens, _) ->
+      without_child ~at:m_loc.Location.loc_start
+        (List.filter Tokens.is_comment m_tokens) tokens
 
-  let remove_from_name name =
-    match name with
-    | _, No_modes, _ -> name
-    | name_loc, Modes { loc; tokens; _ }, name_tokens ->
+  let remove_from_name ~replace name =
+    let (name_loc, m, name_tokens) = name in
+    match replace m with
+    | None -> name
+    | Some (m_loc, m_tokens, replacement) ->
       let tokens =
-        without_child ~at:loc.loc_start
-          (List.filter Tokens.is_comment tokens) name_tokens
+        without_child ~at:m_loc.Location.loc_start
+          (List.filter Tokens.is_comment m_tokens) name_tokens
         |> Tokens.Seq.without ~token:LPAREN
         |> Tokens.Seq.without ~token:RPAREN
       in
-      name_loc, No_modes, tokens
+      name_loc, replacement, tokens
+end
+
+module Modes = struct
+  let replace = function
+    | No_modes -> None
+    | Modes { loc; tokens; _ } -> Some (loc, tokens, No_modes)
+
+  let remove_from_tokens modes tokens =
+    Modes_and_modas.remove_from_tokens tokens (replace modes)
+
+  let remove_from_name =
+    Modes_and_modas.remove_from_name ~replace
 end
 
 module Modalities = struct
-  let remove_from_tokens modas tokens =
-    match modas with
-    | No_modalities -> tokens
-    | Modalities { loc; tokens = modes_tokens; _ } ->
-      without_child ~at:loc.loc_start
-        (List.filter Tokens.is_comment modes_tokens) tokens
+  let replace = function
+    | No_modalities -> None
+    | Modalities { loc; tokens; _ } -> Some (loc, tokens, No_modalities)
 
-  let remove_from_name name =
-    match name with
-    | _, No_modalities, _ -> name
-    | name_loc, Modalities { loc; tokens; _ }, name_tokens ->
-      let tokens =
-        without_child ~at:loc.loc_start
-          (List.filter Tokens.is_comment tokens) name_tokens
-        |> Tokens.Seq.without ~token:LPAREN
-        |> Tokens.Seq.without ~token:RPAREN
-      in
-      name_loc, No_modalities, tokens
+  let remove_from_tokens modes tokens =
+    Modes_and_modas.remove_from_tokens tokens (replace modes)
+
+  let remove_from_name =
+    Modes_and_modas.remove_from_name ~replace
 end
 
 module Implicit_source_pos = struct
@@ -206,18 +209,15 @@ let token_of_legacy_mode (m : mode Location.loc) : Parser_tokens.token =
   | Mode "once" -> ONCE
   | _ -> assert false
 
-let expression e =
-  match e.pexp_desc with
-  | Pexp_mode_legacy (m, me) -> fold_into ~parent:e (token_of_legacy_mode m) me
-  | Pexp_stack se -> fold_into ~parent:e STACK se
-  | Pexp_exclave ee -> fold_into ~parent:e EXCLAVE ee
-  | Pexp_borrow be -> fold_into ~parent:e BORROW be
-  | Pexp_unboxed_unit ->
+module Unboxed = struct
+  (* Patterns and expression are syntactically/lexically the same. *)
+
+  let unit ~loc tokens =
     (* The tree and nesting of tokens is different between the boxed and unboxed
        version...
 
        Perhaps the cst should have a Pexp_unit? *)
-    let exp_tokens, lid_tokens =
+    let tokens, lid_tokens =
       let open Tokens.Seq in
       (* TODO: a ppx to write the following as:
          {[
@@ -225,7 +225,7 @@ let expression e =
            | before, HASHLPAREN, between, RPAREN, after ->
              ...
          ]} *)
-      match split ~on:HASHLPAREN e.pexp_tokens with
+      match split ~on:HASHLPAREN tokens with
       | before, lparen :: rem ->
         begin match split ~on:RPAREN rem with
         | between, rparen :: after ->
@@ -236,7 +236,47 @@ let expression e =
       | _ -> assert false
     in
     let lid = { Longident.desc = Lident (Str "()"); tokens = lid_tokens } in
-    let lid_loc = Location.mkloc lid e.pexp_loc in
+    let lid_loc = Location.mkloc lid loc in
+    lid_loc, tokens
+
+  let bool ~loc tokens b =
+    let unboxed, boxed, name =
+      let open Parser_tokens in
+      if b
+      then HASHTRUE, TRUE, "true"
+      else HASHFALSE, FALSE, "false"
+    in
+    let tokens, lid_tokens =
+      match Tokens.Seq.split tokens ~on:unboxed with
+      | before, tok :: after ->
+        before @ { tok with desc = Child_node } :: after,
+        [{ tok with desc = Token (boxed, false) }]
+      | _ -> assert false
+    in
+    let lid = { Longident.desc = Lident (Str name); tokens = lid_tokens } in
+    let lid_loc = Location.mkloc lid loc in
+    lid_loc, tokens
+
+  let tuple_tokens ~loc tokens =
+    match Tokens.Seq.split ~on:HASHLPAREN tokens with
+    | before_hlp, hlp :: after_hlp ->
+      let inner_tokens, lp_and_after = Tokens.Seq.split ~on:RPAREN after_hlp in
+      let outer_tokens =
+          before_hlp @ { hlp with desc = Token (LPAREN, false) } ::
+          { desc = Child_node; pos = loc.Location.loc_start } :: lp_and_after
+      in
+      inner_tokens, outer_tokens
+    | _ -> assert false
+end
+
+let expression e =
+  match e.pexp_desc with
+  | Pexp_mode_legacy (m, me) -> fold_into ~parent:e (token_of_legacy_mode m) me
+  | Pexp_stack se -> fold_into ~parent:e STACK se
+  | Pexp_exclave ee -> fold_into ~parent:e EXCLAVE ee
+  | Pexp_borrow be -> fold_into ~parent:e BORROW be
+  | Pexp_unboxed_unit ->
+    let lid_loc, exp_tokens = Unboxed.unit ~loc:e.pexp_loc e.pexp_tokens in
     { e with
       pexp_desc = Pexp_construct (lid_loc, None);
       pexp_tokens = exp_tokens }
@@ -246,43 +286,25 @@ let expression e =
       pexp_desc = Pexp_constant boxed_c;
       pexp_tokens = tokens }
   | Pexp_unboxed_bool b ->
-    let unboxed, boxed, name =
-      let open Parser_tokens in
-      if b
-      then HASHTRUE, TRUE, "true"
-      else HASHFALSE, FALSE, "false"
-    in
-    let exp_tokens, lid_tokens =
-      match Tokens.Seq.split e.pexp_tokens ~on:unboxed with
-      | before, tok :: after ->
-        before @ { tok with desc = Child_node } :: after,
-        [{ tok with desc = Token (boxed, false) }]
-      | _ -> assert false
-    in
-    let lid = { Longident.desc = Lident (Str name); tokens = lid_tokens } in
-    let lid_loc = Location.mkloc lid e.pexp_loc in
+    let lid_loc, exp_tokens = Unboxed.bool ~loc:e.pexp_loc e.pexp_tokens b in
     { e with
       pexp_desc = Pexp_construct (lid_loc, None);
       pexp_tokens = exp_tokens }
   | Pexp_unboxed_tuple fields ->
     (* For the sake of simplicity: keep it in parens *)
-    begin match Tokens.Seq.split ~on:HASHLPAREN e.pexp_tokens with
-    | before_hlp, hlp :: after_hlp ->
-      let inner_tokens, lp_and_after = Tokens.Seq.split ~on:RPAREN after_hlp in
-      let inner =
-        { pexp_desc = Pexp_tuple fields
-        ; pexp_loc = e.pexp_loc
-        ; pexp_ext_attr = { pea_ext = None; pea_attrs = No_attributes }
-        ; pexp_attributes = No_attributes
-        ; pexp_tokens = inner_tokens }
-      in
-      { e with
-        pexp_desc = Pexp_parens { exp = inner; optional = false };
-        pexp_tokens =
-          before_hlp @ { hlp with desc = Token (LPAREN, false) } ::
-          { desc = Child_node; pos = e.pexp_loc.loc_start } :: lp_and_after }
-    | _ -> assert false
-    end
+    let inner_tokens, outer_tokens =
+      Unboxed.tuple_tokens ~loc:e.pexp_loc e.pexp_tokens
+    in
+    let inner =
+      { pexp_desc = Pexp_tuple fields
+      ; pexp_loc = e.pexp_loc
+      ; pexp_ext_attr = { pea_ext = None; pea_attrs = No_attributes }
+      ; pexp_attributes = No_attributes
+      ; pexp_tokens = inner_tokens }
+    in
+    { e with
+      pexp_desc = Pexp_parens { exp = inner; optional = false };
+      pexp_tokens = outer_tokens }
   | Pexp_record_unboxed_product (re, fields) ->
     { e with
       pexp_desc = Pexp_record (re, fields);
@@ -318,30 +340,7 @@ let expression e =
 let pattern p =
   match p.ppat_desc with
   | Ppat_unboxed_unit ->
-    (* The tree and nesting of tokens is different between the boxed and unboxed
-       version...
-
-       Perhaps the cst should have a Pexp_unit? *)
-    let exp_tokens, lid_tokens =
-      let open Tokens.Seq in
-      (* TODO: a ppx to write the following as:
-         {[
-           match%tokens e.pexp_tokens with
-           | before, HASHLPAREN, between, RPAREN, after ->
-             ...
-         ]} *)
-      match split ~on:HASHLPAREN p.ppat_tokens with
-      | before, lparen :: rem ->
-        begin match split ~on:RPAREN rem with
-        | between, rparen :: after ->
-          before @ { lparen with desc = Child_node } :: after,
-          { lparen with desc = Token (LPAREN, false) } :: between @ [rparen]
-        | _ -> assert false
-        end
-      | _ -> assert false
-    in
-    let lid = { Longident.desc = Lident (Str "()"); tokens = lid_tokens } in
-    let lid_loc = Location.mkloc lid p.ppat_loc in
+    let lid_loc, exp_tokens = Unboxed.unit ~loc:p.ppat_loc p.ppat_tokens in
     { p with
       ppat_desc = Ppat_construct (lid_loc, None);
       ppat_tokens = exp_tokens }
@@ -359,43 +358,25 @@ let pattern p =
       ppat_desc = Ppat_interval (boxed_c1, boxed_c2);
       ppat_tokens = tokens }
   | Ppat_unboxed_bool b ->
-    let unboxed, boxed, name =
-      let open Parser_tokens in
-      if b
-      then HASHTRUE, TRUE, "true"
-      else HASHFALSE, FALSE, "false"
-    in
-    let pat_tokens, lid_tokens =
-      match Tokens.Seq.split p.ppat_tokens ~on:unboxed with
-      | before, tok :: after ->
-        before @ { tok with desc = Child_node } :: after,
-        [{ tok with desc = Token (boxed, false) }]
-      | _ -> assert false
-    in
-    let lid = { Longident.desc = Lident (Str name); tokens = lid_tokens } in
-    let lid_loc = Location.mkloc lid p.ppat_loc in
+    let lid_loc, pat_tokens = Unboxed.bool ~loc:p.ppat_loc p.ppat_tokens b in
     { p with
       ppat_desc = Ppat_construct (lid_loc, None);
       ppat_tokens = pat_tokens }
   | Ppat_unboxed_tuple (fields, cf) ->
     (* As in expressions, we keep parentheses *)
-    begin match Tokens.Seq.split ~on:HASHLPAREN p.ppat_tokens with
-    | before_hlp, hlp :: after_hlp ->
-      let inner_tokens, lp_and_after = Tokens.Seq.split ~on:RPAREN after_hlp in
-      let inner =
-        { ppat_desc = Ppat_tuple (fields, cf)
-        ; ppat_loc = p.ppat_loc
-        ; ppat_ext_attr = { pea_ext = None; pea_attrs = No_attributes }
-        ; ppat_attributes = No_attributes
-        ; ppat_tokens = inner_tokens }
-      in
-      { p with
-        ppat_desc = Ppat_parens { pat = inner; optional = false };
-        ppat_tokens =
-          before_hlp @ { hlp with desc = Token (LPAREN, false) } ::
-          { desc = Child_node; pos = p.ppat_loc.loc_start } :: lp_and_after }
-    | _ -> assert false
-    end
+    let inner_tokens, outer_tokens =
+      Unboxed.tuple_tokens ~loc:p.ppat_loc p.ppat_tokens
+    in
+    let inner =
+      { ppat_desc = Ppat_tuple (fields, cf)
+      ; ppat_loc = p.ppat_loc
+      ; ppat_ext_attr = { pea_ext = None; pea_attrs = No_attributes }
+      ; ppat_attributes = No_attributes
+      ; ppat_tokens = inner_tokens }
+    in
+    { p with
+      ppat_desc = Ppat_parens { pat = inner; optional = false };
+      ppat_tokens = outer_tokens }
   | Ppat_record_unboxed_product (fields, cf) ->
     { p with
       ppat_desc = Ppat_record (fields, cf);
