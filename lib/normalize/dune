@@ -1,4 +1,4 @@
 (library
   (name normalize)
-  (libraries config ocaml_syntax dbg_print traversals_helpers std)
+  (libraries config ocaml_syntax dbg_print traversals_helpers erase_jane_syntax std)
   (flags :standard -open Dbg_print))

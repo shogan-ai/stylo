@@ -1,0 +1,4 @@
+(library
+  (name erase_jane_syntax)
+  (libraries ocaml_syntax dbg_print std)
+  (flags :standard -open Dbg_print))

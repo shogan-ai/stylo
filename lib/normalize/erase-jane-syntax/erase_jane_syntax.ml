@@ -1,48 +1,7 @@
 open Ocaml_syntax
 open Parsetree
 
-module Attrs = struct
-  let add parent_tokens parent_attrs attrs =
-    match parent_attrs, attrs with
-    | Attributes _, _
-    | _, No_attributes -> assert false
-    | No_attributes, Attributes a ->
-      (* Parent didn't have any attributes, we need to add a Child_node. *)
-      parent_tokens @ [{ Tokens.desc = Child_node; pos = a.loc.loc_start }],
-      Attributes a
-
-  let merge parent_tokens attrs1 attrs2 =
-    match attrs1, attrs2 with
-    | No_attributes, attrs
-    | attrs, No_attributes ->
-      parent_tokens, attrs
-    | Attributes a1, Attributes a2 ->
-      (* We're taking two subtrees and merging them into one, so we need to
-         remove one Child_node from the parent's tokens. *)
-      let tokens =
-        let rev_toks = List.rev parent_tokens in
-        let rev_tail, rev_head = Tokens.Seq.split_on_child rev_toks in
-        let rev_head_no_child = List.tl rev_head in
-        List.rev (rev_tail @ rev_head_no_child)
-      in
-      let attrs =
-        let attributes = a1.attributes @ a2.attributes in
-        let loc = { a1.loc with loc_end = a2.loc.loc_end } in
-        let tokens = a1.tokens @ a2.tokens in
-        Attributes { attributes; loc; tokens }
-      in
-      tokens, attrs
-end
-
-let without_child ?at:pos flattened_child_tokens tokens =
-  match Tokens.Seq.split_on_child ?pos tokens with
-  | _, [] ->
-    (* We expected to find a Child_node at the given position, otherwise where
-       did we get [flattened_child_tokens] from? *)
-    assert false
-  | before, _child :: after ->
-    let cmts_of_child = List.filter Tokens.is_comment flattened_child_tokens in
-    before @ cmts_of_child @ after
+open Token_helpers
 
 let no_ext_attrs = function
   | { pea_ext = None; pea_attrs = No_attributes } -> true
@@ -51,7 +10,8 @@ let no_ext_attrs = function
 let fold_into ~parent parent_kw_tok child =
   assert (no_ext_attrs parent.pexp_ext_attr);
   let parent_tokens, merged_attributes =
-    Attrs.merge parent.pexp_tokens parent.pexp_attributes child.pexp_attributes
+    Attributes.merge parent.pexp_tokens
+      parent.pexp_attributes child.pexp_attributes
   in
   let tokens =
     parent_tokens
@@ -59,51 +19,6 @@ let fold_into ~parent parent_kw_tok child =
     |> Tokens.replace_first_child ~subst:child.pexp_tokens
   in
   { child with pexp_tokens = tokens; pexp_attributes = merged_attributes }
-
-module Modes_and_modas = struct
-  let remove_from_tokens tokens = function
-    | None -> tokens
-    | Some (m_loc, m_tokens, _) ->
-      without_child ~at:m_loc.Location.loc_start
-        (List.filter Tokens.is_comment m_tokens) tokens
-
-  let remove_from_name ~replace name =
-    let (name_loc, m, name_tokens) = name in
-    match replace m with
-    | None -> name
-    | Some (m_loc, m_tokens, replacement) ->
-      let tokens =
-        without_child ~at:m_loc.Location.loc_start
-          (List.filter Tokens.is_comment m_tokens) name_tokens
-        |> Tokens.Seq.without ~token:LPAREN
-        |> Tokens.Seq.without ~token:RPAREN
-      in
-      name_loc, replacement, tokens
-end
-
-module Modes = struct
-  let replace = function
-    | No_modes -> None
-    | Modes { loc; tokens; _ } -> Some (loc, tokens, No_modes)
-
-  let remove_from_tokens modes tokens =
-    Modes_and_modas.remove_from_tokens tokens (replace modes)
-
-  let remove_from_name =
-    Modes_and_modas.remove_from_name ~replace
-end
-
-module Modalities = struct
-  let replace = function
-    | No_modalities -> None
-    | Modalities { loc; tokens; _ } -> Some (loc, tokens, No_modalities)
-
-  let remove_from_tokens modes tokens =
-    Modes_and_modas.remove_from_tokens tokens (replace modes)
-
-  let remove_from_name =
-    Modes_and_modas.remove_from_name ~replace
-end
 
 module Implicit_source_pos = struct
   let mk_lexing_lident ~pos lident =
@@ -209,66 +124,6 @@ let token_of_legacy_mode (m : mode Location.loc) : Parser_tokens.token =
   | Mode "once" -> ONCE
   | _ -> assert false
 
-module Unboxed = struct
-  (* Patterns and expression are syntactically/lexically the same. *)
-
-  let unit ~loc tokens =
-    (* The tree and nesting of tokens is different between the boxed and unboxed
-       version...
-
-       Perhaps the cst should have a Pexp_unit? *)
-    let tokens, lid_tokens =
-      let open Tokens.Seq in
-      (* TODO: a ppx to write the following as:
-         {[
-           match%tokens e.pexp_tokens with
-           | before, HASHLPAREN, between, RPAREN, after ->
-             ...
-         ]} *)
-      match split ~on:HASHLPAREN tokens with
-      | before, lparen :: rem ->
-        begin match split ~on:RPAREN rem with
-        | between, rparen :: after ->
-          before @ { lparen with desc = Child_node } :: after,
-          { lparen with desc = Token (LPAREN, false) } :: between @ [rparen]
-        | _ -> assert false
-        end
-      | _ -> assert false
-    in
-    let lid = { Longident.desc = Lident (Str "()"); tokens = lid_tokens } in
-    let lid_loc = Location.mkloc lid loc in
-    lid_loc, tokens
-
-  let bool ~loc tokens b =
-    let unboxed, boxed, name =
-      let open Parser_tokens in
-      if b
-      then HASHTRUE, TRUE, "true"
-      else HASHFALSE, FALSE, "false"
-    in
-    let tokens, lid_tokens =
-      match Tokens.Seq.split tokens ~on:unboxed with
-      | before, tok :: after ->
-        before @ { tok with desc = Child_node } :: after,
-        [{ tok with desc = Token (boxed, false) }]
-      | _ -> assert false
-    in
-    let lid = { Longident.desc = Lident (Str name); tokens = lid_tokens } in
-    let lid_loc = Location.mkloc lid loc in
-    lid_loc, tokens
-
-  let tuple_tokens ~loc tokens =
-    match Tokens.Seq.split ~on:HASHLPAREN tokens with
-    | before_hlp, hlp :: after_hlp ->
-      let inner_tokens, lp_and_after = Tokens.Seq.split ~on:RPAREN after_hlp in
-      let outer_tokens =
-          before_hlp @ { hlp with desc = Token (LPAREN, false) } ::
-          { desc = Child_node; pos = loc.Location.loc_start } :: lp_and_after
-      in
-      inner_tokens, outer_tokens
-    | _ -> assert false
-end
-
 let expression e =
   match e.pexp_desc with
   | Pexp_mode_legacy (m, me) -> fold_into ~parent:e (token_of_legacy_mode m) me
@@ -321,19 +176,21 @@ let expression e =
     { e with
       pexp_desc = Pexp_parens { exp = ce; optional = false };
       pexp_tokens =
-        Modes.remove_from_tokens modes e.pexp_tokens
+        Modes_and_modalities.Modes.remove_from_tokens modes e.pexp_tokens
         |> Tokens.Seq.without ~token:COLON }
   | Pexp_constraint (ce, ct, modes) ->
     { e with
       pexp_desc = Pexp_constraint (ce, ct, No_modes);
-      pexp_tokens = Modes.remove_from_tokens modes e.pexp_tokens }
+      pexp_tokens =
+        Modes_and_modalities.Modes.remove_from_tokens modes e.pexp_tokens }
   | Pexp_function (params, cstrt, body) ->
     { e with
       pexp_desc =
         Pexp_function
           (params, { cstrt with ret_mode_annotations = No_modes }, body);
       pexp_tokens =
-        Modes.remove_from_tokens cstrt.ret_mode_annotations e.pexp_tokens }
+        Modes_and_modalities.Modes.remove_from_tokens
+          cstrt.ret_mode_annotations e.pexp_tokens }
   | _ ->
     e
 
@@ -385,11 +242,10 @@ let pattern p =
   | Ppat_constraint (subp, tc, modes) ->
     { p with
       ppat_desc = Ppat_constraint (subp, tc, No_modes);
-      ppat_tokens = Modes.remove_from_tokens modes p.ppat_tokens }
+      ppat_tokens =
+        Modes_and_modalities.Modes.remove_from_tokens modes p.ppat_tokens }
   | _ ->
     p
-
-let get_modes_tokens m = Result.get_ok (Tokens_of_tree.modes m)
 
 module Argument = struct
   let erase_modes a =
@@ -405,6 +261,7 @@ module Argument = struct
         arg.modes
     in
     let tokens =
+      let open Modes_and_modalities in
       Modes.remove_from_tokens legacy_modes a.parg_tokens
       |> Modes.remove_from_tokens modes
     in
@@ -519,6 +376,7 @@ module Argument = struct
 end
 
 let value_binding vb =
+  let open Modes_and_modalities in
   let tokens_without_pat_modes =
     match vb.pvb_modes with
     | No_modes -> vb.pvb_tokens
@@ -585,6 +443,7 @@ module Arrow_arg = struct
 
   let erase_modes aa =
     let aa_tokens =
+      let open Modes_and_modalities in
       Modes.remove_from_tokens aa.aa_legacy_modes aa.aa_tokens
       |> Modes.remove_from_tokens aa.aa_modes
     in
@@ -613,6 +472,7 @@ let core_type ct =
   match ct.ptyp_desc with
   | Ptyp_arrow at ->
     let tokens =
+      let open Modes_and_modalities in
       Modes.remove_from_tokens at.codom_legacy_modes ct.ptyp_tokens
       |> Modes.remove_from_tokens at.codom_modes
     in
@@ -708,23 +568,6 @@ let ptype_param p =
     in
     { p with ptp_jkind = None; ptp_tokens = tokens }
 
-module Attr = struct
-  let synthesize_tokens ~(loc : Location.t) attr_name_tokens =
-    let open Tokens in
-    { desc = Token (LBRACKETATAT, false); pos = loc.loc_start } ::
-    attr_name_tokens @
-    { desc = Child_node (* empty payload *); pos = loc.loc_end } ::
-    { desc = Token (RBRACKET, false); pos = loc.loc_end } :: []
-
-  let mk_empty_payload ~attr_loc ~name_loc (name, name_tokens) =
-    let empty_payload : structure =
-      { pst_items = []; pst_loc = name_loc; pst_tokens = [] }
-    in
-    let tokens = synthesize_tokens ~loc:name_loc name_tokens in
-    Ast_helper.Attr.mk ~loc:attr_loc ~tokens
-      (Location.mkloc [name] name_loc) (PStr empty_payload)
-end
-
 let jkind_to_attr jk =
   let rec desc_to_attr = function
     | Pjk_parens desc -> desc_to_attr desc
@@ -733,7 +576,7 @@ let jkind_to_attr jk =
             { desc = Lident Str ("immediate" | "immediate64" as s)
             ; tokens = lid_toks }; loc}, []) ->
       let attr =
-        Attr.mk_empty_payload ~attr_loc:jk.pjka_loc ~name_loc:loc
+        Attributes.mk_empty_payload ~attr_loc:jk.pjka_loc ~name_loc:loc
           (s, Tokens.replace_first_child ~subst:lid_toks jk.pjka_tokens)
       in
       Some attr
@@ -803,7 +646,8 @@ let value_description vd =
   { vd with
     pval_modalities = No_modalities;
     pval_tokens =
-      Modalities.remove_from_tokens vd.pval_modalities vd.pval_tokens }
+      Modes_and_modalities.Modalities.remove_from_tokens
+        vd.pval_modalities vd.pval_tokens }
 
 module Globalized = struct
   let of_global_ global_typ parent_tokens =
@@ -814,7 +658,7 @@ module Globalized = struct
       let globalized_attr =
         let loc = { typ_loc with loc_start = typ_loc.loc_end } in
         let attr =
-          Attr.mk_empty_payload
+          Attributes.mk_empty_payload
             ~attr_loc:loc ~name_loc:loc
             ("globalized", [global (* that's a lie, correct = LIDENT *)])
         in
@@ -828,7 +672,7 @@ module Globalized = struct
         let tokens, attrs =
           (* We're only called on field decls and cstr arguments, which do not
              accept attr on the typ part, so we can safely use [Attrs.add]. *)
-          Attrs.add global_typ.ptyp_tokens global_typ.ptyp_attributes
+          Attributes.add global_typ.ptyp_tokens global_typ.ptyp_attributes
             globalized_attr
         in
         { global_typ with ptyp_attributes = attrs; ptyp_tokens = tokens }
@@ -850,7 +694,8 @@ module Label_declaration = struct
     { lbl with
       pld_modalities = No_modalities;
       pld_tokens =
-        Modalities.remove_from_tokens lbl.pld_modalities lbl.pld_tokens }
+        Modes_and_modalities.Modalities.remove_from_tokens
+          lbl.pld_modalities lbl.pld_tokens }
 
   let global_to_at_globalized lbl =
     if not lbl.pld_global then
@@ -872,7 +717,8 @@ module Constructor_argument = struct
     { ca with
       pca_modalities = No_modalities;
       pca_tokens =
-        Modalities.remove_from_tokens ca.pca_modalities ca.pca_tokens }
+        Modes_and_modalities.Modalities.remove_from_tokens
+          ca.pca_modalities ca.pca_tokens }
 
   let global_to_at_globalized ca =
     if not ca.pca_global then
@@ -889,59 +735,20 @@ module Constructor_argument = struct
     |> global_to_at_globalized
 end
 
-module Synced_progress = struct
-  (** Synced traversal of sig/struct items and the corresponding tokens.
-      So individual items can be removed from a sig/struct. *)
-
-
-  (* not using Tokens.Seq.split_on_child as it's more efficient to accumulate
-     tokens in reverse order and call reverse once at the end. *)
-  let next_child =
-    let rec aux acc lst =
-      match lst with
-      | [] -> acc, []
-      | x :: _ when Tokens.is_child x -> acc, lst
-      | x :: xs -> aux (x :: acc) xs
-    in
-    aux []
-
-  let filter ~drop items tokens =
-    let rec aux rev_items_prefix rev_tokens_prefix tokens items =
-      match items, tokens with
-      | _ :: _, [] -> assert false
-      | [], _ ->
-        List.rev rev_items_prefix, List.rev_append rev_tokens_prefix tokens
-      | item :: items, curr_child :: following_tokens ->
-        let rev_before_next, tail = next_child following_tokens in
-        begin match drop item with
-        | Some cmt_tokens_of_removed_subtree ->
-          let rev_before_next, tail = next_child following_tokens in
-          let rev_prefix =
-            rev_tokens_prefix
-            |> List.rev_append cmt_tokens_of_removed_subtree
-            |> List.append rev_before_next
-          in
-          aux rev_items_prefix rev_prefix tail items
-        | None ->
-          aux (item :: rev_items_prefix)
-            (rev_before_next @ curr_child :: rev_tokens_prefix)
-            tail items
-        end
-    in
-    let rev_tokens_prefix, tokens_from_first_item = next_child tokens in
-    aux [] rev_tokens_prefix tokens_from_first_item items
-end
-
 let signature_item si =
   match si.psig_desc with
   | Psig_include (id, modas) ->
     { si with
       psig_desc = Psig_include (id, No_modalities);
-      psig_tokens = Modalities.remove_from_tokens modas si.psig_tokens }
+      psig_tokens =
+        Modes_and_modalities.Modalities.remove_from_tokens modas si.psig_tokens }
   | _ -> si
 
 let signature sg =
-  let tokens = Modalities.remove_from_tokens sg.psg_modalities sg.psg_tokens in
+  let tokens =
+    Modes_and_modalities.Modalities.remove_from_tokens sg.psg_modalities
+      sg.psg_tokens
+  in
   let items, tokens =
     Synced_progress.filter sg.psg_items tokens ~drop:(fun si ->
       match si.psig_desc with
@@ -1018,6 +825,7 @@ let no_kind_constraint wc toks =
   constrs, remove_stale_ands tokens
 
 let functor_parameter fp =
+  let open Modes_and_modalities in
   match fp.pfp_desc with
   | Unit
   | Named (_, _, No_modes)
@@ -1032,6 +840,7 @@ let functor_parameter fp =
       pfp_tokens = Modes.remove_from_tokens modes fp.pfp_tokens }
 
 let module_type mt =
+  let open Modes_and_modalities in
   match mt.pmty_desc with
   | Pmty_functor (attrs, params, mty, modes) ->
     { mt with
@@ -1048,7 +857,7 @@ let module_type mt =
       match no_kind_constraint wcs suff with
       | [], suff ->
         let tokens, merged_attributes =
-          Attrs.merge (pre @ suff) mt.pmty_attributes mty.pmty_attributes
+          Attributes.merge (pre @ suff) mt.pmty_attributes mty.pmty_attributes
         in
         { mty with
           pmty_attributes = merged_attributes;
@@ -1062,6 +871,7 @@ let module_type mt =
   | _ -> mt
 
 let module_declaration md =
+  let open Modes_and_modalities in
   let pmd_name = Modalities.remove_from_name md.pmd_name in
   let pmd_body, pmd_tokens =
     match md.pmd_body with
@@ -1078,6 +888,7 @@ let module_declaration md =
     pmd_tokens }
 
 let module_binding mb =
+  let open Modes_and_modalities in
   let pmb_name = Modes.remove_from_name mb.pmb_name in
   let pmb_tokens = Modes.remove_from_tokens mb.pmb_modes mb.pmb_tokens in
   { mb with
@@ -1090,7 +901,8 @@ let module_expr me =
   | Pmod_constraint (e, mt, modes) ->
     { me with
       pmod_desc = Pmod_constraint (e, mt, No_modes);
-      pmod_tokens = Modes.remove_from_tokens modes me.pmod_tokens }
+      pmod_tokens =
+        Modes_and_modalities.Modes.remove_from_tokens modes me.pmod_tokens }
   | _ -> me
 
 let structure st =
