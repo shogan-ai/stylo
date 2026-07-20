@@ -90,8 +90,8 @@ type t =
   }
 
 type t =
-  { x : int
-  ; (* baz *) y : bool
+  { x : int (* baz *)
+  ; y : bool
   }
 
 type t =

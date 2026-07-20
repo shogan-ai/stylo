@@ -30,13 +30,13 @@ let punned = 2
 let _ = (~x:5, 2, ~z, ~(punned : int))
 
 (* Basic annotations *)
-let (x : int * int) = (1, 2)
-let (x : x:int * int) = (~x:1, 2)
+let (x : (int * int)) = (1, 2)
+let (x : (x:int * int)) = (~x:1, 2)
 
 (* Incorrect annotations *)
-let (x : int * int) = (~x:1, 2)
-let (x : x:string * int) = (~x:1, 2)
-let (x : int * y:int) = (~x:1, 2)
+let (x : (int * int)) = (~x:1, 2)
+let (x : (x:string * int)) = (~x:1, 2)
+let (x : (int * y:int)) = (~x:1, 2)
 
 (* Happy case *)
 let foo b = if b then (~a:"s", 10, ~c:"hi") else (~a:"5", 10, ~c:"hi")
@@ -114,20 +114,20 @@ let barfoo = swap (~a:"foo", ~b:"bar") 87
 
 (* Labeled tuple type annotations *)
 (* Bad type *)
-let x : string * a:int * int = (~lbl:5, "hi")
+let x : (string * a:int * int) = (~lbl:5, "hi")
 
 (* Well-typed *)
-let x : string * a:int * int = ("hi", ~a:1, 2)
+let x : (string * a:int * int) = ("hi", ~a:1, 2)
 
 (* Function type *)
-let mk_x : (foo:unit * bar:unit) -> string * a:int * int = fun _ -> x
+let mk_x : (foo:unit * bar:unit) -> (string * a:int * int) = fun _ -> x
 let x = mk_x (~foo:(), ~bar:())
 
 (* Labeled tuples in records *)
 
-type bad_t = { x : lbl:bad_type * int }
-type tx = { x : foo:int * bar:int }
-type tx_unlabeled = { x : int * int }
+type bad_t = { x : (lbl:bad_type * int) }
+type tx = { x : (foo:int * bar:int) }
+type tx_unlabeled = { x : (int * int) }
 
 let _ = { x = (~foo:1, ~bar:2) }
 let _ : tx = { x = (~foo:1, ~bar:2) }
@@ -142,9 +142,9 @@ module IntString : sig
   type t
 
   val mk : (x:int * string) -> t
-  val unwrap : t -> x:int * string
+  val unwrap : t -> (x:int * string)
 end = struct
-  type t = string * x:int
+  type t = (string * x:int)
 
   let mk (~x, s) = (s, ~x)
   let unwrap (s, ~x) = (~x, s)
@@ -154,7 +154,7 @@ module Stringable = struct
   module type Has_unwrap = sig
     type t
 
-    val unwrap : t -> x:int * string
+    val unwrap : t -> (x:int * string)
   end
 
   module type Has_to_string = sig
@@ -181,8 +181,8 @@ end
 let _ = StringableIntString.to_string (StringableIntString.mk (~x:1, "hi"))
 
 module M : sig
-  val f : (x:int * string) -> x:int * string
-  val mk : unit -> x:bool * y:string
+  val f : (x:int * string) -> (x:int * string)
+  val mk : unit -> (x:bool * y:string)
 end = struct
   let f x = x
   let mk () = (~x:false, ~y:"hi")
@@ -190,17 +190,17 @@ end
 
 (* Module inclusion failure *)
 module X_int_int = struct
-  type t = x:int * int
+  type t = (x:int * int)
 end
 
 module Y_int_int : sig
-  type t = y:int * int
+  type t = (y:int * int)
 end = struct
   include X_int_int
 end
 
 module Int_int : sig
-  type t = int * int
+  type t = (int * int)
 end = X_int_int
 
 (* Recursive modules *)
@@ -222,9 +222,9 @@ end = struct
 end
 
 and TwoTrees : sig
-  type t = left:Tree.t * right:Tree.t
+  type t = (left:Tree.t * right:Tree.t)
 end = struct
-  type t = left:Tree.t * right:Tree.t
+  type t = (left:Tree.t * right:Tree.t)
 end
 
 let leaf s = Tree.Leaf s
@@ -252,7 +252,7 @@ let x = (~x:1, ~y:2)
 let z = 5
 let y = (~z, ~z, ~z:(z [@attr]))
 
-let (~x:x0, ~s, ~(y : int), ..) : x:int * s:string * y:int * string =
+let (~x:x0, ~s, ~(y : int), ..) : (x:int * s:string * y:int * string) =
   (~x:1, ~s:"a", ~y:2, "ignore me")
 ;;
 
@@ -282,7 +282,7 @@ let f = function
 ;;
 
 let f = function
-  | (A | B), C -> ()
+  | ((A | B), C) -> ()
 ;;
 
 let x = ((fun () -> ()), fun () -> ())
@@ -340,7 +340,7 @@ type t =
 
 let x =
   match foo with
-  | Some x, ~l:(Some y) -> ()
+  | (Some x, ~l:(Some y)) -> ()
 ;;
 
 let foo a =
@@ -421,10 +421,10 @@ let bar =
 (* Labeled tuples in function return positions: Parens are needed iff the first
    element is labeled AND the return is `local_` *)
 module type S = sig
-  val t1 : unit -> int * y:bool
-  val t2 : unit -> int * y:bool
-  val t3 : unit -> x:int * y:bool
-  val t4 : unit -> x:int * y:bool
+  val t1 : unit -> (int * y:bool)
+  val t2 : unit -> (int * y:bool)
+  val t3 : unit -> (x:int * y:bool)
+  val t4 : unit -> (x:int * y:bool)
 
   val f
     :  (foo:int * very_long_type_name_so_we_get_multiple_lines)
@@ -444,23 +444,25 @@ let _ =
     , g y x )
 ;;
 
-let _ = [%ext 1, 2, 3]
+let _ = [%ext (1, 2, 3)]
 
 let _ =
   [%ext
-    loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
+    (
+      loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
     ,
       loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
-    , 3]
+    , 3 )]
 ;;
 
-type t = int [@@deriving 1, 2, 3]
+type t = int [@@deriving (1, 2, 3)]
 
 type t = int
 [@@deriving
-  sexp
+  ( sexp
   , compare
-  , loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong]
+  , loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
+  )]
 
 let _ =
   ( 1
@@ -471,13 +473,13 @@ let _ =
 
 let _ = (1, 2, 3, short) ;;
 
-1
+( 1
 , 2
 , looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
-, looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
+, looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong )
 ;;
 
-1, 2, 3, short
+(1, 2, 3, short)
 
 (* make sure to not drop parens for local open. *)
-let _ = A.(1, 2)
+let _ = A.((1, 2))

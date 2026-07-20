@@ -44,14 +44,14 @@ let f () =
   let r = 1 in
   let f : 'a. 'a -> 'a = fun x -> x in
   let g a b c : int = 1 in
-  let () = g (fun () -> ()) in
+  let () = g ((fun () -> ())) in
   "asdfasdfasdfasdfasdfasdfasdf"
 ;;
 
 type 'a r =
   { mutable a : 'a
   ; b : 'a
-  ; c : 'a [@globalized]
+  ; c : ('a [@globalized])
   }
 
 type 'a r =
@@ -59,7 +59,7 @@ type 'a r =
   | Bar of 'a * ('a [@globalized])
   | Baz of (int[@globalized]) * string * ('a [@globalized])
 
-type ('a, 'b) cfn = a:'a -> ?b:b -> 'a -> int -> 'b
+type ('a, 'b) cfn = a:'a -> ?b:b -> 'a -> (int -> 'b)
 
 let _ = ()
 let _ = ()
@@ -79,13 +79,13 @@ let x : 'a. 'a -> 'a = "hi"
 let f : 'a. 'a -> 'a = "hi"
 
 let foo () =
-  if true then ();
+  if true then (());
   ()
 ;;
 
 let[@ocaml.local] upstream_local_attr_long x = x
 
-module type S = functor (_ : S) (_ : S) -> S
+module type S = S -> S -> S
 
 let[@ocaml.local never] upstream_local_attr_never_long x = x
 let[@ocaml.local always] upstream_local_attr_always_long x = x
@@ -95,30 +95,26 @@ let[@local never] upstream_local_attr_never_short x = x
 let[@local always] upstream_local_attr_always_short x = x
 let[@local maybe] upstream_local_attr_maybe_short x = x
 
-let f x =
-  (* a *)
+let f x = (* a *)
   let y = 1 in
   x + y
 ;;
 
-let f x =
-  (* a *)
+let f x = (* a *)
   let y = 1 in
   x + y
 ;;
 
-let x =
-  (* a *)
+let x = (* a *)
   let y = 1 in
   y
 ;;
 
-let x =
-  (* a *)
+let x = (* a *)
   let y = 1 in
   y
 ;;
 
-module type S = functor (_ : S) (_ : S) -> S
+module type S = S -> S -> S
 (* this is here to make sure we pass the AST equality checks even when the
    extended AST is different *)

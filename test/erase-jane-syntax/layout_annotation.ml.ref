@@ -41,7 +41,7 @@ type t_imm =
 [@@immediate]
 
 type t_imm =
-  [ `Aaaaaaaaaaaaaaaaaaaaa
+  [ | `Aaaaaaaaaaaaaaaaaaaaa
   | `Bbbbbbbbbbbbbbbbbbbbb
   | `Ccccccccccccccccccccc
   ]
@@ -73,7 +73,7 @@ type t_value_maybe_pointer_non_pointer
 type t_product_non_pointer
 type t_qualified_non_pointer
 
-let scannable_id : 'a -> 'a = fun x -> x
+let scannable_id : ('a) -> 'a = fun x -> x
 
 (***************************************)
 (* Test 1: annotation on type variable *)
@@ -88,44 +88,44 @@ let x : int list as 'a = [ 3; 4; 5 ]
 (****************************************)
 (* Test 2: Annotation on type parameter *)
 
-type 'a t2_imm
-type _ t2_imm'
+type ('a) t2_imm
+type (_) t2_imm'
 type t1 = int t2_imm
 type t2 = bool t2_imm
-type 'a t2_float64
-type _ t2_float64'
+type ('a) t2_float64
+type (_) t2_float64'
 type t3 = float t2_float64
 
 module M1 : sig
-  type 'a t
+  type ('a) t
 end = struct
-  type _ t
+  type (_) t
 end
 
 module M2 : sig
-  type _ t
+  type (_) t
 end = struct
-  type 'a t
+  type ('a) t
 end
 
 type t = string t2_imm
 
 let f : 'a t2_imm -> 'a t2_imm = fun x -> x
-let f : 'a t2_imm -> 'a t2_imm = fun x -> x
-let f : 'a t2_imm -> 'a t2_imm = fun x -> x
+let f : ('a) t2_imm -> ('a) t2_imm = fun x -> x
+let f : ('a) t2_imm -> ('a) t2_imm = fun x -> x
 let f : 'a. 'a t2_imm -> 'a t2_imm = fun x -> x
 let f : 'a. 'a t2_imm -> 'a t2_imm = fun x -> x
 
 type 'a t = 'a t2_imm
-type 'a t = 'a t2_imm
-type 'a t = 'a t2_imm
+type ('a) t = 'a t2_imm
+type ('a) t = 'a t2_imm
 
-let f : _ t2_imm -> unit = fun _ -> ()
-let g : _ t2_imm -> unit = fun _ -> ()
-let f : _ -> unit = fun _ -> ()
-let g : _ -> unit = fun _ -> ()
-let f : _ -> _ = fun _ -> assert false
-let g : _ -> _ = fun _ -> assert false
+let f : (_) t2_imm -> unit = fun _ -> ()
+let g : (_) t2_imm -> unit = fun _ -> ()
+let f : (_) -> unit = fun _ -> ()
+let g : (_) -> unit = fun _ -> ()
+let f : (_) -> (_) = fun _ -> assert false
+let g : (_) -> (_) = fun _ -> assert false
 
 type ('a, 'b, 'c) t4
 type 'a t5 = ('a, int, bool) t4
@@ -137,7 +137,7 @@ type ('a, 'b, 'c) t6 = ('a, 'b, 'c) t4
 (********************************************)
 (* Test 3: Annotation on types in functions *)
 
-let f : 'a -> 'a = fun x -> x
+let f : ('a) -> 'a = fun x -> x
 let f : 'a. 'a -> 'a = fun x -> x
 let f : 'a. 'a -> 'a = fun x -> x
 
@@ -163,7 +163,7 @@ let r = { field = (fun (type a) (x : a) -> x) }
 
 (* CR layouts v1.5: that's a pretty awful error message *)
 
-type 'a t_imm
+type ('a) t_imm
 type s = { f : 'a. 'a -> 'a u } and 'a u = 'a t_imm
 
 (* CR layouts v1.5: the location on that message is wrong. But it's hard to
@@ -236,41 +236,41 @@ let f x y (type a) (z : a) = z
 
 external f : 'a. 'a -> 'a = "%identity"
 
-type _ t2_any
+type (_) t2_any
 
 exception E : 'a 'b. 'b t2_any * 'a list -> exn
 
 let f (x : 'a. 'a -> 'a) = (x 3, x true)
 
-type _ a = Mk : [> ] * 'a -> int a
+type _ a = Mk : [> ] * ('a) -> int a
 
 module type S = sig
-  type _ a = Mk : [> ] * 'a -> int a
+  type _ a = Mk : [> ] * ('a) -> int a
 
   val f_imm : 'a 'b. 'a -> 'a
   val f_val : 'a. 'a -> 'a
 
-  type _ g = MkG : 'a. 'a g
+  type (_) g = MkG : 'a. 'a g
   type t = int
 end
 
 let f_imm : 'a. 'a -> 'a = fun x -> x
 let f_val : 'a. 'a -> 'a = fun x -> f_imm x
 
-type _ g = MkG : 'a. 'a g
+type (_) g = MkG : 'a. 'a g
 type t = int
-type t = ('a, 'b) t2
-type ('a, 'b) t = 'a * 'b
+type t = (('a), ('b)) t2
+type ('a, 'b) t = ('a) * ('b)
 
-class c : object method m : 'a. 'a -> 'a val f : 'a -> 'a end =
+class c : object method m : 'a. 'a -> 'a val f : ('a) -> 'a end =
   object
     method m : type a. a -> a = fun x -> x
 
-    val f = fun (x : 'a) -> x
+    val f = fun (x : ('a)) -> x
   end
 
 type _ g = MkG : 'a 'b. 'a -> 'b g
-type 'a t3 = ..
+type ('a) t3 = ..
 
 type _ t3 += MkG : 'a 'b. 'a -> 'b t3
 
@@ -278,11 +278,9 @@ let f_gadt : 'a. 'a -> 'a g -> 'a = fun x MkG -> f_imm x
 
 (* comments *)
 val foo
-  :  (* comment 1 *) 'k
-     (* comment 2 *)
-     (* comment 3 *)
-     (* comment 4 *)
+  : (* comment 1 *)  'k (* comment 2 *) (* comment 3 *)
      (* comment 5 *)
+     (* comment 4 *)
      'cmp
   .  (module
      S
@@ -292,12 +290,13 @@ val foo
   -> 'k Jane_symbol.Map.t
   -> ('k, Sockaddr.t, 'cmp) Map.t
 
-type a = b (* comment 0 *) as (* comment 1 *) 'k (* comment 2 *)
+type a = b (* comment 0 *) as (* comment 1 *) 'k
 
-(* comment 3 *)
-(* comment 4 *)
 (* comment 5 *)
 
+(* comment 2 *)
+(* comment 3 *)
+(* comment 4 *)
 let f (type a) x = x
 let f (type a b c d e f g h i j k l m n o p q r s t u v w x y z) x = x
 let f (type a b) x = x
@@ -334,10 +333,8 @@ type t = T : 'a 'b 'c 'd. { x : 'a * 'b * 'c * 'd } -> t
 type t = T : (* 1 *) 'a 'b (* 2 *) 'c (* 3 *) 'd. (* 4 *) 'a * 'b * 'c * 'd -> t
 
 type t =
-  | T :
-      (* 1 *)
-      'a 'b (* 2 *) 'c (* 3 *) 'd.
-      (* 4 *)
+  | T : (* 1 *)
+      'a 'b (* 2 *) 'c (* 3 *) 'd. (* 4 *)
       { x : 'a * 'b * 'c * 'd }
       ->
       t

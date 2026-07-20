@@ -39,7 +39,7 @@ type t = float #t2
 type t = (int, float) either
 type t = (float, int) either
 type t = (float, float) either
-type 'a t = 'a
+type ('a) t = 'a
 type ('b, 'a) t
 type ('b, 'a) t
 type t
@@ -50,7 +50,7 @@ type t = int32 #t2
 type t = (int, int32) either
 type t = (int32, int) either
 type t = (int32, int32) either
-type 'a t = 'a
+type ('a) t = 'a
 type ('b, 'a) t
 type ('b, 'a) t
 type t
@@ -61,7 +61,7 @@ type t = int64 #t2
 type t = (int, int64) either
 type t = (int64, int) either
 type t = (int64, int64) either
-type 'a t = 'a
+type ('a) t = 'a
 type ('b, 'a) t
 type ('b, 'a) t
 type t
@@ -72,7 +72,7 @@ type t = int64 #t2
 type t = (int, nativeint) either
 type t = (nativeint, int) either
 type t = (nativeint, nativeint) either
-type 'a t = 'a
+type ('a) t = 'a
 type ('b, 'a) t
 type ('b, 'a) t
 
@@ -118,9 +118,9 @@ let f x =
 ;;
 
 module Wildcard_with_jkind : sig
-  type _ t
+  type (_) t
   type ('a, _) t
 end = struct
-  type _ t
+  type (_) t
   type ('a, _) t
 end

@@ -21,7 +21,7 @@
    SOFTWARE. *)
 (* this one is purposefully misformatted *)
 
-let x = 3.14
+let x = +3.14
 let x = 3.14 + 5.82
 let x = 3l - 4n
 let x = 4n + -5.0
@@ -33,6 +33,6 @@ type t = float #float
 type t = float float
 type t = float float
 type t = #float float #float
-type 'a t = 'a
+type ('a) t = 'a
 type ('b, 'a) t
 type ('b, 'a) t = 'a

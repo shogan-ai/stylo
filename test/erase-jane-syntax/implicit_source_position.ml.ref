@@ -26,10 +26,10 @@
    [implicit_source_position_erased.ml.ref]. The options for this test can be
    found in [implicit_source_position_erased.ml.opts]. *)
 let punned_pattern ?(call_pos = Stdlib.Lexing.dummy_pos) () = call_pos
-let ignored_pattern ?call_pos:(_ = Stdlib.Lexing.dummy_pos) () = 1
+let ignored_pattern ?call_pos:((_) = Stdlib.Lexing.dummy_pos) () = 1
 
 let destructured_pattern
-  ?call_pos:({ pos_fname; _ } = Stdlib.Lexing.dummy_pos)
+  ?call_pos:(({ pos_fname; _ }) = Stdlib.Lexing.dummy_pos)
   ()
   =
   ()

@@ -62,7 +62,7 @@ let (* a *) () (* bb *) =
 (* With attributes *)
 let[@aaaaaaaa] (false | true) [@bbbbbbb] =
   match [@cccccc] ((true, false) [@ddddd]) with
-  | ((true, false) [@eeee]) -> true [@fff]
+  | ((true, false) [@eeee]) -> (true [@fff])
   | (false [@gg]), (true [@h]) -> false
 ;;
 

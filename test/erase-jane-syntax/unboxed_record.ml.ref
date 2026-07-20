@@ -75,23 +75,23 @@ let _ = { (x : x) with e1; e2 }
 let _ = { (x :> x) with e1; e2 }
 let _ = { (x#x) with e1; e2 }
 let f ~l:{ f; g } = e
-let f ?l:({ f; g }) = e
+let f ?l:{ f; g } = e
 
 let _ =
   { a
   ; b =
-      (match b with
-       | `A -> A
-       | `B -> B
-       | `C -> C
+      ((match b with
+        | `A -> A
+        | `B -> B
+        | `C -> C)
        : c)
   ; c
   }
 ;;
 
-let a () = A { A.a : t }
-let x = { aaaaaaaaaa (* b *); b }
-let x = { aaaaaaaaaa (* b *); b }
+let a () = A { A.a = (a : t) }
+let x = { aaaaaaaaaa(* b *) ; b }
+let x = { aaaaaaaaaa(* b *) ; b }
 
 type t =
   { a : (module S)
@@ -100,7 +100,7 @@ type t =
 
 let _ = { a = (module M : S); b = (module M : S) }
 let to_string { x; _ (* we should print y *) } = string_of_int x
-let { x : t } = x
+let { x = (x : t) } = x
 
 (* Copy of record.ml ends here *)
 (* Basic field access. *)
@@ -124,7 +124,6 @@ let _ =
     ; c = abcdefghijklmnopqrstuvwxyz
     ; d = abcdefghijklmnopqrstuvwxyz
     ; e = abcdefghijklmnopqrstuvwxyz
-    ;
     } -> ()
 ;;
 
@@ -169,7 +168,6 @@ let foo a =
     ; l16 = [%bar baz]
     ; l17 = M.(A)
     ; l18 = M.(A 42)
-    ;
     } -> false
 ;;
 
@@ -199,7 +197,7 @@ let bar =
   ; l15 = { x = 42; z = false }
   ; l16 = foo.lbl
   ; l17 = (foo 42).lbl
-  ; l18 = foo.lbl <- 42
+  ; l18 = (foo.lbl <- 42)
   ; l19 = [| 1; 2 |]
   ; l20 = [: 1; 2 :]
   ; l21 = [ 1; 2 ]
@@ -222,7 +220,7 @@ let bar =
   ; l30 = foo#bar
   ; l31 = foo #~# bar
   ; l32 = new M.c
-  ; l33 = x <- 2
+  ; l33 = (x <- 2)
   ; l34 = {< x = 42; y = false >}
   ; l35 =
       (let module M = N in
@@ -292,7 +290,7 @@ let _ = { a = 1; b = 2; c = 3; short } ;;
 { a = 1; b = 2; c = 3; short }
 
 (* make sure to not drop parens for local open. *)
-let _ = A.{ a = 1; b = 2 }
+let _ = A.({ a = 1; b = 2 })
 
 (* make sure not to drop parens around thing being projected from. *)
 let _ = (f x).foo

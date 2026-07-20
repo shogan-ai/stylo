@@ -40,14 +40,14 @@ let f () =
   let r = 1 in
   let f : 'a. 'a -> 'a = fun x -> x in
   let g a b c : int = 1 in
-  let () = g (fun () -> ()) in
+  let () = g ((fun () -> ())) in
   "asdfasdfasdfasdfasdfasdfasdf"
 ;;
 
 type 'a r =
   { mutable a : 'a
   ; b : 'a
-  ; c : 'a [@globalized]
+  ; c : ('a [@globalized])
   }
 
 type 'a r =
@@ -55,7 +55,7 @@ type 'a r =
   | Bar of 'a * ('a [@globalized])
   | Baz of (int[@globalized]) * string * ('a [@globalized])
 
-type ('a, 'b) cfn = a:'a -> ?b:b -> 'a -> int -> 'b
+type ('a, 'b) cfn = a:'a -> ?b:b -> 'a -> (int -> 'b)
 
 let _ = ()
 let _ = ()
@@ -75,13 +75,13 @@ let x : 'a. 'a -> 'a = "hi"
 let f : 'a. 'a -> 'a = "hi"
 
 let foo () =
-  if true then ();
+  if true then (());
   ()
 ;;
 
 let[@ocaml.local] upstream_local_attr_long x = x
 
-module type S = functor (_ : S) (_ : S) -> S
+module type S = S -> S -> S
 
 let[@ocaml.local never] upstream_local_attr_never_long x = x
 let[@ocaml.local always] upstream_local_attr_always_long x = x
@@ -91,58 +91,38 @@ let[@local never] upstream_local_attr_never_short x = x
 let[@local always] upstream_local_attr_always_short x = x
 let[@local maybe] upstream_local_attr_maybe_short x = x
 
-let f x =
-  (* a *)
-  (* b *)
-  (* c *)
-  (* d *)
+let f x = (* a *) (* b *) (* c *) (* d *)
   let y = 1 in
   x + y
 ;;
 
-let f x =
-  (* a *)
-  (* b *)
-  (* c *)
-  (* d *)
+let f x = (* a *) (* b *) (* c *) (* d *)
   let y = 1 in
   x + y
 ;;
 
-let x =
-  (* a *)
-  (* b *)
-  (* c *)
-  (* d *)
+let x = (* a *) (* b *) (* c *) (* d *)
   let y = 1 in
   y
 ;;
 
-let x =
-  (* a *)
-  (* b *)
-  (* c *)
-  (* d *)
+let x = (* a *) (* b *) (* c *) (* d *)
   let y = 1 in
   y
 ;;
 
 module type S =
-  functor
-  (_ : S)
-  (_ : S)
+  S
+  ->
+  S
   ->
   S
   (* this is here to make sure we pass the AST equality checks even when the
      extended AST is different *)
 
-let f
-  (* a *)
-  (* b *)
-  (* c *)
-  (* d *)
+let f (* a *) (* b *) (* c *) (* d *)
   a
-  ~foo:(* e *) (* f *) (* g *) (* h *) b
+  ~foo: (* e *) (* f *) (* g *) (* h *)b
   ?foo:(c = 1)
   ~d
   =
@@ -152,7 +132,7 @@ let f
 type 'a r =
   { mutable a : 'a
   ; b : 'a
-  ; (* a *) (* b *) (* c *) (* d *) c : 'a [@globalized]
+  ; (* a *) (* b *) (* c *) (* d *) c : ('a [@globalized])
   }
 
 type 'a r =
@@ -168,26 +148,24 @@ type 'a r =
 let () =
   let foo (_ : int) = 10 in
   let bar (Some x : _) = Some 10 in
-  let baz (Some x) = Some 10 in
+  let baz Some x = Some 10 in
   ()
 ;;
 
 type t
 
+let _ = (x) + y
+let _ = (x) |> f
 let _ = x + y
 let _ = x |> f
-let _ = x + y
-let _ = x |> f
-let _ = x + y
-let _ = x |> f
+let _ = (x) + y
+let _ = (x) |> f
 let _ = x + y
 let _ = x |> f
 
-let _ =
-  (* 1 *)
-  M.x (* 2 *) l (* 3 *) ~f: (* 4 *) (fun (* 5 *) (* 6 *) x (* 7 *) ->
-    Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxx
-      (* 7 *)
+let _ = (* 1 *)
+  M.x (* 2 *) l (* 3 *) ~f: (* 4 *) ( (* 5 *) (* 6 *) fun x (* 7 *) ->
+    Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxx (* 7 *)
       (module struct
         type nonrec t = M.t
       end))
@@ -201,14 +179,10 @@ let _ =
       end))
 ;;
 
-let _ =
-  (* 1 *)
-  M.x (* 2 *) l (* 3 *) (* 4 *) ~f:(function
-    (* 5 *)
-    (* 6 *)
+let _ = (* 1 *)
+  M.x (* 2 *) l (* 3 *) ~f: (* 4 *) ( (* 5 *) (* 6 *) function
     | x (* 7 *) ->
-      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxx
-        (* 8 *)
+      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxx (* 8 *)
         (module struct
           type nonrec t = M.t
         end))
@@ -223,20 +197,15 @@ let _ =
         end))
 ;;
 
-let _ =
-  (* 1 *)
-  M.x (* 2 *) l (* 3 *) (* 4 *) ~f:(function
-    (* 5 *)
-    (* 6 *)
+let _ = (* 1 *)
+  M.x (* 2 *) l (* 3 *) ~f: (* 4 *) ( (* 5 *) (* 6 *) function
     | _ ->
-      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxx
-        (* 8 *)
+      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxx (* 8 *)
         (module struct
           type nonrec t = M.t
         end)
     | _ ->
-      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxx
-        (* 9 *)
+      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxx (* 9 *)
         (module struct
           type nonrec t = M.t
         end))
@@ -258,9 +227,10 @@ let _ =
 
 let _ =
   List.iter
-    l (* 1 *)
-    ~f:(fun (* 2 *) (* 3 *) (* 4 *) xxxxx ->
-      (* 5 *)
+    l
+    (* 1 *)
+    ~f:( (* 2 *) (* 3 *)
+    fun (* 4 *) xxxxx -> (* 5 *)
       Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
         (module struct
           type nonrec t = M.t
@@ -281,13 +251,10 @@ let _ =
 
 let _ =
   List.iter
-    l (* 1 *)
-    ~f:(function
-      (* 2 *)
-      (* 3 *)
-      (* 4 *)
-      | xxxxx ->
-        (* 5 *)
+    l
+    (* 1 *)
+    ~f:( (* 2 *) (* 3 *) function (* 4 *)
+      | xxxxx -> (* 5 *)
         Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
           (module struct
             type nonrec t = M.t
@@ -309,11 +276,9 @@ let _ =
 
 let _ =
   List.iter
-    l (* 1 *)
-    ~f:(function
-      (* 2 *)
-      (* 3 *)
-      (* 4 *)
+    l
+    (* 1 *)
+    ~f:( (* 2 *) (* 3 *) function (* 4 *)
       | _ (* 5 *) -> Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx x
       | _ (* 6 *) -> Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx x)
     ~g:x
@@ -332,11 +297,8 @@ let _ =
 let _ =
   List.iter
     l
-    ~f:(function
-      (* x *)
-      | xxxxx (* y *) ->
-        (* z *)
-        (* w *)
+    ~f:(function (* x *)
+      | xxxxx (* y *) -> (* z *) (* w *)
         Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
           (module struct
             type nonrec t = M.t
@@ -345,9 +307,7 @@ let _ =
 ;;
 
 let _ =
-  List.iter l ~f:(fun (* x *) xxxxx (* y *) ->
-    (* z *)
-    (* w *)
+  List.iter l ~f:(fun (* x *) xxxxx (* y *) -> (* z *) (* w *)
     Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
       (module struct
         type nonrec t = M.t
@@ -424,6 +384,7 @@ let xxxxxxxxxxxxxxxxx xxxxxxx ~xxx =
 let x =
   xxxxxxx
     ~xxxxxxxxxxxxxxxxxxxxxxxxxxx:(fun _ -> x)
-    ~xxxxxxxxxxxxxxxxxxxxxxxxxxx: (* xxxxxxxxxxxxxxxxxxxxxxxxxx *)
+    ~xxxxxxxxxxxxxxxxxxxxxxxxxxx:
+    (* xxxxxxxxxxxxxxxxxxxxxxxxxx *)
     (fun _ _ -> xxxxxxxxxxxxxxxxxxxxxx)
 ;;

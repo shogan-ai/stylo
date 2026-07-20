@@ -93,34 +93,21 @@ module type T = sig
   type t
 end
 
-module type T = sig
-  (* cmt *)
+module type T = sig (* cmt *)
   type t
 end
 
 module type T = sig
-  (* cmt1 *)
   (* cmt2 *)
   (* cmt3 *)
   (* cmt4 *)
+
+  (* cmt1 *)
   type t
 end
 
 module type T = [%ext: (* cmt *) type t]
-
-module type T =
-  [%ext:
-    (* cmt1 *)
-    (* cmt2 *)
-    (* cmt3 *)
-    (* cmt4 *)
-    type t]
+module type T = [%ext: (* cmt1 *) (* cmt2 *) (* cmt3 *) (* cmt4 *) type t]
 
 [@@@attr: (* cmt *) type t]
-
-[@@@attr:
-  (* cmt1 *)
-  (* cmt2 *)
-  (* cmt3 *)
-  (* cmt4 *)
-  type t]
+[@@@attr: (* cmt1 *) (* cmt2 *) (* cmt3 *) (* cmt4 *) type t]

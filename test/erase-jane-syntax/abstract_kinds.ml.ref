@@ -23,15 +23,14 @@
 
 (** Doc comment 1 *)
 
-(* a b c d e f g *)
 (* A normal comment 1 *)
 
+(* a b c d e f g *)
 type t (* Surprise *)
 
 (** Doc comment 3 *)
 
 (* 1 2 3 *)
-(* 4 5 6 *)
 (* 7 8 9 *)
 (* Now with comments *)
 (* 168 *)
@@ -223,13 +222,6 @@ type t (* Surprise *)
 (* 411 *)
 (* 413 *)
 (* Attributes *)
-(* Prefix [@foo] attributes on abstract kinds *)
-(* Prefix [@foo] attributes on kind abbreviations *)
-(* Post-item [@@foo] attributes on abstract kinds *)
-(* Post-item [@@foo] attributes on kind abbreviations *)
-(* Both prefix and post attributes *)
-(* Long kind with attributes that may break *)
-(* Attributes with comments *)
 (* attr comment *)
 (* before name *)
 (* after name *)
@@ -243,9 +235,15 @@ type t (* Surprise *)
 (* after attr *)
 (* struct *)
 
+(* 4 5 6 *)
+(* Prefix [@foo] attributes on abstract kinds *)
+(* Prefix [@foo] attributes on kind abbreviations *)
+(* Post-item [@@foo] attributes on abstract kinds *)
+(* Post-item [@@foo] attributes on kind abbreviations *)
+(* Both prefix and post attributes *)
+(* Long kind with attributes that may break *)
+(* Attributes with comments *)
 module _ = struct
-(* Comment for abstract kind *)
-(* Attributes inside struct *)
 (* 415 *)
 (* 414 *)
 (* 416 *)
@@ -307,14 +305,14 @@ module _ = struct
 (* 949 *)
 (* 948 *)
 (* 950 *)
+(* Comment for abstract kind *)
+(* Attributes inside struct *)
 end
 
 (* sig *)
 
 module type S = sig
 
-(* Comment for abstract kind *)
-(* Attributes inside sig *)
 (* 952 *)
 (* 951 *)
 (* 954 *)
@@ -460,5 +458,7 @@ module type S = sig
 (* 1518 *)
 (* 1519 *)
 (* 1506 *)
+(* Comment for abstract kind *)
+(* Attributes inside sig *)
 end
 (* [@@ocamlformat "disable"] preserves source formatting *)
