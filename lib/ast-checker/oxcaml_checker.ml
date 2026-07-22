@@ -3,11 +3,14 @@ open Parsetree
 
 let sort_attributes : attributes -> attributes = List.sort compare
 
-let cleaner =
+let cleaner erase =
   let from_docstring attr =
     match attr.attr_name.txt with
     | "ocaml.doc" | "ocaml.text"  -> true
     | _ -> false
+  in
+  let do_erase : 'a. ('a -> 'a) -> 'a -> 'a =
+    fun eraser v -> if erase then eraser v else v
   in
   object
     method unit () () = ()
@@ -18,6 +21,14 @@ let cleaner =
 
     method location () _ = Location.none
     method! location_stack () _ = []
+
+    method! modes () m =
+      super#modes () m
+      |> do_erase Erase_jane_syntax.modes
+
+    method! modalities () m =
+      super#modalities () m
+      |> do_erase Erase_jane_syntax.modalities
 
     method! attribute () attr =
       let attr_payload =
@@ -35,7 +46,16 @@ let cleaner =
       super#attribute () { attr with attr_payload }
 
     method! attributes () attrs =
-      super#attributes () ((* FIXME: why? *) sort_attributes attrs)
+      super#attributes () attrs
+      |> sort_attributes (* FIXME: why? *)
+
+    method! constant () c =
+      super#constant () c
+      |> do_erase Erase_jane_syntax.constant
+
+    method! expression () e =
+      super#expression () e
+      |> do_erase Erase_jane_syntax.expression
 
     method! pattern () p =
       let p =
@@ -51,38 +71,56 @@ let cleaner =
         | _ -> p
       in
       super#pattern () p
+      |> do_erase Erase_jane_syntax.pattern
+
+    method! function_param_desc () fp =
+      do_erase Erase_jane_syntax.function_param_desc fp
+      |> super#function_param_desc ()
+
+    method! core_type () ct =
+      super#core_type () ct
+      |> do_erase Erase_jane_syntax.core_type
+
+    method! label_declaration () lbl =
+      do_erase Erase_jane_syntax.label_declaration lbl
+      |> super#label_declaration ()
+
+    method! constructor_argument () c =
+      do_erase Erase_jane_syntax.constructor_argument c
+      |> super#constructor_argument ()
+
+    method! constructor_declaration () c =
+      do_erase Erase_jane_syntax.constructor_declaration c
+      |> super#constructor_declaration ()
+
+    method! extension_constructor_kind () eck =
+      do_erase Erase_jane_syntax.extension_constructor_kind eck
+      |> super#extension_constructor_kind ()
+
+    method! type_kind () tk =
+      do_erase Erase_jane_syntax.type_kind tk
+      |> super#type_kind ()
+
+    method! type_declaration () td =
+      super#type_declaration () td
+      |> do_erase Erase_jane_syntax.type_declaration
+
+    method! module_type () m =
+      super#module_type () m
+      |> do_erase Erase_jane_syntax.module_type
+
+    method! module_expr () m =
+      super#module_expr () m
+      |> do_erase Erase_jane_syntax.module_expr
+
+    method! signature () s =
+      do_erase Erase_jane_syntax.signature s
+      |> super#signature ()
+
+    method! structure () s =
+      super#structure () s
+      |> do_erase Erase_jane_syntax.structure
   end
-
-  (*
-  method! visit_expression env exp =
-    let {pexp_desc; pexp_attributes; _} = exp in
-    match pexp_desc with
-    (* convert [(c1; c2); c3] to [c1; (c2; c3)] *)
-    | Pexp_sequence
-        ({pexp_desc= Pexp_sequence (e1, e2); pexp_attributes= []; _}, e3) ->
-      (* FIXME: what about ext_attrs?! *)
-      self#visit_expression env
-        (Exp.sequence e1
-           (Exp.sequence ~attrs:pexp_attributes e2 e3))
-    | _ -> super#visit_expression env exp
-
-  method! visit_pattern env pat =
-    let {ppat_desc; ppat_loc= loc1; ppat_attributes= attrs1; _} = pat in
-    (* normalize nested or patterns *)
-    match ppat_desc with
-    | Ppat_or
-        ( pat1
-        , { ppat_desc= Ppat_or (pat2, pat3)
-          ; ppat_loc= loc2
-          ; ppat_attributes= attrs2
-          ; _ } ) ->
-        self#visit_pattern env
-          (Pat.or_ ~loc:loc1 ~attrs:attrs1
-             (Pat.or_ ~loc:loc2 ~attrs:attrs2 pat1 pat2)
-             pat3)
-    | _ -> super#visit_pattern env pat
-     *)
-
 
 type _ input_kind =
   | Impl : Parsetree.structure  input_kind
@@ -113,10 +151,10 @@ let parse (type a) (input : a input) wrap_exn : (a, _) result =
   with exn ->
     Error (wrap_exn lb.lex_start_p lb.lex_curr_p exn)
 
-let clean (type a) (kind : a input_kind) (ast : a) : a =
+let clean (type a) ~erase_jane_syntax (kind : a input_kind) (ast : a) : a =
   match kind with
-  | Impl -> cleaner#structure () ast
-  | Intf -> cleaner#signature () ast
+  | Impl -> (cleaner erase_jane_syntax)#structure () ast
+  | Intf -> (cleaner erase_jane_syntax)#signature () ast
 
 let input_wrap startp endp exn = `Input_parse_error (Errors.Oxcaml's, startp, endp, exn)
 let output_wrap _ _ exn = `Output_parse_error (Errors.Oxcaml's, exn)
@@ -145,13 +183,15 @@ let dump_out output =
     (fun ppf -> Format.pp_print_string ppf output.source)
 
 let check_same_ast (type a) (input_ast : a) (output : a input) =
-  let input_ast = clean output.kind input_ast in
+  let input_ast =
+    clean ~erase_jane_syntax:!Config.erase_jane_syntax output.kind input_ast
+  in
   let* output_ast =
     let output = { output with fname = output.fname ^ ".out" } in
     parse output output_wrap
     |> Result.map_error (fun err -> dump_out ~or_:() output; err)
   in
-  let output_ast = clean output.kind output_ast in
+  let output_ast = clean ~erase_jane_syntax:false output.kind output_ast in
   if input_ast = output_ast
   then Ok ()
   else (

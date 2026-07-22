@@ -229,15 +229,15 @@ let exclave_extension loc =
 let mkexp_exclave ~loc ~kwd_loc exp =
   ghexp ~loc (Pexp_apply(exclave_extension (make_loc kwd_loc), [Nolabel, exp]))
 
-let mktyp_curry typ loc =
-  {typ with ptyp_attributes =
-     Builtin_attributes.curry_attr loc :: typ.ptyp_attributes}
-
-let maybe_curry_typ typ loc =
+let maybe_curry_typ typ _loc =
   match typ.ptyp_desc with
+(*
+  (* This parser is used only by the AST checker, it should not hallucinate
+     things. *)
   | Ptyp_arrow _ ->
       if Builtin_attributes.has_curry typ.ptyp_attributes then typ
       else mktyp_curry typ (make_loc loc)
+*)
   | _ -> typ
 
 (* TODO define an abstraction boundary between locations-as-pairs
