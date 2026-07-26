@@ -11,7 +11,7 @@
   (synopsis "Styling O(x)Caml code")
   (depends
     (cmdliner (>= 2.1.0))
-    menhir
+    (menhir (>= 20260209))
     odoc-parser
     ppxlib ; TODO: only require it in dev mode
     ))
