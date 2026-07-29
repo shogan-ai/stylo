@@ -1,67 +1,100 @@
-# Upgrade workflow
+This directory contains a vendored subset of the oxcaml compiler frontend, built
+as the `oxcaml_frontend` library. Stylo does not use it at runtime; it exists as
 
-## Upgrading the vendored frontend
+- the grammar reference that `tools/diff-grammar.sh` compares stylo's parser
+  against, and
+- the input from which dune generates `ast_mapper.ml` (via
+  `lib/traversals/gen.exe`).
 
-- Pull oxcaml.
-- Get targeted log/diff since the last sync:
+`upstream-commit.txt` records the oxcaml commit the files were last imported
+from.
+
+Most files here track their upstream counterparts (from oxcaml's `parsing/` and
+`utils/` directories), possibly with small local edits needed to build
+standalone. Three files are hand-maintained shims, not upstream copies:
+`clflags.ml`, `misc.ml` and `pprintast.ml` are fake or heavily trimmed stand-ins
+carrying just enough definitions for the library to build.
+
+## Upgrading
+
+```
+./vendor/oxcaml-frontend/repatch.sh <path-to-oxcaml-checkout> [<rev>]
+```
+
+`<rev>` defaults to `HEAD`. Prerequisites:
+
+- no uncommitted changes under `vendor/oxcaml-frontend/` or `lib/parsing/`
+- the oxcaml checkout must contain both `<rev>` and the commit in
+  `upstream-commit.txt`
+- a `dune` that works in this project: the script puts `./_opam/bin` first on
+  `PATH` if present, and aborts if the `dune` it finds still doesn't run
+  (e.g. it found only jane street's internal version of dune)
+
+The script:
+
+1. captures a baseline of `tools/diff-grammar.sh` (the acceptable
+   vendor-vs-stylo grammar delta before the upgrade);
+2. three-way-merges each tracked vendor file: ancestor = the file at the commit
+   in `upstream-commit.txt`, theirs = the file at `<rev>`, ours = the vendor
+   copy.
+3. runs the same merge into the `lib/parsing/` files that are CST-adapted copies
+   of vendor files (`parser.mly`, `parsetree.mli`, `lexer.mll`, ...), so the
+   upstream delta lands there with conflict markers wherever it collides with
+   the CST adaptations;
+4. updates `upstream-commit.txt` and prints a per-file conflict summary, plus
+   notes about upstream file additions/deletions and about upstream changes to
+   files stylo has rewritten (see below).
+
+Tips:
+
+- Read the upstream log before you start; it gives far more context than the
+  merged diff alone:
   ```
-  git log $(cat $STYLO/vendor/oxcaml-frontend/upstream-commit.txt)..HEAD -- \
-    parsing/{parsetree.mli,parser.mly,lexer.mll}
+  git -C $OXCAML log $(cat vendor/oxcaml-frontend/upstream-commit.txt)..<rev> -- parsing/
   ```
-  Getting the log from oxcaml gives more context than just diffing after having
-  reimported the files.
-- report upstream changes to stylo's `vendor/` directory.
-  The best method (whole file `cp`, `patch`, manual edits, ...) is left to the
-  appreciation of the updater although the following often works well enough
-  ```
-  cd $OXCAML
-  git diff -p $(cat $STYLO/vendor/oxcaml-frontend/upstream-commit.txt)..HEAD \
-    -- parsing/{parsetree.mli,parser.mly,lexer.mll,ast_helper.*} \
-    > /tmp/parsing.patch
-  cd $STYLO
-  patch -d vendor/oxcaml-frontend -p2 < /tmp/parsing.patch
-  ```
+- After a long gap, upgrade in steps (`repatch.sh $OXCAML <intermediate-rev>`
+  repeatedly, resolving as you go) to keep the conflict volume manageable.
 
-## Upgrading stylo
+## Resolving conflicts in vendor/
 
-### AST vs CST
+Almost always take the upstream side. The only legitimate local content is the
+minimal edits needed for this library to build on its own (it links against only
+`menhirLib` and stylo's `config`). If the new code needs more from `Misc`,
+`Clflags` or `Pprintast`, extend those shims by hand.
 
-Changes to the parsetree can sometimes be imported directly, but will most
-likely need some tweaking: `lib/parsing/parsetree.mli` defines a CST, there are
-more nodes and fields than in `vendor/oxcaml-frontend/parsetree.mli`.
+## Resolving conflicts in lib/parsing/
 
-If we oversimplify things a bit, we can assume there are only two kinds of
-changes to the AST:
-1. a new constructor is added to an already defined syntactic category, e.g. the
-   addition of unboxed tuple patterns `Ppat_unboxed_tuple of ...`
-2. a new syntactic category is defined, e.g . list/array comprehensions
+`lib/parsing/` defines a CST, not the compiler's AST: nodes carry extra
+constructors and fields to keep everything the compiler discards (parentheses,
+tokens, ...; see `HACKING.md`). The merge deliberately leaves you conflicts
+exactly where upstream changed something stylo had to adapt. But these may not
+be the only things you need to change - new upstream additions may merge cleanly
+into the parser, but their actions will need to be updated to produce the CST
+rather than the AST.
 
-(1) can usually be imported as is, as long as the concrete syntax can be
-unambiguously reconstructed from the information in the parsetree.
-There have historically been a few cases where that was not directly possible,
-for instance the `Pexp_open` could be obtained from two distinct concrete forms:
-`let open M in ...` and `M.(...)`, in that case the AST constructor was replaced
-by two CST contructors `Pexp_let_open` and `Pexp_dot_open`.
+**Files the script does not merge into lib/parsing**: `ast_helper.*`,
+`location.*`, `longident.*` and `parse.ml` share names with upstream files but
+have diverged in ways that make a line-level merge useless. The script prints a
+note when upstream changed these files; apply it manually. In particular,
+whatever you decided for a `parsetree.mli` change usually needs mirroring in
+`lib/parsing/ast_helper.*` by hand.
 
-(2) will pretty much always require some changes, but they are fairly
-regular/mechanical. Mainly, one needs to make sure that these new CST nodes
-carry with them the tokens used for their construction (cf. `HACKING.md`).
-Which roughly means:
-- making sure the record contains a `pwhatever_tokens` field
-- calling `Tokens.at <some loc>` from the parser when constructing values of
-  that type
-- updating `lib/parsing/tokens_of_tree.ml` to visit the new nodes when
-  extracting tokens from the CST.
+## Verifying the upgrade
 
-### Parser changes
+Build and run tests. You will probably have to update the styling code, and will
+want to add tests for any new language constructs you are supporting.
 
-`lib/parsing/parser.mly` is probably the place where most manual interventions
-will happen.
+## Manual fallback
 
-Roughly, you want to import verbatim the changes to the grammar itself but adapt
-the content of the semantic actions.
+The script is just a loop around `git merge-file`; the same operation for a
+single file is:
 
-`tools/diff-grammar.sh` can be used to produce a (mostly) noise-free diff of
-stylo's grammar with the one in `vendor/oxcaml-frontend`. A good approximation
-your goal during an update is that this diff should be the same before you start
-the upgrade, and after you're done upgrading everything.
+```
+old=$(cat vendor/oxcaml-frontend/upstream-commit.txt)
+git -C $OXCAML show $old:parsing/parser.mly > /tmp/parser-old.mly
+git -C $OXCAML show <rev>:parsing/parser.mly > /tmp/parser-new.mly
+git merge-file --diff3 lib/parsing/parser.mly /tmp/parser-old.mly /tmp/parser-new.mly
+```
+
+The list of tracked files and their upstream paths lives at the top of
+`repatch.sh`.

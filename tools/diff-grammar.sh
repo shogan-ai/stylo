@@ -40,11 +40,18 @@ function do_diff {
     accept_diff $1 > $1.txt
     accept_diff $2 > $2.txt
     if (which patdiff &>/dev/null); then
-        patdiff -alt-prev "$1" -alt-next "$2" \
-            $1.txt $2.txt | \
-            less -r
+        if [ -t 1 ]; then
+            patdiff -alt-prev "$1" -alt-next "$2" \
+                $1.txt $2.txt | \
+                less -r
+        else
+            # plain output when redirected, e.g. to capture a baseline before
+            # an upgrade (cf. vendor/oxcaml-frontend/repatch.sh)
+            patdiff -ascii -alt-prev "$1" -alt-next "$2" \
+                $1.txt $2.txt || true
+        fi
     else
-        git diff --no-index $1.txt $2.txt
+        git diff --no-index $1.txt $2.txt || true
     fi
 }
 
