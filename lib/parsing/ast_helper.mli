@@ -244,6 +244,14 @@ module Val:
       value_description
   end
 
+(** Kind declarations *)
+module Jkd:
+  sig
+    val mk: ?loc:loc -> ?ext_attrs:ext_attribute -> ?attrs:attrs ->
+      tokens:Tokens.seq -> ?docs:docs ->
+      str -> jkind_annotation option -> jkind_declaration
+  end
+
 (** Type declarations *)
 module Type:
   sig

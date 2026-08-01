@@ -15,10 +15,8 @@ type _ t =
   | Module_strengthening : unit t
   | Layouts : maturity t
   | SIMD : maturity t
-  | Labeled_tuples : unit t
   | Small_numbers : maturity t
   | Instances : unit t
-  | Separability : unit t
   | Let_mutable : unit t
   | Layout_poly : maturity t
   | Runtime_metaprogramming : unit t
@@ -35,10 +33,8 @@ let to_string : type a. a t -> string = function
   | Module_strengthening -> "module_strengthening"
   | Layouts -> "layouts"
   | SIMD -> "simd"
-  | Labeled_tuples -> "labeled_tuples"
   | Small_numbers -> "small_numbers"
   | Instances -> "instances"
-  | Separability -> "separability"
   | Let_mutable -> "let_mutable"
   | Layout_poly -> "layout_poly"
   | Runtime_metaprogramming -> "runtime_metaprogramming"

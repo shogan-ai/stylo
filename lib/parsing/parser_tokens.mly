@@ -113,7 +113,6 @@
 %token NONREC                 "nonrec"
 %token OBJECT                 "object"
 %token OF                     "of"
-%token ONCE                   "once_"
 %token OPEN                   "open"
 %token <string> OPTLABEL      "?label:" (* just an example *)
 %token OR                     "or"
@@ -158,7 +157,6 @@
 %token TYPE                   "type"
 %token <string> UIDENT        "UIdent" (* just an example *)
 %token UNDERSCORE             "_"
-%token UNIQUE                 "unique_"
 %token VAL                    "val"
 %token VIRTUAL                "virtual"
 %token WHEN                   "when"

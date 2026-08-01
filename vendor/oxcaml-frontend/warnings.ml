@@ -130,6 +130,10 @@ type t =
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
+  (* Oxcaml specific warnings: numbers should go down from 199 *)
+  | Untagged_external_small_int_return      (* 182 *)
+  | Redundant_kind_modifier of string       (* 183 *)
+  | Ignored_kind_modifier of string * string list (* 184 *)
   | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)
@@ -227,6 +231,9 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
+  | Untagged_external_small_int_return -> 182
+  | Redundant_kind_modifier _ -> 183
+  | Ignored_kind_modifier _ -> 184
   | Unmutated_mutable _ -> 186
   | Incompatible_with_upstream _ -> 187
   | Unerasable_position_argument -> 188
@@ -584,6 +591,25 @@ let descriptions = [
     description = "A generative functor is applied to an empty structure \
                    (struct end) rather than to ().";
     since = since 5 1 };
+  { number = 182;
+    names = ["untagged-external-small-int-return"];
+    description = "An external declaration returns an (int8[@untagged]) or \
+                   an (int16[@untagged])";
+    since = since 5 2 };
+  { number = 183;
+    names = ["redundant-kind-modifier"];
+    (* CR layouts-scannable: As more axes are added, this description (and
+       the following description) should be updated in tandem. *)
+    description = "A nullability or separability axis annotation appears on \
+                   a kind that already implies the annotation.";
+    since = since 5 2 };
+  { number = 184;
+    names = ["ignored-kind-modifier"];
+    (* CR layouts-scannable: As more axes are added, this description (and
+       the following description) should be updated in tandem. *)
+    description = "A nullability or separability axis annotation appears on \
+                   a non-value, non-any layout.";
+    since = since 5 2 };
   { number = 186;
     names = ["unmutated-mutable"];
     description =
@@ -968,7 +994,7 @@ let parse_options errflag s =
   alerts
 
 (* If you change these, don't forget to change them in man/ocamlc.m *)
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70"
+let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-183..184"
 let defaults_warn_error = "-a"
 let default_disabled_alerts = [ "unstable"; "unsynchronized_access" ]
 
@@ -1248,6 +1274,17 @@ let message = function
   | Generative_application_expects_unit ->
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
+  | Untagged_external_small_int_return ->
+      "Using (int8[@untagged]) or (int16[@untagged]) on C stub returns is not\n\
+       recommended since [@untagged] does not perform a sign-extension. Use\n\
+       (int8[@unboxed]) or (int16[@unboxed]) instead."
+  | Redundant_kind_modifier abbrev ->
+      "This kind modifier, or a stronger one, is\n\
+       already implied by the kind \"" ^ abbrev ^ "\"."
+  | Ignored_kind_modifier (abbrev, modifiers) ->
+      Printf.sprintf
+      "The kind modifier(s) \"%s\" have no effect on the kind \"%s\"."
+      (String.concat " " modifiers) abbrev
   | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
   | Incompatible_with_upstream (Immediate_erasure id)  ->
       Printf.sprintf

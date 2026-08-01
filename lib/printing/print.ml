@@ -3998,8 +3998,8 @@ end
 and Jkind_declaration : sig
   val pp : jkind_declaration -> t
 end = struct
-  let pp { pjkind_ext_attrs; pjkind_name; pjkind_manifest; pjkind_attributes;
-           pjkind_loc = _; pjkind_tokens = _ } =
+  let pp { pjkind_pre_doc; pjkind_ext_attrs; pjkind_name; pjkind_manifest;
+           pjkind_attributes; pjkind_post_doc; pjkind_loc = _; pjkind_tokens = _ } =
     let kw = Ext_attribute.decorate S.kind__ pjkind_ext_attrs in
     Attribute.attach ~item:true ~attrs:pjkind_attributes (
       kw ^/^ string pjkind_name.txt ^?^
@@ -4008,6 +4008,7 @@ end = struct
       | Some annot -> S.equals ^/^ Jkind_annotation.pp annot
     )
     |> group
+    |> Doc.attach ?pre_doc:pjkind_pre_doc ?post_doc:pjkind_post_doc
 end
 
 (* FIXME: TODO? *)

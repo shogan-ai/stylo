@@ -107,8 +107,6 @@ end
 let token_of_legacy_mode (m : mode Location.loc) : Parser_tokens.token =
   match m.txt with
   | Mode "local" -> LOCAL
-  | Mode "unique" -> UNIQUE
-  | Mode "once" -> ONCE
   | _ -> assert false
 
 let rec expression e =

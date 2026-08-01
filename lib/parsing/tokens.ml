@@ -104,7 +104,6 @@ module Raw = struct
   | NONREC  -> "NONREC"
   | OBJECT  -> "OBJECT"
   | OF  -> "OF"
-  | ONCE  -> "ONCE"
   | OPEN  -> "OPEN"
   | OPTLABEL _ -> "OPTLABEL"
   | OR  -> "OR"
@@ -144,7 +143,6 @@ module Raw = struct
   | TYPE  -> "TYPE"
   | UIDENT _ -> "UIDENT"
   | UNDERSCORE  -> "UNDERSCORE"
-  | UNIQUE  -> "UNIQUE"
   | VAL  -> "VAL"
   | VIRTUAL  -> "VIRTUAL"
   | WHEN  -> "WHEN"
@@ -260,7 +258,6 @@ module Raw = struct
   | NONREC , NONREC -> true
   | OBJECT , OBJECT -> true
   | OF , OF -> true
-  | ONCE , ONCE -> true
   | OPEN , OPEN -> true
   | OPTLABEL _, OPTLABEL _-> true
   | OR , OR -> true
@@ -300,7 +297,6 @@ module Raw = struct
   | TYPE , TYPE -> true
   | UIDENT _, UIDENT _-> true
   | UNDERSCORE , UNDERSCORE -> true
-  | UNIQUE , UNIQUE -> true
   | VAL , VAL -> true
   | VIRTUAL , VIRTUAL -> true
   | WHEN , WHEN -> true

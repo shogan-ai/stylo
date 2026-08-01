@@ -1002,10 +1002,12 @@ and extension_constructor_kind =
 
 and jkind_declaration =
   {
+    pjkind_pre_doc: doc option;
     pjkind_ext_attrs: ext_attribute;
     pjkind_name : string loc;
     pjkind_manifest : jkind_annotation option;
     pjkind_attributes : attributes;
+    pjkind_post_doc: doc option;
     pjkind_loc : Location.t;
     pjkind_tokens : Tokens.seq;
   }

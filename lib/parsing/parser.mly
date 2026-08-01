@@ -667,6 +667,9 @@ let unboxed_type sloc lident tys =
   Ptyp_constr (tys, mkloc lident loc)
 %}
 
+/* Tokens: stylo declares these in [parser_tokens.mly]. To resolve a conflict
+   here, manually apply the old oxcaml -> new oxcaml diff in that file. */
+
 
 /* Precedences and associativities.
 
@@ -3872,14 +3875,13 @@ jkind_constraint:
 jkind_decl:
   KIND
   ext_attrs=attrs_as_extattrs
-  pjkind_name=mkrhs(LIDENT)
-  pjkind_manifest=jkind_manifest
+  name=mkrhs(LIDENT)
+  manifest=jkind_manifest
   attrs=post_item_attributes
     {
-      let pjkind_loc = make_loc $sloc in
-      { pjkind_name; pjkind_manifest; pjkind_attributes = attrs; pjkind_loc
-      ; pjkind_ext_attrs = ext_attrs
-      ; pjkind_tokens = Tokens.at $sloc }
+      let loc = make_loc $sloc in
+      let docs, sloc = symbol_docs $sloc in
+      Jkd.mk name manifest ~ext_attrs ~attrs ~loc ~docs ~tokens:(Tokens.at sloc)
     }
 
 %inline type_param_with_jkind:
@@ -4442,10 +4444,6 @@ strict_function_or_labeled_tuple_type:
 %inline mode_legacy:
    | LOCAL
        { mkloc (Mode "local") (make_loc $sloc) }
-   | UNIQUE
-       { mkloc (Mode "unique") (make_loc $sloc) }
-   | ONCE
-       { mkloc (Mode "once") (make_loc $sloc) }
 ;
 
 %inline mode_expr_legacy:

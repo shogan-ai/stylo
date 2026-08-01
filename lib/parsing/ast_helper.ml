@@ -473,6 +473,22 @@ module Val = struct
     }
 end
 
+module Jkd = struct
+  let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = No_attributes)
+        ~tokens ?(docs = empty_docs) name manifest =
+    let pre_doc, post_doc = Docs.pre_post docs in
+    {
+     pjkind_pre_doc = pre_doc;
+     pjkind_ext_attrs = ext_attrs;
+     pjkind_name = name;
+     pjkind_manifest = manifest;
+     pjkind_attributes = attrs;
+     pjkind_post_doc = post_doc;
+     pjkind_loc = loc;
+     pjkind_tokens = tokens;
+    }
+end
+
 module Md = struct
   let mk ?(loc = !default_loc) ?(ext_attrs = empty_ext_attr) ?(attrs = No_attributes)
         ~tokens ?(docs = empty_docs) ?(text = []) name body =
