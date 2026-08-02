@@ -15,6 +15,7 @@ let cleaner erase =
   object
     method unit () () = ()
     method format__formatter () x = x (* eww. *)
+    method format_doc__t () x = x
 
     inherit [unit] Traversals_helpers.map_with_context
     inherit [unit] Ast_mapper.map_with_context as super
@@ -49,9 +50,9 @@ let cleaner erase =
       sort_attributes attrs (* FIXME: why? *)
       |> super#attributes ()
 
-    method! constant () c =
-      do_erase Erase_jane_syntax.constant c
-      |> super#constant ()
+    method! constant_desc () c =
+      do_erase Erase_jane_syntax.constant_desc c
+      |> super#constant_desc ()
 
     method! expression () e =
       do_erase Erase_jane_syntax.expression e

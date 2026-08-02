@@ -23,9 +23,13 @@
 
 open Asttypes
 
-(**************************************************************)
+type constant = {
+  pconst_desc : constant_desc;
+  pconst_loc : Location.t;
+  pconst_tokens : Tokens.seq;
+}
 
-type constant =
+and constant_desc =
   | Pconst_integer of string option * string * char option
       (** Integer constants such as [3] [-3] [-3l] [3L] [3n].
 
@@ -172,9 +176,12 @@ and core_type_desc =
          *)
   | Ptyp_tuple of (string option * core_type) list
       (** [Ptyp_tuple(tl)] represents a product type:
-          - [T1 * ... * Tn]       when [tl] is [(None,T1);...;(None,Tn)]
-          - [L1:T1 * ... * Ln:Tn] when [tl] is [(Some L1,T1);...;(Some Ln,Tn)]
-          - A mix, e.g. [L1:T1 * T2] when [tl] is [(Some L1,T1);(None,T2)]
+          - [T1 * ... * Tn]
+              when [tl] is [(None, T1); ...; (None, Tn)]
+          - [L1:T1 * ... * Ln:Tn]
+              when [tl] is [(Some L1, T1); ...; (Some Ln, Tn)]
+          - A mix, e.g., [L1:T1 * T2]
+              when [tl] is [(Some L1, T1); (None, T2)]
 
            Invariant: [n >= 2].
         *)
@@ -340,18 +347,6 @@ and pattern_desc =
            but rejected by the type-checker. *)
   | Ppat_unboxed_unit (** [#()] *)
   | Ppat_unboxed_bool of bool (** [#false] or [#true] *)
-  | Ppat_tuple of pattern argument list * closed_flag
-      (** [Ppat_tuple(pl, Closed)] represents
-          - [(P1, ..., Pn)]       when [pl] is [(None, P1);...;(None, Pn)]
-          - [(~L1:P1, ..., ~Ln:Pn)] when [pl] is
-            [(Some L1, P1);...;(Some Ln, Pn)]
-          - A mix, e.g. [(~L1:P1, P2)] when [pl] is [(Some L1, P1);(None, P2)]
-          - If pattern is open, then it also ends in a [..]
-
-          Invariant:
-          - If Closed, [n >= 2].
-          - If Open, [n >= 1].
-        *)
   | Ppat_unboxed_tuple of pattern argument list * closed_flag
       (** Unboxed tuple patterns: [#(l1:P1, ..., ln:Pn)] is [([(Some
           l1,P1);...;(Some l2,Pn)], Closed)], and the labels are optional.  An
@@ -361,6 +356,22 @@ and pattern_desc =
           - If Closed, [n >= 2]
           - If Open, [n >= 1]
         *)
+  | Ppat_tuple of pattern argument list * Asttypes.closed_flag
+      (** [Ppat_tuple(pl, Closed)] represents
+          - [(P1, ..., Pn)]
+              when [pl] is [(None, P1); ...; (None, Pn)]
+          - [(~L1:P1, ..., ~Ln:Pn)]
+              when [pl] is [(Some L1, P1); ...; (Some Ln, Pn)]
+          - A mix, e.g. [(~L1:P1, P2)]
+              when [pl] is [(Some L1, P1); (None, P2)]
+
+          [Ppat_tuple(pl, Open)] is similar, but indicates the pattern
+          additionally ends in a [..].
+
+          Invariant:
+          - If Closed, [n >= 2].
+          - If Open, [n >= 1].
+      *)
   | Ppat_construct of Longident.t loc * (bound_ty_var list * pattern) option
       (** [Ppat_construct(C, args)] represents:
             - [C]               when [args] is [None],
@@ -409,6 +420,7 @@ and pattern_desc =
             - [(module P)] when [s] is [Some "P"]
             - [(module _)] when [s] is [None] *)
   | Ppat_exception of pattern  (** Pattern [exception P] *)
+  | Ppat_effect of pattern * pattern (* Pattern [effect P P] *)
   | Ppat_extension of extension  (** Pattern [[%id]] *)
   | Ppat_open of Longident.t loc * pattern  (** Pattern [M.(P)] *)
   | Ppat_parens of { pat: pattern; optional: bool }
@@ -451,8 +463,9 @@ and expression_desc =
       [C] represents a type constraint or coercion placed immediately before the
       arrow, e.g. [fun P1 ... Pn : ty -> ...] when [C = Some (Pconstraint ty)].
 
-      A function must have parameters. [Pexp_function (params, _, body)] must
-      have non-empty [params] or a [Pfunction_cases _] body.
+      A function must have parameters: in [Pexp_function (params, _, body)],
+      if [params] does not contain a [Pparam_val _], [body] must be
+      [Pfunction_cases _].
   *)
   | Pexp_prefix_apply of expression * expression
   | Pexp_add_or_sub of string * expression
@@ -477,11 +490,11 @@ and expression_desc =
   | Pexp_tuple of expression argument list
       (** [Pexp_tuple(el)] represents
           - [(E1, ..., En)]
-            when [el] is [(None, E1);...;(None, En)]
+              when [el] is [(None, E1); ...; (None, En)]
           - [(~L1:E1, ..., ~Ln:En)]
-            when [el] is [(Some L1, E1);...;(Some Ln, En)]
-          - A mix, e.g.:
-            [(~L1:E1, E2)] when [el] is [(Some L1, E1); (None, E2)]
+              when [el] is [(Some L1, E1); ...; (Some Ln, En)]
+          - A mix, e.g., [(~L1:E1, E2)]
+              when [el] is [(Some L1, E1); (None, E2)]
 
            Invariant: [n >= 2]
         *)
@@ -561,10 +574,7 @@ and expression_desc =
   | Pexp_lazy of expression  (** [lazy E] *)
   | Pexp_object of class_structure  (** [object ... end] *)
   | Pexp_pack of module_expr * package_type option
-      (** [(module ME)].
-
-           [(module ME : S)] is represented as
-           [Pexp_constraint(Pexp_pack ME, Ptyp_package S)] *)
+      (** [(module ME)] or [(module ME : S)]. *)
   | Pexp_dot_open of Longident.t loc * expression
       (** - [M.(E)] *)
   | Pexp_let_open of open_declaration * expression

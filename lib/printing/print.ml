@@ -63,9 +63,9 @@ let str_or_op (so : Longident.str_or_op) =
 let rec longident (l : Longident.t) =
   match l.desc with
   | Lident so -> str_or_op so
-  | Ldot (lid, s) -> longident lid ^^ S.dot ^^ str_or_op s
+  | Ldot (lid, s) -> longident lid.txt ^^ S.dot ^^ str_or_op s.txt
   | Lapply (l1, l2) ->
-    longident l1 ^^ S.lparen ^^ break 0 ^^ longident l2 ^^ break 0 ^^ S.rparen
+    longident l1.txt ^^ S.lparen ^^ break 0 ^^ longident l2.txt ^^ break 0 ^^ S.rparen
 
 let constr_ident = function
   | Longident.Str "[]" -> S.lbracket ^^ S.rbracket
@@ -108,7 +108,7 @@ let array_delimiters = function
 
 (* N.B. [stringf] is important here: suffixed number come out of the lexer as a
    single token. We can't use ^^ here. *)
-let constant = function
+let constant c = match c.pconst_desc with
   | Pconst_float (sign, nb, None)
   | Pconst_integer (sign, nb, None) -> optional string sign ^^ string nb
   | Pconst_float (sign, nb, Some suffix)
@@ -121,7 +121,7 @@ let constant = function
   | Pconst_unboxed_float (sign, nb, Some suffix) ->
     optional string sign ^^ stringf "#%s%c" nb suffix
   | Pconst_char (_, src) -> stringf "%s" src
-  | Pconst_untagged_char (_, src) -> stringf "%s" src
+  | Pconst_untagged_char (_, src) -> stringf "#%s" src
   | Pconst_string (s, _, None) -> String_lit.pp s
   | Pconst_string (s, _, Some delim) -> fancy_string "{%s|%s|%s}" delim s delim
 
@@ -922,6 +922,9 @@ end = struct
     | Ppat_exception p ->
       let exn, pre_nest = Preceeding.group_with preceeding !!S.exception_ in
       exn ^/^ pre_nest @@ nest 2 (pp p)
+    | Ppat_effect (p1, p2) ->
+      let eff, pre_nest = Preceeding.group_with preceeding !!S.effect_ in
+      eff ^/^ pre_nest @@ nest 2 (pp p1 ^^ S.comma ^/^ pp p2)
     | Ppat_extension ext -> Extension.pp ?preceeding ext
     | Ppat_open (lid, p) -> pp_open ~preceeding lid p
     | Ppat_parens { pat; optional } ->
@@ -1175,9 +1178,10 @@ end = struct
     | Pexp_unboxed_tuple _
     | Pexp_record_unboxed_product _
     | Pexp_constant
-        ( Pconst_unboxed_float _
-        | Pconst_unboxed_integer _
-        | Pconst_untagged_char _)
+        { pconst_desc =
+            ( Pconst_unboxed_float _
+            | Pconst_unboxed_integer _
+            | Pconst_untagged_char _); _ }
     (* And before < or $ *)
     | Pexp_quote _
     | Pexp_splice _
@@ -1523,7 +1527,7 @@ end = struct
     let pre_nest = Preceeding.implied_nest preceeding in
     let spaces_before_dot =
       match seq.pexp_desc with
-      | Pexp_constant Pconst_integer (_, _, None) ->
+      | Pexp_constant { pconst_desc = Pconst_integer (_, _, None); _ } ->
         (* An int without suffix would become a float... *)
         1
       | _ -> 0
@@ -1916,7 +1920,7 @@ end = struct
     let pre_nest = Preceeding.implied_nest preceeding in
     let space =
       match e.pexp_desc with
-      | Pexp_constant Pconst_integer (_, _, None) ->
+      | Pexp_constant { pconst_desc = Pconst_integer (_, _, None); _ } ->
         (* We need a space here otherwise this would lex as an invalid
            literal. *)
         nbsp
@@ -2481,6 +2485,11 @@ end = struct
       if var_inj_as_single_token tokens
       then string "!-"
       else S.minus ^^ S.bang
+    | Bivariant, NoInjectivity -> string "+-"
+    | Bivariant, Injective ->
+      if var_inj_as_single_token tokens
+      then string "!+-"
+      else string "+-" ^^ S.bang
   )
 
   let pp ?preceeding

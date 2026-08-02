@@ -12,6 +12,7 @@
 (*   special exception on linking described in the file LICENSE.          *)
 (*                                                                        *)
 (**************************************************************************)
+open Location
 
 type dotop_delims = Paren | Brace | Bracket
 
@@ -23,13 +24,13 @@ type str_or_op =
 
 type lid_desc =
     Lident of str_or_op
-  | Ldot of t * str_or_op
-  | Lapply of t * t
+  | Ldot of t loc * str_or_op loc
+  | Lapply of t loc * t loc
 
 and t = { desc: lid_desc; tokens: Tokens.seq }
 
 let last t =
   match t.desc with
     Lident s -> s
-  | Ldot(_, s) -> s
+  | Ldot(_, s) -> s.txt
   | Lapply(_, _) -> failwith "Longident.last"

@@ -49,15 +49,19 @@ end
 (** {1 Constants} *)
 
 module Const : sig
-  val char : char -> constant
+  val mk : ?loc:loc -> tokens:Tokens.seq -> constant_desc -> constant
+  val char : ?loc:loc -> tokens:Tokens.seq -> char -> constant
   val string :
-    ?quotation_delimiter:string -> ?loc:Location.t -> string -> constant
-  val integer : ?sign:string -> ?suffix:char -> string -> constant
-  val int : ?suffix:char -> int -> constant
-  val int32 : ?suffix:char -> int32 -> constant
-  val int64 : ?suffix:char -> int64 -> constant
-  val nativeint : ?suffix:char -> nativeint -> constant
-  val float : ?sign:string -> ?suffix:char -> string -> constant
+    ?quotation_delimiter:string -> ?loc:Location.t -> tokens:Tokens.seq -> string ->
+    constant
+  val integer : ?loc:loc -> ?sign:string -> ?suffix:char -> tokens:Tokens.seq -> string ->
+    constant
+  val int : ?loc:loc -> ?suffix:char -> tokens:Tokens.seq -> int -> constant
+  val int32 : ?loc:loc -> ?suffix:char -> tokens:Tokens.seq -> int32 -> constant
+  val int64 : ?loc:loc -> ?suffix:char -> tokens:Tokens.seq -> int64 -> constant
+  val nativeint : ?loc:loc -> ?suffix:char -> tokens:Tokens.seq -> nativeint -> constant
+  val float : ?loc:loc -> ?sign:string -> ?suffix:char -> tokens:Tokens.seq -> string ->
+    constant
 end
 
 (** {1 Attributes} *)

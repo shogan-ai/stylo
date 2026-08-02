@@ -19,7 +19,8 @@ module Implicit_source_pos = struct
         ; { desc = Token (DOT, false); pos }
         ; mk_ident_tok ?uppercase s ]
       in
-      { Longident.desc = Ldot (lid, Str s); tokens }
+      { Longident.desc =
+          Ldot (Location.mknoloc lid, Location.mknoloc (Longident.Str s)); tokens }
     in
     let stdlib =
       let str = "Stdlib" in
@@ -88,20 +89,35 @@ module Implicit_source_pos = struct
 end
 
 module Constant = struct
-  let rewrite parent_tokens = function
+  let rewrite { pconst_desc; pconst_loc; pconst_tokens } =
+    match pconst_desc with
     | Pconst_unboxed_float (sign, lit, modifier) ->
-      Pconst_float (sign, lit, modifier),
-      Tokens.Seq.search_and_replace
-        [ HASH_FLOAT (lit, modifier)
-        , FLOAT (lit, modifier) ]
-        parent_tokens
+      { pconst_desc = Pconst_float (sign, lit, modifier);
+        pconst_loc;
+        pconst_tokens =
+          Tokens.Seq.search_and_replace
+            [ HASH_FLOAT (lit, modifier)
+            , FLOAT (lit, modifier) ]
+            pconst_tokens }
     | Pconst_unboxed_integer (sign, lit, modifier) ->
-      Pconst_integer (sign, lit, Some modifier),
-      Tokens.Seq.search_and_replace
-        [ HASH_INT (lit, Some modifier)
-        , INT (lit, Some modifier) ]
-        parent_tokens
-    | c -> c, parent_tokens
+      { pconst_desc = Pconst_integer (sign, lit, Some modifier);
+        pconst_loc;
+        pconst_tokens =
+          Tokens.Seq.search_and_replace
+            [ HASH_INT (lit, Some modifier)
+            , INT (lit, Some modifier) ]
+            pconst_tokens }
+    | Pconst_untagged_char (ch, src) ->
+      { pconst_desc = Pconst_char (ch, src);
+        pconst_loc;
+        pconst_tokens =
+          Tokens.Seq.search_and_replace
+            [ HASH_CHAR (ch, src)
+            , CHAR (ch, src) ]
+            pconst_tokens }
+    | Pconst_integer _ | Pconst_char _
+    | Pconst_string _ | Pconst_float _ ->
+      { pconst_desc; pconst_loc; pconst_tokens }
 end
 
 let token_of_legacy_mode (m : mode Location.loc) : Parser_tokens.token =
@@ -138,10 +154,7 @@ let rec expression e =
       pexp_desc = Pexp_construct (lid_loc, None);
       pexp_tokens = exp_tokens }
   | Pexp_constant c ->
-    let boxed_c, tokens = Constant.rewrite e.pexp_tokens c in
-    { e with
-      pexp_desc = Pexp_constant boxed_c;
-      pexp_tokens = tokens }
+    { e with pexp_desc = Pexp_constant (Constant.rewrite c) }
   | Pexp_unboxed_bool b ->
     let lid_loc, exp_tokens = Unboxed.bool ~loc:e.pexp_loc e.pexp_tokens b in
     { e with
@@ -204,18 +217,10 @@ let pattern p =
       ppat_desc = Ppat_construct (lid_loc, None);
       ppat_tokens = exp_tokens }
   | Ppat_constant c ->
-    let boxed_c, tokens = Constant.rewrite p.ppat_tokens c in
-    { p with
-      ppat_desc = Ppat_constant boxed_c;
-      ppat_tokens = tokens }
+    { p with ppat_desc = Ppat_constant (Constant.rewrite c) }
   | Ppat_interval (c1, c2) ->
-    (* N.B. we thread [tokens] as the code might be ill-typed, e.g. the pattern
-       could be [#1 .. #3.14]. *)
-    let boxed_c1, tokens = Constant.rewrite p.ppat_tokens c1 in
-    let boxed_c2, tokens = Constant.rewrite tokens c2 in
     { p with
-      ppat_desc = Ppat_interval (boxed_c1, boxed_c2);
-      ppat_tokens = tokens }
+      ppat_desc = Ppat_interval (Constant.rewrite c1, Constant.rewrite c2) }
   | Ppat_unboxed_bool b ->
     let lid_loc, pat_tokens = Unboxed.bool ~loc:p.ppat_loc p.ppat_tokens b in
     { p with
@@ -462,18 +467,18 @@ module Arrow_arg = struct
 end
 
 let rec unboxed_type { Longident.desc; tokens } : Longident.t =
+  let sub lid = { lid with Location.txt = unboxed_type lid.Location.txt } in
   match desc with
   | Lident Str_trailing_hash s ->
     { desc = Lident (Str s);
       tokens = Tokens.Seq.without ~token:HASH_SUFFIX tokens }
-  | Ldot (lid, Str_trailing_hash s) ->
-    let lid = unboxed_type lid in
-    { desc = Ldot (lid, Str s);
+  | Ldot (lid, ({ txt = Str_trailing_hash s; _ } as name)) ->
+    { desc = Ldot (sub lid, { name with txt = Str s });
       tokens = Tokens.Seq.without ~token:HASH_SUFFIX tokens }
   | Lident _ -> { desc; tokens }
-  | Ldot (lid, s) -> { desc = Ldot (unboxed_type lid, s); tokens }
+  | Ldot (lid, s) -> { desc = Ldot (sub lid, s); tokens }
   | Lapply (l1, l2) ->
-    { desc = Lapply (unboxed_type l1, unboxed_type l2); tokens }
+    { desc = Lapply (sub l1, sub l2); tokens }
 
 let core_type ct =
   match ct.ptyp_desc with

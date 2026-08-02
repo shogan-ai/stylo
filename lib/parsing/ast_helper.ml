@@ -77,15 +77,25 @@ module Ext = struct
 end
 
 module Const = struct
-  let integer ?sign ?suffix i = Pconst_integer (sign, i, suffix)
-  let int ?suffix i = integer ?suffix (Int.to_string i)
-  let int32 ?(suffix='l') i = integer ~suffix (Int32.to_string i)
-  let int64 ?(suffix='L') i = integer ~suffix (Int64.to_string i)
-  let nativeint ?(suffix='n') i = integer ~suffix (Nativeint.to_string i)
-  let float ?sign ?suffix f = Pconst_float (sign, f, suffix)
-  let char c = Pconst_char (c, String.make 1 c)
-  let string ?quotation_delimiter ?(loc= !default_loc) s =
-    Pconst_string (s, loc, quotation_delimiter)
+  let mk ?(loc = !default_loc) ~tokens d =
+    {pconst_desc = d;
+     pconst_loc = loc;
+     pconst_tokens = tokens}
+
+  let integer ?loc ?sign ?suffix ~tokens i =
+    mk ?loc ~tokens (Pconst_integer (sign, i, suffix))
+  let int ?loc ?suffix ~tokens i = integer ?loc ?suffix ~tokens (Int.to_string i)
+  let int32 ?loc ?(suffix='l') ~tokens i =
+    integer ?loc ~suffix ~tokens (Int32.to_string i)
+  let int64 ?loc ?(suffix='L') ~tokens i =
+    integer ?loc ~suffix ~tokens (Int64.to_string i)
+  let nativeint ?loc ?(suffix='n') ~tokens i =
+    integer ?loc ~suffix ~tokens (Nativeint.to_string i)
+  let float ?loc ?sign ?suffix ~tokens f =
+    mk ?loc ~tokens (Pconst_float (sign, f, suffix))
+  let char ?loc ~tokens c = mk ?loc ~tokens (Pconst_char (c, String.make 1 c))
+  let string ?quotation_delimiter ?(loc= !default_loc) ~tokens s =
+    mk ~loc ~tokens (Pconst_string (s, loc, quotation_delimiter))
 end
 
 module Attr = struct

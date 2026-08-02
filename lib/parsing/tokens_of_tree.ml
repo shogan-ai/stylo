@@ -355,6 +355,10 @@ let tokenizer = object
     let node_toks = jk.pjkind_tokens in
     combine_children "jkind_declaration" ~loc:jk.pjkind_loc node_toks sub_tokens
 
+  method! constant c =
+    let sub_tokens = super#constant c in
+    combine_children "constant" ~loc:c.pconst_loc c.pconst_tokens sub_tokens
+
   method! module_name visit_modities mn =
     let sub_tokens = super#module_name visit_modities mn in
     let (name,_,node_toks) = mn in

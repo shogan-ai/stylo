@@ -12,7 +12,7 @@
 open Oxcaml_frontend
 open Parsetree
 
-let constant = function
+let constant_desc = function
   | Pconst_unboxed_integer (lit, modif) ->
     Pconst_integer (lit, Some modif)
   | Pconst_unboxed_float (lit, modif) ->
@@ -30,6 +30,11 @@ let is_exclave e =
     true
   | _ -> false
 
+let lid_of_parts ~loc ident projs =
+  let locate x = Location.mkloc x loc in
+  List.fold_left (fun lid proj -> locate @@ Longident.Ldot (lid, locate proj))
+    (locate @@ Longident.Lident ident) projs
+
 let rec expression e =
   let fold_into ~parent child =
     let merged_attributes = parent.pexp_attributes @ child.pexp_attributes in
@@ -45,12 +50,10 @@ let rec expression e =
     when is_exclave maybe_exclave ->
     fold_into ~parent:e child
   | Pexp_unboxed_unit ->
-    let unit_lid = Location.mkloc (Longident.Lident "()") e.pexp_loc in
+    let unit_lid = lid_of_parts ~loc:e.pexp_loc "()" [] in
     { e with pexp_desc = Pexp_construct (unit_lid, None) }
   | Pexp_unboxed_bool b ->
-    let bool_lid =
-      Location.mkloc (Longident.Lident (string_of_bool b)) e.pexp_loc
-    in
+    let bool_lid = lid_of_parts ~loc:e.pexp_loc (string_of_bool b) [] in
     { e with pexp_desc = Pexp_construct (bool_lid, None) }
   | Pexp_unboxed_tuple fields ->
     { e with pexp_desc = Pexp_tuple fields }
@@ -59,12 +62,8 @@ let rec expression e =
   | Pexp_unboxed_field (re, fn) ->
     { e with pexp_desc = Pexp_field (re, fn) }
   | Pexp_extension ({ txt = "src_pos"; _ }, PStr []) ->
-    let lid_loc =
-      Location.mkloc
-        Longident.(Ldot (Ldot (Lident "Stdlib", "Lexing"), "dummy_pos"))
-        e.pexp_loc
-    in
-    { e with pexp_desc = Pexp_ident lid_loc }
+    let lid = lid_of_parts ~loc:e.pexp_loc "Stdlib" ["Lexing"; "dummy_pos"] in
+    { e with pexp_desc = Pexp_ident lid }
   | Pexp_constraint (ce, None, _modes) ->
     (* explicit handling to erase the node in the absence of constraints *)
     fold_into ~parent:e ce
@@ -75,12 +74,10 @@ let rec expression e =
 let rec pattern p =
   match p.ppat_desc with
   | Ppat_unboxed_unit ->
-    let unit_lid = Location.mkloc (Longident.Lident "()") p.ppat_loc in
+    let unit_lid = lid_of_parts ~loc:p.ppat_loc "()" [] in
     { p with ppat_desc = Ppat_construct (unit_lid, None) }
   | Ppat_unboxed_bool b ->
-    let bool_lid =
-      Location.mkloc (Longident.Lident (string_of_bool b)) p.ppat_loc
-    in
+    let bool_lid = lid_of_parts ~loc:p.ppat_loc (string_of_bool b) [] in
     { p with ppat_desc = Ppat_construct (bool_lid, None) }
   | Ppat_unboxed_tuple (fields, cf) ->
     { p with ppat_desc = Ppat_tuple (fields, cf) }
@@ -104,8 +101,9 @@ let rec unboxed_type lid =
   let open Longident in
   match lid with
   | Lident s -> Lident (without_hash s)
-  | Ldot (lid, s) -> Ldot (lid, without_hash s)
-  | Lapply (l1, l2) -> Lapply (unboxed_type l1, unboxed_type l2)
+  | Ldot (lid, s) -> Ldot (lid, Location.map without_hash s)
+  | Lapply (l1, l2) ->
+    Lapply (Location.map unboxed_type l1, Location.map unboxed_type l2)
 
 let is_call_pos ct =
   match ct.ptyp_desc with
@@ -123,9 +121,7 @@ let core_type ct =
       match lbl with
       | Labelled lbl when is_call_pos dom ->
         let lid_loc =
-          Location.mkloc
-            Longident.(Ldot (Ldot (Lident "Stdlib", "Lexing"), "position"))
-            dom.ptyp_loc
+          lid_of_parts ~loc:dom.ptyp_loc "Stdlib" ["Lexing"; "position"]
         in
         let dom = { dom with ptyp_desc = Ptyp_constr (lid_loc, []) } in
         Ptyp_arrow (Optional lbl, dom, codom, dms, cdms)
@@ -161,11 +157,7 @@ let function_param_desc = function
     when is_call_pos ct ->
     let default =
       let loc = ct.ptyp_loc in
-      let lid_loc =
-        Location.mkloc
-          Longident.(Ldot (Ldot (Lident "Stdlib", "Lexing"), "dummy_pos"))
-          loc
-      in
+      let lid_loc = lid_of_parts ~loc "Stdlib" ["Lexing"; "dummy_pos"] in
       Ast_helper.Exp.ident ~loc lid_loc
     in
     let p = { cp with ppat_desc = Ppat_constraint (p, None, modes) } in

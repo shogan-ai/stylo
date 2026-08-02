@@ -63,6 +63,8 @@ TRACKED=(
   utils/terminfo.mli
   utils/warnings.ml
   utils/warnings.mli
+  utils/format_doc.ml
+  utils/format_doc.mli
 )
 
 # LIB_MERGE: the lib/parsing files that are CST-adapted copies of the vendor
@@ -253,7 +255,8 @@ fi
 added_deleted=$(git -C "$OXCAML" diff --name-status --diff-filter=ADR \
   "$OLD" "$NEW" -- parsing/ \
   utils/language_extension_kernel.ml utils/language_extension_kernel.mli \
-  utils/terminfo.ml utils/terminfo.mli utils/warnings.ml utils/warnings.mli)
+  utils/terminfo.ml utils/terminfo.mli utils/warnings.ml utils/warnings.mli \
+  utils/format_doc.ml utils/format_doc.mli)
 if [ -n "$added_deleted" ]; then
   echo
   echo "Upstream added/deleted/renamed frontend files since the last import"

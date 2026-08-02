@@ -39,6 +39,7 @@
 %token DOTDOT                 ".."
 %token DOTHASH                ".#"
 %token DOWNTO                 "downto"
+%token EFFECT                 "effect"
 %token ELSE                   "else"
 %token END                    "end"
 %token EOF                    ""
@@ -167,5 +168,10 @@
 %token <Lexer_directive.t> LEXER_DIRECTIVE "#syntax foo on" (* just an example *)
 
 %token EOL                    "\\n"      (* not great, but EOL is unused *)
+
+(* see the [metaocaml_expr] comment *)
+%token METAOCAML_ESCAPE       ".~"
+%token METAOCAML_BRACKET_OPEN   ".<"
+%token METAOCAML_BRACKET_CLOSE  ">."
 
 %%

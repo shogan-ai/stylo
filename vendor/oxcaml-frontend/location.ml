@@ -286,6 +286,8 @@ let show_filename file =
   let file = if !Clflags.absname then absolute_path file else file in
   rewrite_absolute_path file
 
+module Fmt = Format_doc
+
 let print_filename ppf file =
   Format.pp_print_string ppf (show_filename file)
 
@@ -769,10 +771,10 @@ let lines_around_from_current_input ~start_pos ~end_pos =
 (******************************************************************************)
 (* Reporting errors and warnings *)
 
-type msg = (Format.formatter -> unit) loc
+type msg = Fmt.t loc
 
 let msg ?(loc = none) fmt =
-  Format.kdprintf (fun txt -> { loc; txt }) fmt
+  Fmt.kdoc_printf (fun txt -> { loc; txt }) fmt
 
 type report_kind =
   | Report_error
@@ -785,6 +787,7 @@ type report = {
   kind : report_kind;
   main : msg;
   sub : msg list;
+  footnote: Fmt.t option;
 }
 
 type report_printer = {
@@ -797,7 +800,7 @@ type report_printer = {
   pp_main_loc : report_printer -> report ->
     Format.formatter -> t -> unit;
   pp_main_txt : report_printer -> report ->
-    Format.formatter -> (Format.formatter -> unit) -> unit;
+    Format.formatter -> Fmt.t -> unit;
   pp_submsgs : report_printer -> report ->
     Format.formatter -> msg list -> unit;
   pp_submsg : report_printer -> report ->
@@ -805,7 +808,7 @@ type report_printer = {
   pp_submsg_loc : report_printer -> report ->
     Format.formatter -> t -> unit;
   pp_submsg_txt : report_printer -> report ->
-    Format.formatter -> (Format.formatter -> unit) -> unit;
+    Format.formatter -> Fmt.t -> unit;
 }
 
 let is_dummy_loc loc =
@@ -861,26 +864,46 @@ let batch_mode_printer : report_printer =
       | Misc.Error_style.Short ->
           ()
     in
-    Format.fprintf ppf "@[<v>%a:@ %a@]" print_loc loc highlight loc
+    Format.fprintf ppf "%a:@ %a" print_loc loc highlight loc
   in
-  let pp_txt ppf txt = Format.fprintf ppf "@[%t@]" txt in
-  let pp self ppf report =
-    setup_tags ();
-    separate_new_message ppf;
-    (* Make sure we keep [num_loc_lines] updated.
-       The tabulation box is here to give submessage the option
-       to be aligned with the main message box
-    *)
-    print_updating_num_loc_lines ppf (fun ppf () ->
-      Format.fprintf ppf "@[<v>%a%a%a: %a%a%a%a@]@."
+  let pp_txt ppf txt = Format.fprintf ppf "%a" Fmt.Doc.format txt in
+  let pp_footnote ppf f =
+    Option.iter (Format.fprintf ppf "@,%a" pp_txt) f
+  in
+  let error_format self ppf report =
+    Format.fprintf ppf "@[<v>%a%a%a: %a@[%a@]%a%a%a@]@."
       Format.pp_open_tbox ()
       (self.pp_main_loc self report) report.main.loc
       (self.pp_report_kind self report) report.kind
       Format.pp_set_tab ()
       (self.pp_main_txt self report) report.main.txt
       (self.pp_submsgs self report) report.sub
+      pp_footnote report.footnote
       Format.pp_close_tbox ()
-    ) ()
+  in
+  let warning_format self ppf report =
+    Format.fprintf ppf "@[<v>%a@[<b 2>%a: %a@]%a%a@]@."
+      (self.pp_main_loc self report) report.main.loc
+      (self.pp_report_kind self report) report.kind
+      (self.pp_main_txt self report) report.main.txt
+      (self.pp_submsgs self report) report.sub
+      pp_footnote report.footnote
+  in
+  let pp self ppf report =
+    setup_tags ();
+    separate_new_message ppf;
+    let printer ppf () = match report.kind with
+      | Report_warning _
+      | Report_warning_as_error _
+      | Report_alert _ | Report_alert_as_error _ ->
+          warning_format self ppf report
+      | Report_error -> error_format self ppf report
+    in
+    (* Make sure we keep [num_loc_lines] updated.
+       The tabulation box is here to give submessage the option
+       to be aligned with the main message box
+    *)
+    print_updating_num_loc_lines ppf printer ()
   in
   let pp_report_kind _self _ ppf = function
     | Report_error -> Format.fprintf ppf "@{<error>Error@}"
@@ -903,9 +926,20 @@ let batch_mode_printer : report_printer =
     ) msgs
   in
   let pp_submsg self report ppf { loc; txt } =
-    Format.fprintf ppf "@[%a  %a@]"
-      (self.pp_submsg_loc self report) loc
-      (self.pp_submsg_txt self report) txt
+    if loc.loc_ghost then
+      (* FIXME This change from ocaml/ocaml#13838 results in some very sad error
+               messages from some of our ppxes. We've tweaked it for now, but
+               intend to coordinate with upstream as to a more proper fix. *)
+      if is_none loc then
+        Format.fprintf ppf "@[%a@]" (self.pp_submsg_txt self report) txt
+      else
+        Format.fprintf ppf "%a@[%a@]"
+          (self.pp_submsg_loc self report) loc
+          (self.pp_submsg_txt self report) txt
+    else
+      Format.fprintf ppf "%a  @[%a@]"
+        (self.pp_submsg_loc self report) loc
+        (self.pp_submsg_txt self report) txt
   in
   let pp_submsg_loc self report ppf loc =
     if not (is_dummy_loc loc) then
@@ -960,21 +994,22 @@ let print_report ppf report =
 (* Reporting errors *)
 
 type error = report
+type delayed_msg = unit -> Fmt.t option
 
 let report_error ppf err =
   print_report ppf err
 
-let mkerror loc sub txt =
-  { kind = Report_error; main = { loc; txt }; sub }
+let mkerror loc sub footnote txt =
+  { kind = Report_error; main = { loc; txt }; sub; footnote=footnote () }
 
-let errorf ?(loc = none) ?(sub = []) =
-  Format.kdprintf (mkerror loc sub)
+let errorf ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) =
+  Fmt.kdoc_printf (mkerror loc sub footnote)
 
-let error ?(loc = none) ?(sub = []) msg_str =
-  mkerror loc sub (fun ppf -> Format.pp_print_string ppf msg_str)
+let error ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) msg_str =
+  mkerror loc sub footnote Fmt.Doc.(string msg_str empty)
 
-let error_of_printer ?(loc = none) ?(sub = []) pp x =
-  mkerror loc sub (fun ppf -> pp ppf x)
+let error_of_printer ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) pp x =
+  mkerror loc sub footnote (Fmt.doc_printf "%a" pp x)
 
 let error_of_printer_file print x =
   error_of_printer ~loc:(in_file !input_name) print x
@@ -987,13 +1022,12 @@ let default_warning_alert_reporter report mk (loc: t) w : report option =
   match report w with
   | `Inactive -> None
   | `Active { Warnings.id; message; is_error; sub_locs } ->
-      let msg_of_str str = fun ppf -> Format.pp_print_string ppf str in
       let kind = mk is_error id in
-      let main = { loc; txt = msg_of_str message } in
+      let main = { loc; txt = message } in
       let sub = List.map (fun (loc, sub_message) ->
-        { loc; txt = msg_of_str sub_message }
+        { loc; txt = sub_message }
       ) sub_locs in
-      Some { kind; main; sub }
+      Some { kind; main; sub; footnote=None }
 
 
 let default_warning_reporter =
@@ -1043,7 +1077,7 @@ let deprecated ?def ?use loc message =
 module Style = Misc.Style
 
 let auto_include_alert lib =
-  let message = Format.asprintf "\
+  let message = Fmt.asprintf "\
     OCaml's lib directory layout changed in 5.0. The %a subdirectory has been \
     automatically added to the search path, but you should add %a to the \
     command-line to silence this alert (e.g. by adding %a to the list of \
@@ -1062,7 +1096,7 @@ let auto_include_alert lib =
   prerr_alert none alert
 
 let deprecated_script_alert program =
-  let message = Format.asprintf "\
+  let message = Fmt.asprintf "\
     Running %a where the first argument is an implicit basename with no \
     extension (e.g. %a) is deprecated. Either rename the script \
     (%a) or qualify the basename (%a)"
@@ -1128,8 +1162,8 @@ let () =
       | _ -> None
     )
 
-let raise_errorf ?(loc = none) ?(sub = []) =
-  Format.kdprintf (fun txt -> raise (Error (mkerror loc sub txt)))
+let raise_errorf ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) =
+  Fmt.kdoc_printf (fun txt -> raise (Error (mkerror loc sub footnote txt)))
 
 let todo_overwrite_not_implemented ?(kind = "") t =
   alert ~kind t "Overwrite not implemented.";

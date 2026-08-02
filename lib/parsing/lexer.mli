@@ -20,7 +20,7 @@
 
 *)
 
-val init : unit -> unit
+val init : ?keyword_edition:((int*int) option * string list) -> unit -> unit
 val token: Lexing.lexbuf -> Parser_tokens.token
 val token_updating_indexed_list: Lexing.lexbuf -> Parser_tokens.token
 val skip_hash_bang: Lexing.lexbuf -> unit
@@ -34,8 +34,14 @@ type error =
   | Unterminated_string_in_comment of Location.t * Location.t
   | Empty_character_literal
   | Keyword_as_label of string
+  | Capitalized_label of string
   | Invalid_literal of string
   | Invalid_directive of string * string option
+  | Invalid_encoding of string
+  | Invalid_char_in_ident of Uchar.t
+  | Non_lowercase_delimiter of string
+  | Capitalized_raw_identifier of string
+  | Unknown_keyword of string
 
 exception Error of error * Location.t
 
