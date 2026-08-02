@@ -205,7 +205,7 @@ let type_kind = function
 let jkind_to_attr jk =
   match jk.pjka_desc with
   | Pjk_abbreviation
-      ({txt = Lident ("immediate" | "immediate64" as s); loc}, []) ->
+      {txt = Lident ("immediate" | "immediate64" as s); loc} ->
     let attr = Ast_helper.Attr.mk ~loc (Location.mkloc s loc) (PStr []) in
     Some attr
   | _ -> None

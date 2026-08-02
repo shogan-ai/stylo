@@ -44,6 +44,7 @@ module End = struct
     | Pjk_product (_ :: _ as jks) -> of_jkind_annotation List.(hd @@ rev jks)
     | Pjk_default
     | Pjk_abbreviation _
+    | Pjk_operator _
     | Pjk_mod _
     | Pjk_with (_, _, Modalities _)
     | Pjk_product []

@@ -3978,9 +3978,10 @@ and Jkind_annotation : sig
 end = struct
   let rec pp_desc = function
     | Pjk_default -> S.underscore
-    | Pjk_abbreviation (lid, axes) ->
+    | Pjk_abbreviation lid -> longident lid.txt
+    | Pjk_operator (jk, axes) ->
       flow (break 1)
-        (longident lid.txt ::
+        (pp jk ::
          List.map (fun a -> string a.Location.txt) axes)
     | Pjk_mod (jk, ms) -> pp jk ^/^ S.mod_ ^/^ modes ms
     | Pjk_with (jk, ct, modalities) ->

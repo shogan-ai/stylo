@@ -584,9 +584,9 @@ let jkind_to_attr jk =
   let rec desc_to_attr = function
     | Pjk_parens desc -> desc_to_attr desc
     | Pjk_abbreviation
-        ({txt =
-            { desc = Lident Str ("immediate" | "immediate64" as s)
-            ; tokens = lid_toks }; loc}, []) ->
+        {txt =
+           { desc = Lident Str ("immediate" | "immediate64" as s)
+           ; tokens = lid_toks }; loc} ->
       let attr =
         Attributes.mk_empty_payload ~attr_loc:jk.pjka_loc ~name_loc:loc
           (s, Tokens.replace_first_child ~subst:lid_toks jk.pjka_tokens)

@@ -1820,8 +1820,8 @@ module_declaration_body(module_type_with_optional_modal_expr):
   }
 ;
 %inline module_expr_alias:
-  id = mkrhs(mod_longident)
-    { Mty.alias ~tokens:(Tokens.at $sloc) ~loc:(make_loc $sloc) id }
+  id = mkrhs(mod_longident) attrs = attributes
+    { Mty.alias ~tokens:(Tokens.at $sloc) ~loc:(make_loc $sloc) ~attrs id }
 ;
 (* A module substitution (in a signature). *)
 module_subst:
@@ -3850,8 +3850,15 @@ jkind_desc_gen(self):
       let tokens = Tokens.at modes_loc in
       Pjk_mod ($1, Modes { modes; loc = make_loc modes_loc; tokens })
     }
-  | mkrhs(type_longident) mkrhs(LIDENT)* {
-      Pjk_abbreviation ($1, $2)
+  | name = mkrhs(type_longident) axes = mkrhs(LIDENT)* {
+      match axes with
+      | [] -> Pjk_abbreviation name
+      | _ :: _ ->
+        Pjk_operator
+          ({ pjka_loc = make_loc $loc(name);
+             pjka_desc = Pjk_abbreviation name;
+             pjka_tokens = Tokens.at $loc(name) },
+           axes)
     }
   | KIND_OF ty=core_type %prec below_LBRACKETAT {
       Pjk_kind_of ty
@@ -3862,8 +3869,16 @@ jkind_desc_gen(self):
   | reverse_product_jkind_gen(self) %prec below_AMPERSAND {
       Pjk_product (List.rev $1)
     }
-  | LPAREN self RPAREN {
-      Pjk_parens $2
+  | LPAREN inner = self RPAREN axes = mkrhs(LIDENT)* {
+      match axes with
+      | [] -> Pjk_parens inner
+      | _ :: _ ->
+        let parens_loc = ($startpos, $endpos($3)) in
+        Pjk_operator
+          ({ pjka_loc = make_loc parens_loc;
+             pjka_desc = Pjk_parens inner;
+             pjka_tokens = Tokens.at parens_loc },
+           axes)
     }
 ;
 

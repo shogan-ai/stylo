@@ -49,6 +49,7 @@ module Stdlib = struct
   module String = struct
     include String
     module Set = Set.Make(String)
+    module Map = Map.Make(String)
   end
 
   module Int = struct
