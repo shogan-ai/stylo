@@ -9,7 +9,7 @@ function check-file {
   (target $out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:$f}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:$f}))))
 
 (rule
   (alias diff-$f)

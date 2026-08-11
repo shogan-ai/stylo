@@ -2,7 +2,7 @@
   (target abstract_kinds.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:abstract_kinds.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:abstract_kinds.ml}))))
 
 (rule
   (alias diff-abstract_kinds.ml)
@@ -16,7 +16,7 @@
   (target borrow.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:borrow.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:borrow.ml}))))
 
 (rule
   (alias diff-borrow.ml)
@@ -30,7 +30,7 @@
   (target default_modalities.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:default_modalities.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:default_modalities.ml}))))
 
 (rule
   (alias diff-default_modalities.ml)
@@ -44,7 +44,7 @@
   (target default_modalities.mli.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:default_modalities.mli}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:default_modalities.mli}))))
 
 (rule
   (alias diff-default_modalities.mli)
@@ -58,7 +58,7 @@
   (target default_modalities2.mli.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:default_modalities2.mli}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:default_modalities2.mli}))))
 
 (rule
   (alias diff-default_modalities2.mli)
@@ -72,7 +72,7 @@
   (target default_modalities3.mli.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:default_modalities3.mli}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:default_modalities3.mli}))))
 
 (rule
   (alias diff-default_modalities3.mli)
@@ -86,7 +86,7 @@
   (target default_modalities4.mli.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:default_modalities4.mli}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:default_modalities4.mli}))))
 
 (rule
   (alias diff-default_modalities4.mli)
@@ -100,7 +100,7 @@
   (target implicit_source_position.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:implicit_source_position.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:implicit_source_position.ml}))))
 
 (rule
   (alias diff-implicit_source_position.ml)
@@ -114,7 +114,7 @@
   (target kind_substitutions.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:kind_substitutions.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:kind_substitutions.ml}))))
 
 (rule
   (alias diff-kind_substitutions.ml)
@@ -128,7 +128,7 @@
   (target layout_annotation.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:layout_annotation.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:layout_annotation.ml}))))
 
 (rule
   (alias diff-layout_annotation.ml)
@@ -142,7 +142,7 @@
   (target local.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:local.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:local.ml}))))
 
 (rule
   (alias diff-local.ml)
@@ -156,7 +156,7 @@
   (target local_erased.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:local_erased.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:local_erased.ml}))))
 
 (rule
   (alias diff-local_erased.ml)
@@ -170,7 +170,7 @@
   (target modes.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:modes.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:modes.ml}))))
 
 (rule
   (alias diff-modes.ml)
@@ -184,7 +184,7 @@
   (target stack.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:stack.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:stack.ml}))))
 
 (rule
   (alias diff-stack.ml)
@@ -198,7 +198,7 @@
   (target unboxed_literals.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:unboxed_literals.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:unboxed_literals.ml}))))
 
 (rule
   (alias diff-unboxed_literals.ml)
@@ -212,7 +212,7 @@
   (target unboxed_record.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:unboxed_record.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:unboxed_record.ml}))))
 
 (rule
   (alias diff-unboxed_record.ml)
@@ -226,7 +226,7 @@
   (target unboxed_records_cmts_attrs.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:unboxed_records_cmts_attrs.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:unboxed_records_cmts_attrs.ml}))))
 
 (rule
   (alias diff-unboxed_records_cmts_attrs.ml)
@@ -240,7 +240,7 @@
   (target unboxed_tuples.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:unboxed_tuples.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:unboxed_tuples.ml}))))
 
 (rule
   (alias diff-unboxed_tuples.ml)
@@ -254,7 +254,7 @@
   (target unboxed_tuples_cmts_attrs.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:unboxed_tuples_cmts_attrs.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:unboxed_tuples_cmts_attrs.ml}))))
 
 (rule
   (alias diff-unboxed_tuples_cmts_attrs.ml)
@@ -268,7 +268,7 @@
   (target unboxed_types.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:unboxed_types.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:unboxed_types.ml}))))
 
 (rule
   (alias diff-unboxed_types.ml)
@@ -282,7 +282,7 @@
   (target unboxed_types2.ml.out)
   (action
     (with-stdout-to %{target}
-      (run %{project_root}/bin/main.exe style --erase-jane-syntax %{dep:unboxed_types2.ml}))))
+      (run %{project_root}/bin/main.exe style --erase-jane-syntax --ast-check %{dep:unboxed_types2.ml}))))
 
 (rule
   (alias diff-unboxed_types2.ml)
