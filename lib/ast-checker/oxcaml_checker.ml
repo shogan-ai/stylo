@@ -23,12 +23,12 @@ let cleaner erase =
     method! location_stack () _ = []
 
     method! modes () m =
-      super#modes () m
-      |> do_erase Erase_jane_syntax.modes
+      do_erase Erase_jane_syntax.modes m
+      |> super#modes ()
 
     method! modalities () m =
-      super#modalities () m
-      |> do_erase Erase_jane_syntax.modalities
+      do_erase Erase_jane_syntax.modalities m
+      |> super#modalities ()
 
     method! attribute () attr =
       let attr_payload =
@@ -46,16 +46,16 @@ let cleaner erase =
       super#attribute () { attr with attr_payload }
 
     method! attributes () attrs =
-      super#attributes () attrs
-      |> sort_attributes (* FIXME: why? *)
+      sort_attributes attrs (* FIXME: why? *)
+      |> super#attributes ()
 
     method! constant () c =
-      super#constant () c
-      |> do_erase Erase_jane_syntax.constant
+      do_erase Erase_jane_syntax.constant c
+      |> super#constant ()
 
     method! expression () e =
-      super#expression () e
-      |> do_erase Erase_jane_syntax.expression
+      do_erase Erase_jane_syntax.expression e
+      |> super#expression ()
 
     method! pattern () p =
       let p =
@@ -70,16 +70,16 @@ let cleaner erase =
             p3
         | _ -> p
       in
-      super#pattern () p
-      |> do_erase Erase_jane_syntax.pattern
+      do_erase Erase_jane_syntax.pattern p
+      |> super#pattern ()
 
     method! function_param_desc () fp =
       do_erase Erase_jane_syntax.function_param_desc fp
       |> super#function_param_desc ()
 
     method! core_type () ct =
-      super#core_type () ct
-      |> do_erase Erase_jane_syntax.core_type
+      do_erase Erase_jane_syntax.core_type ct
+      |> super#core_type ()
 
     method! label_declaration () lbl =
       do_erase Erase_jane_syntax.label_declaration lbl
@@ -102,24 +102,24 @@ let cleaner erase =
       |> super#type_kind ()
 
     method! type_declaration () td =
-      super#type_declaration () td
-      |> do_erase Erase_jane_syntax.type_declaration
+      do_erase Erase_jane_syntax.type_declaration td
+      |> super#type_declaration ()
 
     method! module_type () m =
-      super#module_type () m
-      |> do_erase Erase_jane_syntax.module_type
+      do_erase Erase_jane_syntax.module_type m
+      |> super#module_type ()
 
     method! module_expr () m =
-      super#module_expr () m
-      |> do_erase Erase_jane_syntax.module_expr
+      do_erase Erase_jane_syntax.module_expr m
+      |> super#module_expr ()
 
     method! signature () s =
       do_erase Erase_jane_syntax.signature s
       |> super#signature ()
 
     method! structure () s =
-      super#structure () s
-      |> do_erase Erase_jane_syntax.structure
+      do_erase Erase_jane_syntax.structure s
+      |> super#structure ()
   end
 
 type _ input_kind =
