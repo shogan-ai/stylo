@@ -7,19 +7,6 @@ let no_ext_attrs = function
   | { pea_ext = None; pea_attrs = No_attributes } -> true
   | _ -> false
 
-let fold_into ~parent parent_kw_tok child =
-  assert (no_ext_attrs parent.pexp_ext_attr);
-  let parent_tokens, merged_attributes =
-    Attributes.merge parent.pexp_tokens
-      parent.pexp_attributes child.pexp_attributes
-  in
-  let tokens =
-    parent_tokens
-    |> Tokens.Seq.without ~token:parent_kw_tok
-    |> Tokens.replace_first_child ~subst:child.pexp_tokens
-  in
-  { child with pexp_tokens = tokens; pexp_attributes = merged_attributes }
-
 module Implicit_source_pos = struct
   let mk_lexing_lident ~pos lident =
     let mk_ident_tok ?(uppercase=true) s =
@@ -124,7 +111,24 @@ let token_of_legacy_mode (m : mode Location.loc) : Parser_tokens.token =
   | Mode "once" -> ONCE
   | _ -> assert false
 
-let expression e =
+let rec expression e =
+  let fold_into ~parent parent_kw_tok child =
+    assert (no_ext_attrs parent.pexp_ext_attr);
+    let parent_tokens, merged_attributes =
+      Attributes.merge parent.pexp_tokens
+        parent.pexp_attributes child.pexp_attributes
+    in
+    let tokens =
+      parent_tokens
+      |> Tokens.Seq.without ~token:parent_kw_tok
+      |> Tokens.replace_first_child ~subst:child.pexp_tokens
+    in
+    (* explicit recursion: as one level disappeared the visitor which recurses on
+       children would skip [child] (as it was bumped up one level, so only its
+       children would be visited). *)
+    expression
+      { child with pexp_tokens = tokens; pexp_attributes = merged_attributes }
+  in
   match e.pexp_desc with
   | Pexp_mode_legacy (m, me) -> fold_into ~parent:e (token_of_legacy_mode m) me
   | Pexp_stack se -> fold_into ~parent:e STACK se
@@ -839,7 +843,7 @@ let functor_parameter fp =
       pfp_desc = Unnamed (mty, No_modes);
       pfp_tokens = Modes.remove_from_tokens modes fp.pfp_tokens }
 
-let module_type mt =
+let rec module_type mt =
   let open Modes_and_modalities in
   match mt.pmty_desc with
   | Pmty_functor (attrs, params, mty, modes) ->
@@ -859,10 +863,12 @@ let module_type mt =
         let tokens, merged_attributes =
           Attributes.merge (pre @ suff) mt.pmty_attributes mty.pmty_attributes
         in
-        { mty with
-          pmty_attributes = merged_attributes;
-          pmty_tokens =
-            Tokens.replace_first_child ~subst:mty.pmty_tokens tokens }
+        (* Explicit recursion for the same reason as [fold_into] above. *)
+        module_type
+          { mty with
+            pmty_attributes = merged_attributes;
+            pmty_tokens =
+              Tokens.replace_first_child ~subst:mty.pmty_tokens tokens }
       | wcs, suff ->
         { mt with
           pmty_desc = Pmty_with (mty, wcs);

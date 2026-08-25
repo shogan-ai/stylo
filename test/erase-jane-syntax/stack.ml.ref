@@ -39,7 +39,7 @@ let f (r : r) = ignore_local (r.x) [@nontail]
 let f = ref ([| 42; 56 |])
 let f = ignore_local ([| 42; 56 |])
 let f () = (3, 5)
-let f () = stack_ (3, 5)
+let f () = (3, 5)
 
 let f () =
   let g = (fun x -> x) in
@@ -123,7 +123,7 @@ let x = (() :: [])
 (* Tuples *)
 
 let x = (1, 2)
-let x = #(1, 2)
+let x = (1, 2)
 let x = (~x:1, ~y:2)
 
 (* Expressions rejected by the typechecker *)

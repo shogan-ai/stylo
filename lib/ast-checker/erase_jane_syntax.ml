@@ -30,10 +30,13 @@ let is_exclave e =
     true
   | _ -> false
 
-let expression e =
+let rec expression e =
   let fold_into ~parent child =
     let merged_attributes = parent.pexp_attributes @ child.pexp_attributes in
-    { child with pexp_attributes = merged_attributes }
+    (* explicit recursion: as one level disappeared the visitor which recurses
+       on children would skip [child] (as it was bumped up one level, so only
+       its children would be visited). *)
+    expression { child with pexp_attributes = merged_attributes }
   in
   match e.pexp_desc with
   | Pexp_stack child
@@ -69,7 +72,7 @@ let expression e =
     { e with pexp_desc = Pexp_newtype (t, None, child)}
   | _ -> e
 
-let pattern p =
+let rec pattern p =
   match p.ppat_desc with
   | Ppat_unboxed_unit ->
     let unit_lid = Location.mkloc (Longident.Lident "()") p.ppat_loc in
@@ -86,7 +89,8 @@ let pattern p =
   | Ppat_constraint (cp, None, _modes) ->
     (* explicit handling to erase the node in the absence of constraints *)
     let merged_attributes = p.ppat_attributes @ cp.ppat_attributes in
-    { cp with ppat_attributes = merged_attributes }
+    (* explicit recursion for the same reason as [fold_into]. *)
+    pattern { cp with ppat_attributes = merged_attributes }
   | _ ->
     p
 
@@ -238,12 +242,13 @@ let module_type mty =
     end
   | _ -> mty
 
-let module_expr me =
+let rec module_expr me =
   match me.pmod_desc with
   | Pmod_constraint (child, None, _) ->
     (* explicit handling to erase the node in the absence of constraints *)
     let merged_attributes = me.pmod_attributes @ child.pmod_attributes in
-    { child with pmod_attributes = merged_attributes }
+    (* explicit recursion for the same reason as [fold_into]. *)
+    module_expr { child with pmod_attributes = merged_attributes }
   | _ -> me
 
 let signature s =
