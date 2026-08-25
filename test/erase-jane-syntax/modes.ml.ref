@@ -463,17 +463,17 @@ module Let_bound_functions = struct
   let f arg1 arg2 = x
 
   let f
-    arg
+    (arg)
     (arg : typ)
-    ~lbl:arg
+    ~lbl:(arg)
     ~lbl:(arg : typ)
-    ~arg
+    ~(arg)
     ~(arg : typ)
-    ?lbl:arg
+    ?lbl:(arg)
     ?lbl:(arg : typ)
     ?lbl:(arg = value)
     ?lbl:(arg : typ = value)
-    ?arg
+    ?(arg)
     ?(arg : typ)
     ?(arg = value)
     ?(arg : typ = value)
@@ -608,7 +608,7 @@ module Line_breaking = struct
 
   module Let_bound_functions = struct
     let long_fun_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-      long_arg_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      (long_arg_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)
       (long_arg_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa : t)
       (long_arg_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
        :

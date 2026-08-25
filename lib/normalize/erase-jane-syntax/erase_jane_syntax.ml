@@ -272,6 +272,10 @@ module Argument = struct
     { a with parg_desc = desc; parg_tokens = tokens }
 
   let cleanup_parens a =
+    (* TODO: fix or remove (hopefully just remove and rely on a more general
+       solution for parens). *)
+    a
+(*
     (* FIXME: incorrect when the pattern is non-trivial, e.g. (Some x). *)
     match a.parg_desc with
     | Parg_unlabelled
@@ -286,6 +290,7 @@ module Argument = struct
           |> Tokens.Seq.without ~token:LPAREN
           |> Tokens.Seq.without ~token:RPAREN }
     | _ -> a
+*)
 
   let rewrite_call_pos_ext a =
     match a.parg_desc with

@@ -2155,7 +2155,7 @@ end = struct
     group @@ match arg.parg_desc with
     | Parg_unlabelled
         { legacy_modes=No_modes; arg; typ_constraint=None; modes=No_modes } ->
-      pp_arg arg
+      parenthesize (pp_arg arg)
     | Parg_unlabelled { legacy_modes; arg; typ_constraint; modes } ->
       parens (pp_generic legacy_modes (pp_arg arg) typ_constraint modes)
     | Parg_labelled {

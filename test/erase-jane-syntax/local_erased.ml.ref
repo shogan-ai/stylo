@@ -25,10 +25,10 @@
    ocamlformat once without the --erase-jane-syntax flag to rewrite it into the
    new syntax and then call ocamlformat a second time to erase the syntax. *)
 let f a b c = 1
-let f a ~foo:b ?foo:(c = 1) ~d = ()
-let f ~x ~(y : string) ?(z : string) = ()
-let xs = [ (fun a (type b) ~c -> 1) ]
-let xs = [ (fun a (type b) ~c -> 1) ]
+let f (a) ~foo:(b) ?foo:(c = 1) ~(d) = ()
+let f ~(x) ~(y : string) ?(z : string) = ()
+let xs = [ (fun (a) (type b) ~(c) -> 1) ]
+let xs = [ (fun (a) (type b) ~(c) -> 1) ]
 
 let f () =
   let a = [ 1 ] in

@@ -21,10 +21,10 @@
    SOFTWARE. *)
 
 let f a b c = 1
-let f a ~foo:b ?foo:(c = 1) ~d = ()
-let f ~x ~(y : string) ?(z : string) = ()
-let xs = [ (fun a (type b) ~c -> 1) ]
-let xs = [ (fun a (type b) ~c -> 1) ]
+let f (a) ~foo:(b) ?foo:(c = 1) ~(d) = ()
+let f ~(x) ~(y : string) ?(z : string) = ()
+let xs = [ (fun (a) (type b) ~(c) -> 1) ]
+let xs = [ (fun (a) (type b) ~(c) -> 1) ]
 
 let f () =
   let a = [ 1 ] in
@@ -120,11 +120,11 @@ module type S =
   (* this is here to make sure we pass the AST equality checks even when the
      extended AST is different *)
 
-let f (* a *) (* b *) (* c *) (* d *)
-  a
-  ~foo: (* e *) (* f *) (* g *) (* h *)b
+let f
+  ( (* a *) (* b *) (* c *) (* d *) a)
+  ~foo:( (* e *) (* f *) (* g *) (* h *) b)
   ?foo:(c = 1)
-  ~d
+  ~(d)
   =
   ()
 ;;
@@ -148,7 +148,7 @@ type 'a r =
 let () =
   let foo (_ : int) = 10 in
   let bar (Some x : _) = Some 10 in
-  let baz Some x = Some 10 in
+  let baz (Some x) = Some 10 in
   ()
 ;;
 
