@@ -1,10 +1,9 @@
 This directory contains a vendored subset of the oxcaml compiler frontend, built
-as the `oxcaml_frontend` library. Stylo does not use it at runtime; it exists as
+as the `oxcaml_frontend` library.
 
-- the grammar reference that `tools/diff-grammar.sh` compares stylo's parser
-  against, and
-- the input from which dune generates `ast_mapper.ml` (via
-  `lib/traversals/gen.exe`).
+Stylo does not use it for styling, but it is used for sanity checks
+(--ast-checker), as a synchronisationpoint for upgrades and as the grammar
+reference that `tools/diff-grammar.sh` compares stylo's parser against.
 
 `upstream-commit.txt` records the oxcaml commit the files were last imported
 from.
