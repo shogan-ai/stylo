@@ -234,6 +234,8 @@ module Odoc = struct
     let content = separate_map hardline string (striped_lines s) in
     group (string "{math" ^/^ nest 2 content ^^ break 0 ^^ string "}")
 
+  (* Not recognized by jst custom parser. *)
+(*
   let media ref_kind href alt kind =
     let media_ref =
       let kind =
@@ -252,6 +254,7 @@ module Odoc = struct
     match ref_kind with
     | `Simple -> media_ref
     | `With_text -> group (string "{" ^^ media_ref ^^ string alt ^^ string "}")
+*)
 
   let extra_spacing_between elt1 elt2 =
     match Loc.value elt1, Loc.value elt2 with
@@ -353,6 +356,8 @@ module Odoc = struct
     List.mapi pp_elt elts
     |> separate sep
 
+  (* Not recognized by jst custom parser. *)
+(*
   and heavy_table rows _align_infos_opt =
     let pp_cell (elts, kind) =
       let kind =
@@ -383,6 +388,7 @@ module Odoc = struct
     (* TODO: keep the light syntax once vertical alignment is implemented.
        In the meantime, normalize to heavy syntax. *)
     heavy_table rows align_info_opt
+*)
 
   let internal_tag = function
     | `Canonical sloc -> string "@canonical" ^/^ located string sloc

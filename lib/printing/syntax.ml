@@ -1,3 +1,6 @@
+(** Documents representing non-ident tokens, to be used by the printer so as to
+    maximise sharing. *)
+
 let str = Document.string
 
 let underscore = str "_"
