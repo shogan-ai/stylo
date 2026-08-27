@@ -10,6 +10,7 @@
       (run
         ocamlgrammarfuzzer --cmly %{dep:../lib/parsing/parser.cmly} --exhaust
           --entrypoint implementation --entrypoint interface --print-entrypoint
+          --avoid METAOCAML_ESCAPE --avoid METAOCAML_BRACKET_OPEN
           --avoid DOLLAR --avoid LESSLBRACKET --avoid RBRACKETGREATER
           ; HASH_CHAR is present in our grammar but not in the one the fuzzer is
           ; built against.
@@ -34,6 +35,7 @@
       (run
         ocamlgrammarfuzzer --cmly %{dep:../lib/parsing/parser.cmly}
           --entrypoint implementation --print-entrypoint
+          --avoid METAOCAML_ESCAPE --avoid METAOCAML_BRACKET_OPEN
           --focus DOLLAR --focus LESSLBRACKET --focus RBRACKETGREATER
           ; HASH_CHAR is present in our grammar but not in the one the fuzzer is
           ; built against.
