@@ -8,7 +8,6 @@ type line_info =
 type state = {
   max_width: int;
   column: int;
-  line_indent: int; (* might refer to the previous line! *)
   line: line_info;
 }
 
@@ -85,7 +84,7 @@ let text buf state indent len s =
     | Has_text -> state
     | _ ->
       Buffer.add_spaces buf indent;
-      { state with column = indent; line_indent = indent }
+      { state with column = indent }
   in
   Buffer.add_string buf s;
   begin match len with
@@ -164,7 +163,6 @@ let to_string ~width d =
   let init =
     { max_width = width
     ; column = 0
-    ; line_indent = 0
     ; line = Is_empty
     }
   in
