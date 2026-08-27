@@ -2486,10 +2486,7 @@ end = struct
       then string "!-"
       else S.minus ^^ S.bang
     | Bivariant, NoInjectivity -> string "+-"
-    | Bivariant, Injective ->
-      if var_inj_as_single_token tokens
-      then string "!+-"
-      else string "+-" ^^ S.bang
+    | Bivariant, Injective -> string "!+-" (* always lexed as a single token *)
   )
 
   let pp ?preceeding
