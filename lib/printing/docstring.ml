@@ -404,12 +404,12 @@ module Odoc = struct
     | `Short_title _nestable_block_elem_loc_list -> string "TODO"
 
   let ocamldoc_tag = function
-    | `Author s -> string "@author" ^/^ string s
+    | `Author s -> group (string "@author" ^/^ string s)
     | `Deprecated text -> string "@deprecated" ^/^ nestable_block_elements text
     | `Param (id, text) ->
-      string "@param" ^/^ string id ^/^ nestable_block_elements text
+      group (string "@param" ^/^ string id) ^/^ nestable_block_elements text
     | `Raise (exc, text) ->
-      string "@raise" ^/^ string exc ^/^ nestable_block_elements text
+      group (string "@raise" ^/^ string exc) ^/^ nestable_block_elements text
     | `Return text -> string "@return" ^/^ nestable_block_elements text
     | `See (kind, ref, text) ->
       let ref =
@@ -419,12 +419,12 @@ module Odoc = struct
           | `File -> "'", "'"
           | `Document -> "\"", "\""
         in
-        string left ^^ string ref ^^ string right
+        group (string left ^^ string ref ^^ string right)
       in
-      string "@see" ^/^ ref ^/^ nestable_block_elements text
+      group (string "@see" ^/^ ref) ^/^ nestable_block_elements text
     | `Since s -> string "@since" ^/^ string s
     | `Before (version, text) ->
-      string "@before" ^/^ string version ^/^ nestable_block_elements text
+      group (string "@before" ^/^ string version) ^/^ nestable_block_elements text
     | `Version s -> string "@version" ^/^ string s
 
   let tag t =
