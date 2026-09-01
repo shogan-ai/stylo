@@ -22,7 +22,10 @@ module Error = struct
   let pp ppf : t -> unit = function
     | Output_longer_than_input doc ->
       Format.fprintf ppf "Output longer than the input.";
-      dprintf "remaining doc: << %s >>@." (Doc.Print.to_string ~width:80 doc)
+      ignore
+        doc
+        (* dprintf "remaining doc: << %s >>@." (Doc.Print.to_string ~width:80
+           doc) *)
     | Missing_token pos ->
       Format.fprintf
         ppf
@@ -179,8 +182,7 @@ let format_directive (ldir : Lexer_directive.t) =
     ^^ string (Printf.sprintf "%S" path)
 ;;
 
-let insert_directive doc ldir =
-  dprintf "reinserting lexer directive@.";
+let insert_directive doc ldir = (* dprintf "reinserting lexer directive@."; *)
   Doc.(format_directive ldir ^^ doc)
 ;;
 
@@ -306,14 +308,10 @@ let rec walk_both state seq doc =
     match first.T.desc, doc with
     (* Synchronized, advance *)
     | T.Token _, Doc.Token { value = p; _ } ->
-      dprintf
-        "assume %a synced at %d:%d with << %a >>@."
-        Tokens.pp_elt
-        first
-        first.pos.pos_lnum
-        (first.pos.pos_cnum - first.pos.pos_bol)
-        Document.pp_pseudo
-        p;
+      ignore p;
+      (* dprintf "assume %a synced at %d:%d with << %a >>@." Tokens.pp_elt first
+         first.pos.pos_lnum (first.pos.pos_cnum - first.pos.pos_bol)
+         Document.pp_pseudo p; *)
       let doc = insert_space_if_required state doc in
       attach_before_comments (saw_leaf state) rest doc
 

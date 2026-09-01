@@ -408,10 +408,6 @@ module Indexed_list = struct
   ;;
 
   let insert_child t pos =
-    dprintf
-      "Inserting Child_node for empty reduction at pos %d:%d@\n"
-      pos.pos_lnum
-      (pos.pos_cnum - pos.pos_bol);
     let[@warning "-8"] (Node node) as cell =
       let value = { desc = Child_node; pos } in
       Node { pos; value; prev = Empty; next = Empty }
@@ -428,9 +424,7 @@ module Indexed_list = struct
             node.next <- n.next;
             (match n.next with
              | Empty -> ()
-             | Node next ->
-               dprintf "prev = %a@ next = %a@." pp_elt n.value pp_elt next.value;
-               next.prev <- cell);
+             | Node next -> next.prev <- cell);
             n.next <- cell;
             node.prev <- n_cell)
           else (
@@ -444,12 +438,6 @@ module Indexed_list = struct
   ;;
 
   let consume t start stop =
-    dprintf
-      "consume %d:%d -> %d:%d@."
-      start.pos_lnum
-      (start.pos_cnum - start.pos_bol)
-      stop.pos_lnum
-      (stop.pos_cnum - stop.pos_bol);
     let rec aux ~replaced_by = function
       | Empty -> invalid_arg "Tokens.consume"
       | Node n as curr ->
@@ -481,17 +469,9 @@ module Indexed_list = struct
         seq
   ;;
 
-  let consume t start stop =
-    let res = consume t start stop in
-    dprintf "consumed: @[<h 2>%a@]@." pp_seq res;
-    res
-  ;;
-
   let consume_all t =
     let rec aux acc = function
-      | Empty ->
-        dprintf "consumed_all: @[<h 2>%a@]@." pp_seq acc;
-        acc
+      | Empty -> acc
       | Node n -> aux (n.value :: acc) n.prev
     in
     aux [] t.last
