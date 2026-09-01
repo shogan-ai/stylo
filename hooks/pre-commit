@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+
+cd "$(git rev-parse --show-toplevel)"
+
+if ! dune build @fmt &>/dev/null; then
+  echo "pre-commit: code is not formatted. Run 'dune fmt', stage the changes and commit again." >&2
+  exit 1
+fi
