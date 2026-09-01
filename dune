@@ -1,0 +1,6 @@
+;; Have `dune fmt` run stylo
+
+(env
+ (_
+  (binaries
+   (tools/dune-stylo-wrapper.sh as ocamlformat))))
