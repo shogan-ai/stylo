@@ -1301,11 +1301,22 @@ and skip_hash_bang = parse
       { before; indent; rev_cmts = [ info ] }
 
     let unstage newline_after t =
+      let cmts = List.rev t.rev_cmts in
       let attachement : Tokens.attachment =
         match t.before, newline_after with
         | NoLine, NoLine ->
-          dprintf "before (same on both side -> default)@.";
-          Before
+          begin match cmts with
+          | [] -> Before (* no comments, doesn't matter *)
+          | fst :: _ ->
+            let last = List.hd t.rev_cmts in
+            if fst.loc.loc_start.pos_lnum <> last.loc.loc_end.pos_lnum then (
+              dprintf "floating (comments over multiple lines)@.";
+              Floating
+            ) else (
+              dprintf "before (same on both side -> default)@.";
+              Before
+            )
+          end
         | NoLine, _ ->
           dprintf "before (same line)@.";
           Before
@@ -1339,7 +1350,7 @@ and skip_hash_bang = parse
           ; attachement }
         in
         Tokens.add ~pos:loc.loc_start (Comment cmt)
-      ) (List.rev t.rev_cmts)
+      ) cmts
 
     let add t before loc txt id =
       match t with
