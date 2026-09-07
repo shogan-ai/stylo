@@ -67,3 +67,36 @@ module List = struct
     | [ x ] -> x
     | _ :: xs -> last xs
 end
+
+let read_input =
+  let buf_size = 1024 in
+  let buffer = Bytes.create buf_size in
+  let previously_read = ref [] in
+  let reconstruct rev_chunks =
+    Bytes.concat Bytes.empty (Stdlib.List.rev rev_chunks)
+  in
+  let rec read_entry ic chunks =
+      let nb_read = In_channel.input ic buffer 0 buf_size in
+      if nb_read = 0 then
+        if chunks = [] then None else Some (reconstruct chunks)
+      else
+        match Bytes.split_on_char '\000' (Bytes.sub buffer 0 nb_read) with
+        | [] -> assert false
+        | [ last ] ->
+          (* no trailing '\000': unterminated final entry; the next read
+             is EOF, which returns the accumulated chunks *)
+          read_entry ic (last :: chunks)
+        | end_of_current_entry :: rest ->
+          previously_read := rest;
+          Some (reconstruct (end_of_current_entry :: chunks))
+  in
+  fun ic ->
+    match !previously_read with
+    | [] -> read_entry ic []
+    | [ x ] ->
+      previously_read := [];
+      let chunks = if x = Bytes.empty then [] else [ x ] in
+      read_entry ic chunks
+    | x :: xs ->
+      previously_read := xs;
+      Some x

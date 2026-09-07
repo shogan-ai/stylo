@@ -53,6 +53,11 @@ module Arg = struct
     |> flag
     |> value
 
+  let ignore_syntax_errors =
+    info ["ignore-output-syntax-errors"]
+    |> flag
+    |> value
+
   let width =
     info ["width"; "w"]
     |> opt int 80
@@ -93,65 +98,110 @@ module Arg = struct
     |> value
 end
 
-let fuzzer_batch fn =
+let do_style is_mli fname ?normalize ?lnum source =
+  if is_mli
+  then Stylo.style_file Intf ~fname ?normalize ?lnum source
+  else Stylo.style_file Impl ~fname ?normalize ?lnum source
+
+let fuzzer_batch ~quiet ~idempotence_check fn =
   let has_errors = ref false in
-  let has_parse_errors = ref false in
-  let styled = Buffer.create 42 in
+  let parse_errors = ref 0 in
+  let entries_checked = ref 0 in
   (* Only create the file when there are parse errors *)
   let parse_error_oc = lazy (Out_channel.open_text (fn ^ ".parse-errors")) in
-  let rec loop_lines i ic =
-    Buffer.clear styled;
-    match In_channel.input_line ic with
+  (* Failing entries are saved, one file per entry, in a [fn ^ ".failures"]
+     directory; entries are stripped of their entrypoint prefix and get a
+     [.ml] or [.mli] extension so that they can be replayed with
+     [stylo style --idempotence-check FILE] directly. *)
+  let failures_dir = fn ^ ".failures" in
+  let failure_count = ref 0 in
+  let save_failure entrypoint_and_src =
+    incr failure_count;
+    (try Unix.mkdir failures_dir 0o750 with
+     | Unix.Unix_error (Unix.EEXIST, _, _) -> ());
+    let intf, source = Stylo.split_fuzzer_line entrypoint_and_src in
+    let fname =
+      Printf.sprintf "%s/%04d%s" failures_dir !failure_count
+        (if intf then ".mli" else ".ml")
+    in
+    Out_channel.with_open_text fname (fun oc ->
+      Out_channel.output_string oc source;
+      if source <> "" && source.[String.length source - 1] <> '\n' then
+        Out_channel.output_char oc '\n'
+    );
+    has_errors := true
+  in
+  let rec loop_entries lnum ic =
+    match Std.read_input ic with
     | None -> () (* done *)
-    | Some entrypoint_and_src ->
-      match Stylo.style_fuzzer_line ~fname:fn ~lnum:i entrypoint_and_src with
-      | Ok _ -> loop_lines (i + 1) ic
+    | Some bytes ->
+      let entrypoint_and_src = Bytes.unsafe_to_string bytes in
+      incr entries_checked;
+      let next_lnum =
+        String.fold_left (fun ln c -> ln + if c = '\n' then 1 else 0)
+          lnum entrypoint_and_src
+      in
+      match Stylo.style_fuzzer_line ~fname:fn ~lnum entrypoint_and_src with
+      | Ok fst_round ->
+        if idempotence_check then begin
+          let intf, _ = Stylo.split_fuzzer_line entrypoint_and_src in
+          match do_style intf fn ~normalize:false ~lnum fst_round with
+          | Ok snd_round when fst_round = snd_round -> ()
+          | _ -> save_failure entrypoint_and_src
+        end;
+        loop_entries next_lnum ic
 
       | Error `Input_parse_error (_, _, _, Ocaml_syntax.Parser_types.Failwith _) ->
         (* ignoring error thrown from semantic actions. *)
-        loop_lines (i + 1) ic
+        loop_entries next_lnum ic
 
       | Error `Input_parse_error _ ->
         (* ignoring entries that don't parse *)
         let oc = Lazy.force parse_error_oc in
         Out_channel.output_string oc entrypoint_and_src;
         Out_channel.output_char oc '\n';
-        has_parse_errors := true;
-        loop_lines (i + 1) ic
+        incr parse_errors;
+        loop_entries next_lnum ic
 
       | Error `Output_parse_error _ ->
-        Format.eprintf
-          "File %s, line %d: error while parsing stylo's output@\n%s@."
-          fn i entrypoint_and_src;
-        has_errors := true
+        (* when [--ignore-output-syntax-errors] is passed we explicitely
+           skip those as we're only interested in idempotence issues when the
+           flag is passed. *)
+        if not quiet then
+          save_failure entrypoint_and_src;
+        loop_entries next_lnum ic
 
       | Error e ->
-        (* we stop at the first error in the batch
-           Eventually we might want to go further, but while we try to fix the
-           errors, there's not much point. *)
-        let fname = fn ^ ":" ^ string_of_int i in
+        let fname = fn ^ ":" ^ string_of_int lnum in
         Stylo.Pipeline.pp_error Format.err_formatter fname e;
-        has_errors := true
+        save_failure entrypoint_and_src;
+        loop_entries next_lnum ic
 
       | exception exn ->
-        Format.eprintf "%s, line %d: uncaught exception:@." fn i;
-        raise exn
+        Format.eprintf "%s, line %d: uncaught exception: %s@." fn lnum
+          (Printexc.to_string exn);
+        if Dbg_print.dbg then Printexc.print_backtrace stderr;
+        save_failure entrypoint_and_src;
+        loop_entries next_lnum ic
   in
-  In_channel.with_open_text fn (loop_lines 1);
-  if !has_parse_errors then (
+  In_channel.with_open_text fn (loop_entries 1);
+  if !parse_errors > 0 then (
     Format.eprintf "Parse errors collected in %s.parse-errors@." fn;
     Out_channel.close (Lazy.force parse_error_oc)
   );
+  if !failure_count > 0 then
+    Format.eprintf
+      "Checked %d entries from %s: %d did not parse, %d failing entries \
+       saved in %s@."
+      !entries_checked fn !parse_errors !failure_count failures_dir
+  else
+    Format.eprintf "Checked %d entries from %s: %d did not parse@."
+      !entries_checked fn !parse_errors;
   if !has_errors
   then Cmd.Exit.some_error
   else Cmd.Exit.ok
 
 type file_kind = Regular | Stdin
-
-let do_style is_mli fname source =
-  if is_mli
-  then Stylo.style_file Intf ~fname source
-  else Stylo.style_file Impl ~fname source
 
 let style_input check_idempotence fkind fname =
   let is_mli = Filename.check_suffix fname ".mli" in
@@ -211,14 +261,17 @@ let style_files check_idempotence inplace fns =
 
 let fuzz_cmd =
   Cmd.make (Cmd.info "fuzz") @@
-  let+ fn = Arg.single_file
-  and+ quotations = Arg.syntax_quotations in
+  let open Arg in
+  let+ fn = single_file
+  and+ quiet = ignore_syntax_errors
+  and+ idempotence_check
+  and+ quotations = syntax_quotations in
   Config.(
     check_same_ast := true;
     check_retokenisation := true;
     syntax_quotations := quotations;
   );
-  fuzzer_batch fn
+  fuzzer_batch ~quiet ~idempotence_check fn
 
 let style_cmd =
   Cmd.make (Cmd.info "style") @@

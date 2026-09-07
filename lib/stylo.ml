@@ -200,8 +200,8 @@ module Pipeline = struct
       Tokens_of_tree.Error.pp ppf e
 end
 
-let style_file kind ~fname source =
-  Pipeline.run { kind; fname; source; start_line = 1 }
+let style_file kind ~fname ?(lnum=1) ?(normalize=true) source =
+  Pipeline.run ~normalize { kind; fname; source; start_line = lnum }
 
 let split_fuzzer_line entrypoint_and_src =
   let intf = String.starts_with ~prefix:"interface:" entrypoint_and_src in

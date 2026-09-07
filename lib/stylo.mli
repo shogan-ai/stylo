@@ -71,8 +71,14 @@ module Pipeline : sig
   val pp_error : Format.formatter -> string -> error -> unit
 end
 
-val style_file :
-  _ input_kind -> fname:string -> string -> (string, [> Pipeline.error ]) result
+val style_file
+  :  _ input_kind
+  -> fname:string
+  -> ?lnum:int
+  -> ?normalize:bool
+  -> string
+  -> (string, [> Pipeline.error ]) result
 
+val split_fuzzer_line : string -> bool * string
 val style_fuzzer_line :
   lnum:int -> fname:string -> string -> (string, Pipeline.error) result
