@@ -180,9 +180,9 @@ module Pattern = struct
     | Ppat_parens {pat; optional} ->
       let pat = simp_pat free pat in
       let skip_parens =
-        match p.ppat_attributes with
-        | No_attributes -> is_compatible (get_prec pat) ~parent:prec
-        | Attributes _ -> false
+        match p.ppat_attributes, pat.ppat_attributes with
+        | No_attributes, No_attributes -> is_compatible (get_prec pat) ~parent:prec
+        | Attributes _, _ | _, Attributes _ -> false
       in
       if skip_parens then pat else return (Ppat_parens {pat; optional})
 
@@ -230,6 +230,10 @@ module Pattern = struct
       let pat = simp_pat lazy_arg pat in
       return (Ppat_exception pat)
 
+    | Ppat_open (loc, pat) ->
+      let pat = simp_pat above_atom pat in
+      return (Ppat_open (loc, pat))
+
     (* Default: everything self-delimited, and maybe some things that might be
        handled later (safe, just incomplete). *)
     | Ppat_any | Ppat_var _ | Ppat_constant _ | Ppat_interval _
@@ -237,7 +241,7 @@ module Pattern = struct
     | Ppat_construct (_, None) | Ppat_variant (_, None)
     | Ppat_record _ | Ppat_record_unboxed_product _
     | Ppat_array _ | Ppat_list _
-    | Ppat_type _ | Ppat_unpack _ | Ppat_extension _ | Ppat_open _
+    | Ppat_type _ | Ppat_unpack _ | Ppat_extension _
     | Ppat_constraint _
     | Ppat_effect _
       -> super ctx p
