@@ -329,7 +329,12 @@ module Type = struct
         atom
       | Ptyp_constr (_ :: _, _) | Ptyp_class (_ :: _, _) ->
         apply_arg
-      | Ptyp_tuple _ -> comma
+      | Ptyp_tuple elts ->
+        (* Parentheses are mandatory around labelled tuples *)
+        if List.exists (fun (lbl, _) -> Option.is_some lbl) elts then
+          mandatory
+        else
+          comma
       | Ptyp_arrow _ -> free
       (* Safe approximation, always keep parentheses. *)
       | Ptyp_alias (_, _, _) | Ptyp_poly (_, _) | Ptyp_newlayout (_, _)
