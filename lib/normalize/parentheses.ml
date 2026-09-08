@@ -259,7 +259,7 @@ module Pattern = struct
                        legacy_modes = No_modes;
                        modes = No_modes;
                        default = None; _ } as parg) ->
-      let arg = simp_pat super self ctx prec arg in
+      let arg = simp_pat super self ctx atom arg in
       {x with parg_desc = Parg_labelled {parg with maybe_punned = Some arg}}
     | Parg_unlabelled _
     | Parg_labelled _ ->
