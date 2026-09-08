@@ -9,3 +9,6 @@ let check_same_ast = ref false
 let dbg_dump = ref false
 
 let erase_jane_syntax = ref false
+
+let parentheses_remove = ref false
+let parentheses_insert = ref false

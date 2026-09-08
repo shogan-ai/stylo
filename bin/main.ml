@@ -79,6 +79,18 @@ module Arg = struct
       ~doc:"Erase OxCaml extensions from the output"
     |> flag
     |> value
+
+  let remove_parentheses =
+    info ["remove-parentheses"]
+      ~doc:"Remove unnecessary parentheses from the output"
+    |> flag
+    |> value
+
+  let insert_parentheses =
+    info ["insert-parentheses"]
+      ~doc:"Ensure all expressions are parenthesized in the output"
+    |> flag
+    |> value
 end
 
 let fuzzer_batch fn =
@@ -219,12 +231,16 @@ let style_cmd =
   and+ tokens_checks
   and+ debug
   and+ erase_jst_syntax
+  and+ remove_parentheses
+  and+ insert_parentheses
   and+ w = width in
   Config.(
     width := w;
     check_same_ast := ast_check;
     dbg_dump := debug;
     erase_jane_syntax := erase_jst_syntax;
+    parentheses_insert := insert_parentheses;
+    parentheses_remove := remove_parentheses;
     if tokens_checks then (
       check_retokenisation := true;
       check_normalization_kept_comments := true;
