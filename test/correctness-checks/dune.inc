@@ -8,6 +8,12 @@
   (alias runtest)
   (action
     (ignore-stdout
+      (run ../../bin/main.exe style --idempotence-check --ast-check %{dep:empty_seq_erasure.ml}))))
+
+(rule
+  (alias runtest)
+  (action
+    (ignore-stdout
       (run ../../bin/main.exe style --idempotence-check --ast-check %{dep:flush_hints_idempotence_issue.mli}))))
 
 (rule

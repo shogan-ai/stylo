@@ -57,12 +57,30 @@ let remove_last_semi tokens =
   let rev_tokens_without_last_semi = before @ List.tl last_semi_and_after in
   List.rev rev_tokens_without_last_semi
 
+let lparen_child_rparen ~optional:opt pos =
+  let open Tokens in
+  let mk desc = { pos; desc } in
+  let mk_tok tok = { pos; desc = Token (tok, opt) } in
+  [ mk_tok LPAREN
+  ; mk Child_node
+  ; mk_tok RPAREN ]
+
+let parens_exp ?(optional=false) exp =
+  { pexp_desc = Pexp_parens { exp; optional }
+  ; pexp_tokens = lparen_child_rparen ~optional exp.pexp_loc.loc_start
+  ; pexp_loc = exp.pexp_loc
+  ; pexp_attributes = No_attributes
+  ; pexp_ext_attr = { pea_ext = None; pea_attrs = No_attributes } }
+
 let exp_no_trailing e =
   match e.pexp_desc with
+(* (* Commented out because you need context and precedence information for this
+      to be correct *)
   | Pexp_seq_empty e ->
     (* Can't attach attrs without parens here *)
     assert (e.pexp_attributes = No_attributes);
     e
+*)
   | Pexp_record (_, fields)
   | Pexp_record_unboxed_product (_, fields)
     when List.compare_length_with fields (nb_semis e.pexp_tokens) = 0 ->
