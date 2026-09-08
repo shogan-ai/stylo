@@ -14,7 +14,7 @@ let redundant_1 = function
 ;;
 
 let redundant_2 = function
-  | Some (A n) -> n (* parses identically to [Some (A n)] *)
+  | Some A n -> n (* parses identically to [Some (A n)] *)
   | _ -> 0
 ;;
 
@@ -46,7 +46,7 @@ let necessary_1 = function
 ;;
 
 let necessary_1_without_parens_means_this = function
-  | Some (A n) :: rest ->
+  | Some A n :: rest ->
     ignore rest;
     n (* really: (Some (A n)) :: rest *)
   | _ -> 0

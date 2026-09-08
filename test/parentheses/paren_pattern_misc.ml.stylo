@@ -39,6 +39,6 @@ let necessary_1 = function
 (* contrast: the very same [A n] nested one level deeper, inside another constructor's
    argument instead of [lazy]'s, is fine unparenthesized *)
 let redundant_4 = function
-  | Some (A n) -> n
+  | Some A n -> n
   | None -> 0
 ;;

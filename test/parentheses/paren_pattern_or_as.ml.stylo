@@ -20,7 +20,7 @@ let alias_over_or_with_parens = function
 ;;
 
 let alias_over_or_without_parens = function
-  | (A x | B x) as p ->
+  | A x | B x as p ->
     ignore p;
     x
   | ignored ->

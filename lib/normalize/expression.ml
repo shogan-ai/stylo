@@ -60,6 +60,9 @@ let map ~recur (parent : Context.parent) orig =
     (* Add parens as necessary *)
     | _, Pexp_tuple _ ->
       parens_exp ~optional:true exp
+    (* FIXME: I assume that was added to reduce the diff on base / with
+       ocamlformat. Currently it'd be removed by the parentheses removal code.
+       Need to handle that properly. *)
     | Expr Pexp_infix_apply { arg1; _ },
       (Pexp_let _ | Pexp_let_open _ | Pexp_letexception _ | Pexp_letmodule _
       | Pexp_letop _) when arg1 == orig ->

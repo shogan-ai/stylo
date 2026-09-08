@@ -120,8 +120,8 @@ type t =
   } (* baz *)
 
 (* Attrs around patterns *)
-let { z = z [@attr]; y } = ()
-let { z; y = 42 [@attr] } = ()
+let { z = (z [@attr]); y } = ()
+let { z; y = (42 [@attr]) } = ()
 let ({ z; y = 42 } [@attr]) = ()
 
 (* Comments around patterns *)

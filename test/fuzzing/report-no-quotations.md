@@ -1,28 +1,13 @@
-## Error while parsing the output with upstream's parser: (17 errors)
+## Error while parsing the output with upstream's parser: (6 errors)
 
-### Item `fun_expr: . simple_expr` (in 12 errors)
+### Item `constant: . unboxed_constant` (in 6 errors)
 
-- Derivation (6 occurrences):
+- Derivation (4 occurrences):
   ```
-  implementation: . structure EOF
-    structure: . seq_expr list(structure_element)
-      seq_expr: . fun_seq_expr
-        fun_seq_expr: . fun_expr
-          fun_expr: . simple_expr
-            simple_expr: . OBJECT ext class_self_pattern list(text_cstr(class_field)) END
-  ```
-  Sample sentence (implementation):
-  ```ocaml
-  object ( false | false ) end
-  ```
-- Derivation (3 occurrences):
-  ```
-  reversed_labeled_tuple_body: TILDE LIDENT COMMA . fun_expr
-    fun_expr: . simple_expr
-      simple_expr: . constr_longident
-        constr_longident: . mod_longident
-          mod_longident: . mk_longident(mod_longident,str_not_op(UIDENT))
-            mk_longident(mod_longident,str_not_op(UIDENT)): . UIDENT
+  reversed_labeled_tuple_body: reversed_labeled_tuple_body COMMA LABEL . simple_expr
+    simple_expr: . constant
+      constant: . unboxed_constant
+        unboxed_constant: . HASH_CHAR
   ```
   Sample sentence (implementation):
   ```ocaml
@@ -30,44 +15,14 @@
   ```
 - Derivation (2 occurrences):
   ```
-  reversed_labeled_tuple_body: LABEL simple_expr COMMA . fun_expr
-    fun_expr: . simple_expr
-      simple_expr: . constr_longident
-        constr_longident: . mod_longident
-          mod_longident: . mk_longident(mod_longident,str_not_op(UIDENT))
-            mk_longident(mod_longident,str_not_op(UIDENT)): . UIDENT
+  reversed_labeled_tuple_body: LABEL . simple_expr COMMA fun_expr
+    simple_expr: . constant
+      constant: . unboxed_constant
+        unboxed_constant: . HASH_CHAR
   ```
   Sample sentence (implementation):
   ```ocaml
   - ~label1: #'a' , X2
-  ```
-- Derivation (1 occurrence):
-  ```
-  implementation: . structure EOF
-    structure: . seq_expr list(structure_element)
-      seq_expr: . fun_seq_expr
-        fun_seq_expr: . fun_expr
-          fun_expr: . simple_expr
-            simple_expr: . LPAREN seq_expr RPAREN
-  ```
-  Sample sentence (implementation):
-  ```ocaml
-  ( - ~ x1 , X2 , ~label3: #'a' )
-  ```
-
-
-### Item `labeled_tuple_pattern(pattern): . reversed_labeled_tuple_pattern(pattern)` (in 5 errors)
-
-- Derivation (5 occurrences):
-  ```
-  pattern: pattern BAR . pattern
-    pattern: . labeled_tuple_pattern(pattern)
-      labeled_tuple_pattern(pattern): . reversed_labeled_tuple_pattern(pattern)
-        reversed_labeled_tuple_pattern(pattern): . labeled_tuple_pat_element_list(pattern)
-  ```
-  Sample sentence (implementation):
-  ```ocaml
-  object ( false | false , false ) end
   ```
 
 

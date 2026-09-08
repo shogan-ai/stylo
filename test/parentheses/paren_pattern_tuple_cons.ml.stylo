@@ -32,7 +32,7 @@ let necessary_1 = function
 (* `,` binds tighter than `|`: redundant to wrap a tuple pattern used as a whole or-branch
    *)
 let redundant_3 = function
-  | 0, 1 | 2, 3 -> true
+  | (0, 1) | (2, 3) -> true
   | _ -> false
 ;;
 
