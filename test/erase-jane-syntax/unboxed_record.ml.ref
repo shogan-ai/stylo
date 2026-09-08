@@ -80,10 +80,10 @@ let f ?l:({ f; g }) = e
 let _ =
   { a
   ; b =
-      ((match b with
-        | `A -> A
-        | `B -> B
-        | `C -> C)
+      (match b with
+       | `A -> A
+       | `B -> B
+       | `C -> C
        : c)
   ; c
   }
@@ -197,12 +197,12 @@ let bar =
   ; l15 = { x = 42; z = false }
   ; l16 = foo.lbl
   ; l17 = (foo 42).lbl
-  ; l18 = (foo.lbl <- 42)
+  ; l18 = foo.lbl <- 42
   ; l19 = [| 1; 2 |]
   ; l20 = [: 1; 2 :]
   ; l21 = [ 1; 2 ]
   ; l22 = [ a for a = 1 to 10 ]
-  ; l23 = (if true then true else false)
+  ; l23 = if true then true else false
   ; l24 =
       (();
       ())
@@ -220,7 +220,7 @@ let bar =
   ; l30 = foo#bar
   ; l31 = foo #~# bar
   ; l32 = new M.c
-  ; l33 = (x <- 2)
+  ; l33 = x <- 2
   ; l34 = {< x = 42; y = false >}
   ; l35 =
       (let module M = N in

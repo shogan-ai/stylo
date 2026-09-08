@@ -25,7 +25,7 @@
 (* Attrs around expressions *)
 let y = { a = z; b = z [@attr] }
 let y = { a = z; b = z } [@@attr]
-let y = { a = ((42 [@attr]) : int); b = 42 }
+let y = { a = (42 [@attr] : int); b = 42 }
 let y = { a = a [@attr]; b = 42 }
 
 (* Comments around expressions *)

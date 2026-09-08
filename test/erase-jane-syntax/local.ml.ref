@@ -40,7 +40,7 @@ let f () =
   let r = 1 in
   let f : 'a. 'a -> 'a = fun x -> x in
   let g a b c : int = 1 in
-  let () = g ((fun () -> ())) in
+  let () = g (fun () -> ()) in
   "asdfasdfasdfasdfasdfasdfasdf"
 ;;
 
@@ -55,7 +55,7 @@ type 'a r =
   | Bar of 'a * ('a [@globalized])
   | Baz of (int[@globalized]) * string * ('a [@globalized])
 
-type ('a, 'b) cfn = a:'a -> ?b:b -> 'a -> (int -> 'b)
+type ('a, 'b) cfn = a:'a -> ?b:b -> 'a -> int -> 'b
 
 let _ = ()
 let _ = ()
@@ -75,7 +75,7 @@ let x : 'a. 'a -> 'a = "hi"
 let f : 'a. 'a -> 'a = "hi"
 
 let foo () =
-  if true then (());
+  if true then ();
   ()
 ;;
 
@@ -154,12 +154,12 @@ let () =
 
 type t
 
-let _ = (x) + y
-let _ = (x) |> f
 let _ = x + y
 let _ = x |> f
-let _ = (x) + y
-let _ = (x) |> f
+let _ = x + y
+let _ = x |> f
+let _ = x + y
+let _ = x |> f
 let _ = x + y
 let _ = x |> f
 
