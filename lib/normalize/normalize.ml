@@ -256,9 +256,42 @@ let style_normalizer = new style_normalizer
 let eraser = new eraser
 
 let normalizer () =
-  if !Config.erase_jane_syntax
-  then eraser
-  else style_normalizer
+  let base =
+    if !Config.erase_jane_syntax
+    then eraser
+    else style_normalizer
+  in
+  object
+    method structure ctx str =
+      let str = base#structure ctx str in
+      let str =
+        if !Config.parentheses_insert then
+          Parentheses.inserter#structure () str
+        else str
+      in
+      let str =
+        if !Config.parentheses_remove then
+          Parentheses.remover#structure () str
+        else str
+      in
+      str
 
-let structure st = (normalizer ())#structure Other st
-let signature sg = (normalizer ())#signature Other sg
+    method signature ctx sg =
+      let sg = base#signature ctx sg in
+      let sg =
+        if !Config.parentheses_insert then
+          Parentheses.inserter#signature () sg
+        else sg
+      in
+      let sg =
+        if !Config.parentheses_remove then
+          Parentheses.remover#signature () sg
+        else sg
+      in
+      sg
+
+  end
+
+let structure s = (normalizer ())#structure Other s
+
+let signature s = (normalizer ())#signature Other s
