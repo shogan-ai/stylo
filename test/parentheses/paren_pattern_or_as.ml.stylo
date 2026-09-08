@@ -1,0 +1,39 @@
+(* `as` and `|` in patterns interact in a way that's easy to get backwards in *both*
+   directions - both claims below were checked twice against `ocamlc -dparsetree` after
+   getting the first one wrong while writing this file (see also
+   test/gallery/complex_pattern_parens.ml). *)
+
+type t =
+  | A of int
+  | B of int
+
+(* `as` binds LOOSER than `|`, not tighter: it grabs the entire preceding or-pattern, with
+   or without parens. These parens are therefore purely for human readability, not
+   required by the grammar - dropping them changes nothing. *)
+let alias_over_or_with_parens = function
+  | (A x | B x) as p ->
+    ignore p;
+    x
+  | ignored ->
+    ignore ignored;
+    0
+;;
+
+let alias_over_or_without_parens = function
+  | (A x | B x) as p ->
+    ignore p;
+    x
+  | ignored ->
+    ignore ignored;
+    0
+;;
+
+(* But wrapping *each branch* of an or-pattern in its own alias is a genuinely different
+   case, and here the parens ARE mandatory. Without them, `x as a | y as b` parses as `(x
+   as a) | y`, with the alias `b` attaching to the *entire* or-pattern rather than to `y`
+   alone - `y` ends up not aliased to anything, and the two branches no longer bind the
+   same set of names (which OCaml requires for an or-pattern to be valid at all). *)
+let necessary_1 = function
+  | (0 as z) | (1 as z) -> z
+  | _ -> -1
+;;

@@ -1,0 +1,25 @@
+(* `;` (sequencing) has very low precedence and extends as far right as
+   possible, similar to `if`/`let ... in`. Whether parens are needed around
+   a sequence depends on what's syntactically able to follow it. *)
+
+let b = true
+let a = ()
+let c = ()
+
+(* a sequence in an `if` WITHOUT an `else` needs no parens: `;` already
+   stops at the point the branch ends, and continues the sequence outside *)
+let redundant_1 = (if b then a); c (* `if b then a; c` already means this *)
+
+(* but a sequence in the `then` branch of an if WITH an `else` is a hard
+   parse error without parens - `;` would try to extend past the branch,
+   and then collide with the following `else` with nothing to attach it to *)
+let necessary_1 = if b then (a; c) else c (* `if b then a; c else c` does not parse *)
+
+(* a sequence inside a match arm's right-hand side needs no parens: it
+   already extends up to (but not past) the next `|` *)
+let x = 0
+
+let redundant_2 =
+  match x with
+  | 0 -> a; c (* means the same as [0 -> (a; c)] *)
+  | _ -> ()

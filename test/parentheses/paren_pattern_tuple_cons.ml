@@ -1,0 +1,35 @@
+(* Pattern precedence, loosest to tightest: `|` (or), then `,` (tuple),
+   then `::` (cons), then constructor application. Each level binds tighter
+   than the one before it, so parenthesizing a tighter construct inside a
+   looser one is always redundant - but going the other way (forcing a
+   looser construct inside a tighter position) is always mandatory.
+   Verified against `ocamlc -dparsetree`. *)
+
+(* `::` binds tighter than `,`: redundant either side of the tuple *)
+let redundant_1 = function
+  | x, y :: z -> ignore (x, y, z); true
+  | _ -> false
+
+let redundant_2 = function
+  | (x :: y), z -> ignore (x, y, z); true
+  | _ -> false
+
+(* to cons onto a whole tuple, parens are mandatory - `x :: y, z` does NOT
+   mean "cons [x] onto the tuple [(y, z)]"; `::` grabs [x] and [y] first,
+   leaving a tuple of that cons-cell and [z] *)
+let necessary_1 = function
+  | x :: (y, z) -> ignore (x, y, z); true
+  | _ -> false
+
+(* `,` binds tighter than `|`: redundant to wrap a tuple pattern used as a
+   whole or-branch *)
+let redundant_3 = function
+  | (0, 1) | (2, 3) -> true
+  | _ -> false
+
+(* but an or-pattern used as *one component* of a tuple needs parens - `0 |
+   1, 2` does NOT mean "(0 or 1), 2"; the tuple binds first, giving
+   "0 | (1, 2)", an or-pattern between an int and a tuple *)
+let necessary_2 = function
+  | (0 | 1), 2 -> true
+  | _ -> false

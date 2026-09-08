@@ -1,0 +1,30 @@
+(* `->` is right-associative and has the lowest precedence among these; `*` (tuple) binds
+   tighter than `->`. Verified against `ocamlc -dparsetree`. The sharpest gotcha here
+   isn't about precedence at all: a tuple *type* is flat/N-ary, not built out of nested
+   pairs the way left-associative operators are - parenthesizing a sub-group inside a
+   tuple type doesn't just "reveal the same type unparenthesized", it builds a genuinely
+   different (nested) type. Never remove those parens. *)
+
+type t1
+type t2
+type t3
+
+(* `->` is right-associative *)
+type redundant_1 = t1 -> t2 -> t3
+type necessary_1 = (t1 -> t2) -> t3 (* without parens: t1 -> (t2 -> t3) *)
+
+(* `*` binds tighter than `->`, so parenthesizing the domain is redundant *)
+type redundant_2 = (t1 * t2) -> t3
+
+(* but to put an arrow type *inside* a tuple component, parens are mandatory - `t1 * t2 ->
+   t3` always means `(t1 * t2) -> t3`, never `t1 * (t2 -> t3)` *)
+type necessary_2 = t1 * (t2 -> t3)
+
+(* tuple types are FLAT, not left-associated pairs: `t1 * t2 * t3` is one 3-element tuple
+   type, while `(t1 * t2) * t3` is a 2-element tuple type whose first component is itself
+   a 2-element tuple. These are different types, not different spellings of the same type.
+   The same is true of tuple *expressions*: `(a, b), c` and `a, b, c` build different
+   values (a nested pair-of-pair vs. a flat triple) for exactly the same reason - this is
+   not a type-only quirk. *)
+type flat_triple = t1 * t2 * t3
+type nested_pair_of_pair = (t1 * t2) * t3 (* NOT the same type as [flat_triple] *)

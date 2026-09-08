@@ -1,0 +1,20 @@
+(* Tuple expressions are FLAT (an n-ary construct), not built out of nested pairs - `(a,
+   b), c` and `a, b, c` build different values (a nested pair-of-pair vs. a flat triple),
+   never the same value reparenthesized. This is also the source of the single most common
+   parenthesization mistake in OCaml: a constructor takes exactly one argument, so `C (a,
+   b)` (one argument, a 2-tuple) and `C a, b` (a 2-tuple of `C a` and `b`) are completely
+   different expressions - dropping those parens is *never* safe, no matter how it looks.
+   Verified against `ocamlc -dparsetree`. *)
+
+let a = 1
+let b = 2
+let c = 3
+let flat_triple = a, b, c
+let nested_pair_of_pair = (a, b), c (* NOT the same value as [flat_triple] *)
+
+type pair = Pair of int * int
+
+let constructor_of_tuple = Pair (a, b) (* [Pair] applied to the single tuple [(a, b)] *)
+let tuple_of_partial_application = Pair a, b
+(* a 2-tuple: [(Pair a, b)] - almost certainly not what was intended if this was meant to
+   build a [pair] *)

@@ -1,0 +1,32 @@
+(* Unary minus is a prefix operator with its own, somewhat surprising precedence: looser
+   than function application and field access, but *tighter* than `**` for a simple
+   operand - `- a ** b` means `(- a) ** b`, not `- (a ** b)`, which is easy to get
+   backwards. All claims verified against `ocamlc -dparsetree`. *)
+
+let a = 1
+let b = 2
+
+(* application binds tighter than unary minus: `- f x` negates the whole application, it
+   does not apply `f` to `(- x)` *)
+let redundant_1 = -a b (* `- a b` already means `- (a b)` *)
+let necessary_1 = (-a) b (* without parens: - (a b), a call with a negated result *)
+
+(* unary minus binds tighter than `*`/`/`, so parenthesizing just the minus changes
+   nothing *)
+let redundant_2 = -a * b (* `- a * b` already means this *)
+
+let necessary_2 = -(a * b)
+;;
+(* without parens: (- a) * b, a different (if numerically equal) tree - `-` distributes
+   differently over `*` *)
+
+(* but unary minus is *looser* than `**` for a bare operand *)
+let redundant_3 = -a ** b (* `- a ** b` already means this - counter-intuitive! *)
+let necessary_3 = -(a ** b) (* without parens: (- a) ** b *)
+
+(* field access binds tighter than unary minus *)
+let r = { contents = 1 }
+let redundant_4 = -r.contents (* `- r.contents` already means this *)
+let necessary_4 = (-r).contents
+(* without parens: - (r.contents), and [- r] wouldn't even typecheck since [r] isn't a
+   number *)

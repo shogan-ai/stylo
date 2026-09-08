@@ -1,0 +1,43 @@
+(* `match ... with` (and `function`) greedily consume every subsequent
+   `| pattern -> expr` clause, regardless of indentation. If one match's
+   case body is itself another match, and more cases follow in the OUTER
+   match, the inner match silently swallows them: the result still parses
+   fine (no error at all!) and just means something else entirely - this is
+   exactly the "silently incorrect" failure mode a paren-removal pass has
+   to avoid. Verified against `ocamlc -dparsetree`. *)
+
+let g y = if y = 0 then 1 else 2
+
+(* NECESSARY: without parens, the inner match's cases (0 -> 1 | _ -> 2)
+   absorb the outer `| _ -> 3` too, leaving the outer match with only ONE
+   case (`0 -> <everything>`) instead of two - indentation is not load-
+   bearing in OCaml, so this compiles to something completely different,
+   not a parse error. *)
+let necessary_1 x y =
+  match x with
+  | 0 -> (match y with
+          | 0 -> 1
+          | _ -> 2)
+  | _ -> 3
+
+(* by contrast, a nested match used as the SCRUTINEE of the outer match
+   needs no parens: the outer match's own `with` keyword is not a valid
+   continuation of a `|`-chain, so it unambiguously ends the inner match's
+   case list right where you'd expect *)
+let redundant_1 a =
+  match match a with
+        | 0 -> 1
+        | _ -> 2
+  with
+  | 1 -> "one"
+  | _ -> "other"
+
+(* and when the nested match is the LAST case of the outer match, there is
+   nothing left for it to swallow, so parens are redundant there too *)
+let redundant_2 x y =
+  match x with
+  | 1 -> 3
+  | 0 ->
+    match y with
+    | 0 -> 1
+    | _ -> 2

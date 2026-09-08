@@ -1,0 +1,44 @@
+(* A grab-bag of other pattern-parenthesization facts, each checked against `ocamlc
+   -dparsetree`. *)
+
+(* a character range on its own needs no parens *)
+let redundant_1 = function
+  | 'a' .. 'z' -> true
+  | _ -> false
+;;
+
+(* `lazy pat` and `exception pat` (in a `try`/`match ... with exception`) both accept a
+   bare nested constructor pattern without parens, just like ordinary constructor nesting
+   *)
+type t = A of int
+
+exception Foo of int
+
+let redundant_2 = function
+  | lazy (A n) -> n
+  | _ -> 0
+;;
+
+let redundant_3 () =
+  try () with
+  | Foo n -> ignore n
+;;
+
+(* but unlike ordinary constructor nesting, `lazy`'s own argument is parsed at a stricter
+   "simple pattern" level that does NOT extend into a nested constructor-with-argument on
+   its own - `lazy A n` is a hard parse error, even though `Some A n` (nesting the very
+   same `A n` one level deeper inside another constructor) parses fine. The parens are
+   mandatory here, for a different reason than anywhere else in this gallery: not because
+   of a precedence clash, but because `lazy`'s grammar production simply doesn't accept
+   that shape unparenthesized. *)
+let necessary_1 = function
+  | lazy (A n) -> n (* [lazy A n] does not parse at all *)
+  | _ -> 0
+;;
+
+(* contrast: the very same [A n] nested one level deeper, inside another constructor's
+   argument instead of [lazy]'s, is fine unparenthesized *)
+let redundant_4 = function
+  | Some A n -> n
+  | None -> 0
+;;

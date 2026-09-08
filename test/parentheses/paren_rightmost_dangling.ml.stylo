@@ -1,0 +1,104 @@
+(* "Dangling" constructs (`if`/`match`/`try`/`let ... in`/`function`) extend as far right
+   as possible - nothing can follow them. That makes them safe, unparenthesized, in ANY
+   position where they are already the rightmost thing that can appear (the right operand
+   of an infix operator, `::`'s tail, unary `-`/`+`'s operand, a tuple's LAST element,
+   ...): there is nothing after them left to accidentally swallow. See
+   `lib/normalize/parentheses.ml`'s `Expr.rightmost` type and `is_dangling_tail`.
+
+   One exception, preserved below (`necessary_unary_function_cases`): a bare `function |
+   ... | ...` is a hard parse error specifically as unary +/-'s operand (`- function 0 ->
+   1 | _ -> 2` does not parse, confirmed against `ocamlc -dparsetree`), even though the
+   exact same shape is fine at every other position here - see `Rightmost_no_fun_cases`.
+   *)
+
+let a = true
+let x = 1
+let y = 2
+let z = 3
+let rest = [ 1; 2; 3 ]
+let aref = ref 1
+
+(* right operand of an infix operator: for EVERY operator class (not just `+`), the same
+   gap applies *)
+let redundant_plus = x + (if a then x else y)
+let redundant_star = x * (if a then x else y)
+let redundant_and = a && (if a then true else false)
+let redundant_or = a || (if a then true else false)
+let redundant_cmp = x < (if a then x else y)
+
+let redundant_at =
+  rest
+  @ (match x with
+     | 0 -> rest
+     | _ -> rest)
+;;
+
+let redundant_match =
+  x
+  + (match x with
+     | 0 -> x
+     | _ -> y)
+;;
+
+let redundant_try =
+  x
+  + (try x with
+     | Not_found -> y)
+;;
+
+let redundant_let =
+  x
+  + (let w = 1 in
+     w)
+;;
+
+let redundant_function =
+  x
+  + (function
+      | 0 -> x
+      | _ -> y)
+;;
+
+(* by contrast, the LEFT operand is never safe unparenthesized here - parsing proceeds
+   left-to-right, so an un-parenthesized dangling construct there would swallow the
+   operator into its own body/branches *)
+let necessary_left = (if a then x else y) + x
+;; (* without parens: if a then x else (y + x) *)
+
+(* `::`'s tail is a rightmost position too (right-associative, extends the same way); the
+   head is not *)
+let redundant_cons_tail = x :: (if a then rest else rest)
+
+let necessary_cons_head = (if a then x else y) :: rest
+;; (* without parens: if a then x else (y :: rest) *)
+
+(* unary +/-'s operand is rightmost - nothing can follow a unary prefix *)
+let redundant_unary_minus = -(if a then x else y)
+
+(* the one exception: a bare `function` case list is a hard parse error as unary +/-'s
+   operand specifically, unlike every other position above (see `redundant_function` and
+   this file's header comment) *)
+let necessary_unary_function_cases =
+  -(function
+    | 0 -> x
+    | _ -> y)
+;;
+
+(* a tuple's LAST element is rightmost; any earlier element is not (a dangling construct
+   there would swallow the rest of the tuple through the comma, exactly like the infix
+   left-operand case above) *)
+let redundant_tuple_last = x, (if a then x else y)
+
+let necessary_tuple_nonlast = (if a then x else y), z
+;; (* without parens: if a then x else (y, z), a pair, not a triple *)
+
+(* for comparison: a position that LOOKS similar but is NOT part of this gap
+   - application arguments are genuinely mandatory (a hard parse error without parens),
+     not merely an unimplemented optimization *)
+let necessary_app_arg = ignore (if a then x else y)
+;; (* application args: hard parse error *)
+
+(* and for contrast, `:=`'s RHS is NOT part of this gap either: unlike the infix operator
+   ladder above, [Pexp_setvar]'s own child call already uses the `free` threshold directly
+   (see `simp_expr`'s `Pexp_setvar` case), so this one is already redundant-free today *)
+let already_removed_assign_rhs = aref := (if a then x else y)

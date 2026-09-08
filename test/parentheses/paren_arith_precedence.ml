@@ -1,0 +1,22 @@
+(* Arithmetic precedence: `*` `/` `mod` bind tighter than `+` `-`, and each
+   group is left-associative. Every claim below was checked against `ocamlc
+   -dparsetree` (not just read off the manual): NECESSARY means removing the
+   parens yields a different tree; REDUNDANT means it yields the same tree. *)
+
+let a = 1
+let b = 2
+let c = 3
+
+(* `*`/`/` bind tighter than `+`/`-` *)
+let necessary_1 = (a + b) * c (* without parens: a + b * c = a + (b * c) *)
+let redundant_1 = a + (b * c) (* * already binds tighter; same either way *)
+let necessary_2 = a / (b * c) (* without parens: a / b * c = (a / b) * c *)
+let redundant_2 = (a * b) / c (* same precedence, left-assoc: a * b / c already means this *)
+
+(* `+`/`-` are left-associative, so only right-grouping needs parens *)
+let redundant_3 = (a - b) - c (* a - b - c already means this *)
+let necessary_3 = a - (b - c) (* without parens: (a - b) - c, a different value *)
+
+(* `mod` sits at the same precedence level as `*`/`/` *)
+let redundant_4 = (a mod b) * c (* a mod b * c already means this *)
+let necessary_4 = a mod (b * c) (* without parens: (a mod b) * c *)

@@ -1,0 +1,35 @@
+(* `::`, `^`, `**`, and `:=` are all right-associative. A user-defined
+   infix operator's precedence and associativity are derived purely from
+   its *first character* - not from what it "means" - so a custom operator
+   starting with `+` behaves exactly like `+` (left-assoc, that level), one
+   starting with `^` behaves like `^` (right-assoc, that level), and so on.
+   Verified against `ocamlc -dparsetree`, since this rule is easy to
+   misremember. *)
+
+let a = 1
+let b = 2
+let c = 3
+
+let redundant_1 = a :: (b :: c) (* right-assoc: a :: b :: c already means this *)
+let redundant_2 = a ^ (b ^ c) (* string concat is right-assoc too *)
+let necessary_1 = (a ^ b) ^ c (* without parens: a ^ (b ^ c), a different grouping *)
+let redundant_3 = a ** (b ** c) (* exponentiation is right-assoc *)
+let necessary_2 = (a ** b) ** c (* without parens: a ** (b ** c) *)
+
+(* a custom operator's precedence comes from its leading character, so
+   `+++` behaves exactly like `+`: same precedence class as `+`, and
+   left-associative *)
+let ( +++ ) x y = x + y
+let redundant_4 = (a +++ b) + c (* +++ and + share a precedence level, both left-assoc:
+                                    a +++ b + c already means this *)
+let necessary_3 = a +++ (b + c) (* without parens: (a +++ b) + c *)
+
+(* a custom operator starting with `^` inherits `^`'s right-associativity *)
+let ( ^^^ ) x y = x + y
+let redundant_5 = a ^^^ (b ^^^ c)
+let necessary_4 = (a ^^^ b) ^^^ c
+
+(* a custom operator starting with `<` inherits the comparison level,
+   which is tighter than `&&` *)
+let ( <+> ) x y = x < y
+let redundant_6 = (a <+> b) && true (* a <+> b && true already means this *)

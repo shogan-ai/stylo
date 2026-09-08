@@ -1,0 +1,31 @@
+(* Function application binds tighter than any infix or prefix operator (except
+   field/array access), and is left-associative. A subtlety for a redundant-parens pass:
+   `(f a) b` and `f a b` are semantically identical (both apply [f] to [a], then the
+   result to [b]), but stylo's own parser represents them with different Parsetree shapes:
+   `f a b` is ONE `Pexp_apply` node with two arguments, while `(f a) b` is two NESTED
+   `Pexp_apply` nodes with one argument each. A paren-removal pass must treat these as
+   equivalent by *value*, not expect a byte-identical AST. *)
+
+let f x y = x + y
+let a = 1
+let b = 2
+
+(* application binds tighter than any infix operator *)
+let redundant_1 = (f a) + b (* `f a + b` already means this *)
+let necessary_1 = f (a + b) (* without parens: (f a) + b, a call with a different arg *)
+
+(* application is left-associative *)
+let redundant_2 = (f a) b (* `f a b` already means this - see note above on AST shape *)
+let necessary_2 = f (a b) (* without parens: (f a) b, applying [f] then [a] to [b] *)
+
+(* an un-parenthesized `if`/`match`/`fun`/`let ... in` cannot be used as a plain
+   application argument at all - this isn't "redundant vs necessary", it's a hard parse
+   error without the parens *)
+let necessary_3 = f (if true then a else b) (* `f if true then a else b` does not parse *)
+
+let necessary_4 =
+  f
+    (match a with
+     | 0 -> a
+     | _ -> b)
+;; (* likewise: does not parse unparenthesized *)
