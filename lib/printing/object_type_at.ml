@@ -20,7 +20,7 @@ module End = struct
     | Ptyp_repr (_, rhs)
     | Ptyp_newlayout (_, rhs)
       -> of_core_type rhs
-    | Ptyp_tuple lst -> of_core_type (snd (List.hd (List.rev lst)))
+    | Ptyp_tuple lst -> of_core_type (snd (Std.List.last lst))
     | Ptyp_any _
     | Ptyp_var _
     | Ptyp_parens _
@@ -41,7 +41,7 @@ module End = struct
   let rec of_jkind_annotation jk =
     match jk.pjka_desc with
     | Pjk_with (_, ct, No_modalities) | Pjk_kind_of ct -> of_core_type ct
-    | Pjk_product (_ :: _ as jks) -> of_jkind_annotation List.(hd @@ rev jks)
+    | Pjk_product (_ :: _ as jks) -> of_jkind_annotation (Std.List.last jks)
     | Pjk_default
     | Pjk_abbreviation _
     | Pjk_operator _
@@ -67,7 +67,7 @@ module End = struct
     match cd with
     | { pcd_res = Some ct; _ } -> of_core_type ct
     | { pcd_args = Pcstr_tuple (_ :: _ as args); _ } ->
-      of_constructor_argument (List.hd @@ List.rev args)
+      of_constructor_argument (Std.List.last args)
     | _ -> false
   ;;
 
@@ -76,12 +76,12 @@ module End = struct
     &&
     match td with
     | { ptype_cstrs = _ :: _ as cstrs; _ } ->
-      let _, ct, _ = List.hd (List.rev cstrs) in
+      let _, ct, _ = Std.List.last cstrs in
       of_core_type ct
     | { ptype_manifest = Some ct; ptype_kind = Ptype_abstract; _ } ->
       of_core_type ct
     | { ptype_kind = Ptype_variant (_ :: _ as cds); _ } ->
-      of_constructor_decl List.(hd (rev cds))
+      of_constructor_decl (Std.List.last cds)
     | _ -> false
   ;;
 
@@ -97,13 +97,13 @@ module End = struct
     match ec.pext_kind with
     | Pext_decl (_, _, Some ret_ct) -> of_core_type ret_ct
     | Pext_decl (_, Pcstr_tuple (_ :: _ as args), None) ->
-      of_constructor_argument List.(hd (rev args))
+      of_constructor_argument (Std.List.last args)
     | _ -> false
   ;;
 
   let of_type_extension te =
     te.ptyext_attributes = No_attributes
-    && of_extension_constructor List.(hd (rev te.ptyext_constructors))
+    && of_extension_constructor (Std.List.last te.ptyext_constructors)
   ;;
 
   let of_type_exception exn =
@@ -162,21 +162,15 @@ module End = struct
   ;;
 
   let of_structure str =
-    let rec last = function
-      | [] -> false
-      | [ item ] -> of_structure_item item
-      | _ :: items -> last items
-    in
-    last str.pst_items
+    match str.pst_items with
+    | [] -> false
+    | items -> of_structure_item (Std.List.last items)
   ;;
 
   let of_signature sg =
-    let rec last = function
-      | [] -> false
-      | [ item ] -> of_signature_item item
-      | _ :: items -> last items
-    in
-    last sg.psg_items
+    match sg.psg_items with
+    | [] -> false
+    | items -> of_signature_item (Std.List.last items)
   ;;
 end
 

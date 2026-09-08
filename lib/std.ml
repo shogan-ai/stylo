@@ -61,4 +61,9 @@ module List = struct
     | [] -> []
     | [ x ] -> [ f x ]
     | x :: xs -> x :: map_last ~f xs
+
+  let rec last = function
+    | [] -> invalid_arg "List.last"
+    | [ x ] -> x
+    | _ :: xs -> last xs
 end

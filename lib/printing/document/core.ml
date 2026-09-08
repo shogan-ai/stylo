@@ -261,7 +261,7 @@ let pseudo_of_string s =
   if String.contains s '\n'
   then
     let lines = String.split_on_char '\n' s in
-    let last = List.hd @@ List.rev lines in
+    let last = Std.List.last lines in
     Verbatim (Req.infinity, s, String.length last)
   else
     Trivial (Req.of_int (strlen s), s)

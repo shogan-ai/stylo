@@ -1362,7 +1362,7 @@ structure:
       match str with
       | [] -> $symbolstartpos, $endpos
       | { pstr_loc = { loc_start = startp; _ }; _ } :: _ ->
-        let endp = (List.hd (List.rev str)).pstr_loc.loc_end in
+        let endp = (Std.List.last str).pstr_loc.loc_end in
         if $symbolstartpos = $endpos (* empty reduction *)
         then
           (* Just use the synthesized items pos.
