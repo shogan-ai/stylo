@@ -73,7 +73,7 @@ type t_value_maybe_pointer_non_pointer
 type t_product_non_pointer
 type t_qualified_non_pointer
 
-let scannable_id : ('a) -> 'a = fun x -> x
+let scannable_id : 'a -> 'a = fun x -> x
 
 (***************************************)
 (* Test 1: annotation on type variable *)
@@ -111,8 +111,8 @@ end
 type t = string t2_imm
 
 let f : 'a t2_imm -> 'a t2_imm = fun x -> x
-let f : ('a) t2_imm -> ('a) t2_imm = fun x -> x
-let f : ('a) t2_imm -> ('a) t2_imm = fun x -> x
+let f : 'a t2_imm -> 'a t2_imm = fun x -> x
+let f : 'a t2_imm -> 'a t2_imm = fun x -> x
 let f : 'a. 'a t2_imm -> 'a t2_imm = fun x -> x
 let f : 'a. 'a t2_imm -> 'a t2_imm = fun x -> x
 
@@ -120,12 +120,12 @@ type 'a t = 'a t2_imm
 type ('a) t = 'a t2_imm
 type ('a) t = 'a t2_imm
 
-let f : (_) t2_imm -> unit = fun _ -> ()
-let g : (_) t2_imm -> unit = fun _ -> ()
-let f : (_) -> unit = fun _ -> ()
-let g : (_) -> unit = fun _ -> ()
-let f : (_) -> (_) = fun _ -> assert false
-let g : (_) -> (_) = fun _ -> assert false
+let f : _ t2_imm -> unit = fun _ -> ()
+let g : _ t2_imm -> unit = fun _ -> ()
+let f : _ -> unit = fun _ -> ()
+let g : _ -> unit = fun _ -> ()
+let f : _ -> _ = fun _ -> assert false
+let g : _ -> _ = fun _ -> assert false
 
 type ('a, 'b, 'c) t4
 type 'a t5 = ('a, int, bool) t4
@@ -137,7 +137,7 @@ type ('a, 'b, 'c) t6 = ('a, 'b, 'c) t4
 (********************************************)
 (* Test 3: Annotation on types in functions *)
 
-let f : ('a) -> 'a = fun x -> x
+let f : 'a -> 'a = fun x -> x
 let f : 'a. 'a -> 'a = fun x -> x
 let f : 'a. 'a -> 'a = fun x -> x
 
@@ -242,10 +242,10 @@ exception E : 'a 'b. 'b t2_any * 'a list -> exn
 
 let f (x : 'a. 'a -> 'a) = (x 3, x true)
 
-type _ a = Mk : [> ] * ('a) -> int a
+type _ a = Mk : [> ] * 'a -> int a
 
 module type S = sig
-  type _ a = Mk : [> ] * ('a) -> int a
+  type _ a = Mk : [> ] * 'a -> int a
 
   val f_imm : 'a 'b. 'a -> 'a
   val f_val : 'a. 'a -> 'a
@@ -259,14 +259,14 @@ let f_val : 'a. 'a -> 'a = fun x -> f_imm x
 
 type (_) g = MkG : 'a. 'a g
 type t = int
-type t = (('a), ('b)) t2
-type ('a, 'b) t = ('a) * ('b)
+type t = ('a, 'b) t2
+type ('a, 'b) t = 'a * 'b
 
-class c : object method m : 'a. 'a -> 'a val f : ('a) -> 'a end =
+class c : object method m : 'a. 'a -> 'a val f : 'a -> 'a end =
   object
     method m : type a. a -> a = fun x -> x
 
-    val f = fun (x : ('a)) -> x
+    val f = fun (x : 'a) -> x
   end
 
 type _ g = MkG : 'a 'b. 'a -> 'b g

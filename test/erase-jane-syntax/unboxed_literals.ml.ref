@@ -61,19 +61,13 @@ let (* a *) () (* bb *) =
 
 (* With attributes *)
 let[@aaaaaaaa] (false | true) [@bbbbbbb] =
-  match [@cccccc] ((true, false) [@ddddd]) with
-  | ((true, false) [@eeee]) -> (true [@fff])
-  | (false [@gg]), (true [@h]) -> false
+  match [@cccccc] (true, false) [@ddddd] with
+  | (true, false) [@eeee] -> true [@fff]
+  | false [@gg], true [@h] -> false
 ;;
 
 (* With comments and attributes *)
-let[@a] (* aaaaaaaa *) (() [@bb] (* bbbbbbb *) ), (false | true) [@ccc]
-  (* cccccc *)
-  =
-  match
-    ( (* ddddd *) (false [@dddd])
-    , (true (* eeee *) [@eeeee])
-    , (() [@ffffff] (* fff *) ) )
-  with
-  | ((false, true, ()) (* hh *) [@hhhhhhh]) -> (((), true) [@g] (* g *) )
+let[@a] (* aaaaaaaa *) () [@bb], (false | true) [@ccc] (* cccccc *) =
+  match ( (* ddddd *)false [@dddd], true (* eeee *) [@eeeee], () [@ffffff]) with
+  | (false, true, ()) (* hh *) [@hhhhhhh] -> ((), true) [@g]
 ;;

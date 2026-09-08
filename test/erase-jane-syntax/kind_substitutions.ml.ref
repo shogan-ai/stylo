@@ -81,8 +81,8 @@ module type S15' = S
 
 module type S16 = S
 module type S16' = S
-module type S17 = S with type t = (int -> string)
-module type S17' = S with type t := (int -> string)
+module type S17 = S with type t = int -> string
+module type S17' = S with type t := int -> string
 
 (* Attributes on the surrounding module type *)
 

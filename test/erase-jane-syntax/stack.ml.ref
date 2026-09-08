@@ -21,41 +21,41 @@
    SOFTWARE. *)
 (* These tests from the campiler test suite *)
 
-let f = ref ((fun x -> x))
-let f = ref ((2, 3))
-let f = ignore_local ((2, 3))
-let f = ref (Foo)
-let f = ref ((Bar 42))
-let f = ignore_local ((Bar 42))
-let f = ref (`Foo)
-let f = ref ((`Bar 42))
-let f = ignore_local ((`Bar 42))
-let f = ref ({ x = "hello" })
-let f = ref ({ x = "hello" })
-let f = ignore_local ({ x = "hello" })
-let f (r : r) = ref (r.x)
-let f (r : r) = ref (r.x)
-let f (r : r) = ignore_local (r.x) [@nontail]
-let f = ref ([| 42; 56 |])
-let f = ignore_local ([| 42; 56 |])
+let f = ref (fun x -> x)
+let f = ref (2, 3)
+let f = ignore_local (2, 3)
+let f = ref Foo
+let f = ref (Bar 42)
+let f = ignore_local (Bar 42)
+let f = ref `Foo
+let f = ref (`Bar 42)
+let f = ignore_local (`Bar 42)
+let f = ref { x = "hello" }
+let f = ref { x = "hello" }
+let f = ignore_local { x = "hello" }
+let f (r : r) = ref r.x
+let f (r : r) = ref r.x
+let f (r : r) = ignore_local r.x [@nontail]
+let f = ref [| 42; 56 |]
+let f = ignore_local [| 42; 56 |]
 let f () = (3, 5)
 let f () = (3, 5)
 
 let f () =
-  let g = (fun x -> x) in
+  let g = fun x -> x in
   g 42
 ;;
 
-let f () = ((fun x -> x)) 42
-let f () = List.length ([ 1; 2; 3 ])
+let f () = (fun x -> x) 42
+let f () = List.length [ 1; 2; 3 ]
 let f () = [ i for i = 0 to 9 ]
 let f () = [| i for i = 0 to 9 |]
-let f () = (new cla)
+let f () = new cla
 
 class foo cla = object method bar = {< >} end
 
 let f () = (object end)
-let f () = (lazy "hello")
+let f () = lazy "hello"
 
 module M = struct end
 
@@ -90,35 +90,32 @@ let mk () =
 (* More tests *)
 
 let f =
-  ref
-    ((function
-       | x -> x))
+  ref (function
+    | x -> x)
 ;;
 
 let f =
-  ref
-    ((function
-       | x -> x
-       | y -> y))
+  ref (function
+    | x -> x
+    | y -> y)
 ;;
 
 let f = (* 1 *)
-  ref (* 2 *)
-    ((* 3 *) (* 4 *) ((* 5 *) function (* 6 *)
-       | x -> x))
+  ref (* 2 *) ( (* 3 *) function (* 6 *)
+    | x -> x)
 ;;
 
-let x = ((2, "hello"), ~x:((Foo x)))
+let x = ((2, "hello"), ~x:(Foo x))
 
 let x = (* 1 *) (* 2 *)
   ( (* 3 *) (* 4 *) ( (* 5 *)1 (* 6 *), (* 7 *) "hello" (* 8 *)) (* 9 *)
-  , (* 10 *) ~x:((* 11 *) (* 12 *) (Foo x)) )
+  , (* 10 *) ~x:((* 11 *) Foo x) )
 ;;
 
 (* Constructor precedence *)
 
-let x = Foo (((), ()))
-let x = (() :: [])
+let x = Foo ((), ())
+let x = () :: []
 
 (* Tuples *)
 
@@ -128,135 +125,116 @@ let x = (~x:1, ~y:2)
 
 (* Expressions rejected by the typechecker *)
 
-let x = (x + y)
-let x = (-x)
-let x = (-42)
-let x = (+x)
-let x = (+42)
-let x = (-(-x))
-let x = (-(-42))
-let x = ((Foo x))
+let x = x + y
+let x = -x
+let x = -42
+let x = +x
+let x = +42
+let x = - -x
+let x = - -42
+let x = Foo x
 
 let x =
-  (let y = 1 in
-   Some y)
+  let y = 1 in
+  Some y
 ;;
 
-let x = (c#x)
-let x = (r.x <- x)
-let x = (if x then y else z)
+let x = c#x
+let x = r.x <- x
+let x = if x then y else z
 let _ = X foo [@bar]
 let _ = X (foo [@bar])
-let _ = (X foo [@bar])
+let _ = X foo [@bar]
 let _ = fun x -> x [@bar]
-let _ = fun x -> (x [@bar])
-let _ = ((fun x -> x) [@bar])
+let _ = fun x -> x [@bar]
+let _ = (fun x -> x) [@bar]
 let _ = (fun x -> x) [@bar]
 
 (* Test labelled argument and long func *)
 
 let _ = (* 1 *)
-  M.x (* 2 *)
-    l (* 3 *)
-    ~f: (* 4 *)
-      ((* 5 *) (* 6 *) (fun x (* 7 *) ->
-         Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxx (* 8 *)
-           (module struct
-             type nonrec t = M.t
-           end)))
+  M.x (* 2 *) l (* 3 *) ~f: (* 4 *) ( (* 5 *) fun x (* 7 *) ->
+    Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxx (* 8 *)
+      (module struct
+        type nonrec t = M.t
+      end))
 ;;
 
 let _ =
-  List.iter
-    l
-    ~f:
-      ((fun xxxxx ->
-         Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
-           (module struct
-             type nonrec t = M.t
-           end)))
+  List.iter l ~f:(fun xxxxx ->
+    Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
+      (module struct
+        type nonrec t = M.t
+      end))
 ;;
 
 let _ = (* 1 *)
-  x (* 2 *)
-    l (* 3 *)
-    ~f: (* 4 *)
-      ((* 5 *) (* 6 *) (function
-         | x (* 7 *) ->
-           Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxx (* 8 *)
-             (module struct
-               type nonrec t = M.t
-             end)))
+  x (* 2 *) l (* 3 *) ~f: (* 4 *) ( (* 5 *) function
+    | x (* 7 *) ->
+      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxx (* 8 *)
+        (module struct
+          type nonrec t = M.t
+        end))
 ;;
 
 let _ =
-  List.iter
-    l
-    ~f:
-      ((function
-         | xxxxx ->
-           Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
-             (module struct
-               type nonrec t = M.t
-             end)))
+  List.iter l ~f:(function
+    | xxxxx ->
+      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
+        (module struct
+          type nonrec t = M.t
+        end))
 ;;
 
 let _ = (* 1 *)
-  M.x (* 2 *)
-    l (* 3 *)
-    ~f: (* 4 *)
-      ((* 5 *) (* 6 *) (function
-         | _ ->
-           Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxx (* 8 *)
-             (module struct
-               type nonrec t = M.t
-             end)
-         | _ ->
-           Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxx (* 9 *)
-             (module struct
-               type nonrec t = M.t
-             end)))
+  M.x (* 2 *) l (* 3 *) ~f: (* 4 *) ( (* 5 *) function
+    | _ ->
+      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxx (* 8 *)
+        (module struct
+          type nonrec t = M.t
+        end)
+    | _ ->
+      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxx (* 9 *)
+        (module struct
+          type nonrec t = M.t
+        end))
 ;;
 
 let _ =
-  List.iter
-    l
-    ~f:
-      ((function
-         | _ ->
-           Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxx
-             (module struct
-               type nonrec t = M.t
-             end)
-         | _ ->
-           Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxx
-             (module struct
-               type nonrec t = M.t
-             end)))
+  List.iter l ~f:(function
+    | _ ->
+      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxx
+        (module struct
+          type nonrec t = M.t
+        end)
+    | _ ->
+      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxx
+        (module struct
+          type nonrec t = M.t
+        end))
 ;;
 
 let _ =
   List.iter
     l
     (* 1 *)
-    ~f: (* 2 *)
-      ((* 3 *) (* 4 *) (fun (* 5 *) xxxxx -> (* 6 *)
-         Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
-           (module struct
-             type nonrec t = M.t
-           end)))
+    ~f: (* 2 *) ( (* 3 *)
+    fun (* 5 *) xxxxx -> (* 6 *)
+      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
+        (module struct
+          type nonrec t = M.t
+        end))
     ~g:x
 ;;
 
 let _ =
   List.iter
     l
-    ~f:
-      ((fun xxxxx ->
-         Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
-           (module struct
-             type nonrec t = M.t
-           end)))
+    ~f:(fun xxxxx ->
+      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
+        (module struct
+          type nonrec t = M.t
+        end))
     ~g:x
 ;;
 
@@ -264,26 +242,24 @@ let _ =
   List.iter
     l
     (* 1 *)
-    ~f: (* 2 *)
-      ((* 3 *) (* 4 *) (function (* 5 *)
-         | xxxxx -> (* 6 *)
-           Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
-             (module struct
-               type nonrec t = M.t
-             end)))
+    ~f: (* 2 *) ( (* 3 *) function (* 5 *)
+      | xxxxx -> (* 6 *)
+        Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
+          (module struct
+            type nonrec t = M.t
+          end))
     ~g:x
 ;;
 
 let _ =
   List.iter
     l
-    ~f:
-      ((function
-         | xxxxx ->
-           Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
-             (module struct
-               type nonrec t = M.t
-             end)))
+    ~f:(function
+      | xxxxx ->
+        Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
+          (module struct
+            type nonrec t = M.t
+          end))
     ~g:x
 ;;
 
@@ -291,20 +267,18 @@ let _ =
   List.iter
     l
     (* 1 *)
-    ~f: (* 2 *)
-      ((* 3 *) (* 4 *) (function (* 5 *)
-         | _ (* 6 *) -> Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx x
-         | _ (* 7 *) -> Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx x))
+    ~f: (* 2 *) ( (* 3 *) function (* 5 *)
+      | _ (* 6 *) -> Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx x
+      | _ (* 7 *) -> Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx x)
     ~g:x
 ;;
 
 let _ =
   List.iter
     l
-    ~f:
-      ((function
-         | _ -> Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx x
-         | _ -> Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx x))
+    ~f:(function
+      | _ -> Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx x
+      | _ -> Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx x)
     ~g:x
 ;;
 
@@ -354,14 +328,11 @@ let _ = M.f ~x:(fun _ -> x) ~y: (* c *) (fun _ -> y)
 
 (* No [stack_] (for reference) *)
 let _ =
-  List.iter
-    l
-    ~f:
-      ((fun xxxxx ->
-         Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
-           (module struct
-             type nonrec t = M.t
-           end)))
+  List.iter l ~f:(fun xxxxx ->
+    Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
+      (module struct
+        type nonrec t = M.t
+      end))
 ;;
 
 let _ =
