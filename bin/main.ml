@@ -233,6 +233,7 @@ let style_cmd =
   and+ erase_jst_syntax
   and+ remove_parentheses
   and+ insert_parentheses
+  and+ quotations = Arg.syntax_quotations
   and+ w = width in
   Config.(
     width := w;
@@ -241,6 +242,7 @@ let style_cmd =
     erase_jane_syntax := erase_jst_syntax;
     parentheses_insert := insert_parentheses;
     parentheses_remove := remove_parentheses;
+    syntax_quotations := quotations;
     if tokens_checks then (
       check_retokenisation := true;
       check_normalization_kept_comments := true;
