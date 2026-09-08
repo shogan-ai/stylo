@@ -1173,7 +1173,9 @@ end = struct
     | Pexp_infix_apply { arg1 = lhs; _ }
     | Pexp_send (lhs, _)
     | Pexp_field (lhs, _)
-    | Pexp_index_op { seq = lhs; _ } ->
+    | Pexp_index_op { seq = lhs; _ }
+    (* as well as under optional parens, since they could disappear *)
+    | Pexp_parens { optional = true; exp = lhs } ->
       needs_space_if_prefixed lhs
     | _ -> false
 

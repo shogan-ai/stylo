@@ -1,32 +1,4 @@
-## Error while parsing the output with upstream's parser: (6 errors)
-
-### Item `constant: . unboxed_constant` (in 6 errors)
-
-- Derivation (4 occurrences):
-  ```
-  reversed_labeled_tuple_body: reversed_labeled_tuple_body COMMA LABEL . simple_expr
-    simple_expr: . constant
-      constant: . unboxed_constant
-        unboxed_constant: . HASH_CHAR
-  ```
-  Sample sentence (implementation):
-  ```ocaml
-  - ~ x1 , X2 , ~label3: #'a'
-  ```
-- Derivation (2 occurrences):
-  ```
-  reversed_labeled_tuple_body: LABEL . simple_expr COMMA fun_expr
-    simple_expr: . constant
-      constant: . unboxed_constant
-        unboxed_constant: . HASH_CHAR
-  ```
-  Sample sentence (implementation):
-  ```ocaml
-  - ~label1: #'a' , X2
-  ```
-
-
-## Input doesn't parse: (5205 errors)
+## Input doesn't parse: (5207 errors)
 
 ### Item `ident: . LIDENT` (in 4353 errors)
 
@@ -239,9 +211,9 @@
 - ...
 
 
-### Item `alias_type: . function_type` (in 637 errors)
+### Item `alias_type: . function_type` (in 638 errors)
 
-- Derivation (79 occurrences):
+- Derivation (80 occurrences):
   ```
   simple_expr: LPAREN seq_expr COLON . core_type COLONGREATER tuple_type at_mode_expr RPAREN
     core_type: . alias_type
@@ -255,7 +227,7 @@
   ```
   Sample sentence (implementation):
   ```ocaml
-  ( ( X1 : {%ext|s2|} :> {%ext|s3|} @ x4 ) )
+  - ( X1 : {%ext|s2|} :> {%ext|s3|} @ x4 )
   ```
 - Derivation (8 occurrences):
   ```
@@ -757,16 +729,16 @@
 - ...
 
 
-### Item `at_mode_expr: . AT nonempty_list(mode)` (in 65 errors)
+### Item `at_mode_expr: . AT nonempty_list(mode)` (in 66 errors)
 
-- Derivation (64 occurrences):
+- Derivation (65 occurrences):
   ```
   simple_expr: LPAREN seq_expr COLONGREATER tuple_type . at_mode_expr RPAREN
     at_mode_expr: . AT nonempty_list(mode)
   ```
   Sample sentence (implementation):
   ```ocaml
-  ( ( X1 :> {%ext|s2|} @ x3 ) )
+  - ( X1 :> {%ext|s2|} @ x3 )
   ```
 - Derivation (1 occurrence):
   ```
