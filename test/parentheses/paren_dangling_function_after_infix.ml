@@ -1,3 +1,5 @@
+(*FIXME: normalize keeps some redundant parentheses, this should be removed later*)
+
 (* `function` has exactly the same "swallows every following `|` clause"
    hazard as `match ... with` (see paren_dangling_match_cases.ml) - and it
    shows up constantly in real code as `expr >>= function | ... | ...` used

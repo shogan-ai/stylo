@@ -1,3 +1,5 @@
+(*FIXME: normalize keeps some redundant parentheses, this should be removed later*)
+
 (* A few more type-level parenthesization facts, each checked against
    `ocamlc -dparsetree` or a direct parse check. *)
 
