@@ -1,17 +1,9 @@
 open Ocaml_syntax
 open Parsetree
 
-let lparen_child_rparen ~optional:opt pos =
-  let open Tokens in
-  let mk desc = { pos; desc } in
-  let mk_tok tok = { pos; desc = Token (tok, opt) } in
-  [ mk_tok LPAREN
-  ; mk Child_node
-  ; mk_tok RPAREN ]
-
 let parens_pat ?(optional=false) pat =
   { ppat_desc = Ppat_parens { pat; optional }
-  ; ppat_tokens = lparen_child_rparen ~optional pat.ppat_loc.loc_start
+  ; ppat_tokens = Utils.lparen_child_rparen ~optional pat.ppat_loc.loc_start
   ; ppat_loc = pat.ppat_loc
   ; ppat_attributes = No_attributes
   ; ppat_ext_attr = { pea_ext = None; pea_attrs = No_attributes } }
