@@ -349,9 +349,9 @@ module Type = struct
       let tt = simp_typ free tt in
       let child_prec = get_prec tt in
       let skip_parens =
-        match t.ptyp_attributes with
-        | No_attributes -> is_compatible child_prec ~parent:prec
-        | Attributes _ -> false
+        match t.ptyp_attributes, tt.ptyp_attributes with
+        | No_attributes, No_attributes -> is_compatible child_prec ~parent:prec
+        | Attributes _, _ | _, Attributes _ -> false
       in
       if skip_parens then tt else return (Ptyp_parens tt)
 
