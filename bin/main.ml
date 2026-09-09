@@ -85,6 +85,18 @@ module Arg = struct
     |> flag
     |> value
 
+  let failures_dir_arg_name = "failures-dir"
+  let failures_dir =
+    info [failures_dir_arg_name]
+      ~doc:"Save failing entries (one file per entry) in the given \
+            directory, instead of a $(i,<batch>.failures) directory next \
+            to the batch file. Sharing a directory between batches is \
+            fine: files are prefixed with the name of the batch they come \
+            from."
+      ~docv:"DIR"
+    |> opt (some filepath) None
+    |> value
+
   let remove_parentheses =
     info ["remove-parentheses"]
       ~doc:"Remove unnecessary parentheses from the output"
@@ -103,17 +115,25 @@ let do_style is_mli fname ?normalize ?lnum source =
   then Stylo.style_file Intf ~fname ?normalize ?lnum source
   else Stylo.style_file Impl ~fname ?normalize ?lnum source
 
-let fuzzer_batch ~quiet ~idempotence_check fn =
+let fuzzer_batch ~quiet ~idempotence_check ~failures_dir fn =
   let has_errors = ref false in
   let parse_errors = ref 0 in
   let entries_checked = ref 0 in
   (* Only create the file when there are parse errors *)
   let parse_error_oc = lazy (Out_channel.open_text (fn ^ ".parse-errors")) in
-  (* Failing entries are saved, one file per entry, in a [fn ^ ".failures"]
-     directory; entries are stripped of their entrypoint prefix and get a
-     [.ml] or [.mli] extension so that they can be replayed with
-     [stylo style --idempotence-check FILE] directly. *)
-  let failures_dir = fn ^ ".failures" in
+  (* Failing entries are saved, one file per entry; entries are stripped of
+     their entrypoint prefix and get a [.ml] or [.mli] extension so that
+     they can be replayed with [stylo style --idempotence-check FILE]
+     directly. By default they land in a [fn ^ ".failures"] directory next
+     to the batch file, but they can be gathered in a directory shared by
+     all the batches, in which case files are prefixed with the name of the
+     batch they come from. *)
+  let failures_dir, failure_prefix =
+    match failures_dir with
+    | Some dir ->
+      dir, Filename.remove_extension (Filename.basename fn) ^ "-"
+    | None -> fn ^ ".failures", ""
+  in
   let failure_count = ref 0 in
   let save_failure entrypoint_and_src =
     incr failure_count;
@@ -121,7 +141,7 @@ let fuzzer_batch ~quiet ~idempotence_check fn =
      | Unix.Unix_error (Unix.EEXIST, _, _) -> ());
     let intf, source = Stylo.split_fuzzer_line entrypoint_and_src in
     let fname =
-      Printf.sprintf "%s/%04d%s" failures_dir !failure_count
+      Printf.sprintf "%s/%s%04d%s" failures_dir failure_prefix !failure_count
         (if intf then ".mli" else ".ml")
     in
     Out_channel.with_open_text fname (fun oc ->
@@ -265,13 +285,14 @@ let fuzz_cmd =
   let+ fn = single_file
   and+ quiet = ignore_syntax_errors
   and+ idempotence_check
+  and+ failures_dir = failures_dir
   and+ quotations = syntax_quotations in
   Config.(
     check_same_ast := true;
     check_retokenisation := true;
     syntax_quotations := quotations;
   );
-  fuzzer_batch ~quiet ~idempotence_check fn
+  fuzzer_batch ~quiet ~idempotence_check ~failures_dir fn
 
 let style_cmd =
   Cmd.make (Cmd.info "style") @@

@@ -64,13 +64,18 @@ let overlapping_force jobs seq =
 let consume_batch = function
   | None -> ()
   | Some (fn, pid) ->
+    let no_unix_err f x = try f x with Unix.Unix_error _ -> () in
     match Unix.waitpid [] pid with
     | _, WEXITED 0 ->
-      let no_unix_err f x = try f x with Unix.Unix_error _ -> () in
       (* clean the batch and its sidecar files, if any *)
       no_unix_err Unix.unlink fn;
       no_unix_err Unix.unlink (fn ^ ".parse-errors");
       no_unix_err Unix.rmdir (fn ^ ".failures");
+    | _, WEXITED _ when not (Sys.file_exists (fn ^ ".failures")) ->
+      (* the offending entries were saved in the directory passed with
+         [--failures-dir]: no need to keep the batch around. *)
+      no_unix_err Unix.unlink fn;
+      no_unix_err Unix.unlink (fn ^ ".parse-errors");
     | _ -> () (* exited abnormally, keeping the file and its sidecars *)
 
 (* Unlike [Filename.get_temp_dir_name () ^ "/formatpinata"], this directory
@@ -93,7 +98,7 @@ let make_temp_dir ~syntax_quotations =
   create 0
 
 let check ~cmd ~syntax_quotations ~ignore_output_syntax_errors
-    ~idempotence_check ~jobs ~batch_size seq =
+    ~idempotence_check ~failures_dir ~jobs ~batch_size seq =
   let temp_dir = make_temp_dir ~syntax_quotations in
   let temp_path id =
     Filename.concat temp_dir (Printf.sprintf "formatpinata_%d.mls" id)
@@ -119,6 +124,9 @@ let check ~cmd ~syntax_quotations ~ignore_output_syntax_errors
             ["--ignore-output-syntax-errors"]
           else [])
         @ (if idempotence_check then ["--idempotence-check"] else [])
+        @ (match failures_dir with
+           | Some dir -> ["--failures-dir"; dir]
+           | None -> [])
       in
       let argv = Array.of_list (cmd :: "fuzz" :: flags @ [path]) in
       let pid = Unix.create_process cmd argv Unix.stdin Unix.stdout Unix.stderr in
@@ -137,14 +145,14 @@ let check ~cmd ~syntax_quotations ~ignore_output_syntax_errors
   (try Unix.rmdir temp_dir with _ -> ())
 
 let run ~cmd ~batch_size ~jobs ~syntax_quotations ~ignore_output_syntax_errors
-    ~idempotence_check input_file =
+    ~idempotence_check ~failures_dir input_file =
   In_channel.with_open_text input_file @@ fun ic ->
   let seq =
     Seq.of_dispenser
       (fun () -> Option.map Bytes.unsafe_to_string (Std.read_input ic))
   in
   check ~cmd ~batch_size ~jobs ~syntax_quotations ~ignore_output_syntax_errors
-    ~idempotence_check seq
+    ~idempotence_check ~failures_dir seq
 
 let driver_cmd =
   let open Arg in
@@ -182,6 +190,14 @@ let driver_cmd =
             the output again is a no-op."
     |> flag
     |> value
+  and+ failures_dir =
+    info ["failures-dir"]
+      ~doc:"Pass $(b,--failures-dir DIR) to stylo: failing entries are \
+            saved (one file per entry) in $(i,DIR) instead of a \
+            $(i,<batch>.failures) directory."
+      ~docv:"DIR"
+    |> opt (some filepath) None
+    |> value
   and+ input_file =
     info [] ~doc:"File holding the corpus of NUL-separated sentences to \
                   check."
@@ -189,7 +205,7 @@ let driver_cmd =
     |> required
   in
   run ~cmd ~batch_size ~jobs ~syntax_quotations ~ignore_output_syntax_errors
-    ~idempotence_check input_file
+    ~idempotence_check ~failures_dir input_file
 
 let () =
   let info =
@@ -202,8 +218,8 @@ let () =
             $(b,fuzz) subcommand on each batch, in parallel. Batches for \
             which stylo reports a failure are kept on disk for \
             inspection, along with the offending entries, saved one per \
-            file in a $(i,<batch>.failures) directory; the others are \
-            deleted.")
+            file in a $(i,<batch>.failures) directory (or in the directory \
+            given by $(b,--failures-dir), if any); the others are deleted.")
       ]
   in
   exit (Cmd.eval (Cmd.v info driver_cmd))
