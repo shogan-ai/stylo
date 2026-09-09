@@ -4,8 +4,11 @@ function check-file {
 (rule
   (alias runtest)
   (action
-    (ignore-stdout
-      (run ../../bin/main.exe style --idempotence-check --ast-check %{dep:$f}))))
+    (with-accepted-exit-codes 123
+      (ignore-stdout
+      (ignore-stderr
+        (run ../../../bin/main.exe style --idempotence-check --ast-check
+            %{dep:$f}))))))
 
 EOF
 }
