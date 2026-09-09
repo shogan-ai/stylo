@@ -18,8 +18,11 @@ let mk ?indent doc space =
   let indent =
     match indent with
     | None ->
-      Requirement.to_int (requirement doc) +
-      if is_empty space then 0 else 1
+      let req = requirement doc in
+      if req = Requirement.infinity (* doc contains [hardline]s *) then
+        2
+      else
+        Requirement.to_int req + if is_empty space then 0 else 1
     | Some i -> i
   in
   let vanish =
