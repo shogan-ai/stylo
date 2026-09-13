@@ -5,6 +5,15 @@
       (ignore-stdout
       (ignore-stderr
         (run ../../../bin/main.exe style --idempotence-check --ast-check
+            %{dep:before_after_before_comments.ml}))))))
+
+(rule
+  (alias runtest)
+  (action
+    (with-accepted-exit-codes 123
+      (ignore-stdout
+      (ignore-stderr
+        (run ../../../bin/main.exe style --idempotence-check --ast-check
             %{dep:moving-comments_1.ml}))))))
 
 (rule
