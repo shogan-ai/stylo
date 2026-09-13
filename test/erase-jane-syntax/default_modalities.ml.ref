@@ -98,11 +98,10 @@ module type T = sig (* cmt *)
 end
 
 module type T = sig
+  (* cmt1 *)
   (* cmt2 *)
   (* cmt3 *)
   (* cmt4 *)
-
-  (* cmt1 *)
   type t
 end
 

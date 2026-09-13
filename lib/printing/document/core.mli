@@ -56,7 +56,6 @@ type t = private
   | Comment of { source_comment_id: int; doc: pseudo_token }
   | Comments_flushing_hint of {
       cmts_were_flushed: bool ref;
-      floating_cmts_allowed: bool;
       pull_cmts_attached_before_hint: bool;
       ws_before: t;
       ws_after: t;
@@ -122,13 +121,15 @@ val opt_token : ?ws_before:t -> ?ws_after:t -> Condition.t -> string -> t
 
 val flush_comments
   :  pull_preceeding_comments:bool
-  -> floating_allowed:bool
   -> ws_before:t
   -> ws_after:t
   -> Condition.t * t
 (** An explicit hint for the comments insertion algorithm to flush comments at
-    this point: it allows for floating comments to be displayed as such if
-    desirable, whereas they would usually be attached to what follows them.
+    this point.
+
+    Comments whose blank-line markers say so will be separated from the
+    surrounding content by a blank line; the rest is attached to what follows
+    them.
 
     Likewise it can also "pull" comments that would otherwise be attached the
     preceeding token.

@@ -1302,21 +1302,36 @@ and skip_hash_bang = parse
 
     let unstage newline_after t =
       let cmts = List.rev t.rev_cmts in
+      (* A staged block spans several lines if its first comment starts on a
+         different line than the one its last comment ends on. *)
+      let () =
+        let len = List.length t.rev_cmts in
+        if len = 1 then
+          dprintf "The next comment attaches "
+        else
+          dprintf "The next %d comments attach " len
+      in
+      let spans_multiple_lines =
+        match cmts with
+        | [] -> false
+        | fst :: _ ->
+          let last = List.hd t.rev_cmts in
+          fst.loc.loc_start.pos_lnum <> last.loc.loc_end.pos_lnum
+      in
       let attachement : Tokens.attachment =
         match t.before, newline_after with
         | NoLine, NoLine ->
-          begin match cmts with
-          | [] -> Before (* no comments, doesn't matter *)
-          | fst :: _ ->
-            let last = List.hd t.rev_cmts in
-            if fst.loc.loc_start.pos_lnum <> last.loc.loc_end.pos_lnum then (
-              dprintf "floating (comments over multiple lines)@.";
-              Floating
-            ) else (
-              dprintf "before (same on both side -> default)@.";
-              Before
-            )
-          end
+          (* The block shares a line with both the preceeding and the following
+             token. If it fits on a single line, we attach it to what follows;
+             otherwise the printer will have to move it to its own line(s), and
+             attaching it to what preceeds keeps the output stable. *)
+          if spans_multiple_lines then (
+            dprintf "after (comments over multiple lines)@.";
+            After
+          ) else (
+            dprintf "before (same on both side -> default)@.";
+            Before
+          )
         | NoLine, _ ->
           dprintf "before (same line)@.";
           Before
@@ -1330,24 +1345,43 @@ and skip_hash_bang = parse
           dprintf "after (blank before)@.";
           After
         | BlankLine, BlankLine ->
-          dprintf "floating (really)@.";
-          Floating
+          (* Standalone block of comments (blank lines on both sides): we
+             attach it to what precedes it, and rely on the blank-line markers
+             to reproduce the layout. *)
+          dprintf "after (blank on both sides)@.";
+          After
         | NewLine, NewLine ->
           let first_cmt_line_indent = t.indent.curr_tok in
           let next_indent = Line_indent.current_line () in
           if first_cmt_line_indent = next_indent then (
-            dprintf "after (same indent)@.";
+            dprintf "after (same indent)";
             After
           ) else (
-            dprintf "before (default)@.";
+            dprintf "before (default)";
             Before
           )
       in
-      List.iter (fun {loc; txt; id} ->
+      (* Blank lines can only occur around a block of comments, not inside it
+         (a blank line splits the block, cf [add]), so only the first comment
+         of the block can be preceded by one, and only the last one followed
+         by one. *)
+      let blank_line_before = t.before = BlankLine in
+      let blank_line_after = newline_after = BlankLine in
+      begin match blank_line_before, blank_line_after with
+      | true, true -> dprintf " and is surrounded by blank lines"
+      | true, false -> dprintf " and is preceeded by a blank line"
+      | false, true -> dprintf " and is followed by a blank line"
+      | _ -> ()
+      end;
+      dprintf "@.";
+      let len = List.length cmts in
+      List.iteri (fun i {loc; txt; id} ->
         let cmt =
           { Tokens.corresponding_document_id = id
           ; text = txt
-          ; attachement }
+          ; attachement
+          ; blank_line_before = blank_line_before && i = 0
+          ; blank_line_after = blank_line_after && i = len - 1 }
         in
         Tokens.add ~pos:loc.loc_start (Comment cmt)
       ) cmts

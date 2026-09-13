@@ -123,7 +123,6 @@ type t =
   | Comment of { source_comment_id: int; doc: pseudo_token }
   | Comments_flushing_hint of {
       cmts_were_flushed: bool ref;
-      floating_cmts_allowed: bool;
       pull_cmts_attached_before_hint: bool;
       ws_before: t;
       ws_after: t;
@@ -200,14 +199,13 @@ let vanishing_whitespace cond = function
       { vanishing_cond = Condition.(cond || other_cond) ; value }
   | _ -> invalid_arg "Document.vanishing_whitespace"
 
-let flush_comments ~pull_preceeding_comments:pull ~floating_allowed:float
+let flush_comments ~pull_preceeding_comments:pull
       ~ws_before ~ws_after =
   let cmts_were_flushed = ref false in
   let cond : Condition.t = Var cmts_were_flushed in
   let hint =
     Comments_flushing_hint {
       cmts_were_flushed; ws_before; ws_after;
-      floating_cmts_allowed = float;
       pull_cmts_attached_before_hint = pull;
     }
   in

@@ -3,11 +3,9 @@ open Document.Utils
 
 open Ocaml_syntax.Tokens
 
-(* All toplevel flush hints "allow" floating comments, but none want to pull
-   comments attached before them. *)
+(* Toplevel flush hints do not want to pull comments attached before them. *)
 let flush_hint ~ws_before ~ws_after =
-  flush_comments ~pull_preceeding_comments:false ~floating_allowed:true
-    ~ws_before ~ws_after
+  flush_comments ~pull_preceeding_comments:false ~ws_before ~ws_after
 
 let add_item ?flatness last_in_group doc item =
   let post_break = if last_in_group then empty else break 0 in

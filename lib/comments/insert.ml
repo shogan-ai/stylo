@@ -3,6 +3,14 @@ open Ocaml_syntax
 module T = Tokens
 module Doc = Document
 
+(* [softline] disappears after a blank line. Emitting two of them forces the
+   presence of a blank line, but ensure that even if it follows some
+   breaks/hardline we won't increase the number of blank lines.
+
+   N.B. that second bit is only valid when [blank_line] follows another
+   whitespace, but not when it preceeds one. *)
+let blank_line = Doc.(softline ^^ softline)
+
 let fmt_comment txt =
   Print.Doc.as_odoc_markup_if_no_warnings ~id:(-1) ~kind:`Regular_comment txt
 
@@ -44,37 +52,28 @@ let corresponding_doc_state cmt =
 let explicitely_inserted cmt = !(cmt.T.corresponding_document_id) >= 0
 
 let consume_leading_comments =
-  let rec aux (floating, attached_after as acc) = function
-    | [] -> acc, []
+  let rec aux last_blank_after acc = function
+    | [] -> (acc, last_blank_after), []
     | first :: rest ->
       match first.T.desc with
       | Child_node -> assert false
       | Comment c when not (explicitely_inserted c) ->
-        let acc =
-          let cmt = fmt_comment ~start_pos:first.pos c.text in
-          match c.attachement with
-          (* It looks like we might reorder comment if some [Floating] comments
-             follow some [After] ones. But that cannot happen, by construction.
-          *)
-          | After -> floating, Doc.Utils.(attached_after ^?^ cmt)
-          | Floating -> Doc.Utils.(floating ^?^ cmt), attached_after
-          (* Ideally we'd [assert false] here: [Before] comments have
-             necessarily been consumed already.
-
-             ... however, comments at the beginning of the file (before anycode)
-             currently get marked as [Before] by the lexer.
-             This is should be fixed eventually (because some might actually be
-             [After]!) but for now we treat them as floating here. *)
-          | Before -> Doc.Utils.(floating ^?^ cmt), attached_after
+        let cmt = fmt_comment ~start_pos:first.pos c.text in
+        let sep =
+          if c.blank_line_before || last_blank_after
+          then blank_line
+          else if Doc.is_empty acc
+          then Doc.empty
+          else Doc.break 1
         in
-        aux acc rest
+        aux c.blank_line_after Doc.(acc ^^ sep ^^ cmt) rest
       | Comment _
-      | Token _ -> acc, first :: rest
+      | Token _
       | Lexer_directive _ ->
         (* Should we consume directives too here? *)
-        acc, first :: rest
+        (acc, last_blank_after), first :: rest
   in
-  aux Doc.(empty, empty)
+    aux false Doc.empty
 
 let rec first_is_space = function
   | Doc.Whitespace _ -> `yes
@@ -123,9 +122,11 @@ let rec nest_before_leaf = function
 let nest_before_leaf d = nest_before_leaf d = `yes
 
 type special_space_treatement =
-   | Nothing_special
-   | Insert_before_leaf
-   | Insert_before_inserting_comment
+  | Nothing_special
+  | Insert_before_leaf
+  | Insert_blank_line_before_leaf
+  | Next_before_leaf_is_blank_line
+  | Insert_before_inserting_comment
 
 type state = {
   space_handling: special_space_treatement;
@@ -190,46 +191,71 @@ let attach_before_comments state tokens doc =
       tokens, doc, state
     | to_append ->
       let tokens = Std.List.drop_while is_comment_attaching_before tokens in
-      let doc =
-        let open Doc in
-        group @@ List.fold_left (fun acc cmt ->
+      let doc, last_blank_after =
+        List.fold_left (fun (acc, last_blank_after) cmt ->
           match cmt.T.desc with
           | Comment c ->
             if explicitely_inserted c
-            then acc
-            else acc ^^ group (break 1 ^^ fmt_comment ~start_pos:cmt.pos c.text)
+            then acc, last_blank_after
+            else
+              (* A blank line between this comment and the previous one must
+                 be reproduced, whether the source marks it before this
+                 comment or after the previous one. *)
+              let sep =
+                if c.blank_line_before || last_blank_after
+                then blank_line
+                else Doc.break 1
+              in
+              let cmt =
+                Doc.(group (sep ^^ fmt_comment ~start_pos:cmt.pos c.text))
+              in
+              Doc.(acc ^^ cmt), c.blank_line_after
           | _ -> assert false
-        ) doc to_append
+        ) (doc, false) to_append
       in
-      tokens, doc, { state with space_handling = Insert_before_leaf }
+      let doc = Doc.group doc in
+      (* If the last comment was followed by a blank line, reproduce it before
+         the token the comments are attached to. *)
+      let space_handling =
+        if last_blank_after
+        then Insert_blank_line_before_leaf
+        else Insert_before_leaf
+      in
+      tokens, doc, { state with space_handling }
 
 let insert_space_if_required ?(inserting_comment=false) state doc =
   let brk =
     match state.space_handling, inserting_comment with
+    | Insert_blank_line_before_leaf, _ -> blank_line
     | Insert_before_leaf, _
     | Insert_before_inserting_comment, true -> Doc.break 1
-    | _ -> Doc.empty
+    | Insert_before_inserting_comment, false
+    | Next_before_leaf_is_blank_line, _
+    | Nothing_special, _ -> Doc.empty
   in
   Doc.(brk ^^ doc)
 
-let prepend_comments_to_doc state (floating, attached_after) doc =
-  let comments = Doc.Utils.(floating ^?^ attached_after) in
+let prepend_comments_to_doc state comments ~blank_line_after doc =
   let doc =
     if first_is_space doc
     then Doc.(comments ^^ doc)
+    else if blank_line_after
+    then Doc.(comments ^^ blank_line ^^ doc)
     else Doc.Utils.(comments ^/^ doc)
   in
   insert_space_if_required ~inserting_comment:true state doc
 
-let flush_comments tokens floating_allowed ~before:ws_b ~after:ws_a state =
-  let to_prepend, rest = consume_leading_comments tokens in
-  let after_floating = Doc.(if floating_allowed then ws_a ^^ ws_a else ws_a) in
+let flush_comments tokens ~before:ws_b ~after:ws_a state =
+  let (to_prepend, last_blank_after), rest = consume_leading_comments tokens in
+  (* A comment followed by a blank line in the source gets one in the output
+     too, instead of the hint's own whitespace. *)
+  let ws_after_comments =
+    if last_blank_after then blank_line else ws_a
+  in
   let doc =
-    match to_prepend with
-    | Empty, after -> Doc.(ws_b ^^ after ^^ ws_a)
-    | floating, Empty -> Doc.(ws_b ^^ floating ^^ after_floating)
-    | floating, after ->
-      Doc.(ws_b ^^ floating ^^ after_floating ^^ after ^^ ws_a)
+    if Doc.is_empty to_prepend
+    then Doc.(ws_b ^^ ws_a)
+    else Doc.(ws_b ^^ to_prepend ^^ ws_after_comments)
   in
   rest, doc, { state with space_handling = Nothing_special }
 
@@ -272,7 +298,18 @@ let rec walk_both state seq doc =
 
     (* Whitespace: don't consume token *)
     | _, Doc.Empty -> seq, doc, state
-    | _, Doc.Whitespace _ -> seq, doc, no_space state
+    | _, Doc.Whitespace _ ->
+      begin match state.space_handling with
+      | Insert_blank_line_before_leaf
+      | Next_before_leaf_is_blank_line ->
+        if not state.at_end_of_a_group then
+          (* Now is a good opportunity to materialise the blank line. *)
+          seq, Doc.(doc ^^ blank_line), no_space state
+        else
+          (* But if we're at the end of a group, we delay further *)
+          seq, doc, state
+      | _ -> seq, doc, no_space state
+      end
 
     (* Skip explicitely inserted comments *)
     | _, Doc.Comment d ->
@@ -301,8 +338,7 @@ let rec walk_both state seq doc =
       | Absent ->
         (* [c] (and perhaps the following comments) can be flushed. *)
         fh.cmts_were_flushed := true;
-        flush_comments seq fh.floating_cmts_allowed ~before:fh.ws_before
-          ~after:fh.ws_after state
+        flush_comments seq ~before:fh.ws_before ~after:fh.ws_after state
       end
 
     | _, Doc.Comments_flushing_hint fh ->
@@ -362,7 +398,18 @@ let rec walk_both state seq doc =
 and traverse_group tokens state margin flatness grouped_doc =
   let rest, d, state' =
     walk_both
-      { state with space_handling = Nothing_special; at_end_of_a_group = true }
+      { state with
+        space_handling =
+          (* Do not force the insertion of space inside the group, we'd rather
+             insert it ourself outside (see below).
+             However if one is inserted, and a blank line is needed, we make
+             sure that the place where the insertion happens knows that
+             requirement. *)
+          (match state.space_handling with
+           | Insert_blank_line_before_leaf | Next_before_leaf_is_blank_line ->
+             Next_before_leaf_is_blank_line
+           | _ -> Nothing_special);
+        at_end_of_a_group = true }
       tokens grouped_doc
   in
   let return_state =
@@ -378,9 +425,11 @@ and traverse_group tokens state margin flatness grouped_doc =
   attach_before_comments return_state rest doc
 
 and insert_comments_before_subtree tokens state doc =
-  let to_prepend, rest = consume_leading_comments tokens in
+  let (to_prepend, last_blank_after), rest = consume_leading_comments tokens in
   let rest, doc, state' = walk_both (no_space state) rest doc in
-  let doc = prepend_comments_to_doc state to_prepend doc in
+  let doc =
+    prepend_comments_to_doc state to_prepend ~blank_line_after:last_blank_after doc
+  in
   attach_before_comments state' rest doc
 
 let append_trailing_comments (tokens, doc, _) =
@@ -395,7 +444,12 @@ let append_trailing_comments (tokens, doc, _) =
         let doc =
           if explicitely_inserted c
           then doc
-          else Doc.Utils.(doc ^?^ fmt_comment ~start_pos:tok.pos c.text)
+          else
+            let cmt = fmt_comment ~start_pos:tok.pos c.text in
+            let sep =
+              if c.blank_line_before then blank_line else Doc.break 1
+            in
+            Doc.(if is_empty doc then cmt else doc ^^ sep ^^ cmt)
         in
         aux doc toks
       | Token _ -> raise (Error (Missing_token tok.pos))

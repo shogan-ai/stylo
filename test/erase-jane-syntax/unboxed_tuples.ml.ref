@@ -19,6 +19,7 @@
    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. *)
+
 (* This test file is just a copy of labeled_tuples.ml and
    labeled_tuples_regressions.ml, with less labels, and some additional
    regression tests at the bottom. *)

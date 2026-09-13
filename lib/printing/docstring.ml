@@ -570,7 +570,7 @@ let pp_pre ds =
      The flush hint allows us to lay it out like we do the docstring; otherwise
      it might be inserted deeper in the document tree and break grouping. *)
   let _, pre_flush_hint =
-    flush_comments ~pull_preceeding_comments:false ~floating_allowed:false
+    flush_comments ~pull_preceeding_comments:false
       ~ws_before:softest_line ~ws_after:empty
   in
   softline ^^ softline ^^ pp ds ^^ pre_flush_hint

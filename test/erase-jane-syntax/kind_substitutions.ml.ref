@@ -19,7 +19,9 @@
    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. *)
+
 (* Top-level *)
+
 (* Simple substitutions *)
 
 module type S1 = S
@@ -110,8 +112,10 @@ module type S27' = S [@deprecated] [@warning "-32"]
 
 module type S21 = S (* 1 *) (* 2 *) (* 3 *) (* 4 *)
 module type S21' = S (* 1 *) (* 2 *) (* 3 *) (* 4 *)
+
 module type S22 = S (* a *) (* b *) (* c *) (* d *) (* e *) (* f *)
 module type S22' = S (* a *) (* b *) (* c *) (* d *) (* e *) (* f *)
+
 module type S23 = S with type t = (* tc *) int (* and *) (* kc *)
 module type S23' = S with type t := (* tc *) int (* and *) (* kc *)
 module type S24 = S (* paren *) (* k1 *) (* k2 *) (* m1 *) (* m2 *)
@@ -122,5 +126,6 @@ module type S25' = S (* before lid *) (* after lid *) (* manifest *)
 (* [@@ocamlformat "disable"] preserves source formatting *)
 
 module type S_disabled = S (* [@@ocamlformat "disable"] *)
+
 module type S_disabled' = S
 (* [@@ocamlformat "disable"] *)

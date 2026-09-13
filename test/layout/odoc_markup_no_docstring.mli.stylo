@@ -1,4 +1,5 @@
 (* Here, we test the rendering of comment markup. *)
+
 (* {1 Sections}
 
     Let's get these done first, because sections will be used to break up the

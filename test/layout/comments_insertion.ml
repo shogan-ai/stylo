@@ -73,3 +73,19 @@ let foo = (* before: same line *)
 (* The same two items as above but with a blank line between each comment
    currently cause stylo to not be idempotent.
    Saved at test/correctness-checks/failing/before_after_before_comments.ml *)
+
+let foo = (* before: same line *)
+
+  (* after: same indent as exp *)
+
+(* also after, despite the confusing indentation! *)
+  exp
+
+
+(* slight variation on the above, to illustrate *)
+let foo = (* before: same line *)
+
+(* before: same indent *)
+
+(* this time around this one also attaches before! *)
+  exp

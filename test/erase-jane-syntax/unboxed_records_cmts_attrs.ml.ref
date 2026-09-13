@@ -19,6 +19,7 @@
    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. *)
+
 (* Tests making sure comments and attributes are handled reasonably by unboxed
    record printing. *)
 
@@ -36,6 +37,7 @@ let _ = { x = 42 (* baz *); y }
 let _ = { x = 42; (* baz *) y }
 let _ = { x = 42; y (* baz *) }
 let _ = { x = 42; y } (* baz *)
+
 let _ = (* baz *) { z; y : int }
 let _ = { (* baz *) z; y : int }
 let _ = { z (* baz *); y : int }

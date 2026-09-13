@@ -19,6 +19,7 @@
    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. *)
+
 (* This test file is a copy of record.ml, updated to use unboxed records, and
    with some additional tests at the end. *)
 
@@ -103,6 +104,7 @@ let to_string { x; _ (* we should print y *) } = string_of_int x
 let { x = (x : t) } = x
 
 (* Copy of record.ml ends here *)
+
 (* Basic field access. *)
 
 let _ = r.x

@@ -316,11 +316,13 @@ module Raw = struct
   | _ -> false
 end
 
-type attachment = Before | After | Floating
+type attachment = Before | After
 
 type comment = {
   text: string;
   attachement: attachment;
+  blank_line_before: bool;
+  blank_line_after: bool;
   corresponding_document_id: int ref;
 }
 
@@ -340,7 +342,7 @@ type seq = elt list
 let desc_as_string = function
   | Token (t, false) -> Raw.to_string t
   | Token (t, true) -> "optional(" ^ Raw.to_string t ^ ")"
-  | Comment c -> Printf.sprintf "(* %s *)" c.text
+  | Comment c -> Printf.sprintf "(* %s | %s bb=%b ba=%b id=%d *)" c.text (match c.attachement with Before -> "B" | After -> "A") c.blank_line_before c.blank_line_after !(c.corresponding_document_id)
   | Lexer_directive _ -> "#lexer_directive"
   | Child_node -> "child"
 

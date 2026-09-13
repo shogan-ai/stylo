@@ -1,4 +1,5 @@
 (* Two cases that are not really about precedence at all: *)
+
 (* A type constraint `(e : t)` or coercion `(e :> t)` is not "redundant parens around an
    expression" - the parens are the mandatory concrete syntax of the construct itself.
    There is no unparenthesized form: bare `a : int` is not a valid expression on its own

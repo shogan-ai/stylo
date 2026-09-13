@@ -19,20 +19,26 @@
    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. *)
+
 (* Top-level *)
 
 (** Doc comment 1 *)
 
+(* a b c d e f g *)
+
 (* A normal comment 1 *)
 
-(* a b c d e f g *)
 type t (* Surprise *)
 
 (** Doc comment 3 *)
 
 (* 1 2 3 *)
+
+(* 4 5 6 *)
 (* 7 8 9 *)
+
 (* Now with comments *)
+
 (* 168 *)
 (* 169 *)
 (* 167 *)
@@ -221,7 +227,22 @@ type t (* Surprise *)
 (* 412 *)
 (* 411 *)
 (* 413 *)
+
 (* Attributes *)
+
+(* Prefix [@foo] attributes on abstract kinds *)
+
+(* Prefix [@foo] attributes on kind abbreviations *)
+
+(* Post-item [@@foo] attributes on abstract kinds *)
+
+(* Post-item [@@foo] attributes on kind abbreviations *)
+
+(* Both prefix and post attributes *)
+
+(* Long kind with attributes that may break *)
+
+(* Attributes with comments *)
 (* attr comment *)
 (* before name *)
 (* after name *)
@@ -233,22 +254,20 @@ type t (* Surprise *)
 (* after manifest *)
 (* attr trailing *)
 (* after attr *)
+
 (* struct *)
 
-(* 4 5 6 *)
-(* Prefix [@foo] attributes on abstract kinds *)
-(* Prefix [@foo] attributes on kind abbreviations *)
-(* Post-item [@@foo] attributes on abstract kinds *)
-(* Post-item [@@foo] attributes on kind abbreviations *)
-(* Both prefix and post attributes *)
-(* Long kind with attributes that may break *)
-(* Attributes with comments *)
 module _ = struct
+
+(* Comment for abstract kind *)
+
+(* Attributes inside struct *)
 (* 415 *)
 (* 414 *)
 (* 416 *)
 (* 418 *)
 (* 417 *)
+
 (* 880 *)
 (* 881 *)
 (* 879 *)
@@ -305,14 +324,15 @@ module _ = struct
 (* 949 *)
 (* 948 *)
 (* 950 *)
-(* Comment for abstract kind *)
-(* Attributes inside struct *)
 end
 
 (* sig *)
 
 module type S = sig
 
+(* Comment for abstract kind *)
+
+(* Attributes inside sig *)
 (* 952 *)
 (* 951 *)
 (* 954 *)
@@ -444,6 +464,7 @@ module type S = sig
 (* 1466 *)
 (* 1472 *)
 (* 1471 *)
+
 (* 1510 *)
 (* 1509 *)
 (* 1511 *)
@@ -458,7 +479,6 @@ module type S = sig
 (* 1518 *)
 (* 1519 *)
 (* 1506 *)
-(* Comment for abstract kind *)
-(* Attributes inside sig *)
 end
+
 (* [@@ocamlformat "disable"] preserves source formatting *)

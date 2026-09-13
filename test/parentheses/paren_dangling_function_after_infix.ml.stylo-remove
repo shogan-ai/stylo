@@ -1,4 +1,5 @@
 (* FIXME: normalize keeps some redundant parentheses, this should be removed later *)
+
 (* `function` has exactly the same "swallows every following `|` clause" hazard as `match
    ... with` (see paren_dangling_match_cases.ml) - and it shows up constantly in real code
    as `expr >>= function | ... | ...` used as one branch of an outer match (monadic-bind
@@ -23,6 +24,7 @@ let necessary_1 x =
 (* without parens, `| _ -> 3` is absorbed into the `function`'s cases, leaving the outer
    match with a single case - same failure mode as the plain nested-match case, just via
    `function` instead of `match ... with` *)
+
 (* two equally valid fixes once an infix operator is involved: *)
 
 (* fix A - parenthesize just the "inner" function *)

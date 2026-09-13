@@ -14,14 +14,18 @@
 
 type token := Parser_tokens.token
 
-type attachment = Before | After | Floating
-(** A comment is either attached to the token before/after it, or left floating.
+type attachment = Before | After
+(** A comment is either attached to the token before or after it.
     This attachement decision is made by the lexer (cf
     {!Lexer.Staged_comments}). *)
 
 type comment = {
   text: string;
   attachement: attachment;
+  blank_line_before: bool;
+  (** whether the comment is preceded by a blank line in the source *)
+  blank_line_after: bool;
+  (** whether the comment is followed by a blank line in the source *)
   corresponding_document_id: int ref;
   (** this is used by {!Insert_comments} to not duplicate comments that were
       already explicitely inserted (e.g. docstrings). *)

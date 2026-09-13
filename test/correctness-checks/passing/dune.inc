@@ -32,6 +32,30 @@
   (alias runtest)
   (action
     (ignore-stdout
+      (run ../../../bin/main.exe style --idempotence-check --ast-check %{dep:moving-comments_1.ml}))))
+
+(rule
+  (alias runtest)
+  (action
+    (ignore-stdout
+      (run ../../../bin/main.exe style --idempotence-check --ast-check %{dep:moving-comments_2.ml}))))
+
+(rule
+  (alias runtest)
+  (action
+    (ignore-stdout
+      (run ../../../bin/main.exe style --idempotence-check --ast-check %{dep:moving-comments_3.ml}))))
+
+(rule
+  (alias runtest)
+  (action
+    (ignore-stdout
+      (run ../../../bin/main.exe style --idempotence-check --ast-check %{dep:moving-comments_4.ml}))))
+
+(rule
+  (alias runtest)
+  (action
+    (ignore-stdout
       (run ../../../bin/main.exe style --idempotence-check --ast-check %{dep:multiline_preceeding.ml}))))
 
 (rule

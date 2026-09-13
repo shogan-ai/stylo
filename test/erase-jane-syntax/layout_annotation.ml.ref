@@ -170,6 +170,7 @@ type s = { f : 'a. 'a -> 'a u } and 'a u = 'a t_imm
    improve, because it comes from re-checking typedtree, where we don't have
    locations any more. I conjecture the same location problem exists when
    constraints aren't satisfied. *)
+
 (********************)
 (* Test 5: newtypes *)
 
@@ -279,8 +280,8 @@ let f_gadt : 'a. 'a -> 'a g -> 'a = fun x MkG -> f_imm x
 (* comments *)
 val foo
   : (* comment 1 *)  'k (* comment 2 *) (* comment 3 *)
-     (* comment 5 *)
      (* comment 4 *)
+     (* comment 5 *)
      'cmp
   .  (module
      S
@@ -292,11 +293,11 @@ val foo
 
 type a = b (* comment 0 *) as (* comment 1 *) 'k
 
-(* comment 5 *)
-
 (* comment 2 *)
 (* comment 3 *)
 (* comment 4 *)
+(* comment 5 *)
+
 let f (type a) x = x
 let f (type a b c d e f g h i j k l m n o p q r s t u v w x y z) x = x
 let f (type a b) x = x
