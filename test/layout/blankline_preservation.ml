@@ -1,0 +1,14 @@
+(* Here stylo's rules for preserving blank lines around comments conflict with
+   the "group alike items together compactly" rule.
+
+   There are at least two ways in which we could deal with this:
+   - add explicit markers in the document to suppress blank lines
+   - only preserve blank lines which separate comments (because they have a sort
+   of semantic meaning in that context?)
+
+   For now, we do nothing *)
+
+type redundant_1
+type necessary_1 (* without parens: t1 -> (t2 -> t3) *)
+
+type redundant_2

@@ -1,4 +1,14 @@
 (rule
+  (target blankline_preservation.ml.out)
+  (action
+    (with-stdout-to %{target}
+      (run %{project_root}/bin/main.exe style --idempotence-check --width 90 %{dep:blankline_preservation.ml}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:blankline_preservation.ml.stylo} %{dep:blankline_preservation.ml.out})))
+
+(rule
   (target cinaps.ml.out)
   (action
     (with-stdout-to %{target}
