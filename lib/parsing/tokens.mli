@@ -29,6 +29,9 @@ type comment = {
   corresponding_document_id: int ref;
   (** this is used by {!Insert_comments} to not duplicate comments that were
       already explicitely inserted (e.g. docstrings). *)
+  is_docstring: bool;
+  (* make sure we emit (** *) for unattached/misplaced docstrings which won't be
+     explicitely handled *)
 }
 
 type desc =

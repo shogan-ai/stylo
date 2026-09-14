@@ -1287,6 +1287,7 @@ and skip_hash_bang = parse
       loc: Location.t;
       txt: string;
       id: int ref;
+      is_docstring: bool;
     }
 
     type t = {
@@ -1295,8 +1296,8 @@ and skip_hash_bang = parse
       indent: Line_indent.t;
     }
 
-    let init before loc txt id =
-      let info = { loc; txt; id } in
+    let init before loc txt id is_docstring =
+      let info = { loc; txt; id; is_docstring } in
       let indent = Line_indent.copy () in
       { before; indent; rev_cmts = [ info ] }
 
@@ -1375,20 +1376,21 @@ and skip_hash_bang = parse
       end;
       dprintf "@.";
       let len = List.length cmts in
-      List.iteri (fun i {loc; txt; id} ->
+      List.iteri (fun i {loc; txt; id; is_docstring} ->
         let cmt =
           { Tokens.corresponding_document_id = id
           ; text = txt
           ; attachement
           ; blank_line_before = blank_line_before && i = 0
-          ; blank_line_after = blank_line_after && i = len - 1 }
+          ; blank_line_after = blank_line_after && i = len - 1
+          ; is_docstring }
         in
         Tokens.add ~pos:loc.loc_start (Comment cmt)
       ) cmts
 
-    let add t before loc txt id =
+    let add t before loc txt id is_docstring =
       match t with
-      | None -> init before loc txt id
+      | None -> init before loc txt id is_docstring
       | Some t ->
         (* If there is a blank line between the comment about to be staged and
            the previous ones, we decide their attachement separately (and so we
@@ -1396,9 +1398,9 @@ and skip_hash_bang = parse
            keep accumulating and we'll decide for the whole block. *)
         if before = BlankLine then (
           unstage before t;
-          init before loc txt id
+          init before loc txt id is_docstring
         ) else (
-          let info = { loc; txt; id } in
+          let info = { loc; txt; id; is_docstring } in
           { t with rev_cmts = info :: t.rev_cmts }
         )
   end
@@ -1415,7 +1417,9 @@ and skip_hash_bang = parse
       | COMMENT (s, loc, id) ->
           Line_indent.new_info lines_for_comments loc.loc_start;
           add_comment (s, loc);
-          let sc = Staged_comments.add sc_opt lines_for_comments loc s id in
+          let sc =
+            Staged_comments.add sc_opt lines_for_comments loc s id false
+          in
           let lines_for_comments' = NoLine in
           let lines_for_docstrings' =
             match lines_for_docstrings with
@@ -1449,6 +1453,7 @@ and skip_hash_bang = parse
             Staged_comments.init lines_for_comments doc_loc
               (Docstrings.docstring_body doc)
               doc.ds_id
+              true
           in
           let docs' = acc_docstring lines_for_docstrings docs doc in
           loop NoLine NoLine docs' (Some sc) lexbuf
