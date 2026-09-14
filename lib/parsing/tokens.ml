@@ -324,7 +324,6 @@ type comment = {
   blank_line_before: bool;
   blank_line_after: bool;
   corresponding_document_id: int ref;
-  is_docstring: bool;
 }
 
 type desc =

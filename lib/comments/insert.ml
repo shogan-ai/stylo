@@ -11,9 +11,8 @@ module Doc = Document
    whitespace, but not when it preceeds one. *)
 let blank_line = Doc.(softline ^^ softline)
 
-let fmt_comment ~start_pos is_docstring txt =
-  let kind = if is_docstring then `Docstring else `Regular_comment in
-  Print.Doc.as_odoc_markup_if_no_warnings ~id:(-1) ~kind ~start_pos txt
+let fmt_comment txt =
+  Print.Doc.as_odoc_markup_if_no_warnings ~id:(-1) ~kind:`Regular_comment txt
 
 module Error = struct
   type t =
@@ -59,7 +58,7 @@ let consume_leading_comments =
       match first.T.desc with
       | Child_node -> assert false
       | Comment c when not (explicitely_inserted c) ->
-        let cmt = fmt_comment ~start_pos:first.pos c.is_docstring c.text in
+        let cmt = fmt_comment ~start_pos:first.pos c.text in
         let sep =
           if c.blank_line_before || last_blank_after
           then blank_line
@@ -207,8 +206,10 @@ let attach_before_comments state tokens doc =
                 then blank_line
                 else Doc.break 1
               in
-              let cmt = fmt_comment ~start_pos:cmt.pos c.is_docstring c.text in
-              Doc.(acc ^^ group (sep ^^ cmt)), c.blank_line_after
+              let cmt =
+                Doc.(group (sep ^^ fmt_comment ~start_pos:cmt.pos c.text))
+              in
+              Doc.(acc ^^ cmt), c.blank_line_after
           | _ -> assert false
         ) (doc, false) to_append
       in
@@ -444,8 +445,10 @@ let append_trailing_comments (tokens, doc, _) =
           if explicitely_inserted c
           then doc
           else
-            let cmt = fmt_comment ~start_pos:tok.pos c.is_docstring c.text in
-            let sep = if c.blank_line_before then blank_line else Doc.break 1 in
+            let cmt = fmt_comment ~start_pos:tok.pos c.text in
+            let sep =
+              if c.blank_line_before then blank_line else Doc.break 1
+            in
             Doc.(if is_empty doc then cmt else doc ^^ sep ^^ cmt)
         in
         aux doc toks
