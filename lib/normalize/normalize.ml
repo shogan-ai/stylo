@@ -81,7 +81,20 @@ class style_normalizer = object
     |> super#type_declaration env
 
   method! type_extension env ext =
-    Docstring_placement.type_extension ext
+    let cstrs =
+      (* Done here and not in [extension_constructor] because adding a pipe for
+         constructors of a [type_exception] would be incorrect. *)
+      List.mapi (fun i ec ->
+        match ec.pext_kind with
+        | Pext_decl _ ->
+          { ec with
+            pext_tokens =
+              add_pipe_if_missing ~mk_optional:(i=0) ec.pext_tokens }
+        | _ -> ec
+      ) ext.ptyext_constructors
+    in
+    { ext with ptyext_constructors = cstrs }
+    |> Docstring_placement.type_extension
     |> super#type_extension env
 
   method! type_exception env exn =

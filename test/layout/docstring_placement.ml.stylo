@@ -20,7 +20,7 @@ module _ : sig
 
   (** ext ext ds *)
   type ext +=
-    A
+    | A
     | B (**)
 
   (** Exn ds *)
@@ -101,7 +101,7 @@ end = struct
 
   (** ext ext ds *)
   type ext +=
-    A
+    | A
     | B (**)
 
   (** Exn ds *)

@@ -1312,8 +1312,9 @@ end = struct
         Preceeding.group_with preceeding (group (S.let_ ^/^ !!S.exception_))
       in
       let binding =
+        let pretend_flat = flatness_tracker () in
         let_exn ^/^
-        pre_nest (nest 2 (Extension_constructor.pp ec) ^/^ S.in_)
+        pre_nest (nest 2 (Extension_constructor.pp pretend_flat ec) ^/^ S.in_)
       in
       binding ^^ hardline ^^ pre_nest (pp body)
     | Pexp_assert e ->
@@ -2624,30 +2625,33 @@ end = struct
   let pp { ptyext_path; ptyext_params; ptyext_constructors; ptyext_private;
            ptyext_attributes; ptyext_ext_attrs; ptyext_pre_doc; ptyext_post_doc;
            ptyext_loc = _ ; ptyext_tokens }=
+    let flatness = flatness_tracker () in
     let kw = Ext_attribute.decorate S.type_ ptyext_ext_attrs in
     let tconstr =
       Type_constructor.pp_decl ptyext_tokens
         ptyext_params (longident ptyext_path.txt)
     in
     let cstrs =
-      separate_map (break 1) Extension_constructor.pp ptyext_constructors
+      separate_map (break 1) (Extension_constructor.pp flatness)
+        ptyext_constructors
     in
     flow (break 1)
       (kw :: List.map (nest 2)
                [ tconstr; S.plus_equals; private_ ptyext_private; cstrs ])
+    |> group ~flatness
     |> Attribute.attach ~item:true ~attrs:ptyext_attributes
     |> Doc.attach ?pre_doc:ptyext_pre_doc ?post_doc:ptyext_post_doc
-    |> group
 end
 
 and Extension_constructor : sig
-  val pp : extension_constructor -> t
+  val pp : flatness -> extension_constructor -> t
 end = struct
-  let pp { pext_name; pext_kind; pext_attributes; pext_doc;
-           pext_loc = _; pext_tokens } =
+  let pp te_flatness
+        { pext_name; pext_kind; pext_attributes; pext_doc
+        ; pext_loc = _; pext_tokens } =
     match pext_kind with
     | Pext_decl (vars, args, res) ->
-      Constructor_decl.pp (flatness_tracker () (* FIXME: pass from caller *))
+      Constructor_decl.pp te_flatness
         pext_tokens pext_name vars args res pext_attributes pext_doc
     | Pext_rebind lid ->
       (if starts_with_pipe pext_tokens then S.pipe else empty) ^?^
@@ -2662,9 +2666,10 @@ end = struct
   let pp { ptyexn_constructor ; ptyexn_attributes ; ptyexn_ext_attrs;
            ptyexn_pre_doc; ptyexn_post_doc; ptyexn_loc = _; ptyexn_tokens = _} =
     let extra_nest = nest 2 in
+    let pretend_flat = flatness_tracker () in
     group (
       Ext_attribute.decorate S.exception_ ptyexn_ext_attrs ^/^
-      nest 2 (Extension_constructor.pp ptyexn_constructor)
+      nest 2 (Extension_constructor.pp pretend_flat ptyexn_constructor)
     )
     |> Attribute.attach ~extra_nest ~item:true ~attrs:ptyexn_attributes
     |> Doc.attach ?pre_doc:ptyexn_pre_doc ?post_doc:ptyexn_post_doc
