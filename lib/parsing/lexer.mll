@@ -1276,6 +1276,7 @@ and skip_hash_bang = parse
       { curr_tok; prev_tok }
 
     let current_line () = state.curr_tok
+    let reset () = state.curr_tok <- 1; state.prev_tok <- -1
   end
 
   module Staged_comments = struct
@@ -1475,6 +1476,8 @@ and skip_hash_bang = parse
     is_in_string := false;
     comment_start_loc := [];
     Queue.clear comments;
+    Line_indent.reset ();
+    previous_token := None;
     match !preprocessor with
     | None -> ()
     | Some (init, _preprocess) -> init ()

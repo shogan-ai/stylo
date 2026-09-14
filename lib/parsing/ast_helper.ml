@@ -30,9 +30,7 @@ type attrs = attributes
 
 let default_loc = ref Location.none
 
-let simplify_ds : Docstring.t option -> _ = function
-  | None | Some { ds_body=""; _ } -> None
-  | Some ds -> Some ds
+let simplify_ds : Docstring.t option -> _ = fun x -> x
 
 let with_default_loc l f =
   let orig = !default_loc in
@@ -303,13 +301,12 @@ module Sig = struct
   let attribute ?loc ~tokens a = mk ?loc ~tokens (Psig_attribute a)
   *)
   let text txt =
-    let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
     List.map
       (fun ds ->
          let loc = docstring_loc ds in
          let ds_toks = Tokens.at (loc.loc_start, loc.loc_end) in
          mk ~loc ~tokens:ds_toks (Psig_docstring (Docs.body_as_doc ds)))
-      f_txt
+      txt
 end
 
 module Sg = struct
@@ -341,13 +338,12 @@ module Str = struct
   let attribute ?loc ~tokens a = mk ?loc ~tokens (Pstr_attribute a)
      *)
   let text txt =
-    let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
     List.map
       (fun ds ->
          let loc = docstring_loc ds in
          let ds_toks = Tokens.at (loc.loc_start, loc.loc_end) in
          mk ~loc ~tokens:ds_toks (Pstr_docstring (Docs.body_as_doc ds)))
-      f_txt
+      txt
 end
 
 module Cl = struct
@@ -413,13 +409,12 @@ module Ctf = struct
   let attribute ?loc a = mk ?loc (Pctf_attribute a)
       *)
   let text txt =
-    let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
     List.map
       (fun ds ->
          let loc = docstring_loc ds in
          let ds_toks = Tokens.at (loc.loc_start, loc.loc_end) in
          mk ~loc ~tokens:ds_toks (Pctf_docstring (Docs.body_as_doc ds)))
-      f_txt
+      txt
 
 (*   let attr d a = {d with pctf_attributes = d.pctf_attributes @ [a]} *)
 
@@ -448,13 +443,12 @@ module Cf = struct
   let attribute ?loc ~tokens a = mk ?loc ~tokens (Pcf_attribute a)
    *)
   let text txt =
-    let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
     List.map
       (fun ds ->
          let loc = docstring_loc ds in
          let ds_toks = Tokens.at (loc.loc_start, loc.loc_end) in
          mk ~loc ~tokens:ds_toks (Pcf_docstring (Docs.body_as_doc ds)))
-      f_txt
+      txt
 
   let virtual_ ct = Cfk_virtual ct
   let concrete o e = Cfk_concrete (o, e)

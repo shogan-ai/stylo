@@ -19,7 +19,9 @@ module _ : sig
   type ext = ..
 
   (** ext ext ds *)
-  type ext += A | B
+  type ext +=
+    A
+    | B (**)
 
   (** Exn ds *)
   exception Exn
@@ -98,7 +100,9 @@ end = struct
   type ext = ..
 
   (** ext ext ds *)
-  type ext += A | B
+  type ext +=
+    A
+    | B (**)
 
   (** Exn ds *)
   exception Exn

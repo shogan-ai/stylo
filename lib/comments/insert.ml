@@ -460,6 +460,7 @@ let append_trailing_comments (tokens, doc, _) =
 type error = [ `Comment_insertion_error of Error.t ]
 
 let from_tokens tokens doc =
+  Hashtbl.clear already_seen;
   try
     Ok (
       walk_both init_state tokens doc
