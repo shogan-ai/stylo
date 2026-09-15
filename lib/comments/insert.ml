@@ -177,7 +177,10 @@ let insert_directive doc ldir =
 
 let is_comment_attaching_before elt =
   match elt.T.desc with
-  | Comment c -> c.attachement = Before && not (explicitely_inserted c)
+  | Comment c ->
+    if explicitely_inserted c
+    then corresponding_doc_state c = Already_seen
+    else c.attachement = Before
   | _ -> false
 
 let attach_before_comments state tokens doc =
@@ -185,18 +188,17 @@ let attach_before_comments state tokens doc =
     (* delay until flush hint or having left the group. *)
     tokens, doc, state
   else
-    match Std.List.take_while is_comment_attaching_before tokens with
-    | [] ->
+    match Std.List.split_at is_comment_attaching_before tokens with
+    | [], _ ->
       (* no comment to attach *)
       tokens, doc, state
-    | to_append ->
-      let tokens = Std.List.drop_while is_comment_attaching_before tokens in
-      let doc, last_blank_after =
-        List.fold_left (fun (acc, last_blank_after) cmt ->
+    | to_append, tokens ->
+      let doc, actually_inserted, last_blank_after =
+        List.fold_left (fun (acc, actually_inserted, last_blank_after) cmt ->
           match cmt.T.desc with
           | Comment c ->
             if explicitely_inserted c
-            then acc, last_blank_after
+            then acc, actually_inserted, last_blank_after
             else
               (* A blank line between this comment and the previous one must
                  be reproduced, whether the source marks it before this
@@ -209,19 +211,21 @@ let attach_before_comments state tokens doc =
               let cmt =
                 Doc.(group (sep ^^ fmt_comment ~start_pos:cmt.pos c.text))
               in
-              Doc.(acc ^^ cmt), c.blank_line_after
+              Doc.(acc ^^ cmt), true, c.blank_line_after
           | _ -> assert false
-        ) (doc, false) to_append
+        ) (doc, false, false) to_append
       in
-      let doc = Doc.group doc in
-      (* If the last comment was followed by a blank line, reproduce it before
-         the token the comments are attached to. *)
-      let space_handling =
-        if last_blank_after
-        then Insert_blank_line_before_leaf
-        else Insert_before_leaf
-      in
-      tokens, doc, { state with space_handling }
+      if not actually_inserted then
+        tokens, doc, state
+      else
+        (* If the last comment was followed by a blank line, reproduce it before
+           the token the comments are attached to. *)
+        let space_handling =
+          if last_blank_after
+          then Insert_blank_line_before_leaf
+          else Insert_before_leaf
+        in
+        tokens, Doc.group doc, { state with space_handling }
 
 let insert_space_if_required ?(inserting_comment=false) state doc =
   let brk =
