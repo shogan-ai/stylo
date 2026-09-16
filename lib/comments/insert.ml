@@ -123,10 +123,9 @@ let nest_before_leaf d = nest_before_leaf d = `yes
 
 type special_space_treatement =
   | Nothing_special
-  | Insert_before_leaf
-  | Insert_blank_line_before_leaf
+  | Insert_before_leaf of Doc.t
   | Next_before_leaf_is_blank_line
-  | Insert_before_inserting_comment
+  | Insert_before_inserting_comment of { after_non_spaced_break: bool }
 
 type state = {
   space_handling: special_space_treatement;
@@ -157,7 +156,9 @@ let exit_nest prev st = { st with at_end_of_a_group = prev.at_end_of_a_group }
 
 let no_space st = { st with space_handling = Nothing_special }
 let saw_leaf st =
-  { st with space_handling = Insert_before_inserting_comment }
+  { st with
+    space_handling =
+      Insert_before_inserting_comment { after_non_spaced_break = false } }
 
 let format_directive (ldir : Lexer_directive.t) =
   let open Doc in
@@ -221,19 +222,17 @@ let attach_before_comments state tokens doc =
         (* If the last comment was followed by a blank line, reproduce it before
            the token the comments are attached to. *)
         let space_handling =
-          if last_blank_after
-          then Insert_blank_line_before_leaf
-          else Insert_before_leaf
+          Insert_before_leaf
+            (if last_blank_after then blank_line else Doc.break 1)
         in
         tokens, Doc.group doc, { state with space_handling }
 
 let insert_space_if_required ?(inserting_comment=false) state doc =
   let brk =
     match state.space_handling, inserting_comment with
-    | Insert_blank_line_before_leaf, _ -> blank_line
-    | Insert_before_leaf, _
-    | Insert_before_inserting_comment, true -> Doc.break 1
-    | Insert_before_inserting_comment, false
+    | Insert_before_leaf doc, _ -> doc
+    | Insert_before_inserting_comment _, true -> Doc.break 1
+    | Insert_before_inserting_comment _, false
     | Next_before_leaf_is_blank_line, _
     | Nothing_special, _ -> Doc.empty
   in
@@ -245,7 +244,13 @@ let prepend_comments_to_doc state comments ~blank_line_after doc =
     then Doc.(comments ^^ doc)
     else if blank_line_after
     then Doc.(comments ^^ blank_line ^^ doc)
-    else Doc.Utils.(comments ^/^ doc)
+    else
+      let space =
+        match state.space_handling with
+        | Insert_before_inserting_comment { after_non_spaced_break = true } -> 0
+        | _ -> 1
+      in
+      Doc.(comments ^^ Doc.break space ^^ doc)
   in
   insert_space_if_required ~inserting_comment:true state doc
 
@@ -302,16 +307,27 @@ let rec walk_both state seq doc =
 
     (* Whitespace: don't consume token *)
     | _, Doc.Empty -> seq, doc, state
-    | _, Doc.Whitespace _ ->
-      begin match state.space_handling with
-      | Insert_blank_line_before_leaf
-      | Next_before_leaf_is_blank_line ->
+    | _, Doc.Whitespace ws ->
+      let with_perhaps_a_bl =
         if not state.at_end_of_a_group then
           (* Now is a good opportunity to materialise the blank line. *)
           seq, Doc.(doc ^^ blank_line), no_space state
         else
           (* But if we're at the end of a group, we delay further *)
           seq, doc, state
+      in
+      begin match state.space_handling, ws.value with
+      | Insert_before_leaf ws, _ when ws == blank_line -> with_perhaps_a_bl
+      | Next_before_leaf_is_blank_line, _ -> with_perhaps_a_bl
+      | Insert_before_inserting_comment _, Break (0, _) ->
+        (* We really want a space before the comment, not just a break point.
+           We also make the extra effort of remembering that there was only a
+           break (and not a space) between the two tokens, so we can follow the
+           comments with insert with a break (instead of the usual space). *)
+        seq, doc,
+        { state with
+          space_handling =
+            Insert_before_inserting_comment { after_non_spaced_break = true } }
       | _ -> seq, doc, no_space state
       end
 
@@ -410,7 +426,8 @@ and traverse_group tokens state margin flatness grouped_doc =
              sure that the place where the insertion happens knows that
              requirement. *)
           (match state.space_handling with
-           | Insert_blank_line_before_leaf | Next_before_leaf_is_blank_line ->
+           | Next_before_leaf_is_blank_line -> Next_before_leaf_is_blank_line
+           | Insert_before_leaf ws when ws == blank_line ->
              Next_before_leaf_is_blank_line
            | _ -> Nothing_special);
         at_end_of_a_group = true }

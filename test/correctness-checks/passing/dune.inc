@@ -2,6 +2,12 @@
   (alias runtest)
   (action
     (ignore-stdout
+      (run ../../../bin/main.exe style --idempotence-check --ast-check %{dep:break0_idempotence_issue.ml}))))
+
+(rule
+  (alias runtest)
+  (action
+    (ignore-stdout
       (run ../../../bin/main.exe style --idempotence-check --ast-check %{dep:code_commenting_idempotence_issues.ml}))))
 
 (rule

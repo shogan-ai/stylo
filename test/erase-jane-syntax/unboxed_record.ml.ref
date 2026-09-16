@@ -91,8 +91,8 @@ let _ =
 ;;
 
 let a () = A { A.a = (a : t) }
-let x = { aaaaaaaaaa(* b *) ; b }
-let x = { aaaaaaaaaa(* b *) ; b }
+let x = { aaaaaaaaaa (* b *); b }
+let x = { aaaaaaaaaa (* b *); b }
 
 type t =
   { a : (module S)
