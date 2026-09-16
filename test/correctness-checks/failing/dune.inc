@@ -5,5 +5,5 @@
       (ignore-stdout
       (ignore-stderr
         (run ../../../bin/main.exe style --idempotence-check --ast-check
-            %{dep:spacing_idempotence_issue.ml}))))))
+            %{dep:break0_idempotence_issue.ml}))))))
 
