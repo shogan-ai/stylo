@@ -1,7 +1,6 @@
 (** Pretty-printer of OxCaml's CST *)
 
 open Ocaml_syntax.Parsetree
-
 module Doc = Docstring
 
 module Structure : sig

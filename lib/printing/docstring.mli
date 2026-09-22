@@ -5,23 +5,24 @@ open Ocaml_syntax
 (**/**)
 
 module Odoc : sig
-  val process_ocaml_block : (string -> Document.t option) ref
+
   (** Filled in from stylo.ml when the pipeline is constructed. *)
+  val process_ocaml_block : (string -> Document.t option) ref
 end
 
+(** Used externally only by the comment insertion engine. *)
 val as_odoc_markup_if_no_warnings
-  :  id:int (** docstrings have unique identifiers that are propagated all the
-                way through the printer. *)
+  :  id:int
+       (** docstrings have unique identifiers that are propagated all the way
+           through the printer. *)
   -> kind:[ `Docstring | `Regular_comment ]
   -> start_pos:Lexing.position
   -> string
   -> Document.t
-(** Used externally only by the comment insertion engine. *)
 
 (**/**)
 
 val pp : Parsetree.doc -> Document.t
-
 val pp_floating : Parsetree.doc -> Document.t
 
 val attach

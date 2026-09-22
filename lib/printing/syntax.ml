@@ -2,7 +2,6 @@
     maximise sharing. *)
 
 let str = Document.string
-
 let underscore = str "_"
 let star = str "*"
 let ampersand = str "&"

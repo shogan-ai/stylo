@@ -1,5 +1,4 @@
 open Ocaml_syntax
-
 module Cst := Ocaml_syntax.Parsetree
 module Ast := Oxcaml_frontend.Parsetree
 
@@ -7,12 +6,12 @@ type (_, _) input_kind =
   | Impl : (Cst.structure, Ast.structure) input_kind
   | Intf : (Cst.signature, Ast.signature) input_kind
 
-type ('a, 'b) input = {
-  fname : string;
-  start_line : int;
-  source : string;
-  kind : ('a, 'b) input_kind;
-}
+type ('a, 'b) input =
+  { fname : string
+  ; start_line : int
+  ; source : string
+  ; kind : ('a, 'b) input_kind
+  }
 
 module Check : sig
   open Ast_checker
@@ -21,53 +20,52 @@ module Check : sig
     | Ast : ('cst, 'ast) input * 'ast -> ('cst, 'ast) checker_input
     | Cst : ('cst, 'ast) input * 'cst -> ('cst, 'ast) checker_input
 
-  val same_ast
-    : _ checker_input -> string -> (unit, [> Errors.t ]) result
+  val same_ast : _ checker_input -> string -> (unit, [> Errors.t ]) result
 
   open Tokenisation_check
 
   val retokenisation
-    : (Tokens.seq, 'a) result lazy_t
-    -> (unit, [> Ordering.error] as 'a) result
+    :  (Tokens.seq, 'a) result lazy_t
+    -> (unit, [> Ordering.error ] as 'a) result
 
   val normalization_kept_comments
     :  (Tokens.seq, 'a) result lazy_t
     -> (Tokens.seq, 'a) result lazy_t
-    -> (unit, [> Comments_comparison.error] as 'a) result
+    -> (unit, [> Comments_comparison.error ] as 'a) result
 
-  type error = [
-    | Ordering.error
+  type error =
+    [ | Ordering.error
     | Comments_comparison.error
     | Errors.t
-  ]
+    ]
 end
 
 module Pipeline : sig
   val parse
     :  ('cst, _) input
-    -> ('cst, [> `Input_parse_error of Ast_checker.Errors.parser *
-                                       Lexing.position *
-                                       Lexing.position * exn]) result
+    -> ( 'cst
+       , [> `Input_parse_error of
+            Ast_checker.Errors.parser * Lexing.position * Lexing.position * exn
+         ] )
+         result
 
   val normalize : ('cst, _) input_kind -> 'cst -> 'cst
 
   val tokens_of_tree
-    : ('cst, _) input_kind
+    :  ('cst, _) input_kind
     -> 'cst
     -> (Tokens.seq, [> Tokens_of_tree.Error.t ]) result
 
   val build_doc : ('cst, _) input_kind -> 'cst -> Document.t
-
   val print_doc : Document.t -> string
 
-  type error = [
-    | Tokens_of_tree.Error.t
+  type error =
+    [ | Tokens_of_tree.Error.t
     | Check.error
     | Comments.Insert.error
-  ]
+    ]
 
   val run : ?normalize:bool -> _ input -> (string, error) result
-
   val pp_error : Format.formatter -> string -> error -> unit
 end
 
@@ -80,5 +78,9 @@ val style_file
   -> (string, [> Pipeline.error ]) result
 
 val split_fuzzer_line : string -> bool * string
-val style_fuzzer_line :
-  lnum:int -> fname:string -> string -> (string, Pipeline.error) result
+
+val style_fuzzer_line
+  :  lnum:int
+  -> fname:string
+  -> string
+  -> (string, Pipeline.error) result

@@ -1,8 +1,7 @@
 open Ocaml_syntax
 open Parsetree
 
-let semisemi ~optional pos =
-  Tokens.{ pos; desc = Token (SEMISEMI, optional)}
+let semisemi ~optional pos = Tokens.{ pos; desc = Token (SEMISEMI, optional) }
 
 let normalize_struct_semisemi str =
   let rec walk_both items tokens =
@@ -13,18 +12,19 @@ let normalize_struct_semisemi str =
         | Pstr_docstring _ -> true
         | _ ->
           let pos = item.pstr_loc.loc_start in
-          dprintf "unexpected item at %d:%d@."
+          dprintf
+            "unexpected item at %d:%d@."
             pos.pos_lnum
             (pos.pos_cnum - pos.pos_bol);
           false
       in
-      assert (List.for_all is_ds items); []
+      assert (List.for_all is_ds items);
+      []
     | t :: tokens ->
       match t.Tokens.desc with
       | Token (EOF, _) (* TODO: filter this out earlier in the pipeline... *)
       | Lexer_directive _
-      | Comment _ ->
-        t :: walk_both items tokens
+      | Comment _ -> t :: walk_both items tokens
       | Token _ ->
         (* No tokens appart from SEMISEMI at this level, and we removed them
            already. *)
@@ -32,76 +32,76 @@ let normalize_struct_semisemi str =
       | Child_node ->
         match items with
         | [] -> assert false
-        | item :: ({ pstr_desc = Pstr_eval _ ; _ } :: _ as items) ->
-          t :: semisemi ~optional:false item.pstr_loc.loc_end ::
-          walk_both items tokens
+        | item :: ({ pstr_desc = Pstr_eval _; _ } :: _ as items) ->
+          t
+          :: semisemi ~optional:false item.pstr_loc.loc_end
+          :: walk_both items tokens
         | item :: items ->
           match item.pstr_desc with
           | Pstr_value _ ->
-            t :: semisemi ~optional:true item.pstr_loc.loc_end ::
-            walk_both items tokens
+            t
+            :: semisemi ~optional:true item.pstr_loc.loc_end
+            :: walk_both items tokens
           | _ -> t :: walk_both items tokens
   in
   let tokens_no_semi = Tokens.Seq.without ~token:SEMISEMI str.pst_tokens in
   let tokens_with_minimal_semi = walk_both str.pst_items tokens_no_semi in
   { str with pst_tokens = tokens_with_minimal_semi }
+;;
 
 let nb_semis =
-  List.fold_left (fun nb tok ->
-    if Tokens.is_token ~which:SEMI tok then nb + 1 else nb
-  ) 0
+  List.fold_left
+    (fun nb tok -> if Tokens.is_token ~which:SEMI tok then nb + 1 else nb)
+    0
+;;
 
 let remove_last_semi tokens =
   let rev_tokens = List.rev tokens in
   let before, last_semi_and_after = Tokens.Seq.split ~on:SEMI rev_tokens in
   let rev_tokens_without_last_semi = before @ List.tl last_semi_and_after in
   List.rev rev_tokens_without_last_semi
+;;
 
 let lparen_child_rparen ~optional:opt pos =
   let open Tokens in
   let mk desc = { pos; desc } in
   let mk_tok tok = { pos; desc = Token (tok, opt) } in
-  [ mk_tok LPAREN
-  ; mk Child_node
-  ; mk_tok RPAREN ]
+  [ mk_tok LPAREN; mk Child_node; mk_tok RPAREN ]
+;;
 
-let parens_exp ?(optional=false) exp =
+let parens_exp ?(optional = false) exp =
   { pexp_desc = Pexp_parens { exp; optional }
   ; pexp_tokens = lparen_child_rparen ~optional exp.pexp_loc.loc_start
   ; pexp_loc = exp.pexp_loc
   ; pexp_attributes = No_attributes
-  ; pexp_ext_attr = { pea_ext = None; pea_attrs = No_attributes } }
+  ; pexp_ext_attr = { pea_ext = None; pea_attrs = No_attributes }
+  }
+;;
 
 let exp_no_trailing e =
   match e.pexp_desc with
-(* (* Commented out because you need context and precedence information for this
-      to be correct *)
-  | Pexp_seq_empty e ->
-    (* Can't attach attrs without parens here *)
-    assert (e.pexp_attributes = No_attributes);
-    e
-*)
-  | Pexp_record (_, fields)
-  | Pexp_record_unboxed_product (_, fields)
+  (* (* Commented out because you need context and precedence information for
+     this to be correct *) | Pexp_seq_empty e -> (* Can't attach attrs without
+     parens here *) assert (e.pexp_attributes = No_attributes); e *)
+  | Pexp_record (_, fields) | Pexp_record_unboxed_product (_, fields)
     when List.compare_length_with fields (nb_semis e.pexp_tokens) = 0 ->
     (* at first glance seems like the wrong level to do this, but the semis are
        actually part of the expression tokens, not the [record_field]. *)
     { e with pexp_tokens = remove_last_semi e.pexp_tokens }
-  | Pexp_list (_ :: _ as elts)
-  | Pexp_array (_, (_ :: _ as elts))
+  | Pexp_list (_ :: _ as elts) | Pexp_array (_, (_ :: _ as elts))
     when List.compare_length_with elts (nb_semis e.pexp_tokens) = 0 ->
     { e with pexp_tokens = remove_last_semi e.pexp_tokens }
   | _ -> e
+;;
 
 let pat_no_trailing p =
   match p.ppat_desc with
-  | Ppat_record (fields, cf)
-  | Ppat_record_unboxed_product (fields, cf) ->
+  | Ppat_record (fields, cf) | Ppat_record_unboxed_product (fields, cf) ->
     let nb_semis = nb_semis p.ppat_tokens in
     let semi_as_term =
       let nb_fields =
-        List.length fields +
-        if cf = Closed then 0 else 1 (* underscore as extra field *)
+        List.length fields
+        + if cf = Closed then 0 else 1 (* underscore as extra field *)
       in
       (* [;] is used as a terminator if there are as many as there are fields *)
       nb_fields = nb_semis
@@ -114,16 +114,18 @@ let pat_no_trailing p =
       let rev_tokens_without_last_semi = before @ List.tl last_semi_and_after in
       let ppat_tokens = List.rev rev_tokens_without_last_semi in
       { p with ppat_tokens }
-  | _ ->
-    p
+  | _ -> p
+;;
 
 let strip_from_label_decl lbl =
   { lbl with pld_tokens = Tokens.Seq.without ~token:SEMI lbl.pld_tokens }
+;;
 
 let constructor_arguments = function
   | Pcstr_tuple _ as tuple -> tuple
   | Pcstr_record lbls ->
     Pcstr_record (Std.List.map_last ~f:strip_from_label_decl lbls)
+;;
 
 let type_kind_no_trailing = function
   | Ptype_record lbls ->
@@ -131,6 +133,5 @@ let type_kind_no_trailing = function
   | Ptype_record_unboxed_product lbls ->
     Ptype_record_unboxed_product
       (Std.List.map_last ~f:strip_from_label_decl lbls)
-  | Ptype_variant _
-  | Ptype_abstract
-  | Ptype_open as kind -> kind
+  | Ptype_variant _ | Ptype_abstract | Ptype_open as kind -> kind
+;;

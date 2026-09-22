@@ -1,2 +1,2 @@
 (library
-  (name dbg_print))
+ (name dbg_print))

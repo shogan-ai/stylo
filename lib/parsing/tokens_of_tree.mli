@@ -1,18 +1,19 @@
-(** {1 Flattening to a sequence of tokens } *)
+(** {1 Flattening to a sequence of tokens} *)
 
-type tokens_from_subtree = {
-  origin: string;
-  tokens: Tokens.seq;
-}
+type tokens_from_subtree =
+  { origin : string
+  ; tokens : Tokens.seq
+  }
 
 module Error : sig
   type context = private
-    { node_kind: string
-    ; pos: Lexing.position }
+    { node_kind : string
+    ; pos : Lexing.position
+    }
 
-  type t = [
-    | `CST_tokens_mismatch of context * Tokens.seq * tokens_from_subtree list
-  ]
+  type t =
+    [ | `CST_tokens_mismatch of context * Tokens.seq * tokens_from_subtree list
+    ]
 
   val pp : Format.formatter -> t -> unit
 end

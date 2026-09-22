@@ -1,19 +1,19 @@
 (executable
-  (name main)
-  (public_name stylo)
-  ; (modes byte)
-  (libraries cmdliner config stylo ocaml_syntax dbg_print std unix)
-  (modules main)
-  (empty_module_interface_if_absent))
+ (name main)
+ (public_name stylo)
+ ; (modes byte)
+ (libraries cmdliner config stylo ocaml_syntax dbg_print std unix)
+ (modules main)
+ (empty_module_interface_if_absent))
 
 (executable
-  (name dump_tokens)
-  (libraries cmdliner stylo ocaml_syntax document)
-  (modules dump_tokens)
-  (empty_module_interface_if_absent))
+ (name dump_tokens)
+ (libraries cmdliner stylo ocaml_syntax document)
+ (modules dump_tokens)
+ (empty_module_interface_if_absent))
 
 (executable
-  (name fuzzer_driver)
-  (libraries std unix cmdliner)
-  (modules fuzzer_driver)
-  (empty_module_interface_if_absent))
+ (name fuzzer_driver)
+ (libraries std unix cmdliner)
+ (modules fuzzer_driver)
+ (empty_module_interface_if_absent))

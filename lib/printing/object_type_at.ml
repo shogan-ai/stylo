@@ -2,6 +2,7 @@ open Ocaml_syntax
 open Parsetree
 
 module End = struct
+
   (* We need to be careful in payload and class path contructors to add an extra space
      before the closing ']' if the payload ends with and object type, otherwise the lexer
      will parse '>]' as a single token.
@@ -18,8 +19,7 @@ module End = struct
     | Ptyp_arrow { codom_type = rhs; codom_modes = No_modes; _ }
     | Ptyp_poly (_, rhs)
     | Ptyp_repr (_, rhs)
-    | Ptyp_newlayout (_, rhs)
-      -> of_core_type rhs
+    | Ptyp_newlayout (_, rhs) -> of_core_type rhs
     | Ptyp_tuple lst -> of_core_type (snd (Std.List.last lst))
     | Ptyp_any _
     | Ptyp_var _
@@ -52,10 +52,12 @@ module End = struct
   ;;
 
   let of_jkind_declaration jd =
-    jd.pjkind_attributes = No_attributes &&
+    jd.pjkind_attributes = No_attributes
+    &&
     match jd.pjkind_manifest with
     | None -> false
     | Some jka -> of_jkind_annotation jka
+  ;;
 
   let of_constructor_argument ca =
     ca.pca_modalities = No_modalities && of_core_type ca.pca_type
@@ -198,8 +200,8 @@ module Start = struct
     | Ptyp_splice _ -> false
 
   and of_arrow_arg aa =
-    aa.aa_legacy_modes = No_modes &&
-    aa.aa_lbl = Nolabel &&
-    of_core_type aa.aa_type
+    aa.aa_legacy_modes = No_modes
+    && aa.aa_lbl = Nolabel
+    && of_core_type aa.aa_type
   ;;
 end

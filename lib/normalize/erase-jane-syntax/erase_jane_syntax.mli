@@ -3,7 +3,6 @@ open Parsetree
 
 module Argument : sig
   val generic_erase : 'a argument -> 'a argument
-
   val erase_function_param : pattern argument -> pattern argument
 end
 

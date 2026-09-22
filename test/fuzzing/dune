@@ -1,67 +1,127 @@
 (alias
-  (name runtest)
-  (deps (alias fuzz)))
+ (name runtest)
+ (deps
+  (alias fuzz)))
 
 (rule
-  (alias fuzz)
-  (action
-    (progn
-      (ignore-stderr ; dune won't let us see the nice summary :'(
-        (run
-          ocamlgrammarfuzzer
-          --cmly %{dep:../../lib/parsing/parser.cmly} --exhaust
-          --entrypoint implementation --entrypoint interface --print-entrypoint
-          --avoid METAOCAML_ESCAPE --avoid METAOCAML_BRACKET_OPEN
-          --avoid DOLLAR --avoid LESSLBRACKET --avoid RBRACKETGREATER
-          ; HASH_CHAR is present in our grammar but not in the one the fuzzer is
-          ; built against.
-          --terminal "BORROW=borrow_"
-          --terminal "HASH_CHAR=#'a'"
-          --terminal "HASHFALSE=#false"
-          --terminal "HASHTRUE=#true"
-          --terminal "KIND=kind_"
-          --terminal "LEXER_DIRECTIVE=#syntax foo on"
-          --terminal "ONCE=once_"
-          --terminal "POLY=poly_"
-          --terminal "REPR=repr_"
-          --terminal "UNIQUE=unique_"
-          --check stylo --check-command %{dep:../../bin/main.exe}
-          --check-command-extra-arg --ast-check
-          --check-command-extra-arg --tokens-checks
-          --save-report-to fuzz-no-quotations.md
-          --jobs 8
-          ))
-      (diff? %{dep:report-no-quotations.md} fuzz-no-quotations.md))))
+ (alias fuzz)
+ (action
+  (progn
+   (ignore-stderr ; dune won't let us see the nice summary :'(
+    (run
+     ocamlgrammarfuzzer
+     --cmly
+     %{dep:../../lib/parsing/parser.cmly}
+     --exhaust
+     --entrypoint
+     implementation
+     --entrypoint
+     interface
+     --print-entrypoint
+     --avoid
+     METAOCAML_ESCAPE
+     --avoid
+     METAOCAML_BRACKET_OPEN
+     --avoid
+     DOLLAR
+     --avoid
+     LESSLBRACKET
+     --avoid
+     RBRACKETGREATER
+     ; HASH_CHAR is present in our grammar but not in the one the fuzzer is
+     ; built against.
+     --terminal
+     "BORROW=borrow_"
+     --terminal
+     "HASH_CHAR=#'a'"
+     --terminal
+     "HASHFALSE=#false"
+     --terminal
+     "HASHTRUE=#true"
+     --terminal
+     "KIND=kind_"
+     --terminal
+     "LEXER_DIRECTIVE=#syntax foo on"
+     --terminal
+     "ONCE=once_"
+     --terminal
+     "POLY=poly_"
+     --terminal
+     "REPR=repr_"
+     --terminal
+     "UNIQUE=unique_"
+     --check
+     stylo
+     --check-command
+     %{dep:../../bin/main.exe}
+     --check-command-extra-arg
+     --ast-check
+     --check-command-extra-arg
+     --tokens-checks
+     --save-report-to
+     fuzz-no-quotations.md
+     --jobs
+     8))
+   (diff? %{dep:report-no-quotations.md} fuzz-no-quotations.md))))
 
 (rule
-  (alias fuzz)
-  (action
-    (progn
-      (ignore-stderr ; dune won't let us see the nice summary :'(
-        (run
-          ocamlgrammarfuzzer
-          --cmly %{dep:../../lib/parsing/parser.cmly}
-          --entrypoint implementation --print-entrypoint
-          --avoid METAOCAML_ESCAPE --avoid METAOCAML_BRACKET_OPEN
-          --focus DOLLAR --focus LESSLBRACKET --focus RBRACKETGREATER
-          ; HASH_CHAR is present in our grammar but not in the one the fuzzer is
-          ; built against.
-          --terminal "BORROW=borrow_"
-          --terminal "HASH_CHAR=#'a'"
-          --terminal "HASHFALSE=#false"
-          --terminal "HASHTRUE=#true"
-          --terminal "KIND=kind_"
-          --terminal "LEXER_DIRECTIVE=#syntax foo on"
-          --terminal "ONCE=once_"
-          --terminal "POLY=poly_"
-          --terminal "REPR=repr_"
-          --terminal "UNIQUE=unique_"
-          --check stylo --check-command %{dep:../../bin/main.exe}
-          --check-command-extra-arg --ast-check
-          --check-command-extra-arg --tokens-checks
-          --check-command-extra-arg --syntax-quotations
-          --save-report-to fuzz-with-quotations.md
-          --seed 50 ; we want a deterministic report since it's commited
-          --jobs 8
-          ))
-      (diff? %{dep:report-with-quotations.md} fuzz-with-quotations.md))))
+ (alias fuzz)
+ (action
+  (progn
+   (ignore-stderr ; dune won't let us see the nice summary :'(
+    (run
+     ocamlgrammarfuzzer
+     --cmly
+     %{dep:../../lib/parsing/parser.cmly}
+     --entrypoint
+     implementation
+     --print-entrypoint
+     --avoid
+     METAOCAML_ESCAPE
+     --avoid
+     METAOCAML_BRACKET_OPEN
+     --focus
+     DOLLAR
+     --focus
+     LESSLBRACKET
+     --focus
+     RBRACKETGREATER
+     ; HASH_CHAR is present in our grammar but not in the one the fuzzer is
+     ; built against.
+     --terminal
+     "BORROW=borrow_"
+     --terminal
+     "HASH_CHAR=#'a'"
+     --terminal
+     "HASHFALSE=#false"
+     --terminal
+     "HASHTRUE=#true"
+     --terminal
+     "KIND=kind_"
+     --terminal
+     "LEXER_DIRECTIVE=#syntax foo on"
+     --terminal
+     "ONCE=once_"
+     --terminal
+     "POLY=poly_"
+     --terminal
+     "REPR=repr_"
+     --terminal
+     "UNIQUE=unique_"
+     --check
+     stylo
+     --check-command
+     %{dep:../../bin/main.exe}
+     --check-command-extra-arg
+     --ast-check
+     --check-command-extra-arg
+     --tokens-checks
+     --check-command-extra-arg
+     --syntax-quotations
+     --save-report-to
+     fuzz-with-quotations.md
+     --seed
+     50 ; we want a deterministic report since it's commited
+     --jobs
+     8))
+   (diff? %{dep:report-with-quotations.md} fuzz-with-quotations.md))))

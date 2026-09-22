@@ -1,16 +1,19 @@
 open Ocaml_syntax
 open Parsetree
 
-let parens_exp ?(optional=false) exp =
+let parens_exp ?(optional = false) exp =
   { pexp_desc = Pexp_parens { exp; optional }
   ; pexp_tokens = Utils.lparen_child_rparen ~optional exp.pexp_loc.loc_start
   ; pexp_loc = exp.pexp_loc
   ; pexp_attributes = No_attributes
-  ; pexp_ext_attr = { pea_ext = None; pea_attrs = No_attributes } }
+  ; pexp_ext_attr = { pea_ext = None; pea_attrs = No_attributes }
+  }
+;;
 
 let map_desc ~recur _ desc =
   let parent_for_recursive_calls = Context.Expr desc in
   recur parent_for_recursive_calls desc
+;;
 
 let insert_pipe_if_missing ~after:kw =
   let open Tokens in
@@ -18,20 +21,20 @@ let insert_pipe_if_missing ~after:kw =
     | [] -> assert false
     | tok :: toks ->
       match tok.desc with
-      | Child_node ->
-        { tok with desc = Token (BAR, false) } :: tok :: toks
+      | Child_node -> { tok with desc = Token (BAR, false) } :: tok :: toks
       | Token (BAR, _) -> tok :: toks
       | _ -> tok :: insert_before_child toks
   in
   let rec seek = function
     | [] -> assert false
     | tok :: toks ->
-      tok ::
-      (match tok.desc with
-       | Token (t, _) when Tokens.Raw.equals t kw -> insert_before_child toks
-       | _ -> seek toks)
+      tok
+      :: (match tok.desc with
+          | Token (t, _) when Tokens.Raw.equals t kw -> insert_before_child toks
+          | _ -> seek toks)
   in
   seek
+;;
 
 let map ~recur (parent : Context.parent) orig =
   (* local changes first *)
@@ -43,10 +46,13 @@ let map ~recur (parent : Context.parent) orig =
           (* we can't attach ext_attrs to parens, so we can only rewrite when
              there are none *)
           { pea_ext = None; pea_attrs = No_attributes }
-      ; _ } ->
+      ; _
+      } ->
       let pexp_desc = Pexp_parens { exp = e; optional = false } in
       let pexp_tokens =
-        Tokens.Seq.search_and_replace [BEGIN, LPAREN; END, RPAREN] exp.pexp_tokens
+        Tokens.Seq.search_and_replace
+          [ BEGIN, LPAREN; END, RPAREN ]
+          exp.pexp_tokens
       in
       { exp with pexp_desc; pexp_tokens }
     | _ -> exp
@@ -55,19 +61,18 @@ let map ~recur (parent : Context.parent) orig =
   let exp =
     match parent, exp.pexp_desc with
     (* Nothing special to do if parent is parens or Pstr_eval. *)
-    | Expr Pexp_parens _, _
-    | Str_item Pstr_eval _, _ -> exp
+    | Expr Pexp_parens _, _ | Str_item Pstr_eval _, _ -> exp
     (* Add parens as necessary *)
-    | _, Pexp_tuple _ ->
-      parens_exp ~optional:true exp
+    | _, Pexp_tuple _ -> parens_exp ~optional:true exp
     (* FIXME: I assume that was added to reduce the diff on base / with
        ocamlformat. Currently it'd be removed by the parentheses removal code.
        Need to handle that properly. *)
-    | Expr Pexp_infix_apply { arg1; _ },
-      (Pexp_let _ | Pexp_let_open _ | Pexp_letexception _ | Pexp_letmodule _
-      | Pexp_letop _) when arg1 == orig ->
-      parens_exp exp
+    | ( Expr Pexp_infix_apply { arg1; _ }
+      , (Pexp_let _ | Pexp_let_open _ | Pexp_letexception _ | Pexp_letmodule _
+         | Pexp_letop _) )
+      when arg1 == orig -> parens_exp exp
     (* Nothing to do in the general case. *)
     | _ -> exp
   in
   recur parent exp
+;;

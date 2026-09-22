@@ -1,29 +1,40 @@
-(ocamllex (modules lexer))
+(ocamllex
+ (modules lexer))
+
 (menhir
-  (modules parser)
-  (flags
-    --lalr --cmly
-    --unused-token COMMENT --unused-token DOCSTRING
-    --unused-token EOL --unused-token GREATERRBRACKET
-    --strategy simplified
-    ))
+ (modules parser)
+ (flags
+  --lalr
+  --cmly
+  --unused-token
+  COMMENT
+  --unused-token
+  DOCSTRING
+  --unused-token
+  EOL
+  --unused-token
+  GREATERRBRACKET
+  --strategy
+  simplified))
 
 (rule
-  (target raw_grammar.txt)
-  (deps parser.mly)
-  (action
-    (with-stdout-to %{target}
-     (run menhir --only-preprocess-uu %{deps}))))
+ (target raw_grammar.txt)
+ (deps parser.mly)
+ (action
+  (with-stdout-to
+   %{target}
+   (run menhir --only-preprocess-uu %{deps}))))
 
 (library
-  (name oxcaml_frontend)
-  (libraries menhirLib config)
-  (modules_without_implementation asttypes parsetree)
-  (flags :standard -w +a-4-9-40-41-42-44-45-48-63-66-67-70))
+ (name oxcaml_frontend)
+ (libraries menhirLib config)
+ (modules_without_implementation asttypes parsetree)
+ (flags :standard -w +a-4-9-40-41-42-44-45-48-63-66-67-70))
 
 (rule
-  (target ast_mapper.ml)
-  (deps location.mli longident.mli asttypes.mli parsetree.mli)
-  (action
-    (with-stdout-to %{target}
-      (run %{project_root}/lib/traversals/gen.exe %{deps}))))
+ (target ast_mapper.ml)
+ (deps location.mli longident.mli asttypes.mli parsetree.mli)
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{project_root}/lib/traversals/gen.exe %{deps}))))

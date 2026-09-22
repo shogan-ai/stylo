@@ -1,12 +1,14 @@
 open Ocaml_syntax
 open Parsetree
 
-let parens_pat ?(optional=false) pat =
+let parens_pat ?(optional = false) pat =
   { ppat_desc = Ppat_parens { pat; optional }
   ; ppat_tokens = Utils.lparen_child_rparen ~optional pat.ppat_loc.loc_start
   ; ppat_loc = pat.ppat_loc
   ; ppat_attributes = No_attributes
-  ; ppat_ext_attr = { pea_ext = None; pea_attrs = No_attributes } }
+  ; ppat_ext_attr = { pea_ext = None; pea_attrs = No_attributes }
+  }
+;;
 
 (* TODO: this code should be used by/moved to parentheses.ml *)
 (*
@@ -30,6 +32,7 @@ let make_parens_optional p =
 let map_desc ~recur _ desc =
   let parent_for_recursive_calls = Context.Pat desc in
   recur parent_for_recursive_calls desc
+;;
 
 let map ~recur (parent : Context.parent) pat =
   let pat =
@@ -43,3 +46,4 @@ let map ~recur (parent : Context.parent) pat =
     | _ -> pat
   in
   recur parent pat
+;;

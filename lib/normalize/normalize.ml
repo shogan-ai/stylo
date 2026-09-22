@@ -5,8 +5,9 @@ let from_docstring attr =
   match attr.attr_name.txt with
   | "ocaml" :: ("doc" | "text") :: [] -> true
   | _ -> false
+;;
 
-let add_pipe_if_missing ?(mk_optional=false) tokens =
+let add_pipe_if_missing ?(mk_optional = false) tokens =
   let open Tokens in
   let desc = Token (BAR, mk_optional) in
   match Tokens.Seq.split ~on:BAR tokens with
@@ -16,275 +17,255 @@ let add_pipe_if_missing ?(mk_optional=false) tokens =
   | leading_comments, pipe :: following_tokens ->
     (* ensure the pipe is optional/mandatory as requested *)
     leading_comments @ { pipe with desc } :: following_tokens
+;;
 
-class style_normalizer = object
-  inherit [Context.parent] Traversals_helpers.map_with_context
-  inherit [Context.parent] Traversals.map_with_context as super
+class style_normalizer =
+  object
+    inherit [Context.parent] Traversals_helpers.map_with_context
 
-  method position _ p = p
+    inherit [Context.parent] Traversals.map_with_context as super
 
-  method! attribute parent attr =
-    if from_docstring attr
-    then attr
-    else super#attribute parent attr
+    method position _ p = p
 
-  method! structure_item _parent str_item =
-    let parent_for_recursive_calls = Context.Str_item str_item.pstr_desc in
-    super#structure_item parent_for_recursive_calls str_item
+    method! attribute parent attr =
+      if from_docstring attr then attr else super#attribute parent attr
 
-  method! constructor_arguments env ca =
-    let ca = Semicolon.constructor_arguments ca in
-    super#constructor_arguments env ca
+    method! structure_item _parent str_item =
+      let parent_for_recursive_calls = Context.Str_item str_item.pstr_desc in
+      super#structure_item parent_for_recursive_calls str_item
 
-  method! case env case =
-    let pc_tokens = add_pipe_if_missing case.pc_tokens in
-    super#case env { case with pc_tokens }
+    method! constructor_arguments env ca =
+      let ca = Semicolon.constructor_arguments ca in
+      super#constructor_arguments env ca
 
-  method! pattern = Pattern.map ~recur:super#pattern
-  method! pattern_desc = Pattern.map_desc ~recur:super#pattern_desc
-  method! expression = Expression.map ~recur:super#expression
-  method! expression_desc = Expression.map_desc ~recur:super#expression_desc
+    method! case env case =
+      let pc_tokens = add_pipe_if_missing case.pc_tokens in
+      super#case env { case with pc_tokens }
 
-  method! type_kind env tk =
-    let tk = Semicolon.type_kind_no_trailing tk in
-    let tk =
-      match tk with
-      | Ptype_variant [ cd ] ->
-        let pcd_tokens = add_pipe_if_missing ~mk_optional:true cd.pcd_tokens in
-        Ptype_variant [ { cd with pcd_tokens } ]
-      | Ptype_variant (cd :: cds) ->
-        let pcd_tokens = add_pipe_if_missing cd.pcd_tokens in
-        Ptype_variant ({ cd with pcd_tokens } :: cds)
-      | _ -> tk
-    in
-    super#type_kind env tk
+    method! pattern = Pattern.map ~recur:super#pattern
 
-  method! structure env str =
-    Semicolon.normalize_struct_semisemi str
-    |> super#structure env
+    method! pattern_desc = Pattern.map_desc ~recur:super#pattern_desc
 
-  method! value_binding _ vb =
-    let vb = Docstring_placement.value_binding vb in
-    let parent_for_recursive_calls = Context.Value_binding vb in
-    super#value_binding parent_for_recursive_calls vb
+    method! expression = Expression.map ~recur:super#expression
 
-  method! value_description env vd =
-    Docstring_placement.value_description vd
-    |> super#value_description env
+    method! expression_desc = Expression.map_desc ~recur:super#expression_desc
 
-  method! argument_desc f _ arg =
-    let parent_for_recursive_calls = Context.Fun_param_or_arg in
-    super#argument_desc f parent_for_recursive_calls arg
+    method! type_kind env tk =
+      let tk = Semicolon.type_kind_no_trailing tk in
+      let tk =
+        match tk with
+        | Ptype_variant [ cd ] ->
+          let pcd_tokens =
+            add_pipe_if_missing ~mk_optional:true cd.pcd_tokens
+          in
+          Ptype_variant [ { cd with pcd_tokens } ]
+        | Ptype_variant (cd :: cds) ->
+          let pcd_tokens = add_pipe_if_missing cd.pcd_tokens in
+          Ptype_variant ({ cd with pcd_tokens } :: cds)
+        | _ -> tk
+      in
+      super#type_kind env tk
 
-  method! type_declaration env td =
-    Docstring_placement.type_declaration td
-    |> super#type_declaration env
+    method! structure env str =
+      Semicolon.normalize_struct_semisemi str |> super#structure env
 
-  method! type_extension env ext =
-    let cstrs =
-      (* Done here and not in [extension_constructor] because adding a pipe for
-         constructors of a [type_exception] would be incorrect. *)
-      List.mapi (fun i ec ->
-        match ec.pext_kind with
-        | Pext_decl _ ->
-          { ec with
-            pext_tokens =
-              add_pipe_if_missing ~mk_optional:(i=0) ec.pext_tokens }
-        | _ -> ec
-      ) ext.ptyext_constructors
-    in
-    { ext with ptyext_constructors = cstrs }
-    |> Docstring_placement.type_extension
-    |> super#type_extension env
+    method! value_binding _ vb =
+      let vb = Docstring_placement.value_binding vb in
+      let parent_for_recursive_calls = Context.Value_binding vb in
+      super#value_binding parent_for_recursive_calls vb
 
-  method! type_exception env exn =
-    Docstring_placement.type_exception exn
-    |> super#type_exception env
+    method! value_description env vd =
+      Docstring_placement.value_description vd |> super#value_description env
 
-  method! class_type_field env cf =
-    Docstring_placement.class_type_field cf
-    |> super#class_type_field env
+    method! argument_desc f _ arg =
+      let parent_for_recursive_calls = Context.Fun_param_or_arg in
+      super#argument_desc f parent_for_recursive_calls arg
 
-  method! class_description env cd =
-    Docstring_placement.class_description cd
-    |> super#class_description env
+    method! type_declaration env td =
+      Docstring_placement.type_declaration td |> super#type_declaration env
 
-  method! class_declaration env cd =
-    Docstring_placement.class_declaration cd
-    |> super#class_declaration env
+    method! type_extension env ext =
+      let cstrs =
+        (* Done here and not in [extension_constructor] because adding a pipe
+           for constructors of a [type_exception] would be incorrect. *)
+        List.mapi
+          (fun i ec ->
+            match ec.pext_kind with
+            | Pext_decl _ ->
+              { ec with
+                pext_tokens =
+                  add_pipe_if_missing ~mk_optional:(i = 0) ec.pext_tokens
+              }
+            | _ -> ec)
+          ext.ptyext_constructors
+      in
+      { ext with ptyext_constructors = cstrs }
+      |> Docstring_placement.type_extension
+      |> super#type_extension env
 
-  method! class_type_declaration env cd =
-    Docstring_placement.class_type_declaration cd
-    |> super#class_type_declaration env
+    method! type_exception env exn =
+      Docstring_placement.type_exception exn |> super#type_exception env
 
-  method! class_field env x =
-    Docstring_placement.class_field x
-    |> super#class_field env
+    method! class_type_field env cf =
+      Docstring_placement.class_type_field cf |> super#class_type_field env
 
-  method! module_declaration env x =
-    Docstring_placement.module_declaration x
-    |> super#module_declaration env
+    method! class_description env cd =
+      Docstring_placement.class_description cd |> super#class_description env
 
-  method! module_substitution env x =
-    Docstring_placement.module_substitution x
-    |> super#module_substitution env
+    method! class_declaration env cd =
+      Docstring_placement.class_declaration cd |> super#class_declaration env
 
-  method! module_type_declaration env x =
-    Docstring_placement.module_type_declaration x
-    |> super#module_type_declaration env
+    method! class_type_declaration env cd =
+      Docstring_placement.class_type_declaration cd
+      |> super#class_type_declaration env
 
-  method! open_description env x =
-    Docstring_placement.open_description x
-    |> super#open_description env
+    method! class_field env x =
+      Docstring_placement.class_field x |> super#class_field env
 
-  method! open_declaration env x =
-    Docstring_placement.open_declaration x
-    |> super#open_declaration env
+    method! module_declaration env x =
+      Docstring_placement.module_declaration x |> super#module_declaration env
 
-  method! include_description env x =
-    Docstring_placement.include_description x
-    |> super#include_description env
+    method! module_substitution env x =
+      Docstring_placement.module_substitution x |> super#module_substitution env
 
-  method! include_declaration env x =
-    Docstring_placement.include_declaration x
-    |> super#include_declaration env
+    method! module_type_declaration env x =
+      Docstring_placement.module_type_declaration x
+      |> super#module_type_declaration env
 
-  method! module_binding env x =
-    Docstring_placement.module_binding x
-    |> super#module_binding env
-end
+    method! open_description env x =
+      Docstring_placement.open_description x |> super#open_description env
 
-class eraser = object
-  inherit style_normalizer as super
+    method! open_declaration env x =
+      Docstring_placement.open_declaration x |> super#open_declaration env
 
-  method! expression ctxt expr =
-    Erase_jane_syntax.expression expr
-    |> super#expression ctxt
+    method! include_description env x =
+      Docstring_placement.include_description x |> super#include_description env
 
-  method! pattern ctxt pat =
-    Erase_jane_syntax.pattern pat
-    |> super#pattern ctxt
+    method! include_declaration env x =
+      Docstring_placement.include_declaration x |> super#include_declaration env
 
-  method! argument f ctxt arg =
-    Erase_jane_syntax.Argument.generic_erase arg
-    |> super#argument f ctxt
+    method! module_binding env x =
+      Docstring_placement.module_binding x |> super#module_binding env
+  end
 
-  (* TODO: dedicated helper funs in [Erase_jane_syntax] for the next 3. *)
-  method! function_param_desc ctxt d =
-    let d =
-      match d with
-      | Pparam_val a ->
-        Pparam_val (Erase_jane_syntax.Argument.erase_function_param a)
-      | _ -> d
-    in
-    super#function_param_desc ctxt d
+class eraser =
+  object
+    inherit style_normalizer as super
 
-  method! class_infos f ctxt ci =
-    super#class_infos f ctxt
-      { ci with
-        pci_value_params =
-          List.map Erase_jane_syntax.Argument.erase_function_param
-            ci.pci_value_params }
+    method! expression ctxt expr =
+      Erase_jane_syntax.expression expr |> super#expression ctxt
 
-  method! class_expr_desc ctxt ced =
-    let ced =
-      match ced with
-      | Pcl_fun (ps, ce) ->
-        let ps = List.map Erase_jane_syntax.Argument.erase_function_param ps in
-        Pcl_fun (ps, ce)
-      | _ -> ced
-    in
-    super#class_expr_desc ctxt ced
+    method! pattern ctxt pat =
+      Erase_jane_syntax.pattern pat |> super#pattern ctxt
 
-  method! value_binding ctxt vb =
-    Erase_jane_syntax.value_binding vb
-    |> super#value_binding ctxt
+    method! argument f ctxt arg =
+      Erase_jane_syntax.Argument.generic_erase arg |> super#argument f ctxt
 
-  method! arrow_arg ctxt aa =
-    Erase_jane_syntax.Arrow_arg.erase aa
-    |> super#arrow_arg ctxt
+    (* TODO: dedicated helper funs in [Erase_jane_syntax] for the next 3. *)
+    method! function_param_desc ctxt d =
+      let d =
+        match d with
+        | Pparam_val a ->
+          Pparam_val (Erase_jane_syntax.Argument.erase_function_param a)
+        | _ -> d
+      in
+      super#function_param_desc ctxt d
 
-  method! core_type ctxt ct =
-    Erase_jane_syntax.core_type ct
-    |> super#core_type ctxt
+    method! class_infos f ctxt ci =
+      super
+      #
+      class_infos
+        f
+        ctxt
+        { ci with
+          pci_value_params =
+            List.map
+              Erase_jane_syntax.Argument.erase_function_param
+              ci.pci_value_params
+        }
 
-  method! bound_ty_var ctxt bv =
-    Erase_jane_syntax.bound_ty_var bv
-    |> super#bound_ty_var ctxt
+    method! class_expr_desc ctxt ced =
+      let ced =
+        match ced with
+        | Pcl_fun (ps, ce) ->
+          let ps =
+            List.map Erase_jane_syntax.Argument.erase_function_param ps
+          in
+          Pcl_fun (ps, ce)
+        | _ -> ced
+      in
+      super#class_expr_desc ctxt ced
 
-  method! ptype_param ctxt p =
-    Erase_jane_syntax.ptype_param p
-    |> super#ptype_param ctxt
+    method! value_binding ctxt vb =
+      Erase_jane_syntax.value_binding vb |> super#value_binding ctxt
 
-  method! type_declaration ctxt td =
-    Erase_jane_syntax.Type_declaration.erase td
-    |> super#type_declaration ctxt
+    method! arrow_arg ctxt aa =
+      Erase_jane_syntax.Arrow_arg.erase aa |> super#arrow_arg ctxt
 
-  method! value_description ctxt vd =
-    Erase_jane_syntax.value_description vd
-    |> super#value_description ctxt
+    method! core_type ctxt ct =
+      Erase_jane_syntax.core_type ct |> super#core_type ctxt
 
-  method! constructor_argument ctxt ca =
-    Erase_jane_syntax.Constructor_argument.erase ca
-    |> super#constructor_argument ctxt
+    method! bound_ty_var ctxt bv =
+      Erase_jane_syntax.bound_ty_var bv |> super#bound_ty_var ctxt
 
-  method! label_declaration ctxt lbl =
-    Erase_jane_syntax.Label_declaration.erase lbl
-    |> super#label_declaration ctxt
+    method! ptype_param ctxt p =
+      Erase_jane_syntax.ptype_param p |> super#ptype_param ctxt
 
-  method! signature ctxt sg =
-    Erase_jane_syntax.signature sg
-    |> super#signature ctxt
+    method! type_declaration ctxt td =
+      Erase_jane_syntax.Type_declaration.erase td |> super#type_declaration ctxt
 
-  method! signature_item ctxt si =
-    Erase_jane_syntax.signature_item si
-    |> super#signature_item ctxt
+    method! value_description ctxt vd =
+      Erase_jane_syntax.value_description vd |> super#value_description ctxt
 
-  method! structure ctxt st =
-    Erase_jane_syntax.structure st
-    |> super#structure ctxt
+    method! constructor_argument ctxt ca =
+      Erase_jane_syntax.Constructor_argument.erase ca
+      |> super#constructor_argument ctxt
 
-  method! module_type ctxt mty =
-    Erase_jane_syntax.module_type mty
-    |> super#module_type ctxt
+    method! label_declaration ctxt lbl =
+      Erase_jane_syntax.Label_declaration.erase lbl
+      |> super#label_declaration ctxt
 
-  method! module_declaration ctxt md =
-    Erase_jane_syntax.module_declaration md
-    |> super#module_declaration ctxt
+    method! signature ctxt sg =
+      Erase_jane_syntax.signature sg |> super#signature ctxt
 
-  method! module_binding ctxt mb =
-    Erase_jane_syntax.module_binding mb
-    |> super#module_binding ctxt
+    method! signature_item ctxt si =
+      Erase_jane_syntax.signature_item si |> super#signature_item ctxt
 
-  method! module_expr ctxt me =
-    Erase_jane_syntax.module_expr me
-    |> super#module_expr ctxt
+    method! structure ctxt st =
+      Erase_jane_syntax.structure st |> super#structure ctxt
 
-  method! functor_parameter ctxt sg =
-    Erase_jane_syntax.functor_parameter sg
-    |> super#functor_parameter ctxt
-end
+    method! module_type ctxt mty =
+      Erase_jane_syntax.module_type mty |> super#module_type ctxt
+
+    method! module_declaration ctxt md =
+      Erase_jane_syntax.module_declaration md |> super#module_declaration ctxt
+
+    method! module_binding ctxt mb =
+      Erase_jane_syntax.module_binding mb |> super#module_binding ctxt
+
+    method! module_expr ctxt me =
+      Erase_jane_syntax.module_expr me |> super#module_expr ctxt
+
+    method! functor_parameter ctxt sg =
+      Erase_jane_syntax.functor_parameter sg |> super#functor_parameter ctxt
+  end
 
 let style_normalizer = new style_normalizer
 let eraser = new eraser
 
 let normalizer () =
-  let base =
-    if !Config.erase_jane_syntax
-    then eraser
-    else style_normalizer
-  in
+  let base = if !Config.erase_jane_syntax then eraser else style_normalizer in
   object
     method structure ctx str =
       let str = base#structure ctx str in
       let str =
-        if !Config.parentheses_insert then
-          Parentheses.inserter#structure () str
+        if !Config.parentheses_insert
+        then Parentheses.inserter#structure () str
         else str
       in
       let str =
-        if !Config.parentheses_remove then
-          Parentheses.remover#structure () str
+        if !Config.parentheses_remove
+        then Parentheses.remover#structure () str
         else str
       in
       str
@@ -292,19 +273,18 @@ let normalizer () =
     method signature ctx sg =
       let sg = base#signature ctx sg in
       let sg =
-        if !Config.parentheses_insert then
-          Parentheses.inserter#signature () sg
+        if !Config.parentheses_insert
+        then Parentheses.inserter#signature () sg
         else sg
       in
       let sg =
-        if !Config.parentheses_remove then
-          Parentheses.remover#signature () sg
+        if !Config.parentheses_remove
+        then Parentheses.remover#signature () sg
         else sg
       in
       sg
-
   end
+;;
 
 let structure s = (normalizer ())#structure Other s
-
 let signature s = (normalizer ())#signature Other s

@@ -1,8 +1,8 @@
 (executable
-  (name gen)
-  (modules gen)
-  (libraries ppxlib.traverse))
+ (name gen)
+ (modules gen)
+ (libraries ppxlib.traverse))
 
 (library
-  (name traversals_helpers)
-  (modules traversals_helpers))
+ (name traversals_helpers)
+ (modules traversals_helpers))

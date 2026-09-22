@@ -2,7 +2,6 @@ open Document
 open Document.Utils
 open Ocaml_syntax
 open Parsetree
-
 open Jst_odoc_parser
 
 let striped_lines s =
@@ -29,34 +28,34 @@ let striped_lines s =
     String.sub s start (end_ - start + 1)
   in
   String.split_on_char '\n' s
-  |> Std.List.drop_while ((=) "")
+  |> Std.List.drop_while (( = ) "")
   |> List.rev_map strip
-  |> Std.List.drop_while ((=) "")
+  |> Std.List.drop_while (( = ) "")
   |> List.rev
+;;
 
 module Odoc = struct
   let process_ocaml_block : (string -> t option) ref =
     ref (fun _ -> failwith "Odoc.process_ocaml_block: use before init")
+  ;;
 
   open Odoc_parser.Ast
-
   module Loc = Odoc_parser.Loc
 
   let located f e = f e.Loc.value
 
   let escape_lone_brackets s =
     let rec find_unmatched acc i =
-      if i >= String.length s then
-        List.rev acc
+      if i >= String.length s
+      then List.rev acc
       else
         let acc =
           match s.[i] with
           | '[' -> (`Open, i) :: acc
           | ']' ->
-            begin match acc with
-            | (`Open, _) :: acc -> acc
-            | _ -> (`Close, i) :: acc
-            end
+            (match acc with
+             | (`Open, _) :: acc -> acc
+             | _ -> (`Close, i) :: acc)
           | _ -> acc
         in
         find_unmatched acc (i + 1)
@@ -67,29 +66,36 @@ module Odoc = struct
     | _ ->
       let buf = Buffer.create (String.length s + List.length to_escape) in
       let last_unmatched_pos =
-        List.fold_left (fun start_pos (_, end_pos) ->
-          let len = end_pos - start_pos in
-          Buffer.add_substring buf s start_pos len;
-          Buffer.add_char buf '\\';
-          end_pos
-        ) 0 to_escape
+        List.fold_left
+          (fun start_pos (_, end_pos) ->
+            let len = end_pos - start_pos in
+            Buffer.add_substring buf s start_pos len;
+            Buffer.add_char buf '\\';
+            end_pos)
+          0
+          to_escape
       in
-      Buffer.add_substring buf s last_unmatched_pos
+      Buffer.add_substring
+        buf
+        s
+        last_unmatched_pos
         (String.length s - last_unmatched_pos);
       Buffer.contents buf
+  ;;
 
   let code_span s =
     (* FIXME: necessarily on one line then? *)
     string "[" ^^ string (escape_lone_brackets s) ^^ string "]"
+  ;;
 
-  let math_span s =
-    group (string "{m" ^/^ string s ^^ string "}")
+  let math_span s = group (string "{m" ^/^ string s ^^ string "}")
 
   let raw_markup target s =
-    string "{%" ^^
-    optional (fun t -> string (t ^ ":")) target ^^
-    fancy_string s ^^
-    string "%}"
+    string "{%"
+    ^^ optional (fun t -> string (t ^ ":")) target
+    ^^ fancy_string s
+    ^^ string "%}"
+  ;;
 
   type inline_no_space =
     [ `Word of string
@@ -97,13 +103,15 @@ module Odoc = struct
     | `Raw_markup of string option * string
     | `Styled of style * inline_element with_location list
     | `Reference of
-        reference_kind * string with_location * inline_element with_location list
+      reference_kind * string with_location * inline_element with_location list
     | `Link of string * inline_element with_location list
-    | `Math_span of string  (** @since 2.0.0 *) ]
+    | `Math_span of string (** @since 2.0.0 *)
+    ]
 
   let don't_break_before : inline_no_space -> bool = function
     | `Word ("-" | "+") -> true (* would start a list if at BOL *)
-    | _ -> false (* TODO: improve? *)
+    | _ -> false
+  ;; (* TODO: improve? *)
 
   let split_on_space (lst : inline_element with_location list) =
     let rec aux = function
@@ -112,35 +120,38 @@ module Odoc = struct
         let g, gs = aux rest in
         [], g :: gs
       | { Loc.value =
-            ( `Word _ | `Code_span _ | `Raw_markup _ | `Styled _ | `Reference _
-            | `Link _ | `Math_span _) as elt ; _ } :: rest ->
+            (`Word _ | `Code_span _ | `Raw_markup _ | `Styled _ | `Reference _
+             | `Link _
+             | `Math_span _) as elt
+        ; _
+        }
+        :: rest ->
         let g, gs = aux rest in
         elt :: g, gs
     in
     let fst_group, groups = aux lst in
     fst_group :: groups
+  ;;
 
   let rec inline_elements elts =
     match split_on_space elts with
     | [] -> empty
     | groups ->
-      let spaced_groups = List.filter ((<>) []) groups in
+      let spaced_groups = List.filter (( <> ) []) groups in
       let append_group (space_before, acc) elts =
         let space =
-          if not space_before then
-            empty
-          else if don't_break_before (List.hd elts (* we've filtered [] *)) then
-            nbsp
-          else
-            break 1
+          if not space_before
+          then empty
+          else if don't_break_before (List.hd elts (* we've filtered [] *) )
+          then nbsp
+          else break 1
         in
         let doc =
           List.fold_left (fun acc elt -> acc ^^ inline_no_space elt) empty elts
         in
         true, acc ^^ group (space ^^ doc)
       in
-      List.fold_left append_group (false, empty) spaced_groups
-      |> snd
+      List.fold_left append_group (false, empty) spaced_groups |> snd
 
   and inline_no_space : inline_no_space -> _ = function
     | `Word s -> string s
@@ -153,11 +164,10 @@ module Odoc = struct
 
   and link url alt =
     let url = string "{:" ^^ string url ^^ string "}" in
-    group (
-      match alt with
-      | [] -> url
-      | elts -> string "{" ^^ url ^^ inline_elements elts ^^ string "}"
-    )
+    group
+      (match alt with
+       | [] -> url
+       | elts -> string "{" ^^ url ^^ inline_elements elts ^^ string "}")
 
   and styled style text =
     let text = inline_elements text in
@@ -173,13 +183,13 @@ module Odoc = struct
 
   and reference kind ref alt =
     let ref = string "{!" ^^ string (Loc.value ref) ^^ string "}" in
-    group (
-      match kind with
-      | `Simple -> ref
-      | `With_text ->
-        let text = inline_elements alt in
-        string "{" ^^ ref ^^ text ^^ string "}"
-    )
+    group
+      (match kind with
+       | `Simple -> ref
+       | `With_text ->
+         let text = inline_elements alt in
+         string "{" ^^ ref ^^ text ^^ string "}")
+  ;;
 
   let cb_meta_lang (lang, _metadata) = Loc.value lang
 
@@ -188,10 +198,11 @@ module Odoc = struct
       Option.map cb_meta_lang meta_opt
       |> Option.value ~default:"ocaml"
       |> String.lowercase_ascii
-      |> (=) "ocaml"
+      |> ( = ) "ocaml"
     in
     let source = Loc.value content in
     if is_ocaml then !process_ocaml_block source else None
+  ;;
 
   let possibly_multiline_verbatim_string (loc : Loc.span) s =
     let multiline = loc.start.line < loc.end_.line in
@@ -199,12 +210,12 @@ module Odoc = struct
     then break 1, fancy_string s
     else
       (* HACK: adding a \n in [s] means we bypass the printing engine and that
-         line doesn't get indented. *)
-      empty, fancy_string ("\n" ^ s)
+         line doesn't get indented. *) empty, fancy_string ("\n" ^ s)
+  ;;
 
   let indented_lines s =
-    String.split_on_char '\n' s
-    |> separate_map hardline string
+    String.split_on_char '\n' s |> separate_map hardline string
+  ;;
 
   let code_block (meta_opt, content) =
     let meta = (* FIXME: tags! *)
@@ -215,46 +226,37 @@ module Odoc = struct
       | Some res -> res
       | None -> indented_lines (Loc.value content)
     in
-    group (string "{" ^^ meta ^^ string "[") ^/^
-    nest 2 (group content) ^/^
-    group (string "]" ^^ string "}")
+    group (string "{" ^^ meta ^^ string "[")
+    ^/^ nest 2 (group content)
+    ^/^ group (string "]" ^^ string "}")
+  ;;
 
   let verbatim ~loc s =
     let break, s = possibly_multiline_verbatim_string loc s in
     group (string "{v" ^^ break ^^ s ^/^ string "v}")
+  ;;
 
   let modules lst =
-    group (
-      string "{!modules:" ^^ break 0 ^^
-      nest 2 (separate_map (break 1) (located string) lst) ^^
-      string "}"
-    )
+    group
+      (string "{!modules:"
+       ^^ break 0
+       ^^ nest 2 (separate_map (break 1) (located string) lst)
+       ^^ string "}")
+  ;;
 
   let math_block s =
     let content = separate_map hardline string (striped_lines s) in
     group (string "{math" ^/^ nest 2 content ^^ break 0 ^^ string "}")
+  ;;
 
   (* Not recognized by jst custom parser. *)
-(*
-  let media ref_kind href alt kind =
-    let media_ref =
-      let kind =
-        match kind with
-        | `Audio -> "audio"
-        | `Video -> "video"
-        | `Image -> "image"
-      in
-      let href =
-        match Loc.value href with
-        | `Reference s -> string "!" ^^ break 0 ^^ string s
-        | `Link s -> string ":" ^^ break 0 ^^ string s
-      in
-      group (string "{" ^^ string kind ^^ href ^^ string "}")
-    in
-    match ref_kind with
-    | `Simple -> media_ref
-    | `With_text -> group (string "{" ^^ media_ref ^^ string alt ^^ string "}")
-*)
+  (* let media ref_kind href alt kind = let media_ref = let kind = match kind
+     with | `Audio -> "audio" | `Video -> "video" | `Image -> "image" in let
+     href = match Loc.value href with | `Reference s -> string "!" ^^ break 0 ^^
+     string s | `Link s -> string ":" ^^ break 0 ^^ string s in group (string
+     "[{" ^^ string kind ^^ href ^^ string "}]") in match ref_kind with |
+     `Simple -> media_ref | `With_text -> group (string
+     "[{" ^^ media_ref ^^ string alt ^^ string "}]") *)
 
   let extra_spacing_between elt1 elt2 =
     match Loc.value elt1, Loc.value elt2 with
@@ -262,8 +264,9 @@ module Odoc = struct
     | (`Heading _ | `Tag _), _
     | _, (`Heading _ | `Tag _)
     | `List (_, _, _), _
-    | `Paragraph _, `Paragraph _  -> true
+    | `Paragraph _, `Paragraph _ -> true
     | _ -> false
+  ;;
 
   type belt = block_element with_location
 
@@ -277,6 +280,7 @@ module Odoc = struct
           || needs_blank_line tail
       in
       List.exists needs_blank_line items
+  ;;
 
   let rec nestable_block_elements = function
     | [] -> empty
@@ -288,8 +292,9 @@ module Odoc = struct
         else empty
       in
       nestable_block_element elt
-      ^^ hardline ^^ spacing ^^
-      nestable_block_elements elts
+      ^^ hardline
+      ^^ spacing
+      ^^ nestable_block_elements elts
 
   and nestable_block_element elt =
     match Loc.value elt with
@@ -298,16 +303,14 @@ module Odoc = struct
     | `Verbatim vb -> verbatim ~loc:(Loc.location elt) vb
     | `Modules mods -> modules mods
     | `List (kind, _, elts) as list ->
-      if really_heavy list
-      then heavy_list kind elts
-      else light_list kind elts
-    | `Math_block mb -> math_block mb
-(*
-    (* Part of upstream's odoc, but not janestreet's odoc. *)
-    | `Table ((rows, align), `Heavy) -> heavy_table rows align
-    | `Table ((rows, align), `Light) -> light_table rows align
-    | `Media (kind, href, alt, media_kind) -> media kind href alt media_kind
-*)
+      if really_heavy list then heavy_list kind elts else light_list kind elts
+    | `Math_block mb ->
+      math_block
+        mb
+        (* (* Part of upstream's odoc, but not janestreet's odoc. *) | `Table
+           ((rows, align), `Heavy) -> heavy_table rows align | `Table ((rows,
+           align), `Light) -> light_table rows align | `Media (kind, href, alt,
+           media_kind) -> media kind href alt media_kind *)
 
   and heavy_list kind elts =
     let kind, item =
@@ -318,11 +321,11 @@ module Odoc = struct
     let pp_elt e =
       group (item ^/^ nest 2 (nestable_block_elements e) ^^ string "}")
     in
-    group (
-      string "{" ^^ string kind ^/^
-      nest 1 (separate_map (break 1) pp_elt elts) ^^
-      string "}"
-    )
+    group
+      (string "{"
+       ^^ string kind
+       ^/^ nest 1 (separate_map (break 1) pp_elt elts)
+       ^^ string "}")
 
   and light_list kind elts =
     let bullet item_num =
@@ -353,42 +356,21 @@ module Odoc = struct
       | `Ordered (Some (_, _, true)) -> hardline ^^ hardline
       | _ -> hardline
     in
-    List.mapi pp_elt elts
-    |> separate sep
+    List.mapi pp_elt elts |> separate sep
+  ;;
 
   (* Not recognized by jst custom parser. *)
-(*
-  and heavy_table rows _align_infos_opt =
-    let pp_cell (elts, kind) =
-      let kind =
-        match kind with
-        | `Header -> "th"
-        | `Data -> "td"
-      in
-      group (
-        string "{" ^^ string kind ^/^
-        nest 2 (nestable_block_elements elts) ^^
-        string "}"
-      )
-    in
-    let pp_row cells =
-      group (
-        string "{tr" ^/^
-        nest 2 (separate_map (break 1) pp_cell cells) ^^
-        string "}"
-      )
-    in
-    group (
-      string "{table" ^/^
-      nest 2 (separate_map hardline pp_row rows) ^^
-      string "}"
-    )
+  (* and heavy_table rows _align_infos_opt = let pp_cell (elts, kind) = let kind
+     = match kind with | `Header -> "th" | `Data -> "td" in group ( string
+     "[{" ^^ string kind ^/^ nest 2 (nestable_block_elements elts) ^^ string "}]"
+     ) in let pp_row cells = group ( string
+     "[{tr" ^/^ nest 2 (separate_map (break 1) pp_cell cells) ^^ string "}]" )
+     in group ( string
+     "[{table" ^/^ nest 2 (separate_map hardline pp_row rows) ^^ string "}]" )
 
-  and light_table rows align_info_opt =
-    (* TODO: keep the light syntax once vertical alignment is implemented.
-       In the meantime, normalize to heavy syntax. *)
-    heavy_table rows align_info_opt
-*)
+     and light_table rows align_info_opt = (* TODO: keep the light syntax once
+     vertical alignment is implemented. In the meantime, normalize to heavy
+     syntax. *) heavy_table rows align_info_opt *)
 
   let internal_tag = function
     | `Canonical sloc -> string "@canonical" ^/^ located string sloc
@@ -402,6 +384,7 @@ module Odoc = struct
       string "@toc_status" ^/^ nestable_block_elements status
     | `Order_category _nestable_block_elem_loc_list -> string "TODO"
     | `Short_title _nestable_block_elem_loc_list -> string "TODO"
+  ;;
 
   let ocamldoc_tag = function
     | `Author s -> group (string "@author" ^/^ string s)
@@ -424,24 +407,26 @@ module Odoc = struct
       group (string "@see" ^/^ ref) ^/^ nestable_block_elements text
     | `Since s -> string "@since" ^/^ string s
     | `Before (version, text) ->
-      group (string "@before" ^/^ string version) ^/^ nestable_block_elements text
+      group (string "@before" ^/^ string version)
+      ^/^ nestable_block_elements text
     | `Version s -> string "@version" ^/^ string s
+  ;;
 
   let tag t =
-    group (
-      match t with
-      | #ocamldoc_tag as ot -> ocamldoc_tag ot
-      | #internal_tag as it -> internal_tag it
-    )
+    group
+      (match t with
+       | #ocamldoc_tag as ot -> ocamldoc_tag ot
+       | #internal_tag as it -> internal_tag it)
+  ;;
 
   let heading (lvl, lbl, elems) =
-    group (
-      string "{" ^^
-      string (string_of_int lvl) ^^
-      optional (fun lbl -> string ":" ^^ string lbl) lbl ^/^
-      inline_elements elems ^^
-      string "}"
-    )
+    group
+      (string "{"
+       ^^ string (string_of_int lvl)
+       ^^ optional (fun lbl -> string ":" ^^ string lbl) lbl
+       ^/^ inline_elements elems
+       ^^ string "}")
+  ;;
 
   let block_element elt =
     match Loc.value elt with
@@ -449,6 +434,7 @@ module Odoc = struct
     | `Tag t -> tag t
     | #nestable_block_element as nbe ->
       nestable_block_element Loc.(at (location elt) nbe)
+  ;;
 
   let pp_ast elts =
     let rec aux = function
@@ -456,37 +442,47 @@ module Odoc = struct
       | [ elt ] -> block_element elt
       | elt :: ((next :: _) as elts) ->
         let spacing =
-          if extra_spacing_between elt next
-          then softline
-          else empty
+          if extra_spacing_between elt next then softline else empty
         in
-        block_element elt ^^
-        hardline ^^ spacing ^^
-        aux elts
+        block_element elt ^^ hardline ^^ spacing ^^ aux elts
     in
     aux elts
+  ;;
 
   let try_parse ~start_pos:location text =
     let res = Odoc_parser.parse_comment ~location ~text in
     match Odoc_parser.warnings res with
     | [] -> Some (Odoc_parser.ast res)
     | _ -> None
+  ;;
 end
 
 type comment_kind =
-  | Verbatim of { opening: string; content: string }
-  | Cinaps of { opening: string; content: string; closing: string }
-  | Markup of { opening: string; content: string }
+  | Verbatim of
+      { opening : string
+      ; content : string
+      }
+  | Cinaps of
+      { opening : string
+      ; content : string
+      ; closing : string
+      }
+  | Markup of
+      { opening : string
+      ; content : string
+      }
 
 let is_ws = function
   | ' ' | '\t' | '\n' -> true
   | _ -> false
+;;
 
-let ( .%[] ) s i = String.get s i
+let (.%[]) s i = String.get s i
 
 let cinaps text =
   let opening = "(*$" in
-  if text.%[String.length text - 1] = '$' then
+  if text.%[String.length text - 1] = '$'
+  then
     let closing = "$*)" in
     let content = String.sub text 2 (String.length text - 3) in
     Cinaps { opening; content; closing }
@@ -494,6 +490,7 @@ let cinaps text =
     let closing = "*)" in
     let content = String.sub text 2 (String.length text - 2) in
     Cinaps { opening; content; closing }
+;;
 
 let categorize kind content =
   let default_opening =
@@ -501,52 +498,55 @@ let categorize kind content =
     | `Docstring -> "(**"
     | `Regular_comment -> "(*"
   in
-  if String.for_all ((=) '*') content then
-    Verbatim { opening = "(*"; content }
-  else if String.for_all is_ws content then
+  if String.for_all (( = ) '*') content
+  then Verbatim { opening = "(*"; content }
+  else if String.for_all is_ws content
+  then
     (* Collapse to a single space. *)
     Verbatim { opening = default_opening; content = " " }
-  else if kind = `Regular_comment && content.%[0] = '=' then
+  else if kind = `Regular_comment && content.%[0] = '='
+  then
     let content = String.sub content 1 (String.length content - 1) in
     Verbatim { opening = "(*="; content }
-  else if content.%[0] = '$' then (
-    if String.length content >= 2 && is_ws content.%[1] then
-      cinaps content
-    else
-      Verbatim { opening = default_opening; content }
-  ) else if kind = `Docstring && content = "/*" then
-    Verbatim { opening = default_opening; content }
+  else if content.%[0] = '$'
+  then (
+    if String.length content >= 2 && is_ws content.%[1]
+    then cinaps content
+    else Verbatim { opening = default_opening; content })
+  else if kind = `Docstring && content = "/*"
+  then Verbatim { opening = default_opening; content }
   else
     let opening, content =
-      if kind = `Regular_comment && content.%[0] = '_' then
+      if kind = `Regular_comment && content.%[0] = '_'
+      then
         let pos =
           if String.length content >= 2 && is_ws content.%[1] then 2 else 1
         in
         "(*_", String.sub content pos (String.length content - pos)
-      else
-        default_opening, content
+      else default_opening, content
     in
-    Markup { opening ; content }
+    Markup { opening; content }
+;;
 
 let print_verbatim opening content closing =
   string opening ^^ fancy_string content ^^ string closing
+;;
 
-let print_doc opening ?(indent=String.length opening + 1) doc closing =
+let print_doc opening ?(indent = String.length opening + 1) doc closing =
   (* FIXME: pass opening as Preceeding... *)
-  string (opening ^ " ") ^^ nest indent (
-    doc ^^ group (break 1 ^^ string closing)
-  )
+  string (opening ^ " ")
+  ^^ nest indent (doc ^^ group (break 1 ^^ string closing))
+;;
 
-let as_odoc_markup_if_no_warnings ~id ~kind ~(start_pos:Lexing.position) text =
+let as_odoc_markup_if_no_warnings ~id ~kind ~(start_pos : Lexing.position) text
+  =
   let doc =
     match categorize kind text with
-    | Verbatim { opening; content } ->
-      print_verbatim opening content "*)"
+    | Verbatim { opening; content } -> print_verbatim opening content "*)"
     | Cinaps { opening; content; closing } ->
-      begin match !Odoc.process_ocaml_block content with
-      | Some doc -> print_doc opening doc closing
-      | None -> print_verbatim (opening ^ " ") content closing
-      end
+      (match !Odoc.process_ocaml_block content with
+       | Some doc -> print_doc opening doc closing
+       | None -> print_verbatim (opening ^ " ") content closing)
     | Markup { opening; content } ->
       let indent = String.length opening + 1 in
       let start_pos =
@@ -557,38 +557,50 @@ let as_odoc_markup_if_no_warnings ~id ~kind ~(start_pos:Lexing.position) text =
       | Some ast -> print_doc opening (Odoc.pp_ast ast) "*)"
   in
   as_comment ~id (group doc)
+;;
 
 let docstring ~id ~start_pos txt =
   as_odoc_markup_if_no_warnings ~kind:`Docstring ~id ~start_pos txt
+;;
 
 let pp (Docstring { id; text; start_pos }) = docstring ~id ~start_pos text
-let pp_floating s =
-  softline ^^ pp s ^^ softline
+let pp_floating s = softline ^^ pp s ^^ softline
 
 let pp_pre ds =
-  (* We control comments between a docstring and the item it attaches to.
-     The flush hint allows us to lay it out like we do the docstring; otherwise
-     it might be inserted deeper in the document tree and break grouping. *)
+  (* We control comments between a docstring and the item it attaches to. The
+     flush hint allows us to lay it out like we do the docstring; otherwise it
+     might be inserted deeper in the document tree and break grouping. *)
   let _, pre_flush_hint =
-    flush_comments ~pull_preceeding_comments:false
-      ~ws_before:softest_line ~ws_after:empty
+    flush_comments
+      ~pull_preceeding_comments:false
+      ~ws_before:softest_line
+      ~ws_after:empty
   in
   softline ^^ softline ^^ pp ds ^^ pre_flush_hint
+;;
 
-let attach ?(possibly_ambiguous=true) ?(extra_nest=Fun.id)
-      ?(text = []) ?pre_doc ?post_doc t =
-  extra_nest (
-    begin match text with
-    | [] -> empty
-    | text ->
-      softline ^^ softline ^^
-      separate_map (break 1) pp text ^^
-      softline ^^ softline
-    end ^^
-    optional pp_pre pre_doc
-  ) ^?/^
+let attach
+  ?(possibly_ambiguous = true)
+  ?(extra_nest = Fun.id)
+  ?(text = [])
+  ?pre_doc
+  ?post_doc
+  t
+  =
+  extra_nest
+    ((match text with
+      | [] -> empty
+      | text ->
+        softline
+        ^^ softline
+        ^^ separate_map (break 1) pp text
+        ^^ softline
+        ^^ softline)
+     ^^ optional pp_pre pre_doc)
+  ^?/^
   match post_doc with
   | None -> t
   | Some s ->
-    group (t ^^ softest_break ^^ extra_nest (pp s)) ^^
-    if possibly_ambiguous then softline else empty
+    group (t ^^ softest_break ^^ extra_nest (pp s))
+    ^^ if possibly_ambiguous then softline else empty
+;;
