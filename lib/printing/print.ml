@@ -2852,7 +2852,7 @@ end = struct
       | _ -> Pattern.pp pcstr_self
     in
     prefix obj_with_self
-      (pre_nest @@ separate_map (hardline ^^ hardline) pp_field pcstr_fields)
+      (pre_nest @@ separate_map (softline ^^ softline) pp_field pcstr_fields)
     ^/^
     pre_nest S.end_
 
@@ -3856,7 +3856,7 @@ end = struct
     | [] -> empty
     | [ x ] -> pp ?preceeding ~item ~add_in ~start x
     | x :: xs ->
-      let sep = if item then hardline ^^ hardline else softest_line in
+      let sep = if item then softline ^^ softline else softest_line in
       let extra_nest =
         Option.map (fun _ -> Preceeding.implied_nest preceeding) preceeding
       in
@@ -3923,7 +3923,7 @@ end = struct
     | [ mb ] -> pp ~item:true ~keywords mb
     | mb :: mbs ->
       pp ~item:true ~keywords mb ^^
-      hardline ^^ hardline ^^
+      softline ^^ softline ^^
       pp_recmods [S.and_] mbs
 
   let pp_recmods = pp_recmods [S.module_; S.rec_]
