@@ -2,6 +2,12 @@
   (alias runtest)
   (action
     (ignore-stdout
+      (run ../../../bin/main.exe style --idempotence-check --ast-check %{dep:blank_before_fst_comment.ml}))))
+
+(rule
+  (alias runtest)
+  (action
+    (ignore-stdout
       (run ../../../bin/main.exe style --idempotence-check --ast-check %{dep:blank_lines.ml}))))
 
 (rule

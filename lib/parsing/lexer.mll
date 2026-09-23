@@ -1412,8 +1412,10 @@ and skip_hash_bang = parse
   let token_updating_indexed_list lexbuf =
     let post_pos = lexeme_end_p lexbuf in
     let rec loop lines_for_comments lines_for_docstrings docs sc_opt lexbuf =
-      match token_with_comments lexbuf with
+      let tok = token_with_comments lexbuf in
+      match tok with
       | COMMENT (s, loc, id) ->
+          previous_token := Some tok;
           Line_indent.new_info lines_for_comments loc.loc_start;
           add_comment (s, loc);
           let sc = Staged_comments.add sc_opt lines_for_comments loc s id in
@@ -1428,7 +1430,10 @@ and skip_hash_bang = parse
       | EOL ->
           let lines_for_comments' =
             match lines_for_comments with
-            | NoLine -> NewLine
+            | NoLine ->
+              if !previous_token = None
+              then BlankLine (* at the start of the file \n = a blank line *)
+              else NewLine
             | NewLine -> BlankLine
             | BlankLine -> BlankLine
           in
@@ -1440,6 +1445,7 @@ and skip_hash_bang = parse
           in
           loop lines_for_comments' lines_for_docstrings' docs sc_opt lexbuf
       | DOCSTRING doc ->
+          previous_token := Some tok;
           let doc_loc = Docstrings.docstring_loc doc in
           Line_indent.new_info lines_for_comments doc_loc.loc_start;
           Docstrings.register doc;
@@ -1453,7 +1459,7 @@ and skip_hash_bang = parse
           in
           let docs' = acc_docstring lines_for_docstrings docs doc in
           loop NoLine NoLine docs' (Some sc) lexbuf
-      | tok ->
+      | _ ->
           previous_token := Some tok;
           let start_pos = lexeme_start_p lexbuf in
           Line_indent.new_info lines_for_comments start_pos;
