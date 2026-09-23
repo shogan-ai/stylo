@@ -110,6 +110,24 @@ module Odoc = struct
 
   let don't_break_before : inline_no_space -> bool = function
     | `Word ("-" | "+") -> true (* would start a list if at BOL *)
+    | `Word w when w <> "" ->
+      (* likewise, though partly jst specific *)
+      let len = String.length w in
+      let alpha_num = function
+        | '0' .. '9' | 'a' .. 'z' -> true
+        | _ -> false
+      in
+      (match String.get w 0, String.get w (len - 1) with
+       | '(', ')' | '[', ']' ->
+         String.for_all alpha_num (String.sub w 1 (len - 1))
+       | _, (')' | ']') -> String.for_all alpha_num (String.sub w 0 (len - 1))
+       | _, '.' ->
+         String.for_all
+           (function
+             | '0' .. '9' -> true
+             | _ -> false)
+           (String.sub w 0 (len - 1))
+       | _ -> false)
     | _ -> false
   ;; (* TODO: improve? *)
 
@@ -362,15 +380,15 @@ module Odoc = struct
   (* Not recognized by jst custom parser. *)
   (* and heavy_table rows _align_infos_opt = let pp_cell (elts, kind) = let kind
      = match kind with | `Header -> "th" | `Data -> "td" in group ( string
-     "[{" ^^ string kind ^/^ nest 2 (nestable_block_elements elts) ^^ string "}]"
-     ) in let pp_row cells = group ( string
+     "[{" ^^ string kind ^/^ nest 2 (nestable_block_elements elts) ^^ string "}]" )
+     in let pp_row cells = group ( string
      "[{tr" ^/^ nest 2 (separate_map (break 1) pp_cell cells) ^^ string "}]" )
      in group ( string
      "[{table" ^/^ nest 2 (separate_map hardline pp_row rows) ^^ string "}]" )
 
      and light_table rows align_info_opt = (* TODO: keep the light syntax once
-     vertical alignment is implemented. In the meantime, normalize to heavy
-     syntax. *) heavy_table rows align_info_opt *)
+     vertical alignment is implemented. In the meantime, normalize to heavy syntax.
+     *) heavy_table rows align_info_opt *)
 
   let internal_tag = function
     | `Canonical sloc -> string "@canonical" ^/^ located string sloc
