@@ -156,20 +156,20 @@ module Odoc = struct
     | [] -> empty
     | groups ->
       let spaced_groups = List.filter (( <> ) []) groups in
-      let append_group (space_before, acc) elts =
-        let space =
-          if not space_before
-          then empty
-          else if don't_break_before (List.hd elts (* we've filtered [] *) )
-          then nbsp
-          else break 1
-        in
-        let doc =
-          List.fold_left (fun acc elt -> acc ^^ inline_no_space elt) empty elts
-        in
-        true, acc ^^ group (space ^^ doc)
+      let doc_of_group elts =
+        List.fold_left (fun acc elt -> acc ^^ inline_no_space elt) empty elts
       in
-      List.fold_left append_group (false, empty) spaced_groups |> snd
+      let regroup acc elts =
+        let doc = doc_of_group elts in
+        match acc with
+        | [] -> [ doc ]
+        | prev :: tl ->
+          if don't_break_before (List.hd elts)
+          then (prev ^^ nbsp ^^ doc) :: tl
+          else (break 1 ^^ doc) :: acc
+      in
+      let rev_groups = List.fold_left regroup [] spaced_groups in
+      List.fold_left (fun acc g -> group g ^^ acc) empty rev_groups
 
   and inline_no_space : inline_no_space -> _ = function
     | `Word s -> string s

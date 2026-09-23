@@ -11,8 +11,8 @@ let necessary_1 = (a : int) (* `a : int` alone does not parse as an expression *
 let necessary_2 = (a :> int) (* likewise for coercion *)
 
 (* A labeled argument `~label:e` parses [e] at a tight precedence that excludes infix
-   operators - much like a plain application argument. So `~x:a + b` does NOT mean `~x:(a +
-   b)`; it means `(f ~x:a) + b`. *)
+   operators - much like a plain application argument. So `~x:a + b` does NOT mean
+   `~x:(a + b)`; it means `(f ~x:a) + b`. *)
 
 let f ~x c = x + c
 let b = 2

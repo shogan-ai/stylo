@@ -1,8 +1,8 @@
 (* Field/array access (`.`, `.()`, `.[]`) binds tighter than *everything* else, including
    function application - so `a b.x` means `a (b.x)`, not `(a b).x`. Assignment (`:=`,
-   `<-`) is right-associative and binds looser than almost everything, similar to `if`/`;` -
-   it naturally extends over the whole right-hand side. Verified against `ocamlc
-   -dparsetree`. *)
+   `<-`) is right-associative and binds looser than almost everything, similar to
+   `if`/`;` - it naturally extends over the whole right-hand side. Verified against
+   `ocamlc -dparsetree`. *)
 
 type r = { mutable x : int }
 
