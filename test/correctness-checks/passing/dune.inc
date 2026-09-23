@@ -74,5 +74,11 @@
   (alias runtest)
   (action
     (ignore-stdout
+      (run ../../../bin/main.exe style --idempotence-check --ast-check %{dep:post_unreachable_spacing.ml}))))
+
+(rule
+  (alias runtest)
+  (action
+    (ignore-stdout
       (run ../../../bin/main.exe style --idempotence-check --ast-check %{dep:trailing_semi.ml}))))
 

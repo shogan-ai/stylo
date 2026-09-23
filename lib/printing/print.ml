@@ -1434,7 +1434,7 @@ end = struct
     | Pexp_extension ext -> Extension.pp ?preceeding ext
     | Pexp_unreachable ->
       let dot, _ = Preceeding.group_with preceeding S.dot in
-      dot ^^ break 1 (* prevents unintentional conversion into DOTOP *)
+      group (dot ^^ break 1) (* prevents unintentional conversion into DOTOP *)
     | Pexp_borrow e ->
       let borrow__, pre_nest = Preceeding.group_with preceeding S.borrow__ in
       borrow__ ^/^ pre_nest @@ nest 2 (pp e)
