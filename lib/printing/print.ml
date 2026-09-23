@@ -2671,11 +2671,11 @@ end = struct
       | Covariant, Injective ->
         (* N.B. we're normalizing here, in practice the order between variance
            and injectivity is not fixed. *)
-        if var_inj_as_single_token tokens then string "!+" else S.plus ^^ S.bang
+        if var_inj_as_single_token tokens then string "!+" else S.bang ^^ S.plus
       | Contravariant, Injective ->
         if var_inj_as_single_token tokens
         then string "!-"
-        else S.minus ^^ S.bang
+        else S.bang ^^ S.minus
       | Bivariant, NoInjectivity -> string "+-"
       | Bivariant, Injective ->
         string "!+-" (* always lexed as a single token *)
