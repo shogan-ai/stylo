@@ -268,13 +268,28 @@ module Odoc = struct
   ;;
 
   (* Not recognized by jst custom parser. *)
-  (* let media ref_kind href alt kind = let media_ref = let kind = match kind
-     with | `Audio -> "audio" | `Video -> "video" | `Image -> "image" in let
-     href = match Loc.value href with | `Reference s -> string "!" ^^ break 0 ^^
-     string s | `Link s -> string ":" ^^ break 0 ^^ string s in group (string
-     "[{" ^^ string kind ^^ href ^^ string "}]") in match ref_kind with |
-     `Simple -> media_ref | `With_text -> group (string
-     "[{" ^^ media_ref ^^ string alt ^^ string "}]") *)
+  (* {[
+       let media ref_kind href alt kind =
+         let media_ref =
+           let kind =
+             match kind with
+             | `Audio -> "audio"
+             | `Video -> "video"
+             | `Image -> "image"
+           in
+           let href =
+             match Loc.value href with
+             | `Reference s -> string "!" ^^ break 0 ^^ string s
+             | `Link s -> string ":" ^^ break 0 ^^ string s
+           in
+           group (string "{" ^^ string kind ^^ href ^^ string "}")
+         in
+         match ref_kind with
+         | `Simple -> media_ref
+         | `With_text ->
+           group (string "{" ^^ media_ref ^^ string alt ^^ string "}")
+       ;;
+     ]} *)
 
   let extra_spacing_between elt1 elt2 =
     match Loc.value elt1, Loc.value elt2 with
@@ -325,10 +340,13 @@ module Odoc = struct
     | `Math_block mb ->
       math_block
         mb
-        (* (* Part of upstream's odoc, but not janestreet's odoc. *) | `Table
-           ((rows, align), `Heavy) -> heavy_table rows align | `Table ((rows,
-           align), `Light) -> light_table rows align | `Media (kind, href, alt,
-           media_kind) -> media kind href alt media_kind *)
+        (* (* Part of upstream's odoc, but not janestreet's odoc. *)
+           {v
+             | `Table ((rows, align), `Heavy) -> heavy_table rows align
+             | `Table ((rows, align), `Light) -> light_table rows align
+             | `Media (kind, href, alt, media_kind) ->
+               media kind href alt media_kind
+           v} *)
 
   and heavy_list kind elts =
     let kind, item =
@@ -378,17 +396,36 @@ module Odoc = struct
   ;;
 
   (* Not recognized by jst custom parser. *)
-  (* and heavy_table rows _align_infos_opt = let pp_cell (elts, kind) = let kind
-     = match kind with | `Header -> "th" | `Data -> "td" in group ( string
-     "[{" ^^ string kind ^/^ nest 2 (nestable_block_elements elts) ^^ string "}]" )
-     in let pp_row cells = group ( string
-     "[{tr" ^/^ nest 2 (separate_map (break 1) pp_cell cells) ^^ string "}]" )
-     in group ( string
-     "[{table" ^/^ nest 2 (separate_map hardline pp_row rows) ^^ string "}]" )
+  (* {v
+       and heavy_table rows _align_infos_opt =
+         let pp_cell (elts, kind) =
+           let kind =
+             match kind with
+             | `Header -> "th"
+             | `Data -> "td"
+           in
+           group
+             (string "{"
+              ^^ string kind
+              ^/^ nest 2 (nestable_block_elements elts)
+              ^^ string "}")
+         in
+         let pp_row cells =
+           group
+             (string "{tr"
+              ^/^ nest 2 (separate_map (break 1) pp_cell cells)
+              ^^ string "}")
+         in
+         group
+           (string "{table"
+            ^/^ nest 2 (separate_map hardline pp_row rows)
+            ^^ string "}")
 
-     and light_table rows align_info_opt = (* TODO: keep the light syntax once
-     vertical alignment is implemented. In the meantime, normalize to heavy syntax.
-     *) heavy_table rows align_info_opt *)
+       and light_table rows align_info_opt =
+         (* TODO: keep the light syntax once vertical alignment is implemented.
+            In the meantime, normalize to heavy syntax. *)
+         heavy_table rows align_info_opt
+     v} *)
 
   let internal_tag = function
     | `Canonical sloc -> string "@canonical" ^/^ located string sloc
