@@ -405,7 +405,10 @@ let rec walk_both state seq doc =
       in
       let restr, right, final_state =
         walk_both
-          { mid_state with at_end_of_a_group = state.at_end_of_a_group }
+          { mid_state with
+            at_end_of_a_group = state.at_end_of_a_group
+          ; next_is_pulling_flush_hint = state.next_is_pulling_flush_hint
+          }
           restl
           right
       in
