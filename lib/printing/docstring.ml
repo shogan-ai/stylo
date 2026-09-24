@@ -114,19 +114,20 @@ module Odoc = struct
       (* likewise, though partly jst specific *)
       let len = String.length w in
       let alpha_num = function
-        | '0' .. '9' | 'a' .. 'z' -> true
+        | '0' .. '9' | 'a' .. 'z' | 'A' .. 'Z' -> true
+        | _ -> false
+      in
+      let digit = function
+        | '0' .. '9' -> true
         | _ -> false
       in
       (match String.get w 0, String.get w (len - 1) with
        | '(', ')' | '[', ']' ->
-         String.for_all alpha_num (String.sub w 1 (len - 1))
-       | _, (')' | ']') -> String.for_all alpha_num (String.sub w 0 (len - 1))
-       | _, '.' ->
-         String.for_all
-           (function
-             | '0' .. '9' -> true
-             | _ -> false)
-           (String.sub w 0 (len - 1))
+         let pred = if len - 2 = 1 then alpha_num else digit in
+         String.for_all pred (String.sub w 1 (len - 2))
+       | _, (')' | '.') ->
+         let pred = if len - 1 = 1 then alpha_num else digit in
+         String.for_all pred (String.sub w 0 (len - 1))
        | _ -> false)
     | _ -> false
   ;; (* TODO: improve? *)

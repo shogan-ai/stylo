@@ -44,10 +44,9 @@ let cleaner =
    method! visit_pattern env pat = let
    [{ppat_desc; ppat_loc= loc1; ppat_attributes= attrs1; _}] = pat in (*
    normalize nested or patterns *) match ppat_desc with | Ppat_or ( pat1 ,
-   [{ ppat_desc= Ppat_or (pat2, pat3) ; ppat_loc= loc2 ; ppat_attributes= attrs2 ; _ }]
-   ) -> self#visit_pattern env (Pat.or_ ~loc:loc1 ~attrs:attrs1 (Pat.or_
-   ~loc:loc2 ~attrs:attrs2 pat1 pat2) pat3) | _ -> super#visit_pattern env pat
-   *)
+   [{ ppat_desc= Ppat_or (pat2, pat3) ; ppat_loc= loc2 ; ppat_attributes= attrs2 ; _ }] )
+   -> self#visit_pattern env (Pat.or_ ~loc:loc1 ~attrs:attrs1 (Pat.or_ ~loc:loc2
+   ~attrs:attrs2 pat1 pat2) pat3) | _ -> super#visit_pattern env pat *)
 
 type _ input_kind =
   | Impl : Parsetree.structure input_kind
