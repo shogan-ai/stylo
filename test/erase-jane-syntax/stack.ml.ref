@@ -244,7 +244,8 @@ let _ =
     l
     (* 1 *)
     ~f: (* 2 *) ( (* 3 *) function (* 5 *)
-      | xxxxx -> (* 6 *)
+      | xxxxx ->
+        (* 6 *)
         Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
           (module struct
             type nonrec t = M.t
@@ -288,7 +289,9 @@ let _ =
   List.iter
     l
     ~f:(function (* x *)
-      | xxxxx (* y *) -> (* z *) (* w *)
+      | xxxxx (* y *) ->
+        (* z *)
+        (* w *)
         Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
           (module struct
             type nonrec t = M.t

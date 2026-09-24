@@ -2167,8 +2167,49 @@ end = struct
       prefix (group (pp_pattern pipe pc_lhs)) (pp_guard pc_guard)
     in
     let body = Expression.pp pc_rhs in
-    (* try to put things on the same line as what preceeds if they fit. *)
-    flow (break 1) [ guarded_pat; nest 2 S.rarrow; nest 2 body ] |> group
+    let _, pulling_hint =
+      flush_comments
+        ~pull_preceeding_comments:true
+        ~ws_before:(break 1)
+        ~ws_after:empty
+    in
+    group
+      ((* We try to put things on the same line as what preceeds if they fit. It
+          is expected/intended that the layout sometimes degrades to
+          {v
+           | Some Long Pattern
+             -> Some short_expr
+          v}
+          However, the whole "fit at the EOL if possible" doesn't play well with
+          the stability of comments. [pulling_hint] is here to make sure that in
+          presence of comments after the arrow the layout degrades to one of
+          {v
+           | Pat ->
+             (* cmt *) expr
+           | Pat ->
+             (* cmt *)
+             expr
+           | Pat
+             ->
+             (* cmt *)
+             expr
+          v}
+          but never to
+          {v
+           | Pat
+             ->
+             (* cmt *) expr
+          v}
+          Likewise for comments before the arrow.
+
+          Beware: [pulling_hint] is shared in both places, which is fine as we
+          do not care whether comments were "flushed" or not. But if one ever
+          happens to care, it should be noted that the [Condition.t] will be
+          true whenever a comment appears in either place... *)
+       group
+         (guarded_pat ^^ nest 2 pulling_hint)
+       ^^ group (break 1 ^^ nest 2 S.rarrow)
+       ^^ group (nest 2 (pulling_hint ^/^ body)))
   ;;
 
   let pp_list = separate_map (break 1) pp

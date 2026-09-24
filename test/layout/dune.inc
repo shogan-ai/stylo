@@ -9,6 +9,16 @@
   (action (diff %{dep:blankline_preservation.ml.stylo} %{dep:blankline_preservation.ml.out})))
 
 (rule
+  (target case_and_comment.40.ml.out)
+  (action
+    (with-stdout-to %{target}
+      (run %{project_root}/bin/main.exe style --idempotence-check --width 40 %{dep:case_and_comment.40.ml}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:case_and_comment.40.ml.stylo} %{dep:case_and_comment.40.ml.out})))
+
+(rule
   (target cinaps.ml.out)
   (action
     (with-stdout-to %{target}
@@ -17,6 +27,16 @@
 (rule
   (alias runtest)
   (action (diff %{dep:cinaps.ml.stylo} %{dep:cinaps.ml.out})))
+
+(rule
+  (target comment_and_case.14.ml.out)
+  (action
+    (with-stdout-to %{target}
+      (run %{project_root}/bin/main.exe style --idempotence-check --width 14 %{dep:comment_and_case.14.ml}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:comment_and_case.14.ml.stylo} %{dep:comment_and_case.14.ml.out})))
 
 (rule
   (target comments_insertion.ml.out)

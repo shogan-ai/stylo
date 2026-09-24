@@ -1,0 +1,3 @@
+match compare_key k k' with
+| _ (* when foobar > 0 *) ->
+  remove acc k v

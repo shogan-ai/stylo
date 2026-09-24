@@ -1,0 +1,2 @@
+function
+| Empty -> (* Precondition cannot be met in these cases. *) assert false
