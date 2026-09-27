@@ -8,10 +8,11 @@ end
 
 type error = [ `Comment_insertion_error of Error.t ]
 
-(** [from_tokens seq doc] will insert any comments present in [seq] in the
-    appropriate place in [doc], assuming [doc] has been produced from CST which
-    corresponds to [seq]. *)
+(** [from_tokens ~render_comment seq doc] will insert any comments present in
+    [seq] in the appropriate place in [doc], assuming [doc] has been produced
+    from CST which corresponds to [seq]. *)
 val from_tokens
-  :  Ocaml_syntax.Tokens.seq
+  :  render_comment:(start_pos:Lexing.position -> string -> Document.t)
+  -> Ocaml_syntax.Tokens.seq
   -> Document.t
   -> (Document.t, [> error ]) result

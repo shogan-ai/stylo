@@ -85,6 +85,12 @@ module Check = struct
     ]
 end
 
+let render_comment =
+  Print.Doc.as_odoc_markup_if_no_warnings
+    ~id:(-1) (* regular comments / unattached docstrings do not have ids *)
+    ~kind:`Regular_comment
+;;
+
 module Pipeline = struct
   let parse (type cst ast) (input : (cst, ast) input) : (cst, _) result =
     let lb = Lexing.from_string input.source in
@@ -158,7 +164,8 @@ module Pipeline = struct
     in
     let* tokens_post_normalize = Lazy.force tokens_post_normalize in
     let* document =
-      build_doc kind cst |> Comments.Insert.from_tokens tokens_post_normalize
+      build_doc kind cst
+      |> Comments.Insert.from_tokens ~render_comment tokens_post_normalize
     in
     let output = print_doc document in
     let* () = Check.same_ast ast_for_checker output in
@@ -187,7 +194,7 @@ module Pipeline = struct
       | Error _ -> None
       | Ok tokens ->
         let doc = build_doc kind cst in
-        match Comments.Insert.from_tokens tokens doc with
+        match Comments.Insert.from_tokens ~render_comment tokens doc with
         | Error _ -> None
         | Ok doc -> Some doc
   ;;

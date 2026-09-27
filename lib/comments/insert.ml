@@ -10,10 +10,6 @@ module Doc = Document
    whitespace, but not when it preceeds one. *)
 let blank_line = Doc.(softline ^^ softline)
 
-let fmt_comment txt =
-  Print.Doc.as_odoc_markup_if_no_warnings ~id:(-1) ~kind:`Regular_comment txt
-;;
-
 module Error = struct
   type t =
     | Output_longer_than_input of Doc.t
@@ -56,14 +52,14 @@ let corresponding_doc_state cmt =
 
 let explicitely_inserted cmt = !(cmt.T.corresponding_document_id) >= 0
 
-let consume_leading_comments =
+let consume_leading_comments ~render_comment =
   let rec aux last_blank_after acc = function
     | [] -> (acc, last_blank_after), []
     | first :: rest ->
       match first.T.desc with
       | Child_node -> assert false
       | Comment c when not (explicitely_inserted c) ->
-        let cmt = fmt_comment ~start_pos:first.pos c.text in
+        let cmt = render_comment ~start_pos:first.pos c.text in
         let sep =
           if c.blank_line_before || last_blank_after
           then blank_line
@@ -195,7 +191,7 @@ let is_comment_attaching_before elt =
   | _ -> false
 ;;
 
-let attach_before_comments state tokens doc =
+let attach_before_comments ~render_comment state tokens doc =
   if state.at_end_of_a_group || state.next_is_pulling_flush_hint
   then
     (* delay until flush hint or having left the group. *) tokens, doc, state
@@ -220,7 +216,7 @@ let attach_before_comments state tokens doc =
                   else Doc.break 1
                 in
                 let cmt =
-                  Doc.(group (sep ^^ fmt_comment ~start_pos:cmt.pos c.text))
+                  Doc.(group (sep ^^ render_comment ~start_pos:cmt.pos c.text))
                 in
                 Doc.(acc ^^ cmt), true, c.blank_line_after
             | _ -> assert false)
@@ -268,8 +264,10 @@ let prepend_comments_to_doc state comments ~blank_line_after doc =
   insert_space_if_required ~inserting_comment:true state doc
 ;;
 
-let flush_comments tokens ~before:ws_b ~after:ws_a state =
-  let (to_prepend, last_blank_after), rest = consume_leading_comments tokens in
+let flush_comments ~render_comment tokens ~before:ws_b ~after:ws_a state =
+  let (to_prepend, last_blank_after), rest =
+    consume_leading_comments ~render_comment tokens
+  in
   (* A comment followed by a blank line in the source gets one in the output
      too, instead of the hint's own whitespace. *)
   let ws_after_comments = if last_blank_after then blank_line else ws_a in
@@ -299,7 +297,7 @@ let flush_comments tokens ~before:ws_b ~after:ws_a state =
     implies that we will insert comments inside a group, so we can reach the
     correct indentation/nesting level. Refer to the lexer the actual rules
     regarding attachement. *)
-let rec walk_both state seq doc =
+let rec walk_both ~render_comment state seq doc =
   match seq with
   | [] ->
     (* Some extra tokens or comments were synthesized *)
@@ -313,7 +311,7 @@ let rec walk_both state seq doc =
          first.pos.pos_lnum (first.pos.pos_cnum - first.pos.pos_bol)
          Document.pp_pseudo p; *)
       let doc = insert_space_if_required state doc in
-      attach_before_comments (saw_leaf state) rest doc
+      attach_before_comments ~render_comment (saw_leaf state) rest doc
 
     (* Whitespace: don't consume token *)
     | _, Doc.Empty -> seq, doc, state
@@ -348,7 +346,7 @@ let rec walk_both state seq doc =
       mark_as_seen d.source_comment_id;
       seq, doc, state
     | T.Comment c, Doc.Token _ when explicitely_inserted c ->
-      walk_both state rest doc
+      walk_both ~render_comment state rest doc
 
     (* Comments flushing hint take precedence over attachement and nesting
        considerations. *)
@@ -357,7 +355,7 @@ let rec walk_both state seq doc =
        | Already_seen ->
          (* skip the first comment and loop back, there might be others
             following it that can be flushed. *)
-         walk_both state rest doc
+         walk_both ~render_comment state rest doc
        | Present_not_seen_yet ->
          (* [c] is already present in the document, but we haven't encountered
             it yet. We do not want to flush any other comment before seeing it
@@ -367,14 +365,20 @@ let rec walk_both state seq doc =
        | Absent ->
          (* [c] (and perhaps the following comments) can be flushed. *)
          fh.cmts_were_flushed := true;
-         flush_comments seq ~before:fh.ws_before ~after:fh.ws_after state)
+         flush_comments
+           ~render_comment
+           seq
+           ~before:fh.ws_before
+           ~after:fh.ws_after
+           state)
     | _, Doc.Comments_flushing_hint fh ->
       (* No comments to insert, the hint vanishes. *)
       fh.cmts_were_flushed := false;
       seq, Doc.empty, state
 
     (* Comments missing in the doc, insert them *)
-    | T.Comment _, Doc.Token _ -> insert_comments_before_subtree seq state doc
+    | T.Comment _, Doc.Token _ ->
+      insert_comments_before_subtree ~render_comment seq state doc
     | T.Comment c, Doc.Group (_, _, _, d)
       when not (explicitely_inserted c)
            && not (nest_before_leaf d)
@@ -382,14 +386,16 @@ let rec walk_both state seq doc =
       (* we can insert comments outside the group as they'll be at the same
          nesting level as the next word and there's no hint that comments should
          be inside the group. *)
-      insert_comments_before_subtree seq state doc
+      insert_comments_before_subtree ~render_comment seq state doc
 
     (* Lexer directives are to be inserted in a similar way to comments, except:
        - they are not attached to anything (so we don't care about nesting,
          grouping, etc)
        - they cannot have been explicitely inserted already *)
     | T.Lexer_directive ldir, _ ->
-      let rest, doc, state = walk_both (no_space state) rest doc in
+      let rest, doc, state =
+        walk_both ~render_comment (no_space state) rest doc
+      in
       rest, insert_directive doc ldir, state
 
     (* Traverse document structure *)
@@ -399,12 +405,14 @@ let rec walk_both state seq doc =
       in
       let restl, left, mid_state =
         walk_both
+          ~render_comment
           { state with at_end_of_a_group = false; next_is_pulling_flush_hint }
           seq
           left
       in
       let restr, right, final_state =
         walk_both
+          ~render_comment
           { mid_state with
             at_end_of_a_group = state.at_end_of_a_group
           ; next_is_pulling_flush_hint = state.next_is_pulling_flush_hint
@@ -414,19 +422,22 @@ let rec walk_both state seq doc =
       in
       restr, Doc.(left ^^ right), final_state
     | _, Doc.Nest (_, i, vanish, doc) ->
-      let rest, doc, state' = walk_both (under_nest state) seq doc in
+      let rest, doc, state' =
+        walk_both ~render_comment (under_nest state) seq doc
+      in
       rest, Doc.nest ~vanish i doc, exit_nest state state'
     | _, Doc.Group (_, margin, flatness, doc) ->
-      traverse_group seq state margin flatness doc
+      traverse_group ~render_comment seq state margin flatness doc
     | (* [Child_node] doesn't appear in linearized token stream *)
       ( T.Child_node
       , _ )
     | (* No directives have been inserted prior to reaching us. *) ( _
       , Doc.Directive _ ) -> assert false
 
-and traverse_group tokens state margin flatness grouped_doc =
+and traverse_group ~render_comment tokens state margin flatness grouped_doc =
   let rest, d, state' =
     walk_both
+      ~render_comment
       { state with
         space_handling =
           (* Do not force the insertion of space inside the group, we'd rather
@@ -453,11 +464,13 @@ and traverse_group tokens state margin flatness grouped_doc =
     then Doc.group ~margin ?flatness d
     else insert_space_if_required state (Doc.group ~margin ?flatness d)
   in
-  attach_before_comments return_state rest doc
+  attach_before_comments ~render_comment return_state rest doc
 
-and insert_comments_before_subtree tokens state doc =
-  let (to_prepend, last_blank_after), rest = consume_leading_comments tokens in
-  let rest, doc, state' = walk_both (no_space state) rest doc in
+and insert_comments_before_subtree ~render_comment tokens state doc =
+  let (to_prepend, last_blank_after), rest =
+    consume_leading_comments ~render_comment tokens
+  in
+  let rest, doc, state' = walk_both ~render_comment (no_space state) rest doc in
   let doc =
     prepend_comments_to_doc
       state
@@ -465,10 +478,10 @@ and insert_comments_before_subtree tokens state doc =
       ~blank_line_after:last_blank_after
       doc
   in
-  attach_before_comments state' rest doc
+  attach_before_comments ~render_comment state' rest doc
 ;;
 
-let append_trailing_comments (tokens, doc, _) =
+let append_trailing_comments ~render_comment (tokens, doc, _) =
   let rec aux doc = function
     | [] | [ T.{ desc = Token (EOF, _); _ } ] -> doc
     | tok :: toks ->
@@ -479,7 +492,7 @@ let append_trailing_comments (tokens, doc, _) =
           if explicitely_inserted c
           then doc
           else
-            let cmt = fmt_comment ~start_pos:tok.pos c.text in
+            let cmt = render_comment ~start_pos:tok.pos c.text in
             let sep = if c.blank_line_before then blank_line else Doc.break 1 in
             Doc.(if is_empty doc then cmt else doc ^^ sep ^^ cmt)
         in
@@ -492,8 +505,12 @@ let append_trailing_comments (tokens, doc, _) =
 
 type error = [ `Comment_insertion_error of Error.t ]
 
-let from_tokens tokens doc =
+let from_tokens ~render_comment tokens doc =
   Hashtbl.clear already_seen;
-  try Ok (walk_both init_state tokens doc |> append_trailing_comments) with
+  try
+    Ok
+      (walk_both ~render_comment init_state tokens doc
+       |> append_trailing_comments ~render_comment)
+  with
   | Error e -> Result.Error (`Comment_insertion_error e)
 ;;

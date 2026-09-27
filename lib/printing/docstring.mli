@@ -10,7 +10,8 @@ module Odoc : sig
   val process_ocaml_block : (string -> Document.t option) ref
 end
 
-(** Used externally only by the comment insertion engine. *)
+(** Used by the pipeline (stylo.ml) to render regular comments during comment
+    insertion. *)
 val as_odoc_markup_if_no_warnings
   :  id:int
        (** docstrings have unique identifiers that are propagated all the way
