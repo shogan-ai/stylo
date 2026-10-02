@@ -1,14 +1,5 @@
-type _ input_kind =
-  | Impl : Ocaml_syntax.Parsetree.structure input_kind
-  | Intf : Ocaml_syntax.Parsetree.signature input_kind
+open Ocaml_syntax
 
-type 'a input =
-  { fname : string
-  ; start_line : int
-  ; source : string
-  ; kind : 'a input_kind
-  }
+(** Check that the output reparses to the same CST, modulo locations. *)
 
-(** Check that two strings parse to the same AST (modulo locations) *)
-
-val check_same_ast : 'cst -> 'cst input -> (unit, [> Errors.t ]) result
+val check_same_ast : Cst.t -> Source.t -> (unit, [> Errors.t ]) result

@@ -1,26 +1,13 @@
 open Ocaml_syntax
-module Cst := Ocaml_syntax.Parsetree
-module Ast := Oxcaml_frontend.Parsetree
-
-type (_, _) input_kind =
-  | Impl : (Cst.structure, Ast.structure) input_kind
-  | Intf : (Cst.signature, Ast.signature) input_kind
-
-type ('a, 'b) input =
-  { fname : string
-  ; start_line : int
-  ; source : string
-  ; kind : ('a, 'b) input_kind
-  }
 
 module Check : sig
   open Ast_checker
 
-  type (_, _) checker_input =
-    | Ast : ('cst, 'ast) input * 'ast -> ('cst, 'ast) checker_input
-    | Cst : ('cst, 'ast) input * 'cst -> ('cst, 'ast) checker_input
+  type checker_input =
+    | Ast of Source.t * Oxcaml_checker.ast
+    | Cst of Source.t * Cst.t
 
-  val same_ast : _ checker_input -> string -> (unit, [> Errors.t ]) result
+  val same_ast : checker_input -> string -> (unit, [> Errors.t ]) result
 
   open Tokenisation_check
 
@@ -42,21 +29,16 @@ end
 
 module Pipeline : sig
   val parse
-    :  ('cst, _) input
-    -> ( 'cst
+    :  Source.t
+    -> ( Cst.t
        , [> `Input_parse_error of
             Ast_checker.Errors.parser * Lexing.position * Lexing.position * exn
          ] )
          result
 
-  val normalize : ('cst, _) input_kind -> 'cst -> 'cst
-
-  val tokens_of_tree
-    :  ('cst, _) input_kind
-    -> 'cst
-    -> (Tokens.seq, [> Tokens_of_tree.Error.t ]) result
-
-  val build_doc : ('cst, _) input_kind -> 'cst -> Document.t
+  val normalize : Cst.t -> Cst.t
+  val tokens_of_tree : Cst.t -> (Tokens.seq, [> Tokens_of_tree.Error.t ]) result
+  val build_doc : Cst.t -> Document.t
   val print_doc : Document.t -> string
 
   type error =
@@ -65,12 +47,12 @@ module Pipeline : sig
     | Comments.Insert.error
     ]
 
-  val run : ?normalize:bool -> _ input -> (string, error) result
+  val run : ?normalize:bool -> Source.t -> (string, error) result
   val pp_error : Format.formatter -> string -> error -> unit
 end
 
 val style_file
-  :  _ input_kind
+  :  Source.kind
   -> fname:string
   -> ?lnum:int
   -> ?normalize:bool

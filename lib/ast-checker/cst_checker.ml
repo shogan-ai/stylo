@@ -48,18 +48,7 @@ let cleaner =
    -> self#visit_pattern env (Pat.or_ ~loc:loc1 ~attrs:attrs1 (Pat.or_ ~loc:loc2
    ~attrs:attrs2 pat1 pat2) pat3) | _ -> super#visit_pattern env pat *)
 
-type _ input_kind =
-  | Impl : Parsetree.structure input_kind
-  | Intf : Parsetree.signature input_kind
-
-type 'a input =
-  { fname : string
-  ; start_line : int
-  ; source : string
-  ; kind : 'a input_kind
-  }
-
-let parse (type a) (input : a input) wrap_exn : (a, _) result =
+let parse (input : Source.t) wrap_exn : (Cst.t, _) result =
   let pos =
     { Lexing.pos_fname = input.fname
     ; pos_lnum = input.start_line
@@ -72,26 +61,25 @@ let parse (type a) (input : a input) wrap_exn : (a, _) result =
   try
     Ok
       (match input.kind with
-       | Impl -> Parse.implementation lb
-       | Intf -> Parse.interface lb)
+       | Impl -> Structure (Parse.implementation lb)
+       | Intf -> Signature (Parse.interface lb))
   with
   | exn -> Error (wrap_exn exn)
 ;;
 
-let clean (type a) (kind : a input_kind) (ast : a) : a =
-  match kind with
-  | Impl -> cleaner#structure () ast
-  | Intf -> cleaner#signature () ast
+let clean : Cst.t -> Cst.t = function
+  | Structure str -> Structure (cleaner#structure () str)
+  | Signature sg -> Signature (cleaner#signature () sg)
 ;;
 
 let output_wrap exn = `Output_parse_error (Errors.Stylo's, exn)
 let ( let* ) = Result.bind
 
-let check_same_ast (type a) (input_cst : a) (output : a input) =
-  let input_cst = clean output.kind input_cst in
+let check_same_ast input_cst (output : Source.t) =
+  let input_cst = clean input_cst in
   let output = { output with fname = output.fname ^ ".out" } in
   let* output_cst = parse output output_wrap in
-  let output_cst = clean output.kind output_cst in
+  let output_cst = clean output_cst in
   if input_cst = output_cst
   then Ok ()
   else Error (`Ast_changed (Errors.Stylo's, output.fname))

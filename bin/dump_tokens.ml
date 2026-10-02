@@ -136,7 +136,8 @@ let run start stop source =
     Stylo.Pipeline.parse
       { kind = Impl; fname = "buffer"; source; start_line = 0 }
   with
-  | Ok cst ->
+  | Ok (Signature _) -> assert false
+  | Ok (Structure cst) ->
     let range =
       match stop with
       | None -> Around start

@@ -115,18 +115,11 @@ let cleaner erase =
   end
 ;;
 
-type _ input_kind =
-  | Impl : Parsetree.structure input_kind
-  | Intf : Parsetree.signature input_kind
+type ast =
+  | Structure of Parsetree.structure
+  | Signature of Parsetree.signature
 
-type 'a input =
-  { fname : string
-  ; start_line : int
-  ; source : string
-  ; kind : 'a input_kind
-  }
-
-let parse (type a) (input : a input) wrap_exn : (a, _) result =
+let parse (input : Ocaml_syntax.Source.t) wrap_exn : (ast, _) result =
   let pos =
     { Lexing.pos_fname = input.fname
     ; pos_lnum = input.start_line
@@ -139,16 +132,15 @@ let parse (type a) (input : a input) wrap_exn : (a, _) result =
   try
     Ok
       (match input.kind with
-       | Impl -> Parse.implementation lb
-       | Intf -> Parse.interface lb)
+       | Impl -> Structure (Parse.implementation lb)
+       | Intf -> Signature (Parse.interface lb))
   with
   | exn -> Error (wrap_exn lb.lex_start_p lb.lex_curr_p exn)
 ;;
 
-let clean (type a) ~erase_jane_syntax (kind : a input_kind) (ast : a) : a =
-  match kind with
-  | Impl -> (cleaner erase_jane_syntax)#structure () ast
-  | Intf -> (cleaner erase_jane_syntax)#signature () ast
+let clean ~erase_jane_syntax = function
+  | Structure str -> Structure ((cleaner erase_jane_syntax)#structure () str)
+  | Signature sg -> Signature ((cleaner erase_jane_syntax)#signature () sg)
 ;;
 
 let input_wrap startp endp exn =
@@ -162,7 +154,7 @@ type ast_source =
   | Input
   | Stylo
 
-let dump_ast (type a) (input : a input) ~src (ast : a) =
+let dump_ast (input : Ocaml_syntax.Source.t) ~src ast =
   let fname =
     input.fname
     ^
@@ -175,19 +167,19 @@ let dump_ast (type a) (input : a input) ~src (ast : a) =
     fname
     Oxcaml_frontend.Printast.(
       fun ppf ->
-        match input.kind with
-        | Impl -> implementation ppf ast
-        | Intf -> interface ppf ast)
+        match ast with
+        | Structure str -> implementation ppf str
+        | Signature sg -> interface ppf sg)
 ;;
 
-let dump_out output =
+let dump_out (output : Ocaml_syntax.Source.t) =
   Debug.dump_to_file output.fname (fun ppf ->
     Format.pp_print_string ppf output.source)
 ;;
 
-let check_same_ast (type a) (input_ast : a) (output : a input) =
+let check_same_ast input_ast (output : Ocaml_syntax.Source.t) =
   let input_ast =
-    clean ~erase_jane_syntax:!Config.erase_jane_syntax output.kind input_ast
+    clean ~erase_jane_syntax:!Config.erase_jane_syntax input_ast
   in
   let* output_ast =
     let output = { output with fname = output.fname ^ ".out" } in
@@ -196,7 +188,7 @@ let check_same_ast (type a) (input_ast : a) (output : a input) =
       dump_out ~or_:() output;
       err)
   in
-  let output_ast = clean ~erase_jane_syntax:false output.kind output_ast in
+  let output_ast = clean ~erase_jane_syntax:false output_ast in
   if input_ast = output_ast
   then Ok ()
   else (

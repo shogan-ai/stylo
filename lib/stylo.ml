@@ -2,50 +2,14 @@ open Ocaml_syntax
 
 let ( let* ) = Result.bind
 
-module Cst = Ocaml_syntax.Parsetree
-module Ast = Oxcaml_frontend.Parsetree
-
-type (_, _) input_kind =
-  | Impl : (Cst.structure, Ast.structure) input_kind
-  | Intf : (Cst.signature, Ast.signature) input_kind
-
-type ('a, 'b) input =
-  { fname : string
-  ; start_line : int
-  ; source : string
-  ; kind : ('a, 'b) input_kind
-  }
-
 module Debug = Ast_checker.Debug
 
 module Check = struct
   open Ast_checker
 
-  type (_, _) checker_input =
-    | Ast : ('cst, 'ast) input * 'ast -> ('cst, 'ast) checker_input
-    | Cst : ('cst, 'ast) input * 'cst -> ('cst, 'ast) checker_input
-
-  let to_cst_kind
-    : type cst ast. (cst, ast) input_kind -> cst Cst_checker.input_kind
-    = function
-    | Impl -> Impl
-    | Intf -> Intf
-  ;;
-
-  let to_ast_kind
-    : type cst ast. (cst, ast) input_kind -> ast Oxcaml_checker.input_kind
-    = function
-    | Impl -> Impl
-    | Intf -> Intf
-  ;;
-
-  let make_cst_input { fname; start_line; kind; source = _ } source =
-    { Cst_checker.fname; start_line; source; kind = to_cst_kind kind }
-  ;;
-
-  let make_ast_input { fname; start_line; kind; source = _ } source =
-    { Oxcaml_checker.fname; start_line; source; kind = to_ast_kind kind }
-  ;;
+  type checker_input =
+    | Ast of Source.t * Oxcaml_checker.ast
+    | Cst of Source.t * Cst.t
 
   let same_ast checker_input output =
     if not !Config.check_same_ast
@@ -53,9 +17,9 @@ module Check = struct
     else (
       match checker_input with
       | Ast (input, input_ast) ->
-        Oxcaml_checker.check_same_ast input_ast (make_ast_input input output)
+        Oxcaml_checker.check_same_ast input_ast { input with source = output }
       | Cst (input, input_cst) ->
-        Cst_checker.check_same_ast input_cst (make_cst_input input output))
+        Cst_checker.check_same_ast input_cst { input with source = output })
   ;;
 
   open Tokenisation_check
@@ -92,14 +56,14 @@ let render_comment =
 ;;
 
 module Pipeline = struct
-  let parse (type cst ast) (input : (cst, ast) input) : (cst, _) result =
+  let parse (input : Source.t) : (Cst.t, _) result =
     let lb = Lexing.from_string input.source in
     Location.init lb ~lnum:input.start_line input.fname;
     try
       Ok
         (match input.kind with
-         | Impl -> Parse.implementation lb
-         | Intf -> Parse.interface lb)
+         | Impl -> Structure (Parse.implementation lb)
+         | Intf -> Signature (Parse.interface lb))
     with
     | exn ->
       Error
@@ -107,34 +71,26 @@ module Pipeline = struct
            (Ast_checker.Errors.Stylo's, lb.lex_start_p, lb.lex_curr_p, exn))
   ;;
 
-  let normalize (type cst ast) (kind : (cst, ast) input_kind) (cst : cst) : cst
-    =
-    match kind with
-    | Impl -> Normalize.structure cst
-    | Intf -> Normalize.signature cst
+  let normalize : Cst.t -> Cst.t = function
+    | Structure str -> Structure (Normalize.structure str)
+    | Signature sg -> Signature (Normalize.signature sg)
   ;;
 
-  let tokens_of_tree (type cst ast) (kind : (cst, ast) input_kind) (cst : cst)
-    : (Tokens.seq, _) result
-    =
-    match kind with
-    | Impl -> Tokens_of_tree.structure cst
-    | Intf -> Tokens_of_tree.signature cst
+  let tokens_of_tree : Cst.t -> (Tokens.seq, _) result = function
+    | Structure str -> Tokens_of_tree.structure str
+    | Signature sg -> Tokens_of_tree.signature sg
   ;;
 
-  let build_doc (type cst ast) (kind : (cst, ast) input_kind) (cst : cst)
-    : Document.t
-    =
-    match kind with
-    | Impl -> Print.Structure.pp_implementation cst
-    | Intf -> Print.Signature.pp_interface cst
+  let build_doc : Cst.t -> Document.t = function
+    | Structure str -> Print.Structure.pp_implementation str
+    | Signature sg -> Print.Signature.pp_interface sg
   ;;
 
   let print_doc doc = Document.Print.to_string ~width:!Config.width doc
 
-  let run ?normalize:(run_normalize = true) ({ kind; _ } as input) =
+  let run ?normalize:(run_normalize = true) input =
     let* cst = parse input in
-    let tokens_pre_normalize = lazy (tokens_of_tree kind cst) in
+    let tokens_pre_normalize = lazy (tokens_of_tree cst) in
     let* () = Debug.dump_tokens input.fname ~src:Parser tokens_pre_normalize in
     let* () = Check.retokenisation tokens_pre_normalize in
     let* cst, tokens_post_normalize, ast_for_checker =
@@ -142,17 +98,16 @@ module Pipeline = struct
       then Ok (cst, tokens_pre_normalize, Check.Cst (input, cst))
       else (
         (* we normalize only if the source parses with the upstream parser *)
-        let input_for_oxchecker = Check.make_ast_input input input.source in
-        match Ast_checker.Oxcaml_checker.parse input_for_oxchecker with
+        match Ast_checker.Oxcaml_checker.parse input with
         | Error e ->
           if !Config.check_same_ast
           then Error e (* might as well fail early *)
           else Ok (cst, tokens_pre_normalize, Check.Cst (input, cst))
         | Ok ast ->
-          let normalized = normalize kind cst in
+          let normalized = normalize cst in
           let tokens =
             (* No need to suspend, we know those will be used. *)
-            Lazy.from_val (tokens_of_tree kind normalized)
+            Lazy.from_val (tokens_of_tree normalized)
           in
           let* () = Debug.dump_tokens input.fname ~src:Normalization tokens in
           Ok (normalized, tokens, Check.Ast (input, ast)))
@@ -164,7 +119,7 @@ module Pipeline = struct
     in
     let* tokens_post_normalize = Lazy.force tokens_post_normalize in
     let* document =
-      build_doc kind cst
+      build_doc cst
       |> Comments.Insert.from_tokens ~render_comment tokens_post_normalize
     in
     let output = print_doc document in
@@ -172,28 +127,26 @@ module Pipeline = struct
     Ok output
   ;;
 
-  type guessed_input = Guess : ('a, _) input_kind * 'a -> guessed_input
-
-  let try_parse source =
+  let try_parse source : Cst.t option =
     let try_parse src parse =
       let lb = Lexing.from_string src in
       try Some (parse lb) with
       | _ -> None
     in
     match try_parse source Parse.implementation with
-    | Some str -> Some (Guess (Impl, str))
+    | Some str -> Some (Structure str)
     | None ->
-      Option.map (fun sg -> Guess (Intf, sg)) (try_parse source Parse.interface)
+      Option.map (fun sg -> Cst.Signature sg) (try_parse source Parse.interface)
   ;;
 
   let for_codeblock source =
     match try_parse source with
     | None -> None
-    | Some Guess (kind, cst) ->
-      match tokens_of_tree kind cst with
+    | Some cst ->
+      match tokens_of_tree cst with
       | Error _ -> None
       | Ok tokens ->
-        let doc = build_doc kind cst in
+        let doc = build_doc cst in
         match Comments.Insert.from_tokens ~render_comment tokens doc with
         | Error _ -> None
         | Ok doc -> Some doc
@@ -223,7 +176,7 @@ module Pipeline = struct
 end
 
 let style_file kind ~fname ?(lnum = 1) ?(normalize = true) source =
-  Pipeline.run ~normalize { kind; fname; source; start_line = lnum }
+  Pipeline.run ~normalize { Source.kind; fname; source; start_line = lnum }
 ;;
 
 let split_fuzzer_line entrypoint_and_src =
@@ -242,7 +195,6 @@ let split_fuzzer_line entrypoint_and_src =
 
 let style_fuzzer_line ~lnum:start_line ~fname entrypoint_and_src =
   let intf, source = split_fuzzer_line entrypoint_and_src in
-  if intf
-  then Pipeline.run ~normalize:false { fname; start_line; source; kind = Intf }
-  else Pipeline.run ~normalize:false { fname; start_line; source; kind = Impl }
+  let kind : Source.kind = if intf then Intf else Impl in
+  Pipeline.run ~normalize:false { fname; start_line; source; kind }
 ;;

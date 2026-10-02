@@ -1,22 +1,15 @@
-type _ input_kind =
-  | Impl : Oxcaml_frontend.Parsetree.structure input_kind
-  | Intf : Oxcaml_frontend.Parsetree.signature input_kind
+open Ocaml_syntax
 
-type 'a input =
-  { fname : string
-  ; start_line : int
-  ; source : string
-  ; kind : 'a input_kind
-  }
-
-(** Check that two strings parse to the same AST (modulo locations) *)
+(** An AST as produced by the upstream OxCaml parser. *)
+type ast
 
 val parse
-  :  'ast input
-  -> ( 'ast
+  :  Source.t
+  -> ( ast
      , [> `Input_parse_error of
           Errors.parser * Lexing.position * Lexing.position * exn
        ] )
        result
 
-val check_same_ast : 'cst -> 'cst input -> (unit, [> Errors.t ]) result
+(** Check that the output reparses to the same AST, modulo locations. *)
+val check_same_ast : ast -> Source.t -> (unit, [> Errors.t ]) result
