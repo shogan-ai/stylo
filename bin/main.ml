@@ -124,10 +124,12 @@ module Arg = struct
   ;;
 end
 
+let checker : (module Stylo.Checker) = (module Oxcaml_checker)
+
 let do_style is_mli fname ?normalize ?lnum source =
   if is_mli
-  then Stylo.style_file Intf ~fname ?normalize ?lnum source
-  else Stylo.style_file Impl ~fname ?normalize ?lnum source
+  then Stylo.style_file ~checker Intf ~fname ?normalize ?lnum source
+  else Stylo.style_file ~checker Impl ~fname ?normalize ?lnum source
 ;;
 
 let fuzzer_batch ~quiet ~idempotence_check ~failures_dir fn =
@@ -179,7 +181,9 @@ let fuzzer_batch ~quiet ~idempotence_check ~failures_dir fn =
           lnum
           entrypoint_and_src
       in
-      match Stylo.style_fuzzer_line ~fname:fn ~lnum entrypoint_and_src with
+      match
+        Stylo.style_fuzzer_line ~checker ~fname:fn ~lnum entrypoint_and_src
+      with
       | Ok fst_round ->
         if idempotence_check
         then (

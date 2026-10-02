@@ -1,4 +1,9 @@
+(** A checker for stylo's pipeline, built on the upstream OxCaml frontend.
+
+    Satisfies [Stylo.Checker]. *)
+
 open Ocaml_syntax
+open Ast_checker
 
 (** An AST as produced by the upstream OxCaml parser. *)
 type ast

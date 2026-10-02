@@ -1,4 +1,5 @@
 open Oxcaml_frontend
+open Ast_checker
 open Parsetree
 
 let sort_attributes : attributes -> attributes = List.sort compare
@@ -143,11 +144,19 @@ let clean ~erase_jane_syntax = function
   | Signature sg -> Signature ((cleaner erase_jane_syntax)#signature () sg)
 ;;
 
-let input_wrap startp endp exn =
-  `Input_parse_error (Errors.Oxcaml's, startp, endp, exn)
+let report_parse_error ppf exn =
+  match Location.error_of_exn exn with
+  | Some `Already_displayed -> ()
+  | Some (`Ok report) -> Format.fprintf ppf "%a" Location.print_report report
+  | None -> Format.fprintf ppf "%s" (Printexc.to_string exn)
 ;;
 
-let output_wrap _ _ exn = `Output_parse_error (Errors.Oxcaml's, exn)
+let parser : Errors.parser =
+  Reference { name = "upstream"; report_exn = report_parse_error }
+;;
+
+let input_wrap startp endp exn = `Input_parse_error (parser, startp, endp, exn)
+let output_wrap _ _ exn = `Output_parse_error (parser, exn)
 let ( let* ) = Result.bind
 
 type ast_source =
@@ -194,7 +203,7 @@ let check_same_ast input_ast (output : Ocaml_syntax.Source.t) =
   else (
     dump_ast output ~src:Input input_ast;
     dump_ast output ~src:Stylo output_ast;
-    Error (`Ast_changed (Errors.Oxcaml's, output.fname)))
+    Error (`Ast_changed (parser, output.fname)))
 ;;
 
 let parse i = parse i input_wrap

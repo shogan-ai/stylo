@@ -1,0 +1,8 @@
+(library
+ (name oxcaml_checker)
+ (libraries
+  config
+  ocaml_syntax
+  oxcaml_frontend
+  ast_checker
+  traversals_helpers))

@@ -1,20 +1,18 @@
+
+(** The parser which reported the error: either stylo's own, or the one of the
+    reference checker passed to the pipeline. *)
 type parser =
   | Stylo's
-  | Oxcaml's
+  | Reference of
+      { name : string (** used in error messages, e.g. "upstream" *)
+      ; report_exn : Format.formatter -> exn -> unit
+      }
 
 type t =
   [ | `Input_parse_error of parser * Lexing.position * Lexing.position * exn
   | `Output_parse_error of parser * exn
   | `Ast_changed of parser * string
   ]
-
-let report_parse_error ppf exn =
-  let module Loc = Oxcaml_frontend.Location in
-  match Loc.error_of_exn exn with
-  | Some `Already_displayed -> ()
-  | Some `Ok report -> Format.fprintf ppf "%a" Loc.print_report report
-  | None -> Format.fprintf ppf "%s" (Printexc.to_string exn)
-;;
 
 let gnu_position startp endp =
   let column pos =
@@ -68,19 +66,22 @@ let pp_error ppf fname : t -> _ = function
       ppf
       "%s: %cst changed@."
       fname
-      (if parser = Stylo's then 'c' else 'a')
+      (match parser with
+       | Stylo's -> 'c'
+       | Reference _ -> 'a')
   | `Input_parse_error (Stylo's, startp, endp, exn) ->
     Format.fprintf
       ppf
       "%s: @[<v>Input doesn't parse:@;%s@]@."
       (gnu_position startp endp)
       (Printexc.to_string exn)
-  | `Input_parse_error (Oxcaml's, startp, endp, exn) ->
+  | `Input_parse_error (Reference { name; report_exn }, startp, endp, exn) ->
     Format.fprintf
       ppf
-      "%s: @[<v>Input doesn't parse with upstream's parser:@;@[<hov 2>%a@]@]@."
+      "%s: @[<v>Input doesn't parse with %s's parser:@;@[<hov 2>%a@]@]@."
       (gnu_position startp endp)
-      report_parse_error
+      name
+      report_exn
       exn
   | `Output_parse_error (Stylo's, exn) ->
     Format.fprintf
@@ -88,12 +89,13 @@ let pp_error ppf fname : t -> _ = function
       "%s: @[<v>Output doesn't reparse:@;%s@]@."
       fname
       (Printexc.to_string exn)
-  | `Output_parse_error (Oxcaml's, exn) ->
+  | `Output_parse_error (Reference { name; report_exn }, exn) ->
     Format.fprintf
       ppf
-      "%s: @[<v>Error while parsing the output with upstream's parser:@;@[<hov \
+      "%s: @[<v>Error while parsing the output with %s's parser:@;@[<hov \
        2>%a@]@]@."
       fname
-      report_parse_error
+      name
+      report_exn
       exn
 ;;

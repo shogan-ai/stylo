@@ -4,22 +4,49 @@ let ( let* ) = Result.bind
 
 module Debug = Ast_checker.Debug
 
+module type Checker = sig
+  type ast
+
+  val parse
+    :  Source.t
+    -> ( ast
+       , [> `Input_parse_error of
+            Ast_checker.Errors.parser * Lexing.position * Lexing.position * exn
+         ] )
+         result
+
+  val check_same_ast
+    :  ast
+    -> Source.t
+    -> (unit, [> Ast_checker.Errors.t ]) result
+end
+
 module Check = struct
   open Ast_checker
 
-  type checker_input =
-    | Ast of Source.t * Oxcaml_checker.ast
-    | Cst of Source.t * Cst.t
+  (* The check to run on the output, partially applied to the input. *)
+  type checker_input = output:string -> (unit, Errors.t) result
 
-  let same_ast checker_input output =
+  let reference
+    (type ast)
+    (module C : Checker with type ast = ast)
+    input
+    (ast : ast)
+    : checker_input
+    =
+    fun ~output -> C.check_same_ast ast { input with source = output }
+  ;;
+
+  let cst input cst : checker_input =
+    fun ~output -> Cst_checker.check_same_ast cst { input with source = output }
+  ;;
+
+  let same_ast (checker_input : checker_input) output =
     if not !Config.check_same_ast
     then Ok ()
-    else (
-      match checker_input with
-      | Ast (input, input_ast) ->
-        Oxcaml_checker.check_same_ast input_ast { input with source = output }
-      | Cst (input, input_cst) ->
-        Cst_checker.check_same_ast input_cst { input with source = output })
+    else
+      checker_input ~output
+      |> Result.map_error (fun e -> (e : Errors.t :> [> Errors.t ]))
   ;;
 
   open Tokenisation_check
@@ -88,21 +115,22 @@ module Pipeline = struct
 
   let print_doc doc = Document.Print.to_string ~width:!Config.width doc
 
-  let run ?normalize:(run_normalize = true) input =
+  let run ?normalize:(run_normalize = true) ~checker input =
+    let (module C : Checker) = checker in
     let* cst = parse input in
     let tokens_pre_normalize = lazy (tokens_of_tree cst) in
     let* () = Debug.dump_tokens input.fname ~src:Parser tokens_pre_normalize in
     let* () = Check.retokenisation tokens_pre_normalize in
     let* cst, tokens_post_normalize, ast_for_checker =
       if not run_normalize
-      then Ok (cst, tokens_pre_normalize, Check.Cst (input, cst))
+      then Ok (cst, tokens_pre_normalize, Check.cst input cst)
       else (
         (* we normalize only if the source parses with the upstream parser *)
-        match Ast_checker.Oxcaml_checker.parse input with
+        match C.parse input with
         | Error e ->
           if !Config.check_same_ast
           then Error e (* might as well fail early *)
-          else Ok (cst, tokens_pre_normalize, Check.Cst (input, cst))
+          else Ok (cst, tokens_pre_normalize, Check.cst input cst)
         | Ok ast ->
           let normalized = normalize cst in
           let tokens =
@@ -110,7 +138,7 @@ module Pipeline = struct
             Lazy.from_val (tokens_of_tree normalized)
           in
           let* () = Debug.dump_tokens input.fname ~src:Normalization tokens in
-          Ok (normalized, tokens, Check.Ast (input, ast)))
+          Ok (normalized, tokens, Check.reference (module C) input ast))
     in
     let* () =
       Check.normalization_kept_comments
@@ -175,8 +203,11 @@ module Pipeline = struct
   ;;
 end
 
-let style_file kind ~fname ?(lnum = 1) ?(normalize = true) source =
-  Pipeline.run ~normalize { Source.kind; fname; source; start_line = lnum }
+let style_file ~checker kind ~fname ?(lnum = 1) ?(normalize = true) source =
+  Pipeline.run
+    ~normalize
+    ~checker
+    { Source.kind; fname; source; start_line = lnum }
 ;;
 
 let split_fuzzer_line entrypoint_and_src =
@@ -193,8 +224,8 @@ let split_fuzzer_line entrypoint_and_src =
   intf, src
 ;;
 
-let style_fuzzer_line ~lnum:start_line ~fname entrypoint_and_src =
+let style_fuzzer_line ~checker ~lnum:start_line ~fname entrypoint_and_src =
   let intf, source = split_fuzzer_line entrypoint_and_src in
   let kind : Source.kind = if intf then Intf else Impl in
-  Pipeline.run ~normalize:false { fname; start_line; source; kind }
+  Pipeline.run ~normalize:false ~checker { fname; start_line; source; kind }
 ;;
