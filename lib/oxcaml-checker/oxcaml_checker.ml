@@ -116,11 +116,18 @@ let cleaner erase =
   end
 ;;
 
+type options =
+  { syntax_quotations : bool
+  ; erase_jane_syntax : bool
+  ; debug : bool
+  }
+
 type ast =
   | Structure of Parsetree.structure
   | Signature of Parsetree.signature
 
-let parse (input : Ocaml_syntax.Source.t) wrap_exn : (ast, _) result =
+let parse options (input : Ocaml_syntax.Source.t) wrap_exn : (ast, _) result =
+  Oxcaml_frontend.Config.syntax_quotations := options.syntax_quotations;
   let pos =
     { Lexing.pos_fname = input.fname
     ; pos_lnum = input.start_line
@@ -163,7 +170,7 @@ type ast_source =
   | Input
   | Stylo
 
-let dump_ast (input : Ocaml_syntax.Source.t) ~src ast =
+let dump_ast options (input : Ocaml_syntax.Source.t) ~src ast =
   let fname =
     input.fname
     ^
@@ -172,6 +179,7 @@ let dump_ast (input : Ocaml_syntax.Source.t) ~src ast =
     | Stylo -> ".output-tree"
   in
   Debug.dump_to_file
+    ~enabled:options.debug
     ~or_:()
     fname
     Oxcaml_frontend.Printast.(
@@ -181,29 +189,29 @@ let dump_ast (input : Ocaml_syntax.Source.t) ~src ast =
         | Signature sg -> interface ppf sg)
 ;;
 
-let dump_out (output : Ocaml_syntax.Source.t) =
-  Debug.dump_to_file output.fname (fun ppf ->
+let dump_out options (output : Ocaml_syntax.Source.t) =
+  Debug.dump_to_file ~enabled:options.debug output.fname (fun ppf ->
     Format.pp_print_string ppf output.source)
 ;;
 
-let check_same_ast input_ast (output : Ocaml_syntax.Source.t) =
+let check_same_ast options input_ast (output : Ocaml_syntax.Source.t) =
   let input_ast =
-    clean ~erase_jane_syntax:!Config.erase_jane_syntax input_ast
+    clean ~erase_jane_syntax:options.erase_jane_syntax input_ast
   in
   let* output_ast =
     let output = { output with fname = output.fname ^ ".out" } in
-    parse output output_wrap
+    parse options output output_wrap
     |> Result.map_error (fun err ->
-      dump_out ~or_:() output;
+      dump_out options ~or_:() output;
       err)
   in
   let output_ast = clean ~erase_jane_syntax:false output_ast in
   if input_ast = output_ast
   then Ok ()
   else (
-    dump_ast output ~src:Input input_ast;
-    dump_ast output ~src:Stylo output_ast;
+    dump_ast options output ~src:Input input_ast;
+    dump_ast options output ~src:Stylo output_ast;
     Error (`Ast_changed (parser, output.fname)))
 ;;
 
-let parse i = parse i input_wrap
+let parse options i = parse options i input_wrap

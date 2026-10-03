@@ -1,4 +1,12 @@
 open Ocaml_syntax.Parsetree
 
-val structure : structure -> structure
-val signature : signature -> signature
+module Options : sig
+  type t =
+    { erase_jane_syntax : bool (** erase OxCaml extensions *)
+    ; insert_parentheses : bool (** parenthesize all expressions *)
+    ; remove_parentheses : bool (** remove unnecessary parentheses *)
+    }
+end
+
+val structure : Options.t -> structure -> structure
+val signature : Options.t -> signature -> signature

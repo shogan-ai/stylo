@@ -29,9 +29,9 @@ LIB_REL=lib/parsing
 # TRACKED: upstream files vendored in this directory, as paths relative to the
 # oxcaml repository root; the basename is the filename used here.  Files of
 # this directory NOT in this list are local and never touched by this script:
-# the shims clflags.ml, misc.ml and pprintast.ml (hand-trimmed stand-ins that
-# carry just enough for the library to build), plus dune, README.md,
-# upstream-commit.txt and the generated ast_mapper.ml.
+# the shims clflags.ml, config.ml, misc.ml and pprintast.ml (hand-trimmed
+# stand-ins that carry just enough for the library to build), plus dune,
+# README.md, upstream-commit.txt and the generated ast_mapper.ml.
 TRACKED=(
   parsing/ast_helper.ml
   parsing/ast_helper.mli

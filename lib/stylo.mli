@@ -12,10 +12,12 @@ open Ocaml_syntax
     to comparing its own CSTs (cf. {!Cst_checker}). Errors are tagged with an
     [Ast_checker.Errors.Reference] parser. *)
 module type Checker = sig
+  type options
   type ast
 
   val parse
-    :  Source.t
+    :  options
+    -> Source.t
     -> ( ast
        , [> `Input_parse_error of
             Ast_checker.Errors.parser * Lexing.position * Lexing.position * exn
@@ -23,7 +25,8 @@ module type Checker = sig
          result
 
   val check_same_ast
-    :  ast
+    :  options
+    -> ast
     -> Source.t
     -> (unit, [> Ast_checker.Errors.t ]) result
 end
@@ -31,19 +34,40 @@ end
 module Check : sig
   open Ast_checker
 
+  (** Which checks to run. *)
+  module Options : sig
+    type t =
+      { same_ast : bool
+           (** the output parses back to the same tree as the input *)
+      ; retokenisation : bool
+           (** the tokens retrieved from the CST are in the same order as in the
+               source *)
+      ; normalization_kept_comments : bool
+           (** normalisation didn't drop any comment *)
+      }
+
+    val none : t
+  end
+
   (** What the output is checked against, decided by {!Make.run}. *)
   type checker_input
 
-  val same_ast : checker_input -> string -> (unit, [> Errors.t ]) result
+  val same_ast
+    :  Options.t
+    -> checker_input
+    -> string
+    -> (unit, [> Errors.t ]) result
 
   open Tokenisation_check
 
   val retokenisation
-    :  (Tokens.seq, 'a) result lazy_t
+    :  Options.t
+    -> (Tokens.seq, 'a) result lazy_t
     -> (unit, [> Ordering.error ] as 'a) result
 
   val normalization_kept_comments
-    :  (Tokens.seq, 'a) result lazy_t
+    :  Options.t
+    -> (Tokens.seq, 'a) result lazy_t
     -> (Tokens.seq, 'a) result lazy_t
     -> (unit, [> Comments_comparison.error ] as 'a) result
 
@@ -104,12 +128,14 @@ end
 module Without_normalization (S : Style) : Style with type options = S.options
 
 (** Uses stylo's own parser as the reference. *)
-module Cst_checker : Checker with type ast = Cst.t
+module Cst_checker :
+  Checker with type options = Parse.Options.t and type ast = Cst.t
 
 (** The style-independent stages of the pipeline. *)
 module Pipeline : sig
   val parse
-    :  Source.t
+    :  Parse.Options.t
+    -> Source.t
     -> ( Cst.t
        , [> `Input_parse_error of
             Ast_checker.Errors.parser * Lexing.position * Lexing.position * exn
@@ -117,7 +143,7 @@ module Pipeline : sig
          result
 
   val tokens_of_tree : Cst.t -> (Tokens.seq, [> Tokens_of_tree.Error.t ]) result
-  val print_doc : Document.t -> string
+  val print_doc : width:int -> Document.t -> string
 
   type error =
     [ | Tokens_of_tree.Error.t
@@ -128,6 +154,17 @@ module Pipeline : sig
   val pp_error : Format.formatter -> string -> error -> unit
 end
 
-module Make (S : Style) (_ : Checker) : sig
-  val run : S.options -> Source.t -> (string, Pipeline.error) result
+module Make (S : Style) (C : Checker) : sig
+  type options =
+    { width : int
+    ; parse : Parse.Options.t
+    ; checks : Check.Options.t
+    ; debug : bool
+         (** dump the token streams of the input (and after normalisation) next
+             to the input file *)
+    ; style : S.options
+    ; checker : C.options
+    }
+
+  val run : options -> Source.t -> (string, Pipeline.error) result
 end

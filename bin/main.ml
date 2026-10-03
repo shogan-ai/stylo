@@ -86,7 +86,7 @@ module Arg = struct
     info ~doc [ "debug" ] |> flag |> value
   ;;
 
-  let erase_jst_syntax =
+  let erase_jane_syntax =
     info [ "erase-jane-syntax" ] ~doc:"Erase OxCaml extensions from the output"
     |> flag
     |> value
@@ -128,11 +128,11 @@ end
 module Janestreet_style = struct
   open Ocaml_syntax
 
-  type options = unit
+  type options = { normalize : Normalize.Options.t }
 
-  let normalize () : Cst.t -> Cst.t = function
-    | Structure str -> Structure (Normalize.structure str)
-    | Signature sg -> Signature (Normalize.signature sg)
+  let normalize options : Cst.t -> Cst.t = function
+    | Structure str -> Structure (Normalize.structure options.normalize str)
+    | Signature sg -> Signature (Normalize.signature options.normalize sg)
   ;;
 
   (* The printer reaches code blocks from deep within docstrings: rather than
@@ -142,14 +142,14 @@ module Janestreet_style = struct
     Print.Doc.Odoc.process_ocaml_block := format_code_block
   ;;
 
-  let build_doc () ~format_code_block : Cst.t -> Document.t =
+  let build_doc _ ~format_code_block : Cst.t -> Document.t =
     set_code_block_hook format_code_block;
     function
     | Structure str -> Print.Structure.pp_implementation str
     | Signature sg -> Print.Signature.pp_interface sg
   ;;
 
-  let render_comment () ~format_code_block =
+  let render_comment _ ~format_code_block =
     set_code_block_hook format_code_block;
     Print.Doc.as_odoc_markup_if_no_warnings
       ~id:(-1) (* regular comments / unattached docstrings do not have ids *)
@@ -167,9 +167,9 @@ module Plain_formatter =
     (Stylo.Without_normalization (Janestreet_style))
     (Stylo.Cst_checker)
 
-let do_style run is_mli fname ?(lnum = 1) source =
+let do_style run options is_mli fname ?(lnum = 1) source =
   let kind : Ocaml_syntax.Source.kind = if is_mli then Intf else Impl in
-  (run () { Ocaml_syntax.Source.kind; fname; source; start_line = lnum }
+  (run options { Ocaml_syntax.Source.kind; fname; source; start_line = lnum }
    : (string, Stylo.Pipeline.error) result
    :> (string, [> Stylo.Pipeline.error ]) result)
 ;;
@@ -188,7 +188,7 @@ let split_fuzzer_line entrypoint_and_src =
   intf, src
 ;;
 
-let fuzzer_batch ~quiet ~idempotence_check ~failures_dir fn =
+let fuzzer_batch ~options ~quiet ~idempotence_check ~failures_dir fn =
   let has_errors = ref false in
   let parse_errors = ref 0 in
   let entries_checked = ref 0 in
@@ -238,11 +238,13 @@ let fuzzer_batch ~quiet ~idempotence_check ~failures_dir fn =
           entrypoint_and_src
       in
       let intf, source = split_fuzzer_line entrypoint_and_src in
-      match do_style Plain_formatter.run intf fn ~lnum source with
+      match do_style Plain_formatter.run options intf fn ~lnum source with
       | Ok fst_round ->
         if idempotence_check
         then (
-          match do_style Plain_formatter.run intf fn ~lnum fst_round with
+          match
+            do_style Plain_formatter.run options intf fn ~lnum fst_round
+          with
           | Ok snd_round when fst_round = snd_round -> ()
           | _ -> save_failure entrypoint_and_src);
         loop_entries next_lnum ic
@@ -306,14 +308,14 @@ type file_kind =
   | Regular
   | Stdin
 
-let style_input check_idempotence fkind fname =
+let style_input ~options check_idempotence fkind fname =
   let is_mli = Filename.check_suffix fname ".mli" in
   let source =
     match fkind with
     | Regular -> In_channel.(with_open_text fname input_all)
     | Stdin -> In_channel.input_all stdin
   in
-  let result = do_style Formatter.run is_mli fname source in
+  let result = do_style Formatter.run options is_mli fname source in
   if not check_idempotence
   then result
   else
@@ -322,15 +324,15 @@ let style_input check_idempotence fkind fname =
     if fst_round = source
     then (* input might already have been formatted *) result
     else (* general case, we styled the input, next round ought to be a noop *)
-      let* snd_round = do_style Formatter.run is_mli fname fst_round in
+      let* snd_round = do_style Formatter.run options is_mli fname fst_round in
       if fst_round = snd_round then result else Error `Not_idempotent
 ;;
 
-let style_files check_idempotence inplace fns =
+let style_files ~options check_idempotence inplace fns =
   let has_error = ref false in
   List.iter
     (fun (fkind, fn) ->
-      match style_input check_idempotence fkind fn with
+      match style_input ~options check_idempotence fkind fn with
       | exception exn ->
         let bt = Printexc.get_backtrace () in
         Format.eprintf "%s: %s" fn (Printexc.to_string exn);
@@ -366,12 +368,27 @@ let fuzz_cmd =
   and+ idempotence_check
   and+ failures_dir = failures_dir
   and+ quotations = syntax_quotations in
-  Config.(
-    check_same_ast := true;
-    check_retokenisation := true;
-    syntax_quotations := quotations;
-  );
-  fuzzer_batch ~quiet ~idempotence_check ~failures_dir fn
+  let parse = { Ocaml_syntax.Parse.Options.syntax_quotations = quotations } in
+  let options =
+    { Plain_formatter.width = 80
+    ; parse
+    ; checks =
+        { same_ast = true
+        ; retokenisation = true
+        ; normalization_kept_comments = false
+        }
+    ; debug = false
+    ; style =
+        { normalize =
+            { erase_jane_syntax = false
+            ; insert_parentheses = false
+            ; remove_parentheses = false
+            }
+        }
+    ; checker = parse
+    }
+  in
+  fuzzer_batch ~options ~quiet ~idempotence_check ~failures_dir fn
 ;;
 
 let style_cmd =
@@ -385,25 +402,27 @@ let style_cmd =
   and+ idempotence_check
   and+ tokens_checks
   and+ debug
-  and+ erase_jst_syntax
+  and+ erase_jane_syntax
   and+ remove_parentheses
   and+ insert_parentheses
-  and+ quotations = Arg.syntax_quotations
+  and+ syntax_quotations
   and+ w = width in
-  Config.(
-    width := w;
-    check_same_ast := ast_check;
-    dbg_dump := debug;
-    erase_jane_syntax := erase_jst_syntax;
-    parentheses_insert := insert_parentheses;
-    parentheses_remove := remove_parentheses;
-    syntax_quotations := quotations;
-    if tokens_checks
-    then (
-      check_retokenisation := true;
-      check_normalization_kept_comments := true;
-      );
-  );
+  let options =
+    { Formatter.width = w
+    ; parse = { syntax_quotations }
+    ; checks =
+        { same_ast = ast_check
+        ; retokenisation = tokens_checks
+        ; normalization_kept_comments = tokens_checks
+        }
+    ; debug
+    ; style =
+        { normalize =
+            { erase_jane_syntax; insert_parentheses; remove_parentheses }
+        }
+    ; checker = { syntax_quotations; erase_jane_syntax; debug }
+    }
+  in
   let files = List.map (fun fn -> Regular, fn) files in
   match stdin, inplace with
   | Some _, true ->
@@ -412,8 +431,9 @@ let style_cmd =
       stdin_arg_name
       inplace_arg_name;
     Cmd.Exit.cli_error
-  | None, _ -> style_files idempotence_check inplace files
-  | Some fn, _ -> style_files idempotence_check inplace @@ (Stdin, fn) :: files
+  | None, _ -> style_files ~options idempotence_check inplace files
+  | Some fn, _ ->
+    style_files ~options idempotence_check inplace @@ (Stdin, fn) :: files
 ;;
 
 let main () = Cmd.group (Cmd.info "stylo") [ fuzz_cmd; style_cmd ] |> Cmd.eval'

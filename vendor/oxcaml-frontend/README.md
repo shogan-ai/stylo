@@ -10,9 +10,10 @@ from.
 
 Most files here track their upstream counterparts (from oxcaml's `parsing/` and
 `utils/` directories), possibly with small local edits needed to build
-standalone. Three files are hand-maintained shims, not upstream copies:
-`clflags.ml`, `misc.ml` and `pprintast.ml` are fake or heavily trimmed stand-ins
-carrying just enough definitions for the library to build.
+standalone. Four files are hand-maintained shims, not upstream copies:
+`clflags.ml`, `config.ml`, `misc.ml` and `pprintast.ml` are fake or heavily
+trimmed stand-ins carrying just enough definitions for the library to build.
+(`config.ml`'s refs are set by stylo's `Oxcaml_checker`, from its options.)
 
 ## Upgrading
 

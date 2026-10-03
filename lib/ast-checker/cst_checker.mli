@@ -6,10 +6,12 @@
 
 open Ocaml_syntax
 
+type options = Parse.Options.t
 type ast = Cst.t
 
 val parse
-  :  Source.t
+  :  options
+  -> Source.t
   -> ( ast
      , [> `Input_parse_error of
           Errors.parser * Lexing.position * Lexing.position * exn
@@ -17,4 +19,4 @@ val parse
        result
 
 (** Check that the output reparses to the same CST, modulo locations. *)
-val check_same_ast : ast -> Source.t -> (unit, [> Errors.t ]) result
+val check_same_ast : options -> ast -> Source.t -> (unit, [> Errors.t ]) result

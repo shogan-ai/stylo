@@ -48,9 +48,10 @@ let cleaner =
    -> self#visit_pattern env (Pat.or_ ~loc:loc1 ~attrs:attrs1 (Pat.or_ ~loc:loc2
    ~attrs:attrs2 pat1 pat2) pat3) | _ -> super#visit_pattern env pat *)
 
+type options = Parse.Options.t
 type ast = Cst.t
 
-let parse (input : Source.t) wrap_exn : (ast, _) result =
+let parse options (input : Source.t) wrap_exn : (ast, _) result =
   let pos =
     { Lexing.pos_fname = input.fname
     ; pos_lnum = input.start_line
@@ -63,8 +64,8 @@ let parse (input : Source.t) wrap_exn : (ast, _) result =
   try
     Ok
       (match input.kind with
-       | Impl -> Structure (Parse.implementation lb)
-       | Intf -> Signature (Parse.interface lb))
+       | Impl -> Structure (Parse.implementation options lb)
+       | Intf -> Signature (Parse.interface options lb))
   with
   | exn -> Error (wrap_exn lb.lex_start_p lb.lex_curr_p exn)
 ;;
@@ -81,14 +82,14 @@ let input_wrap startp endp exn =
 let output_wrap _ _ exn = `Output_parse_error (Errors.Stylo's, exn)
 let ( let* ) = Result.bind
 
-let check_same_ast input_cst (output : Source.t) =
+let check_same_ast options input_cst (output : Source.t) =
   let input_cst = clean input_cst in
   let output = { output with fname = output.fname ^ ".out" } in
-  let* output_cst = parse output output_wrap in
+  let* output_cst = parse options output output_wrap in
   let output_cst = clean output_cst in
   if input_cst = output_cst
   then Ok ()
   else Error (`Ast_changed (Errors.Stylo's, output.fname))
 ;;
 
-let parse i = parse i input_wrap
+let parse options i = parse options i input_wrap

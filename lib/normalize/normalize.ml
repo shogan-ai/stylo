@@ -253,18 +253,26 @@ class eraser =
 let style_normalizer = new style_normalizer
 let eraser = new eraser
 
-let normalizer () =
-  let base = if !Config.erase_jane_syntax then eraser else style_normalizer in
+module Options = struct
+  type t =
+    { erase_jane_syntax : bool
+    ; insert_parentheses : bool
+    ; remove_parentheses : bool
+    }
+end
+
+let normalizer (options : Options.t) =
+  let base = if options.erase_jane_syntax then eraser else style_normalizer in
   object
     method structure ctx str =
       let str = base#structure ctx str in
       let str =
-        if !Config.parentheses_insert
+        if options.insert_parentheses
         then Parentheses.inserter#structure () str
         else str
       in
       let str =
-        if !Config.parentheses_remove
+        if options.remove_parentheses
         then Parentheses.remover#structure () str
         else str
       in
@@ -273,12 +281,12 @@ let normalizer () =
     method signature ctx sg =
       let sg = base#signature ctx sg in
       let sg =
-        if !Config.parentheses_insert
+        if options.insert_parentheses
         then Parentheses.inserter#signature () sg
         else sg
       in
       let sg =
-        if !Config.parentheses_remove
+        if options.remove_parentheses
         then Parentheses.remover#signature () sg
         else sg
       in
@@ -286,5 +294,5 @@ let normalizer () =
   end
 ;;
 
-let structure s = (normalizer ())#structure Other s
-let signature s = (normalizer ())#signature Other s
+let structure options s = (normalizer options)#structure Other s
+let signature options s = (normalizer options)#signature Other s

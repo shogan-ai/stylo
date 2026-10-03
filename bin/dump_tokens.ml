@@ -134,6 +134,7 @@ end
 let run start stop source =
   match
     Stylo.Pipeline.parse
+      Ocaml_syntax.Parse.Options.default
       { kind = Impl; fname = "buffer"; source; start_line = 0 }
   with
   | Ok (Signature _) -> assert false

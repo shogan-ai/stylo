@@ -2,8 +2,8 @@ type tokens_source =
   | Parser
   | Normalization
 
-let dump_to_file fname ~or_ to_ppf =
-  if not !Config.dbg_dump
+let dump_to_file ~enabled fname ~or_ to_ppf =
+  if not enabled
   then or_
   else (
     Out_channel.with_open_text fname
@@ -14,7 +14,7 @@ let dump_to_file fname ~or_ to_ppf =
     res)
 ;;
 
-let dump_tokens input_name ~src tokens_lazy =
+let dump_tokens ~enabled input_name ~src tokens_lazy =
   let fname =
     input_name
     ^
@@ -22,6 +22,6 @@ let dump_tokens input_name ~src tokens_lazy =
     | Parser -> ".parser-tokens"
     | Normalization -> ".normalized-tokens"
   in
-  dump_to_file fname ~or_:(Ok ()) (fun ppf ->
+  dump_to_file ~enabled fname ~or_:(Ok ()) (fun ppf ->
     Lazy.force tokens_lazy |> Result.map (Ocaml_syntax.Tokens.dump ppf))
 ;;
