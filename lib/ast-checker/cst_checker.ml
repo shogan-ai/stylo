@@ -48,7 +48,9 @@ let cleaner =
    -> self#visit_pattern env (Pat.or_ ~loc:loc1 ~attrs:attrs1 (Pat.or_ ~loc:loc2
    ~attrs:attrs2 pat1 pat2) pat3) | _ -> super#visit_pattern env pat *)
 
-let parse (input : Source.t) wrap_exn : (Cst.t, _) result =
+type ast = Cst.t
+
+let parse (input : Source.t) wrap_exn : (ast, _) result =
   let pos =
     { Lexing.pos_fname = input.fname
     ; pos_lnum = input.start_line
@@ -64,7 +66,7 @@ let parse (input : Source.t) wrap_exn : (Cst.t, _) result =
        | Impl -> Structure (Parse.implementation lb)
        | Intf -> Signature (Parse.interface lb))
   with
-  | exn -> Error (wrap_exn exn)
+  | exn -> Error (wrap_exn lb.lex_start_p lb.lex_curr_p exn)
 ;;
 
 let clean : Cst.t -> Cst.t = function
@@ -72,7 +74,11 @@ let clean : Cst.t -> Cst.t = function
   | Signature sg -> Signature (cleaner#signature () sg)
 ;;
 
-let output_wrap exn = `Output_parse_error (Errors.Stylo's, exn)
+let input_wrap startp endp exn =
+  `Input_parse_error (Errors.Stylo's, startp, endp, exn)
+;;
+
+let output_wrap _ _ exn = `Output_parse_error (Errors.Stylo's, exn)
 let ( let* ) = Result.bind
 
 let check_same_ast input_cst (output : Source.t) =
@@ -84,3 +90,5 @@ let check_same_ast input_cst (output : Source.t) =
   then Ok ()
   else Error (`Ast_changed (Errors.Stylo's, output.fname))
 ;;
+
+let parse i = parse i input_wrap

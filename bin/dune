@@ -6,6 +6,9 @@
   cmdliner
   config
   stylo
+  normalize
+  print
+  document
   oxcaml_checker
   ocaml_syntax
   dbg_print

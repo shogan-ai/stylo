@@ -124,12 +124,68 @@ module Arg = struct
   ;;
 end
 
-let checker : (module Stylo.Checker) = (module Oxcaml_checker)
+(* A style aiming to match ocamlformat's "janestreet" profile. *)
+module Janestreet_style = struct
+  open Ocaml_syntax
 
-let do_style is_mli fname ?normalize ?lnum source =
-  if is_mli
-  then Stylo.style_file ~checker Intf ~fname ?normalize ?lnum source
-  else Stylo.style_file ~checker Impl ~fname ?normalize ?lnum source
+  type options = unit
+
+  let normalize () : Cst.t -> Cst.t = function
+    | Structure str -> Structure (Normalize.structure str)
+    | Signature sg -> Signature (Normalize.signature sg)
+  ;;
+
+  (* The printer reaches code blocks from deep within docstrings: rather than
+     threading [format_code_block] through all of it, we keep the printer's
+     global hook, but only set it from here. *)
+  let set_code_block_hook format_code_block =
+    Print.Doc.Odoc.process_ocaml_block := format_code_block
+  ;;
+
+  let build_doc () ~format_code_block : Cst.t -> Document.t =
+    set_code_block_hook format_code_block;
+    function
+    | Structure str -> Print.Structure.pp_implementation str
+    | Signature sg -> Print.Signature.pp_interface sg
+  ;;
+
+  let render_comment () ~format_code_block =
+    set_code_block_hook format_code_block;
+    Print.Doc.as_odoc_markup_if_no_warnings
+      ~id:(-1) (* regular comments / unattached docstrings do not have ids *)
+      ~kind:`Regular_comment
+  ;;
+end
+
+module Formatter = Stylo.Make (Janestreet_style) (Oxcaml_checker)
+
+(* Used in fuzzing mode. The fuzzer generates inputs from stylo's grammar, which
+   upstream's parser might reject: so we don't normalize, and check the output
+   against stylo's own parser. *)
+module Plain_formatter =
+  Stylo.Make
+    (Stylo.Without_normalization (Janestreet_style))
+    (Stylo.Cst_checker)
+
+let do_style run is_mli fname ?(lnum = 1) source =
+  let kind : Ocaml_syntax.Source.kind = if is_mli then Intf else Impl in
+  (run () { Ocaml_syntax.Source.kind; fname; source; start_line = lnum }
+   : (string, Stylo.Pipeline.error) result
+   :> (string, [> Stylo.Pipeline.error ]) result)
+;;
+
+let split_fuzzer_line entrypoint_and_src =
+  let intf = String.starts_with ~prefix:"interface:" entrypoint_and_src in
+  let src =
+    let prefix_len =
+      String.length (if intf then "interface:" else "implementation:")
+    in
+    String.sub
+      entrypoint_and_src
+      prefix_len
+      (String.length entrypoint_and_src - prefix_len)
+  in
+  intf, src
 ;;
 
 let fuzzer_batch ~quiet ~idempotence_check ~failures_dir fn =
@@ -154,7 +210,7 @@ let fuzzer_batch ~quiet ~idempotence_check ~failures_dir fn =
     incr failure_count;
     (try Unix.mkdir failures_dir 0o750 with
      | Unix.Unix_error (Unix.EEXIST, _, _) -> ());
-    let intf, source = Stylo.split_fuzzer_line entrypoint_and_src in
+    let intf, source = split_fuzzer_line entrypoint_and_src in
     let fname =
       Printf.sprintf
         "%s/%s%04d%s"
@@ -181,14 +237,12 @@ let fuzzer_batch ~quiet ~idempotence_check ~failures_dir fn =
           lnum
           entrypoint_and_src
       in
-      match
-        Stylo.style_fuzzer_line ~checker ~fname:fn ~lnum entrypoint_and_src
-      with
+      let intf, source = split_fuzzer_line entrypoint_and_src in
+      match do_style Plain_formatter.run intf fn ~lnum source with
       | Ok fst_round ->
         if idempotence_check
         then (
-          let intf, _ = Stylo.split_fuzzer_line entrypoint_and_src in
-          match do_style intf fn ~normalize:false ~lnum fst_round with
+          match do_style Plain_formatter.run intf fn ~lnum fst_round with
           | Ok snd_round when fst_round = snd_round -> ()
           | _ -> save_failure entrypoint_and_src);
         loop_entries next_lnum ic
@@ -259,7 +313,7 @@ let style_input check_idempotence fkind fname =
     | Regular -> In_channel.(with_open_text fname input_all)
     | Stdin -> In_channel.input_all stdin
   in
-  let result = do_style is_mli fname source in
+  let result = do_style Formatter.run is_mli fname source in
   if not check_idempotence
   then result
   else
@@ -268,7 +322,7 @@ let style_input check_idempotence fkind fname =
     if fst_round = source
     then (* input might already have been formatted *) result
     else (* general case, we styled the input, next round ought to be a noop *)
-      let* snd_round = do_style is_mli fname fst_round in
+      let* snd_round = do_style Formatter.run is_mli fname fst_round in
       if fst_round = snd_round then result else Error `Not_idempotent
 ;;
 

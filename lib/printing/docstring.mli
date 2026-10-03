@@ -6,11 +6,11 @@ open Ocaml_syntax
 
 module Odoc : sig
 
-  (** Filled in from stylo.ml when the pipeline is constructed. *)
+  (** Set by the style (bin/main.ml) to the pipeline's code block formatter. *)
   val process_ocaml_block : (string -> Document.t option) ref
 end
 
-(** Used by the pipeline (stylo.ml) to render regular comments during comment
+(** Used by the style (bin/main.ml) to render regular comments during comment
     insertion. *)
 val as_odoc_markup_if_no_warnings
   :  id:int
