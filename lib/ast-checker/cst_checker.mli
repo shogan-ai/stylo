@@ -12,11 +12,7 @@ type ast = Cst.t
 val parse
   :  options
   -> Source.t
-  -> ( ast
-     , [> `Input_parse_error of
-          Errors.parser * Lexing.position * Lexing.position * exn
-       ] )
-       result
+  -> (ast, Errors.parser * Lexing.position * Lexing.position * exn) result
 
 (** Check that the output reparses to the same CST, modulo locations. *)
 val check_same_ast : options -> ast -> Source.t -> (unit, [> Errors.t ]) result

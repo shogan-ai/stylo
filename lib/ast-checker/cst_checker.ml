@@ -75,10 +75,7 @@ let clean : Cst.t -> Cst.t = function
   | Signature sg -> Signature (cleaner#signature () sg)
 ;;
 
-let input_wrap startp endp exn =
-  `Input_parse_error (Errors.Stylo's, startp, endp, exn)
-;;
-
+let input_wrap startp endp exn = Errors.Stylo's, startp, endp, exn
 let output_wrap _ _ exn = `Output_parse_error (Errors.Stylo's, exn)
 let ( let* ) = Result.bind
 

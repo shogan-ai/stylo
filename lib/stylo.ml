@@ -12,9 +12,7 @@ module type Checker = sig
     :  options
     -> Source.t
     -> ( ast
-       , [> `Input_parse_error of
-            Ast_checker.Errors.parser * Lexing.position * Lexing.position * exn
-         ] )
+       , Ast_checker.Errors.parser * Lexing.position * Lexing.position * exn )
          result
 
   val check_same_ast
@@ -41,33 +39,6 @@ module Check = struct
       }
     ;;
   end
-
-  (* The check to run on the output, partially applied to the input. *)
-  type checker_input = output:string -> (unit, Errors.t) result
-
-  let reference
-    (type options ast)
-    (module C : Checker with type options = options and type ast = ast)
-    (options : options)
-    input
-    (ast : ast)
-    : checker_input
-    =
-    fun ~output -> C.check_same_ast options ast { input with source = output }
-  ;;
-
-  let cst parse_options input cst : checker_input =
-    fun ~output ->
-    Cst_checker.check_same_ast parse_options cst { input with source = output }
-  ;;
-
-  let same_ast (options : Options.t) (checker_input : checker_input) output =
-    if not options.same_ast
-    then Ok ()
-    else
-      checker_input ~output
-      |> Result.map_error (fun e -> (e : Errors.t :> [> Errors.t ]))
-  ;;
 
   open Tokenisation_check
 
@@ -104,7 +75,7 @@ module type Style = sig
 
   val normalize : options -> Cst.t -> Cst.t
 
-  val build_doc
+  val doc_of_cst
     :  options
     -> format_code_block:(string -> Document.t option)
     -> Cst.t
@@ -202,11 +173,25 @@ module Make (S : Style) (C : Checker) = struct
       | Error _ -> None
       | Ok tokens ->
         let format_code_block = format_code_block opts in
-        let doc = S.build_doc opts.style ~format_code_block cst in
+        let doc = S.doc_of_cst opts.style ~format_code_block cst in
         let render_comment = S.render_comment opts.style ~format_code_block in
         match Comments.Insert.from_tokens ~render_comment tokens doc with
         | Error _ -> None
         | Ok doc -> Some doc
+  ;;
+
+  type base_for_ast_check =
+    | Ast of C.ast
+    | Cst of Cst.t
+
+  let check_same_ast opts (input : Source.t) reference output =
+    if not opts.checks.same_ast
+    then Ok ()
+    else (
+      let output = { input with source = output } in
+      match reference with
+      | Ast ast -> C.check_same_ast opts.checker ast output
+      | Cst cst -> Cst_checker.check_same_ast opts.parse cst output)
   ;;
 
   let run opts input =
@@ -220,14 +205,17 @@ module Make (S : Style) (C : Checker) = struct
         tokens_pre_normalize
     in
     let* () = Check.retokenisation opts.checks tokens_pre_normalize in
-    let* cst, tokens_post_normalize, ast_for_checker =
+    let* cst, tokens_post_normalize, reference =
       (* we normalize only if the source is accepted by the reference checker *)
       match C.parse opts.checker input with
-      | Error e ->
+      | Error (src, startp, endp, exn) ->
         if opts.checks.same_ast
-        then Error e (* might as well fail early *)
-        else Ok (cst, tokens_pre_normalize, Check.cst opts.parse input cst)
-      | Ok tree ->
+        then
+          Error
+            (`Input_parse_error (src, startp, endp, exn))
+            (* might as well fail early *)
+        else Ok (cst, tokens_pre_normalize, Cst cst)
+      | Ok ast ->
         let normalized = S.normalize opts.style cst in
         let tokens =
           (* No need to suspend, we know those will be used. *)
@@ -240,10 +228,7 @@ module Make (S : Style) (C : Checker) = struct
             ~src:Normalization
             tokens
         in
-        Ok
-          ( normalized
-          , tokens
-          , Check.reference (module C) opts.checker input tree )
+        Ok (normalized, tokens, Ast ast)
     in
     let* () =
       Check.normalization_kept_comments
@@ -254,13 +239,13 @@ module Make (S : Style) (C : Checker) = struct
     let* tokens_post_normalize = Lazy.force tokens_post_normalize in
     let format_code_block = format_code_block opts in
     let* document =
-      S.build_doc opts.style ~format_code_block cst
+      S.doc_of_cst opts.style ~format_code_block cst
       |> Comments.Insert.from_tokens
            ~render_comment:(S.render_comment opts.style ~format_code_block)
            tokens_post_normalize
     in
     let output = Pipeline.print_doc ~width:opts.width document in
-    let* () = Check.same_ast opts.checks ast_for_checker output in
+    let* () = check_same_ast opts input reference output in
     Ok output
   ;;
 end

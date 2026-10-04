@@ -162,7 +162,7 @@ let parser : Errors.parser =
   Reference { name = "upstream"; report_exn = report_parse_error }
 ;;
 
-let input_wrap startp endp exn = `Input_parse_error (parser, startp, endp, exn)
+let input_wrap startp endp exn = parser, startp, endp, exn
 let output_wrap _ _ exn = `Output_parse_error (parser, exn)
 let ( let* ) = Result.bind
 

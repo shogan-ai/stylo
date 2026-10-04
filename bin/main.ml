@@ -135,14 +135,12 @@ module Janestreet_style = struct
     | Signature sg -> Signature (Normalize.signature options.normalize sg)
   ;;
 
-  (* The printer reaches code blocks from deep within docstrings: rather than
-     threading [format_code_block] through all of it, we keep the printer's
-     global hook, but only set it from here. *)
+  (* tying the not between code and docstring's printer. *)
   let set_code_block_hook format_code_block =
     Print.Doc.Odoc.process_ocaml_block := format_code_block
   ;;
 
-  let build_doc _ ~format_code_block : Cst.t -> Document.t =
+  let doc_of_cst _ ~format_code_block : Cst.t -> Document.t =
     set_code_block_hook format_code_block;
     function
     | Structure str -> Print.Structure.pp_implementation str
@@ -157,12 +155,12 @@ module Janestreet_style = struct
   ;;
 end
 
-module Formatter = Stylo.Make (Janestreet_style) (Oxcaml_checker)
+module Jst_styler = Stylo.Make (Janestreet_style) (Oxcaml_checker)
 
-(* Used in fuzzing mode. The fuzzer generates inputs from stylo's grammar, which
-   upstream's parser might reject: so we don't normalize, and check the output
-   against stylo's own parser. *)
-module Plain_formatter =
+(* [stylo.exe fuzz], which we use in the test suite, only fuzzes the printer,
+   not the normalizer. The normalizer is fuzzed "manually" (not from the
+   testsuite) by going through the 'style' subcommand. *)
+module Jst_style_for_fuzzer =
   Stylo.Make
     (Stylo.Without_normalization (Janestreet_style))
     (Stylo.Cst_checker)
@@ -238,12 +236,12 @@ let fuzzer_batch ~options ~quiet ~idempotence_check ~failures_dir fn =
           entrypoint_and_src
       in
       let intf, source = split_fuzzer_line entrypoint_and_src in
-      match do_style Plain_formatter.run options intf fn ~lnum source with
+      match do_style Jst_style_for_fuzzer.run options intf fn ~lnum source with
       | Ok fst_round ->
         if idempotence_check
         then (
           match
-            do_style Plain_formatter.run options intf fn ~lnum fst_round
+            do_style Jst_style_for_fuzzer.run options intf fn ~lnum fst_round
           with
           | Ok snd_round when fst_round = snd_round -> ()
           | _ -> save_failure entrypoint_and_src);
@@ -315,7 +313,7 @@ let style_input ~options check_idempotence fkind fname =
     | Regular -> In_channel.(with_open_text fname input_all)
     | Stdin -> In_channel.input_all stdin
   in
-  let result = do_style Formatter.run options is_mli fname source in
+  let result = do_style Jst_styler.run options is_mli fname source in
   if not check_idempotence
   then result
   else
@@ -324,7 +322,7 @@ let style_input ~options check_idempotence fkind fname =
     if fst_round = source
     then (* input might already have been formatted *) result
     else (* general case, we styled the input, next round ought to be a noop *)
-      let* snd_round = do_style Formatter.run options is_mli fname fst_round in
+      let* snd_round = do_style Jst_styler.run options is_mli fname fst_round in
       if fst_round = snd_round then result else Error `Not_idempotent
 ;;
 
@@ -370,7 +368,7 @@ let fuzz_cmd =
   and+ quotations = syntax_quotations in
   let parse = { Ocaml_syntax.Parse.Options.syntax_quotations = quotations } in
   let options =
-    { Plain_formatter.width = 80
+    { Jst_style_for_fuzzer.width = 80
     ; parse
     ; checks =
         { same_ast = true
@@ -408,7 +406,7 @@ let style_cmd =
   and+ syntax_quotations
   and+ w = width in
   let options =
-    { Formatter.width = w
+    { Jst_styler.width = w
     ; parse = { syntax_quotations }
     ; checks =
         { same_ast = ast_check

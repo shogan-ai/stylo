@@ -1,16 +1,5 @@
 open Ocaml_syntax
 
-(** A reference parser against which stylo's output is checked.
-
-    It plays two roles in {!Make.run}:
-    - a guard: normalisation only happens on inputs it accepts;
-    - a checker: when normalisation happened (and [--ast-check] was passed),
-      [check_same_ast input_tree output] verifies that the output parses back to
-      the same tree as the input.
-
-    When the input is rejected and no AST check was requested, stylo falls back
-    to comparing its own CSTs (cf. {!Cst_checker}). Errors are tagged with an
-    [Ast_checker.Errors.Reference] parser. *)
 module type Checker = sig
   type options
   type ast
@@ -19,9 +8,7 @@ module type Checker = sig
     :  options
     -> Source.t
     -> ( ast
-       , [> `Input_parse_error of
-            Ast_checker.Errors.parser * Lexing.position * Lexing.position * exn
-         ] )
+       , Ast_checker.Errors.parser * Lexing.position * Lexing.position * exn )
          result
 
   val check_same_ast
@@ -49,15 +36,6 @@ module Check : sig
     val none : t
   end
 
-  (** What the output is checked against, decided by {!Make.run}. *)
-  type checker_input
-
-  val same_ast
-    :  Options.t
-    -> checker_input
-    -> string
-    -> (unit, [> Errors.t ]) result
-
   open Tokenisation_check
 
   val retokenisation
@@ -78,44 +56,20 @@ module Check : sig
     ]
 end
 
-(** A formatting style: the parts of the pipeline which are a matter of taste.
-    Parsing, token bookkeeping, comment insertion, the layout engine, and the
-    checks are shared by all styles. *)
 module type Style = sig
   type options
 
-  (** Rewrites the CST into the style's canonical form.
-
-      Contract: rewrites must update the token sequences attached to the CST
-      nodes in lockstep, so that {!Pipeline.tokens_of_tree} on the result still
-      accounts for every token and comment of the input. Tokens the style wants
-      to make optional must be marked as such.
-
-      Only called on inputs accepted by the checker, never on OCaml code blocks
-      found in docstrings. *)
   val normalize : options -> Cst.t -> Cst.t
 
-  (** Turns a (normalised) CST into a document.
-
-      Contract:
-      - the leaves of the document must correspond, one-to-one and in order, to
-        the tokens {!Pipeline.tokens_of_tree} produces for the same tree;
-        optional tokens must be printed with [Document.opt_token];
-      - docstrings placed explicitly must be emitted with the id the lexer gave
-        them, otherwise comment insertion will print them a second time.
-
-      [format_code_block] formats an OCaml snippet (e.g. a [{[ ... ]}] block in
-      a docstring) with this same style. It returns [None] if the snippet
-      doesn't parse, or cannot be formatted. *)
-  val build_doc
+  val doc_of_cst
     :  options
     -> format_code_block:(string -> Document.t option)
     -> Cst.t
     -> Document.t
 
-  (** Renders the comments placed by comment insertion (i.e. those [build_doc]
-      did not place itself). [start_pos] is the comment's position in the
-      source. *)
+  (** Helper for automatic comment insertion.
+
+      @param start_pos is the comment's position in the source. *)
   val render_comment
     :  options
     -> format_code_block:(string -> Document.t option)
@@ -124,14 +78,11 @@ module type Style = sig
     -> Document.t
 end
 
-(** [S], minus the normalisation. *)
 module Without_normalization (S : Style) : Style with type options = S.options
 
-(** Uses stylo's own parser as the reference. *)
 module Cst_checker :
   Checker with type options = Parse.Options.t and type ast = Cst.t
 
-(** The style-independent stages of the pipeline. *)
 module Pipeline : sig
   val parse
     :  Parse.Options.t
@@ -160,8 +111,6 @@ module Make (S : Style) (C : Checker) : sig
     ; parse : Parse.Options.t
     ; checks : Check.Options.t
     ; debug : bool
-         (** dump the token streams of the input (and after normalisation) next
-             to the input file *)
     ; style : S.options
     ; checker : C.options
     }
