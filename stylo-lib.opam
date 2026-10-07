@@ -4,7 +4,7 @@ synopsis: "Core libraries of the stylo code formatter for O(x)Caml"
 depends: [
   "dune" {>= "3.15"}
   "menhir" {>= "20260209"}
-  "ppxlib"
+  "ppxlib" {dev}
   "odoc" {with-doc}
 ]
 build: [

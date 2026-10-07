@@ -48,8 +48,12 @@
  (libraries menhirLib dbg_print std)
  (flags :standard -w -9-63 -open Dbg_print))
 
+; Not committed, but shipped in releases (see tools/release.sh): a source copy,
+; if present, is used instead of generating the file.
+
 (rule
  (target traversals.ml)
+ (mode fallback)
  (deps
   location.mli
   tokens.ml

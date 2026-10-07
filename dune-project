@@ -12,7 +12,7 @@
  (depends
   (menhir
    (>= 20260209))
-  ppxlib ; TODO: only require it in dev mode
+  (ppxlib :dev) ; to generate traversals, absent from release tarballs
   ))
 
 (package
