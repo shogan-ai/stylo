@@ -5,9 +5,7 @@
  (libraries
   cmdliner
   stylo
-  normalize
-  print
-  document
+  janestreet_style
   oxcaml_checker
   ocaml_syntax
   dbg_print

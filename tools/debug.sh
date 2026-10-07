@@ -6,11 +6,11 @@ rlwrap ocamldebug \
     -I _build/default/lib/comments/.comments.objs/byte \
     -I _build/default/lib/config/.config.objs/byte \
     -I _build/default/lib/dbg_print/.dbg_print.objs/byte \
-    -I _build/default/lib/normalize/erase-jane-syntax/.erase_jane_syntax.objs/byte \
-    -I _build/default/lib/normalize/.normalize.objs/byte \
+    -I _build/default/lib/styles/janestreet/normalize/erase-jane-syntax/.erase_jane_syntax.objs/byte \
+    -I _build/default/lib/styles/janestreet/normalize/.normalize.objs/byte \
     -I _build/default/lib/parsing/.ocaml_syntax.objs/byte \
-    -I _build/default/lib/printing/document/.document.objs/byte \
-    -I _build/default/lib/printing/.print.objs/byte \
+    -I _build/default/lib/styles/janestreet/printing/document/.document.objs/byte \
+    -I _build/default/lib/styles/janestreet/printing/.print.objs/byte \
     -I _build/default/lib/.std.objs/byte \
     -I _build/default/lib/.stylo.objs/byte \
     -I _build/default/lib/traversals/.gen.eobjs/byte \
