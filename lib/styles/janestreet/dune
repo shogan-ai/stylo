@@ -1,3 +1,10 @@
 (library
  (name janestreet_style)
- (libraries ocaml_syntax document normalize print))
+ (libraries
+  ocaml_syntax
+  document
+  normalize
+  print
+  stylo
+  oxcaml_checker
+  cst_checker))

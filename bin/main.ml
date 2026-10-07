@@ -124,16 +124,6 @@ module Arg = struct
   ;;
 end
 
-module Jst_styler = Stylo.Make (Janestreet_style) (Oxcaml_checker)
-
-(* [stylo.exe fuzz], which we use in the test suite, only fuzzes the printer,
-   not the normalizer. The normalizer is fuzzed "manually" (not from the
-   testsuite) by going through the 'style' subcommand. *)
-module Jst_style_for_fuzzer =
-  Stylo.Make
-    (Stylo.Without_normalization (Janestreet_style))
-    (Stylo.Cst_checker)
-
 let do_style run options is_mli fname ?(lnum = 1) source =
   let kind : Ocaml_syntax.Source.kind = if is_mli then Intf else Impl in
   (run options { Ocaml_syntax.Source.kind; fname; source; start_line = lnum }
@@ -205,12 +195,26 @@ let fuzzer_batch ~options ~quiet ~idempotence_check ~failures_dir fn =
           entrypoint_and_src
       in
       let intf, source = split_fuzzer_line entrypoint_and_src in
-      match do_style Jst_style_for_fuzzer.run options intf fn ~lnum source with
+      match
+        do_style
+          Janestreet_style.Without_normalization.run
+          options
+          intf
+          fn
+          ~lnum
+          source
+      with
       | Ok fst_round ->
         if idempotence_check
         then (
           match
-            do_style Jst_style_for_fuzzer.run options intf fn ~lnum fst_round
+            do_style
+              Janestreet_style.Without_normalization.run
+              options
+              intf
+              fn
+              ~lnum
+              fst_round
           with
           | Ok snd_round when fst_round = snd_round -> ()
           | _ -> save_failure entrypoint_and_src);
@@ -282,7 +286,7 @@ let style_input ~options check_idempotence fkind fname =
     | Regular -> In_channel.(with_open_text fname input_all)
     | Stdin -> In_channel.input_all stdin
   in
-  let result = do_style Jst_styler.run options is_mli fname source in
+  let result = do_style Janestreet_style.run options is_mli fname source in
   if not check_idempotence
   then result
   else
@@ -291,7 +295,9 @@ let style_input ~options check_idempotence fkind fname =
     if fst_round = source
     then (* input might already have been formatted *) result
     else (* general case, we styled the input, next round ought to be a noop *)
-      let* snd_round = do_style Jst_styler.run options is_mli fname fst_round in
+      let* snd_round =
+        do_style Janestreet_style.run options is_mli fname fst_round
+      in
       if fst_round = snd_round then result else Error `Not_idempotent
 ;;
 
@@ -337,7 +343,7 @@ let fuzz_cmd =
   and+ quotations = syntax_quotations in
   let parse = { Ocaml_syntax.Parse.Options.syntax_quotations = quotations } in
   let options =
-    { Jst_style_for_fuzzer.width = 80
+    { Janestreet_style.Without_normalization.width = 80
     ; parse
     ; checks =
         { same_ast = true
@@ -375,7 +381,7 @@ let style_cmd =
   and+ syntax_quotations
   and+ w = width in
   let options =
-    { Jst_styler.width = w
+    { Janestreet_style.width = w
     ; parse = { syntax_quotations }
     ; checks =
         { same_ast = ast_check

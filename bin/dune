@@ -2,14 +2,6 @@
  (name main)
  (public_name stylo)
  ; (modes byte)
- (libraries
-  cmdliner
-  stylo
-  janestreet_style
-  oxcaml_checker
-  ocaml_syntax
-  dbg_print
-  std
-  unix)
+ (libraries cmdliner stylo janestreet_style ocaml_syntax dbg_print std unix)
  (modules main)
  (empty_module_interface_if_absent))
