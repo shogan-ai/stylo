@@ -54,7 +54,7 @@ stylo_flags=(
   --ignore-output-syntax-errors # we only want idempotency bugs to show up
 )
 
-$BIN/fuzzer_driver.exe "${stylo_flags[@]}" $sentences
+./_build/default/tools/fuzzer_driver.exe "${stylo_flags[@]}" $sentences
 
 rm $sentences
 

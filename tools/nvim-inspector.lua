@@ -117,7 +117,7 @@ local function invoke_stylo(opts)
 end
 
 function M.setup(stylo_repo)
-    stylo_path = vim.fs.normalize(stylo_repo .. "/_build/default/bin/dump_tokens.exe")
+    stylo_path = vim.fs.normalize(stylo_repo .. "/_build/default/tools/dump_tokens.exe")
 
     vim.api.nvim_create_user_command("StyloInspectTokens", invoke_stylo, {
         desc = "Show tokens of selected node / node under the cursor",

@@ -1,3 +1,15 @@
 (install
  (files dune-stylo-wrapper.sh)
  (section bin))
+
+(executable
+ (name dump_tokens)
+ (libraries cmdliner stylo ocaml_syntax document)
+ (modules dump_tokens)
+ (empty_module_interface_if_absent))
+
+(executable
+ (name fuzzer_driver)
+ (libraries std unix cmdliner)
+ (modules fuzzer_driver)
+ (empty_module_interface_if_absent))
