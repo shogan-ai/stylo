@@ -9,7 +9,7 @@ rlwrap ocamldebug \
     -I _build/default/lib/styles/janestreet/normalize/erase-jane-syntax/.erase_jane_syntax.objs/byte \
     -I _build/default/lib/styles/janestreet/normalize/.normalize.objs/byte \
     -I _build/default/lib/parsing/.ocaml_syntax.objs/byte \
-    -I _build/default/lib/styles/janestreet/printing/document/.document.objs/byte \
+    -I _build/default/lib/document/.document.objs/byte \
     -I _build/default/lib/styles/janestreet/printing/.print.objs/byte \
     -I _build/default/lib/.std.objs/byte \
     -I _build/default/lib/.stylo.objs/byte \

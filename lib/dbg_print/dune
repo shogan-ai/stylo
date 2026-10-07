@@ -1,2 +1,3 @@
 (library
- (name dbg_print))
+ (name dbg_print)
+ (public_name stylo-lib.dbg_print))

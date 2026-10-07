@@ -43,6 +43,7 @@
 
 (library
  (name ocaml_syntax)
+ (public_name stylo-lib.ocaml_syntax)
  (modules_without_implementation asttypes parsetree)
  (libraries menhirLib dbg_print std)
  (flags :standard -w -9-63 -open Dbg_print))

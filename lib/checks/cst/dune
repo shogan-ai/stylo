@@ -1,3 +1,4 @@
 (library
  (name cst_checker)
+ (public_name stylo-lib.cst_checker)
  (libraries ocaml_syntax checks traversals_helpers))

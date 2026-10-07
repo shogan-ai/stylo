@@ -12,7 +12,7 @@ case $1 in
         exit 1
 esac
 
-if [[ -f "$ROOT/stylo.opam" ]]; then
+if [[ -f "$ROOT/stylo-lib.opam" ]]; then
     # we are running locally in the workspace, so don't look for stylo in path
     STYLO="$ROOT/bin/main.exe"
 

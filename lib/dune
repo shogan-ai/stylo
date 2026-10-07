@@ -1,8 +1,10 @@
 (library
  (name stylo)
+ (public_name stylo-lib)
  (libraries checks cst_checker ocaml_syntax document dbg_print comments)
  (modules :standard \ std))
 
 (library
  (name std)
+ (public_name stylo-lib.std)
  (modules std))

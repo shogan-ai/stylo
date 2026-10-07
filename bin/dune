@@ -1,6 +1,7 @@
 (executable
  (name main)
  (public_name stylo)
+ (package stylo-jane)
  ; (modes byte)
  (libraries cmdliner stylo janestreet_style ocaml_syntax dbg_print std unix)
  (modules main)

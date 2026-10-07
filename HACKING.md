@@ -36,7 +36,7 @@ Further reading:
   for details regarding spacing and layout.
 - the above is simplistic and can lead to a combinatorial explosion in presence
   of PPrint's [`ifflat`](https://cambium.inria.fr/~fpottier/pprint/doc/pprint/PPrint/index.html#val-ifflat) operator.
-  See the comments in [`lib/printing/document/`](./lib/printing/document/document.ml) for more details.
+  See the comments in [`lib/document/`](./lib/document/document.ml) for more details.
 
 ## Code style normalisation
 

@@ -1,4 +1,5 @@
 (library
  (name document)
+ (public_name stylo-lib.document)
  (libraries std dbg_print)
  (flags :standard -open Dbg_print))

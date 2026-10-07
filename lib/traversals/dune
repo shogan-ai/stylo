@@ -1,8 +1,11 @@
 (executable
  (name gen)
+ (public_name stylo-lib-gen-traversals)
+ (package stylo-lib)
  (modules gen)
  (libraries ppxlib.traverse))
 
 (library
  (name traversals_helpers)
+ (public_name stylo-lib.traversals_helpers)
  (modules traversals_helpers))

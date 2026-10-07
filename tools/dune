@@ -1,4 +1,5 @@
 (install
+ (package stylo-jane)
  (files dune-stylo-wrapper.sh)
  (section bin))
 

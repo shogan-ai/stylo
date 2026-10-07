@@ -1,3 +1,4 @@
 (library
  (name checks)
+ (public_name stylo-lib.checks)
  (libraries ocaml_syntax traversals_helpers))
