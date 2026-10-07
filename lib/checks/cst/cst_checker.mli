@@ -5,6 +5,7 @@
     accepts. *)
 
 open Ocaml_syntax
+open Checks
 
 type options = Parse.Options.t
 type ast = Cst.t

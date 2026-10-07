@@ -2,7 +2,7 @@ open Ocaml_syntax
 
 let ( let* ) = Result.bind
 
-module Debug = Ast_checker.Debug
+module Debug = Checks.Debug
 
 module type Checker = sig
   type options
@@ -11,19 +11,18 @@ module type Checker = sig
   val parse
     :  options
     -> Source.t
-    -> ( ast
-       , Ast_checker.Errors.parser * Lexing.position * Lexing.position * exn )
+    -> (ast, Checks.Errors.parser * Lexing.position * Lexing.position * exn)
          result
 
   val check_same_ast
     :  options
     -> ast
     -> Source.t
-    -> (unit, [> Ast_checker.Errors.t ]) result
+    -> (unit, [> Checks.Errors.t ]) result
 end
 
 module Check = struct
-  open Ast_checker
+  open Checks
 
   module Options = struct
     type t =
@@ -66,7 +65,7 @@ module Check = struct
   type error =
     [ | Ordering.error
     | Comments_comparison.error
-    | Ast_checker.Errors.t
+    | Checks.Errors.t
     ]
 end
 
@@ -95,7 +94,7 @@ module Without_normalization (S : Style) = struct
   let normalize _ cst = cst
 end
 
-module Cst_checker = Ast_checker.Cst_checker
+module Cst_checker = Cst_checker
 
 module Pipeline = struct
   let parse options (input : Source.t) : (Cst.t, _) result =
@@ -110,7 +109,7 @@ module Pipeline = struct
     | exn ->
       Error
         (`Input_parse_error
-           (Ast_checker.Errors.Stylo's, lb.lex_start_p, lb.lex_curr_p, exn))
+           (Checks.Errors.Stylo's, lb.lex_start_p, lb.lex_curr_p, exn))
   ;;
 
   let try_parse options source : Cst.t option =
@@ -141,7 +140,7 @@ module Pipeline = struct
     ]
 
   let pp_error ppf fname : error -> unit =
-    let open Ast_checker in
+    let open Checks in
     let open Tokenisation_check in
     function
     | `Comments_dropped as e ->
@@ -150,7 +149,7 @@ module Pipeline = struct
     | `Comment_insertion_error e ->
       Format.fprintf ppf "%s: ERROR: %a@." fname Comments.Insert.Error.pp e
     | (`Input_parse_error _ | `Output_parse_error _ | `Ast_changed _) as e ->
-      Ast_checker.Errors.pp_error ppf fname e
+      Checks.Errors.pp_error ppf fname e
     | (`CST_tokens_mismatch _) as e -> Tokens_of_tree.Error.pp ppf e
   ;;
 end

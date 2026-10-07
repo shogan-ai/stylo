@@ -2,7 +2,7 @@
 
 rlwrap ocamldebug \
     -I _build/default/bin/.main.eobjs/byte \
-    -I _build/default/lib/ast-checker/.ast_checker.objs/byte \
+    -I _build/default/lib/checks/common/.checks.objs/byte \
     -I _build/default/lib/comments/.comments.objs/byte \
     -I _build/default/lib/config/.config.objs/byte \
     -I _build/default/lib/dbg_print/.dbg_print.objs/byte \

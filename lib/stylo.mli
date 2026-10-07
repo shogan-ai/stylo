@@ -7,19 +7,18 @@ module type Checker = sig
   val parse
     :  options
     -> Source.t
-    -> ( ast
-       , Ast_checker.Errors.parser * Lexing.position * Lexing.position * exn )
+    -> (ast, Checks.Errors.parser * Lexing.position * Lexing.position * exn)
          result
 
   val check_same_ast
     :  options
     -> ast
     -> Source.t
-    -> (unit, [> Ast_checker.Errors.t ]) result
+    -> (unit, [> Checks.Errors.t ]) result
 end
 
 module Check : sig
-  open Ast_checker
+  open Checks
 
   (** Which checks to run. *)
   module Options : sig
@@ -89,7 +88,7 @@ module Pipeline : sig
     -> Source.t
     -> ( Cst.t
        , [> `Input_parse_error of
-            Ast_checker.Errors.parser * Lexing.position * Lexing.position * exn
+            Checks.Errors.parser * Lexing.position * Lexing.position * exn
          ] )
          result
 

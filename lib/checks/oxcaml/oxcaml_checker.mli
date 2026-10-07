@@ -3,7 +3,7 @@
     Satisfies [Stylo.Checker]. *)
 
 open Ocaml_syntax
-open Ast_checker
+open Checks
 
 type options =
   { syntax_quotations : bool

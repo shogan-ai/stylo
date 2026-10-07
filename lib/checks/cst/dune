@@ -1,0 +1,3 @@
+(library
+ (name cst_checker)
+ (libraries ocaml_syntax checks traversals_helpers))

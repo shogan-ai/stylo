@@ -1,5 +1,5 @@
-(** Simplified version of [lib/normalize/erase_jane_syntax/]: to be used from an
-    AST mapper.
+(** Simplified version of [lib/styles/janestreet/normalize/erase-jane-syntax/]:
+    to be used from an AST mapper.
 
     Notable differences:
     - no tokens fiddling

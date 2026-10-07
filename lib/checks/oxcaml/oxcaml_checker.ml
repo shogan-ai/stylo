@@ -1,5 +1,5 @@
 open Oxcaml_frontend
-open Ast_checker
+open Checks
 open Parsetree
 
 let sort_attributes : attributes -> attributes = List.sort compare
@@ -28,10 +28,10 @@ let cleaner erase =
 
     method! location_stack () _ = []
 
-    method! modes () m = do_erase Erase_jane_syntax.modes m |> super#modes ()
+    method! modes () m = do_erase Erase_for_checker.modes m |> super#modes ()
 
     method! modalities () m =
-      do_erase Erase_jane_syntax.modalities m |> super#modalities ()
+      do_erase Erase_for_checker.modalities m |> super#modalities ()
 
     method! attribute () attr =
       let attr_payload =
@@ -52,10 +52,10 @@ let cleaner erase =
       sort_attributes attrs (* FIXME: why? *) |> super#attributes ()
 
     method! constant_desc () c =
-      do_erase Erase_jane_syntax.constant_desc c |> super#constant_desc ()
+      do_erase Erase_for_checker.constant_desc c |> super#constant_desc ()
 
     method! expression () e =
-      do_erase Erase_jane_syntax.expression e |> super#expression ()
+      do_erase Erase_for_checker.expression e |> super#expression ()
 
     method! pattern () p =
       let p =
@@ -70,49 +70,49 @@ let cleaner erase =
             p3
         | _ -> p
       in
-      do_erase Erase_jane_syntax.pattern p |> super#pattern ()
+      do_erase Erase_for_checker.pattern p |> super#pattern ()
 
     method! function_param_desc () fp =
-      do_erase Erase_jane_syntax.function_param_desc fp
+      do_erase Erase_for_checker.function_param_desc fp
       |> super#function_param_desc ()
 
     method! core_type () ct =
-      do_erase Erase_jane_syntax.core_type ct |> super#core_type ()
+      do_erase Erase_for_checker.core_type ct |> super#core_type ()
 
     method! label_declaration () lbl =
-      do_erase Erase_jane_syntax.label_declaration lbl
+      do_erase Erase_for_checker.label_declaration lbl
       |> super#label_declaration ()
 
     method! constructor_argument () c =
-      do_erase Erase_jane_syntax.constructor_argument c
+      do_erase Erase_for_checker.constructor_argument c
       |> super#constructor_argument ()
 
     method! constructor_declaration () c =
-      do_erase Erase_jane_syntax.constructor_declaration c
+      do_erase Erase_for_checker.constructor_declaration c
       |> super#constructor_declaration ()
 
     method! extension_constructor_kind () eck =
-      do_erase Erase_jane_syntax.extension_constructor_kind eck
+      do_erase Erase_for_checker.extension_constructor_kind eck
       |> super#extension_constructor_kind ()
 
     method! type_kind () tk =
-      do_erase Erase_jane_syntax.type_kind tk |> super#type_kind ()
+      do_erase Erase_for_checker.type_kind tk |> super#type_kind ()
 
     method! type_declaration () td =
-      do_erase Erase_jane_syntax.type_declaration td
+      do_erase Erase_for_checker.type_declaration td
       |> super#type_declaration ()
 
     method! module_type () m =
-      do_erase Erase_jane_syntax.module_type m |> super#module_type ()
+      do_erase Erase_for_checker.module_type m |> super#module_type ()
 
     method! module_expr () m =
-      do_erase Erase_jane_syntax.module_expr m |> super#module_expr ()
+      do_erase Erase_for_checker.module_expr m |> super#module_expr ()
 
     method! signature () s =
-      do_erase Erase_jane_syntax.signature s |> super#signature ()
+      do_erase Erase_for_checker.signature s |> super#signature ()
 
     method! structure () s =
-      do_erase Erase_jane_syntax.structure s |> super#structure ()
+      do_erase Erase_for_checker.structure s |> super#structure ()
   end
 ;;
 

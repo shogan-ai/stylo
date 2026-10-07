@@ -1,6 +1,6 @@
 (library
  (name stylo)
- (libraries ast_checker ocaml_syntax document dbg_print comments)
+ (libraries checks cst_checker ocaml_syntax document dbg_print comments)
  (modules :standard \ std))
 
 (library

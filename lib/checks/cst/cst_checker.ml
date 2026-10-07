@@ -1,4 +1,5 @@
 open Ocaml_syntax
+open Checks
 open Parsetree
 
 let sort_attributes : attributes -> attributes = function
