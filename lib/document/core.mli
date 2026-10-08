@@ -205,4 +205,7 @@ val alignment_context : t -> t
 (** Likewise for [Alignment_row] nodes. *)
 val alignment_row : t -> t
 
+(** Number of unicode characters in a (UTF-8 encoded) string. *)
+val strlen : string -> int
+
 val pp_pseudo : Format.formatter -> pseudo_token -> unit

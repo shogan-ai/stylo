@@ -131,5 +131,10 @@ module Make (Buffer : Printing_buffer_intf.S) = struct
 end
 
 module Regular = Make (Regular_buffer)
+module Vertically_aligned = Make (Column_based_buffer)
 
-let to_string = Regular.to_string
+let to_string ?(vertically_aligned = false) ~width d =
+  if vertically_aligned
+  then Vertically_aligned.to_string ~width d
+  else Regular.to_string ~width d
+;;
