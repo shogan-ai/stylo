@@ -35,7 +35,7 @@ end = struct
       if n <= 0
       then t.delayed_ws <- 0
       else
-        let nb = min t.delayed_ws 80 in
+        let nb = min n 80 in
         Buffer.add_substring t.buf spaces 0 nb;
         aux t (n - nb)
     in
