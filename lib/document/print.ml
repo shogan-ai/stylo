@@ -14,50 +14,7 @@ type state =
 let incr_col st i = { st with column = st.column + i }
 let has_text st = { st with line = Has_text }
 
-(* Wrapper with whitespace buffering *)
-module Buffer : sig
-  type t
-
-  val create : int -> t
-  val newline : t -> unit
-  val add_spaces : t -> int -> unit
-  val add_string : t -> string -> unit
-  val contents : t -> string
-end = struct
-  type t =
-    { buf : Buffer.t
-    ; mutable delayed_ws : int
-    }
-
-  let flush_ws =
-    let spaces = String.make 80 ' ' in
-    let rec aux t n =
-      if n <= 0
-      then t.delayed_ws <- 0
-      else
-        let nb = min n 80 in
-        Buffer.add_substring t.buf spaces 0 nb;
-        aux t (n - nb)
-    in
-    fun t -> aux t t.delayed_ws
-  ;;
-
-  let create n = { buf = Buffer.create n; delayed_ws = 0 }
-
-  let newline t =
-    t.delayed_ws <- 0;
-    Buffer.add_char t.buf '\n'
-  ;;
-
-  let add_spaces t n = t.delayed_ws <- t.delayed_ws + n
-
-  let add_string t s =
-    flush_ws t;
-    Buffer.add_string t.buf s
-  ;;
-
-  let contents t = Buffer.contents t.buf
-end
+module Buffer = Regular_buffer
 
 let newline st soft t =
   match soft, st.line with
