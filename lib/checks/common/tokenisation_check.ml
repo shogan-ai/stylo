@@ -10,7 +10,7 @@ let compare_pos p1 p2 =
 
 module Ordering = struct
   type error =
-    [ | `Incomplete_flattening of Lexing.position
+    [ `Incomplete_flattening of Lexing.position
     | `Reordered of Lexing.position * Tokens.elt * Tokens.elt
     ]
 

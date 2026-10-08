@@ -63,7 +63,7 @@ module Check = struct
   ;;
 
   type error =
-    [ | Ordering.error
+    [ Ordering.error
     | Comments_comparison.error
     | Checks.Errors.t
     ]
@@ -134,7 +134,7 @@ module Pipeline = struct
   let print_doc ~width doc = Document.Print.to_string ~width doc
 
   type error =
-    [ | Tokens_of_tree.Error.t
+    [ Tokens_of_tree.Error.t
     | Check.error
     | Comments.Insert.error
     ]
@@ -209,10 +209,8 @@ module Make (S : Style) (C : Checker) = struct
       match C.parse opts.checker input with
       | Error (src, startp, endp, exn) ->
         if opts.checks.same_ast
-        then
-          Error
-            (`Input_parse_error (src, startp, endp, exn))
-            (* might as well fail early *)
+        then (* might as well fail early *)
+          Error (`Input_parse_error (src, startp, endp, exn))
         else Ok (cst, tokens_pre_normalize, Cst cst)
       | Ok ast ->
         let normalized = S.normalize opts.style cst in

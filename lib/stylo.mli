@@ -49,7 +49,7 @@ module Check : sig
     -> (unit, [> Comments_comparison.error ] as 'a) result
 
   type error =
-    [ | Ordering.error
+    [ Ordering.error
     | Comments_comparison.error
     | Errors.t
     ]
@@ -96,7 +96,7 @@ module Pipeline : sig
   val print_doc : width:int -> Document.t -> string
 
   type error =
-    [ | Tokens_of_tree.Error.t
+    [ Tokens_of_tree.Error.t
     | Check.error
     | Comments.Insert.error
     ]

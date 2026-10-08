@@ -125,8 +125,14 @@ module Arg = struct
 end
 
 let do_style run options is_mli fname ?(lnum = 1) source =
-  let kind : Ocaml_syntax.Source.kind = if is_mli then Intf else Impl in
-  (run options { Ocaml_syntax.Source.kind; fname; source; start_line = lnum }
+  let input =
+    { Ocaml_syntax.Source.fname
+    ; source
+    ; start_line = lnum
+    ; kind = if is_mli then Intf else Impl
+    }
+  in
+  (run options input
    : (string, Stylo.Pipeline.error) result
    :> (string, [> Stylo.Pipeline.error ]) result)
 ;;
@@ -195,27 +201,12 @@ let fuzzer_batch ~options ~quiet ~idempotence_check ~failures_dir fn =
           entrypoint_and_src
       in
       let intf, source = split_fuzzer_line entrypoint_and_src in
-      match
-        do_style
-          Janestreet_style.Without_normalization.run
-          options
-          intf
-          fn
-          ~lnum
-          source
-      with
+      let module Style = Janestreet_style.Without_normalization in
+      match do_style Style.run options intf fn ~lnum source with
       | Ok fst_round ->
         if idempotence_check
         then (
-          match
-            do_style
-              Janestreet_style.Without_normalization.run
-              options
-              intf
-              fn
-              ~lnum
-              fst_round
-          with
+          match do_style Style.run options intf fn ~lnum fst_round with
           | Ok snd_round when fst_round = snd_round -> ()
           | _ -> save_failure entrypoint_and_src);
         loop_entries next_lnum ic

@@ -22,7 +22,7 @@ module Error = struct
   ;;
 
   type t =
-    [ | `CST_tokens_mismatch of context * Tokens.seq * tokens_from_subtree list
+    [ `CST_tokens_mismatch of context * Tokens.seq * tokens_from_subtree list
     ]
 
   let pp_bounded_tokens ~limit ppf seq =

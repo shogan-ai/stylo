@@ -12,7 +12,7 @@ module Error : sig
     }
 
   type t =
-    [ | `CST_tokens_mismatch of context * Tokens.seq * tokens_from_subtree list
+    [ `CST_tokens_mismatch of context * Tokens.seq * tokens_from_subtree list
     ]
 
   val pp : Format.formatter -> t -> unit

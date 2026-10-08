@@ -9,7 +9,7 @@ type parser =
       }
 
 type t =
-  [ | `Input_parse_error of parser * Lexing.position * Lexing.position * exn
+  [ `Input_parse_error of parser * Lexing.position * Lexing.position * exn
   | `Output_parse_error of parser * exn
   | `Ast_changed of parser * string
   ]
