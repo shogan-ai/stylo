@@ -107,6 +107,16 @@ module Arg = struct
     |> value
   ;;
 
+  let vertically_aligned =
+    info
+      [ "vertically-aligned" ]
+      ~doc:
+        "Vertically align some constructs (e.g. constructor declarations, \
+         match cases). This can make lines go past the width limit."
+    |> flag
+    |> value
+  ;;
+
   let remove_parentheses =
     info
       [ "remove-parentheses" ]
@@ -336,10 +346,12 @@ let fuzz_cmd =
   and+ quiet = ignore_syntax_errors
   and+ idempotence_check
   and+ failures_dir = failures_dir
+  and+ vertically_aligned
   and+ quotations = syntax_quotations in
   let parse = { Ocaml_syntax.Parse.Options.syntax_quotations = quotations } in
   let options =
     { Janestreet_style.Without_normalization.width = 80
+    ; vertically_aligned
     ; parse
     ; checks =
         { same_ast = true
@@ -374,10 +386,12 @@ let style_cmd =
   and+ erase_jane_syntax
   and+ remove_parentheses
   and+ insert_parentheses
+  and+ vertically_aligned
   and+ syntax_quotations
   and+ w = width in
   let options =
     { Janestreet_style.width = w
+    ; vertically_aligned
     ; parse = { syntax_quotations }
     ; checks =
         { same_ast = ast_check

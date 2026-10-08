@@ -93,7 +93,7 @@ module Pipeline : sig
          result
 
   val tokens_of_tree : Cst.t -> (Tokens.seq, [> Tokens_of_tree.Error.t ]) result
-  val print_doc : width:int -> Document.t -> string
+  val print_doc : vertically_aligned:bool -> width:int -> Document.t -> string
 
   type error =
     [ Tokens_of_tree.Error.t
@@ -107,6 +107,9 @@ end
 module Make (S : Style) (C : Checker) : sig
   type options =
     { width : int
+    ; vertically_aligned : bool
+         (** Vertically align some constructs (cf.
+             [Document.vertically_aligned]). Can make lines go past [width]. *)
     ; parse : Parse.Options.t
     ; checks : Check.Options.t
     ; debug : bool

@@ -133,7 +133,9 @@ module Pipeline = struct
     | Toplevel uf -> Tokens_of_tree.use_file uf
   ;;
 
-  let print_doc ~width doc = Document.Print.to_string ~width doc
+  let print_doc ~vertically_aligned ~width doc =
+    Document.Print.to_string ~vertically_aligned ~width doc
+  ;;
 
   type error =
     [ Tokens_of_tree.Error.t
@@ -159,6 +161,7 @@ end
 module Make (S : Style) (C : Checker) = struct
   type options =
     { width : int
+    ; vertically_aligned : bool
     ; parse : Parse.Options.t
     ; checks : Check.Options.t
     ; debug : bool
@@ -243,7 +246,12 @@ module Make (S : Style) (C : Checker) = struct
            ~render_comment:(S.render_comment opts.style ~format_code_block)
            tokens_post_normalize
     in
-    let output = Pipeline.print_doc ~width:opts.width document in
+    let output =
+      Pipeline.print_doc
+        ~vertically_aligned:opts.vertically_aligned
+        ~width:opts.width
+        document
+    in
     let* () = check_same_ast opts input reference output in
     Ok output
   ;;

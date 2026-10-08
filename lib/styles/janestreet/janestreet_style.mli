@@ -7,6 +7,7 @@ type style_options = { normalize : Normalize.Options.t }
 
 type options =
   { width : int
+  ; vertically_aligned : bool
   ; parse : Parse.Options.t
   ; checks : Stylo.Check.Options.t
   ; debug : bool
@@ -23,6 +24,7 @@ val run : options -> Source.t -> (string, Stylo.Pipeline.error) result
 module Without_normalization : sig
   type options =
     { width : int
+    ; vertically_aligned : bool
     ; parse : Parse.Options.t
     ; checks : Stylo.Check.Options.t
     ; debug : bool
