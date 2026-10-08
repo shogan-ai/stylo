@@ -61,6 +61,9 @@ type t = private
   | Cat of Requirement.t * t * t
   | Nest of Requirement.t * int * Condition.t * t
   | Group of Requirement.t * int * flatness option * t
+  | Alignment_context of Requirement.t * t
+  | Alignment_row of Requirement.t * t
+  | Alignment_point
 and pseudo_token = private
   | Trivial of Requirement.t * string
   | Verbatim of Requirement.t * string * int
@@ -172,6 +175,34 @@ val nest : ?vanish:Condition.t -> int -> t -> t
     checked before the group is traversed, it will be assumed to be non-flat. *)
 val group : ?margin:int -> ?flatness:flatness -> t -> t
 
+(** {2 Vertical alignment} *)
+
+(** [vertically_aligned ~sep rows] is [rows] separated by [sep], with the
+    columns of the rows aligned with each other when the printer's output buffer
+    supports it (cf. [Print.to_string]).
+
+    Columns are delimited by {!alignment_point}s. Only the first line of each
+    row is aligned; points on the following lines are ignored. When more than
+    two lines (e.g. comments) separate two rows, the rows above and below them
+    are aligned independently.
+
+    Padding is added after the layout has been decided, so it can make lines go
+    past the width limit.
+
+    Alignment is disabled if the rows are printed in flat mode. *)
+val vertically_aligned : ?sep:t -> t list -> t
+
+(** Marks the end of a column, cf. {!vertically_aligned}. Outside of a
+    [vertically_aligned] document, it has no effect. *)
+val alignment_point : t
+
 (**/**)
+
+(** Rebuilds an [Alignment_context] node from its (already delimited) content.
+    Only meant to be used when transforming documents. *)
+val alignment_context : t -> t
+
+(** Likewise for [Alignment_row] nodes. *)
+val alignment_row : t -> t
 
 val pp_pseudo : Format.formatter -> pseudo_token -> unit

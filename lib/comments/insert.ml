@@ -78,8 +78,11 @@ let consume_leading_comments ~render_comment =
 let rec first_is_space = function
   | Doc.Whitespace _ -> `yes
   | Token _ | Comment _ | Directive _ -> `no
-  | Group (_, _, _, d) | Nest (_, _, _, d) -> first_is_space d
-  | Empty | Comments_flushing_hint _ -> `maybe
+  | Group (_, _, _, d)
+  | Nest (_, _, _, d)
+  | Alignment_context (_, d)
+  | Alignment_row (_, d) -> first_is_space d
+  | Empty | Comments_flushing_hint _ | Alignment_point -> `maybe
   | Cat (_, d1, d2) ->
     match first_is_space d1 with
     | `maybe -> first_is_space d2
@@ -94,8 +97,11 @@ let rec first_is_flushhint ?pulls_before = function
      | Some value when value <> fh.pull_cmts_attached_before_hint -> `no
      | _ -> `yes)
   | Token _ | Comment _ | Whitespace _ | Directive _ -> `no
-  | Group (_, _, _, d) | Nest (_, _, _, d) -> first_is_flushhint ?pulls_before d
-  | Empty -> `maybe
+  | Group (_, _, _, d)
+  | Nest (_, _, _, d)
+  | Alignment_context (_, d)
+  | Alignment_row (_, d) -> first_is_flushhint ?pulls_before d
+  | Empty | Alignment_point -> `maybe
   | Cat (_, d1, d2) ->
     match first_is_flushhint ?pulls_before d1 with
     | `maybe -> first_is_flushhint ?pulls_before d2
@@ -109,8 +115,9 @@ let first_is_flushhint ?pulls_before d =
 let rec nest_before_leaf = function
   | Doc.Nest _ -> `yes
   | Token _ | Comment _ | Directive _ -> `no
-  | Group (_, _, _, d) -> nest_before_leaf d
-  | Empty | Whitespace _ | Comments_flushing_hint _ -> `maybe
+  | Group (_, _, _, d) | Alignment_context (_, d) | Alignment_row (_, d) ->
+    nest_before_leaf d
+  | Empty | Whitespace _ | Comments_flushing_hint _ | Alignment_point -> `maybe
   | Cat (_, d1, d2) ->
     match nest_before_leaf d1 with
     | `maybe -> nest_before_leaf d2
@@ -314,7 +321,7 @@ let rec walk_both ~render_comment state seq doc =
       attach_before_comments ~render_comment (saw_leaf state) rest doc
 
     (* Whitespace: don't consume token *)
-    | _, Doc.Empty -> seq, doc, state
+    | _, (Doc.Empty | Doc.Alignment_point) -> seq, doc, state
     | _, Doc.Whitespace ws ->
       let with_perhaps_a_bl =
         if not state.at_end_of_a_group
@@ -426,6 +433,12 @@ let rec walk_both ~render_comment state seq doc =
         walk_both ~render_comment (under_nest state) seq doc
       in
       rest, Doc.nest ~vanish i doc, exit_nest state state'
+    | _, Doc.Alignment_context (_, doc) ->
+      let rest, doc, state' = walk_both ~render_comment state seq doc in
+      rest, Doc.alignment_context doc, state'
+    | _, Doc.Alignment_row (_, doc) ->
+      let rest, doc, state' = walk_both ~render_comment state seq doc in
+      rest, Doc.alignment_row doc, state'
     | _, Doc.Group (_, margin, flatness, doc) ->
       traverse_group ~render_comment seq state margin flatness doc
     | (* [Child_node] doesn't appear in linearized token stream *)

@@ -100,6 +100,20 @@ module Make (Buffer : Printing_buffer_intf.S) = struct
         (fun flatness -> (flatness : flatness :> bool ref) := flat)
         flat_track_opt;
       pretty buf state indent flat t
+    | Alignment_context (_, t) ->
+      (* N.B. the padding is not accounted for in [state.column]. *)
+      Buffer.open_alignment_context buf ~enabled:(not flat);
+      let state = pretty buf state indent flat t in
+      Buffer.close_alignment_context buf;
+      state
+    | Alignment_row (_, t) ->
+      Buffer.start_alignment_row buf;
+      let state = pretty buf state indent flat t in
+      Buffer.end_alignment_row buf;
+      state
+    | Alignment_point ->
+      Buffer.alignment_point buf;
+      state
 
   and pp_pseudo buf state indent flat = function
     | Trivial (len, s) -> text buf state indent (`Full len) s
