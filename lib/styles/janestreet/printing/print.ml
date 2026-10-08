@@ -2770,18 +2770,17 @@ end = struct
       | [] -> empty
       | _ -> Core_type.pp_poly_bindings vars ^^ S.dot
     in
-    let name = group (constr_ident name.txt) in
+    let name = group (constr_ident name.txt) ^^ alignment_point in
     let pipe_and_name, pre_nest = Preceeding.group_with pre_pipe name in
     let constr =
       match args, res with
-      | Pcstr_tuple [], None -> pipe_and_name
+      | Pcstr_tuple [], None -> pipe_and_name ^^ alignment_point
       | args, None ->
         group (pipe_and_name ^/^ pre_nest @@ nest 2 S.of_)
-        ^/^ pre_nest
-        @@ nest 2
-        @@ Constructor_arguments.pp args
+        ^/^ (pre_nest @@ nest 2 @@ Constructor_arguments.pp args)
+        ^^ alignment_point
       | Pcstr_tuple [], Some ct ->
-        group (pipe_and_name ^/^ pre_nest @@ nest 2 S.colon)
+        group (pipe_and_name ^/^ alignment_point ^^ pre_nest @@ nest 2 S.colon)
         ^?^ pre_nest
         @@ nest 2 (vars ^?^ Core_type.pp ct)
       | args, Some ct ->
@@ -2791,10 +2790,13 @@ end = struct
              2
              (vars
               ^?^ Constructor_arguments.pp args
-              ^/^ S.rarrow
+              ^/^ alignment_point
+              ^^ S.rarrow
               ^/^ Core_type.pp ct)
     in
+    (* The extra alignment point aligns docstrings. *)
     Attribute.attach ~extra_nest:pre_nest ~attrs (group constr)
+    ^^ alignment_point
     |> Doc.attach ~extra_nest:pre_nest ?post_doc
     |> group
   ;;
@@ -2829,16 +2831,9 @@ end = struct
 
   let pp_variant td_flatness = function
     | [] -> S.pipe
-    | cd :: cds ->
-      let cd = constructor_declaration td_flatness cd in
-      match cds with
-      | [] -> cd
-      | _ ->
-        List.fold_left
-          (fun doc cd ->
-            doc ^^ softest_line ^^ constructor_declaration td_flatness cd)
-          cd
-          cds
+    | cds ->
+      List.map (constructor_declaration td_flatness) cds
+      |> vertically_aligned ~sep:softest_line
   ;;
 
   let type_kind td_flatness = function
