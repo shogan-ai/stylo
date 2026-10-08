@@ -2208,11 +2208,12 @@ end = struct
           true whenever a comment appears in either place... *)
        group
          (guarded_pat ^^ nest 2 pulling_hint)
+       ^^ alignment_point
        ^^ group (break 1 ^^ nest 2 S.rarrow)
        ^^ group (nest 2 (pulling_hint ^/^ body)))
   ;;
 
-  let pp_list = separate_map (break 1) pp
+  let pp_list cases = vertically_aligned ~sep:(break 1) (List.map pp cases)
 end
 
 and Letop : sig
