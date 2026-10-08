@@ -1,0 +1,15 @@
+(* Text containing newlines (quoted strings, comments) ends the first line of
+   the row it's in. *)
+let f = function
+  | A -> {|x
+y|}
+  | Bbbbb -> 2
+  | {|a
+     b|} -> 3
+;;
+
+type t =
+  | A of int (* multi
+
+  line *)
+  | Bbbbbb of string

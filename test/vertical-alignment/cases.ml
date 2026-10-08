@@ -1,0 +1,18 @@
+let f x =
+  match x with
+  | A -> 1
+  | Bbbbbb (x, y) -> 2
+  | C when cond -> 3
+  | Dd -> 4
+;;
+
+let g = function A -> 1 | Bbb -> 2
+
+let h x = try f x with Not_found -> 0 | Invalid_argument _ -> 1
+
+(* Bodies on the next line. *)
+let i = function
+  | A ->
+    some_function_with_a_long_name argument_number_one argument_number_two argument_three
+  | Bbbbbbb -> 2
+;;

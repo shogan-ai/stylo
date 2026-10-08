@@ -1,0 +1,6 @@
+let f x y =
+  match x with
+  | A -> (match y with Z -> 0 | Zzzzz -> 1)
+  | Bbbbbbbb when (match y with Z -> true | _ -> false) -> 2
+  | Cc -> (function Yyyyyyy -> 0 | Y -> 1) y
+;;
