@@ -16,7 +16,7 @@
   ```
   Sample sentence (implementation):
   ```ocaml
-  [%% local_ : type [@ true ] nonrec x1 := <[ _ ]> ]
+  [%% as : type [@ in ] nonrec x1 := <[ _ ]> ]
   ```
 - Derivation (1 occurrence):
   ```
@@ -32,7 +32,7 @@
   ```
   Sample sentence (implementation):
   ```ocaml
-  [%% to : type nonrec x1 := <[ {%ext|s2|} ]> ]
+  [%% or : type nonrec x1 := <[ _ ]> ]
   ```
 - Derivation (1 occurrence):
   ```
@@ -46,7 +46,7 @@
   ```
   Sample sentence (implementation):
   ```ocaml
-  [%% if : type [@ x1 ] nonrec x2 := $ x3 ]
+  [%% x1 : type [@ of ] nonrec x2 := $ x3 ]
   ```
 - Derivation (1 occurrence):
   ```
@@ -60,7 +60,7 @@
   ```
   Sample sentence (implementation):
   ```ocaml
-  [%% layout_ : type nonrec x1 := $ x2 ]
+  [%% then : type nonrec x1 := $ x2 ]
   ```
 
 
