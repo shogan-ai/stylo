@@ -320,6 +320,11 @@ let rec walk_both ~render_comment state seq doc =
       let doc = insert_space_if_required state doc in
       attach_before_comments ~render_comment (saw_leaf state) rest doc
 
+    (* Comments preceeding a row: insert them between rows rather than at the
+       beginning of the row, so that they don't prevent its alignment. *)
+    | T.Comment c, Doc.Alignment_row _ when not (explicitely_inserted c) ->
+      insert_comments_before_subtree ~render_comment seq state doc
+
     (* Whitespace: don't consume token *)
     | _, (Doc.Empty | Doc.Alignment_point) -> seq, doc, state
     | _, Doc.Whitespace ws ->
