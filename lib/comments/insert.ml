@@ -82,7 +82,7 @@ let rec first_is_space = function
   | Nest (_, _, _, d)
   | Alignment_context (_, d)
   | Alignment_row (_, d)
-  | Alignment_cell (_, d) -> first_is_space d
+  | Alignment_cell (_, _, d) -> first_is_space d
   | Empty | Comments_flushing_hint _ -> `maybe
   | Cat (_, d1, d2) ->
     match first_is_space d1 with
@@ -102,7 +102,7 @@ let rec first_is_flushhint ?pulls_before = function
   | Nest (_, _, _, d)
   | Alignment_context (_, d)
   | Alignment_row (_, d)
-  | Alignment_cell (_, d) -> first_is_flushhint ?pulls_before d
+  | Alignment_cell (_, _, d) -> first_is_flushhint ?pulls_before d
   | Empty -> `maybe
   | Cat (_, d1, d2) ->
     match first_is_flushhint ?pulls_before d1 with
@@ -120,7 +120,7 @@ let rec nest_before_leaf = function
   | Group (_, _, _, d)
   | Alignment_context (_, d)
   | Alignment_row (_, d)
-  | Alignment_cell (_, d) -> nest_before_leaf d
+  | Alignment_cell (_, _, d) -> nest_before_leaf d
   | Empty | Whitespace _ | Comments_flushing_hint _ -> `maybe
   | Cat (_, d1, d2) ->
     match nest_before_leaf d1 with
@@ -443,14 +443,11 @@ let rec walk_both ~render_comment state seq doc =
       in
       rest, Doc.nest ~vanish i doc, exit_nest state state'
     | _, Doc.Alignment_context (_, doc) ->
-      let rest, doc, state' = walk_both ~render_comment state seq doc in
-      rest, Doc.alignment_context doc, state'
+      walk_rewrap ~render_comment state seq Doc.alignment_context doc
     | _, Doc.Alignment_row (_, doc) ->
-      let rest, doc, state' = walk_both ~render_comment state seq doc in
-      rest, Doc.alignment_row doc, state'
-    | _, Doc.Alignment_cell (_, doc) ->
-      let rest, doc, state' = walk_both ~render_comment state seq doc in
-      rest, Doc.cell doc, state'
+      walk_rewrap ~render_comment state seq Doc.alignment_row doc
+    | _, Doc.Alignment_cell (_, align, doc) ->
+      walk_rewrap ~render_comment state seq (Doc.cell ~align) doc
     | _, Doc.Group (_, margin, flatness, doc) ->
       traverse_group ~render_comment seq state margin flatness doc
     | (* [Child_node] doesn't appear in linearized token stream *)
@@ -458,6 +455,11 @@ let rec walk_both ~render_comment state seq doc =
       , _ )
     | (* No directives have been inserted prior to reaching us. *) ( _
       , Doc.Directive _ ) -> assert false
+
+(* Walks [doc], the content of a node rebuilt with [rewrap]. *)
+and walk_rewrap ~render_comment state seq rewrap doc =
+  let rest, doc, state' = walk_both ~render_comment state seq doc in
+  rest, rewrap doc, state'
 
 and traverse_group ~render_comment tokens state margin flatness grouped_doc =
   let rest, d, state' =

@@ -1,6 +1,6 @@
 let f x y =
   match x with
-  | A  ->
+  | A ->
     (match y with
      | Z     -> 0
      | Zzzzz -> 1)

@@ -124,9 +124,10 @@ module Make (Buffer : Printing_buffer_intf.S) = struct
       let state = pretty buf state indent flat t in
       Buffer.end_alignment_row buf;
       state
-    | Alignment_cell (_, t) ->
+    | Alignment_cell (_, align, t) ->
+      Buffer.open_cell buf ~align;
       let state = pretty buf state indent flat t in
-      Buffer.alignment_point buf;
+      Buffer.close_cell buf;
       state
 
   and pp_pseudo buf state indent flat = function
@@ -145,7 +146,7 @@ module Make (Buffer : Printing_buffer_intf.S) = struct
 end
 
 module Regular = Make (Regular_buffer)
-module Vertically_aligned = Make (Column_based_buffer)
+module Vertically_aligned = Make (Tabular_buffer)
 
 let to_string ?(vertically_aligned = false) ~width d =
   if vertically_aligned

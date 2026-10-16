@@ -116,6 +116,10 @@ type 'a can_vanish =
   ; value : 'a
   }
 
+type alignment =
+  | Left
+  | Right
+
 type t =
   | Empty
   | Directive of pseudo_token
@@ -136,7 +140,7 @@ type t =
   | Group of Req.t * int * flatness option * t
   | Alignment_context of Req.t * t
   | Alignment_row of Req.t * t
-  | Alignment_cell of Req.t * t
+  | Alignment_cell of Req.t * alignment * t
 and pseudo_token =
   | Trivial of Req.t * string
   | Verbatim of Req.t * string list * int
@@ -180,7 +184,7 @@ let requirement = function
   | Group (r, _, _, _)
   | Alignment_context (r, _)
   | Alignment_row (r, _)
-  | Alignment_cell (r, _) -> r
+  | Alignment_cell (r, _, _) -> r
 ;;
 
 let ws value = Whitespace { vanishing_cond = False; value }
@@ -268,7 +272,7 @@ let vertically_aligned ?(sep = empty) = function
     |> alignment_context
 ;;
 
-let cell t = Alignment_cell (requirement t, t)
+let cell ?(align = Left) t = Alignment_cell (requirement t, align, t)
 
 let flatness_tracker () =
   (* Setting this value to true initially let us assume flatness during the

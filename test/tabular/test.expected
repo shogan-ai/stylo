@@ -1,0 +1,59 @@
+=== nested cells
+Foo of int
+Bar of float         list
+Baz of (unit * char) list
+
+=== terminal cells don't constrain columns
+let a =  some_long_function_call x y
+let bb = 1  (* one *)
+let c =  22 (* twenty-two *)
+
+=== rows with fewer cells, empty trailing cells
+| Int  of int (** foo *)
+| None        (** baz *)
+| Floatttt
+
+=== whitespace in anonymous cells
+x foo |
+x bar |
+
+=== only the first line of a row is aligned
+| A  -> 1
+| Bbbbbbbbbbbbbbbbbb
+  when x -> 2
+| Cc ->
+  3
+
+=== nested contexts
+| A      ->
+| Bbbbbb ->
+  | Z    -> 0
+  | Zzzz -> 1
+| Cc     -> 2
+
+=== right aligned cells are padded at the end of lines
+a =   1
+b = 100
+c =  22
+
+=== left aligned cells at the end of lines don't push right aligned ones
+x =   1
+y = 100
+z = some_long_thing
+
+=== right aligned cells followed by something
+  1, -2;
+100,  3;
+
+=== right aligned leaf in a subdivided column
+| A        int (** a *)
+| B float list (** b *)
+
+=== right aligned cells spanning several lines
+a = 1
+b = [ 100
+    ]
+
+=== flat contexts are not aligned
+a1 bbb2
+

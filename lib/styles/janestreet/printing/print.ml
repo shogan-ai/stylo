@@ -2781,7 +2781,9 @@ end = struct
       | Pcstr_tuple [], Some ct ->
         group (pipe_and_name ^/^ pre_nest @@ nest 2 @@ cell S.colon)
         ^?^ pre_nest
-        @@ nest 2 (cell vars ^?^ cell empty ^^ cell empty ^^ Core_type.pp ct)
+        @@ nest
+             2
+             (cell vars ^?^ cell empty ^^ cell empty ^^ cell (Core_type.pp ct))
       | args, Some ct ->
         group (pipe_and_name ^/^ pre_nest @@ nest 2 @@ cell S.colon)
         ^?^ pre_nest

@@ -18,4 +18,4 @@ type t =
       another_long_type_name
       *
       int
-  | Mid                                    of int
+  | Mid of int

@@ -22,7 +22,7 @@ let ( ^/^ ) t1 t2 = t1 ^^ break 1 ^^ t2
    matter for vertical alignment (e.g. empty cells). *)
 let rec prints_nothing = function
   | Empty -> true
-  | Alignment_cell (_, d) -> prints_nothing d
+  | Alignment_cell (_, _, d) -> prints_nothing d
   | Cat (_, d1, d2) -> prints_nothing d1 && prints_nothing d2
   | _ -> false
 ;;

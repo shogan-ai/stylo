@@ -11,7 +11,7 @@ y|}
 ;;
 
 type t =
-  | A      of
+  | A of
       int
       (* multi
 

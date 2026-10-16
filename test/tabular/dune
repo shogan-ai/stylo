@@ -1,0 +1,13 @@
+(executable
+ (name test)
+ (libraries document))
+
+(rule
+ (with-stdout-to
+  test.output
+  (run ./test.exe)))
+
+(rule
+ (alias runtest)
+ (action
+  (diff test.expected test.output)))

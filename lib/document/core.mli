@@ -41,6 +41,12 @@ type 'a can_vanish =
   ; value : 'a
   }
 
+(** How the content of a cell is placed in its column, when it's narrower than
+    the column. *)
+type alignment =
+  | Left (** Padded on the right. *)
+  | Right (** Padded on the left. *)
+
 type t = private
   | Empty
   | Directive of pseudo_token
@@ -63,7 +69,7 @@ type t = private
   | Group of Requirement.t * int * flatness option * t
   | Alignment_context of Requirement.t * t
   | Alignment_row of Requirement.t * t
-  | Alignment_cell of Requirement.t * t
+  | Alignment_cell of Requirement.t * alignment * t
 and pseudo_token = private
   | Trivial of Requirement.t * string
   | Verbatim of Requirement.t * string list * int
@@ -183,10 +189,11 @@ val group : ?margin:int -> ?flatness:flatness -> t -> t
     columns of the rows aligned with each other when the printer's output buffer
     supports it (cf. [Print.to_string]).
 
-    Columns are delimited by {!cell}s. Only the first line of each row is
-    aligned; cells ending on the following lines are ignored. When more than two
-    lines (e.g. comments) separate two rows, the rows above and below them are
-    aligned independently.
+    Columns are delimited by {!cell}s, which can be nested to subdivide a column
+    (cf. HACKING.md). Only the first line of each row is aligned; cells ending
+    on the following lines are ignored. When more than two lines (e.g. comments,
+    or the following lines of a row) separate the first lines of two rows, the
+    rows above and below them are aligned independently.
 
     Padding is added after the layout has been decided, so it can make lines go
     past the width limit.
@@ -194,10 +201,14 @@ val group : ?margin:int -> ?flatness:flatness -> t -> t
     Alignment is disabled if the rows are printed in flat mode. *)
 val vertically_aligned : ?sep:t -> t list -> t
 
-(** [cell d] is a column of a row, ending right after [d], cf.
-    {!vertically_aligned}. Outside of a [vertically_aligned] document, it is
-    equivalent to [d]. *)
-val cell : t -> t
+(** [cell d] is a column of a row (or a sub-column of an enclosing cell)
+    containing [d], cf. {!vertically_aligned}. [align] defaults to [Left].
+
+    A right aligned cell is padded even when nothing follows it on its line. The
+    alignment of a cell only matters in rows where it isn't subdivided into
+    sub-cells. Outside of a [vertically_aligned] document, it is equivalent to
+    [d]. *)
+val cell : ?align:alignment -> t -> t
 
 (**/**)
 
