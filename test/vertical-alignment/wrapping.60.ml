@@ -1,5 +1,5 @@
-(* The first line of a row is the only one aligned: rows whose alignment points
-   are on the following lines don't contribute to the width of columns. *)
+(* The first line of a row is the only one aligned: rows whose cells end on the
+   following lines don't contribute to the width of columns. *)
 let f x =
   match x with
   | A -> 1

@@ -2207,9 +2207,8 @@ end = struct
           happens to care, it should be noted that the [Condition.t] will be
           true whenever a comment appears in either place... *)
        group
-         (guarded_pat ^^ nest 2 pulling_hint)
-       ^^ alignment_point
-       ^^ group (break 1 ^^ nest 2 S.rarrow)
+         (cell (guarded_pat ^^ nest 2 pulling_hint))
+       ^^ group (break 1 ^^ nest 2 (cell S.rarrow))
        ^^ group (nest 2 (pulling_hint ^/^ body)))
   ;;
 
@@ -2770,33 +2769,32 @@ end = struct
       | [] -> empty
       | _ -> Core_type.pp_poly_bindings vars ^^ S.dot
     in
-    let name = group (constr_ident name.txt) ^^ alignment_point in
+    let name = group (constr_ident name.txt) in
     let pipe_and_name, pre_nest = Preceeding.group_with pre_pipe name in
+    let pipe_and_name = cell pipe_and_name in
     let constr =
       match args, res with
-      | Pcstr_tuple [], None -> pipe_and_name ^^ alignment_point
+      | Pcstr_tuple [], None -> pipe_and_name
       | args, None ->
-        group (pipe_and_name ^/^ pre_nest @@ nest 2 S.of_)
-        ^/^ (pre_nest @@ nest 2 @@ Constructor_arguments.pp args)
-        ^^ alignment_point
+        group (pipe_and_name ^/^ pre_nest @@ nest 2 @@ cell S.of_)
+        ^/^ (pre_nest @@ nest 2 @@ cell @@ Constructor_arguments.pp args)
       | Pcstr_tuple [], Some ct ->
-        group (pipe_and_name ^/^ alignment_point ^^ pre_nest @@ nest 2 S.colon)
+        group (pipe_and_name ^/^ pre_nest @@ nest 2 @@ cell S.colon)
         ^?^ pre_nest
-        @@ nest 2 (vars ^?^ Core_type.pp ct)
+        @@ nest 2 (cell vars ^?^ cell empty ^^ cell empty ^^ Core_type.pp ct)
       | args, Some ct ->
-        group (pipe_and_name ^/^ pre_nest @@ nest 2 S.colon)
+        group (pipe_and_name ^/^ pre_nest @@ nest 2 @@ cell S.colon)
         ^?^ pre_nest
         @@ nest
              2
-             (vars
-              ^?^ Constructor_arguments.pp args
-              ^/^ alignment_point
-              ^^ S.rarrow
-              ^/^ Core_type.pp ct)
+             (cell vars
+              ^?^ cell (Constructor_arguments.pp args)
+              ^/^ cell S.rarrow
+              ^/^ cell (Core_type.pp ct))
     in
-    (* The extra alignment point aligns docstrings. *)
+    (* The extra cell aligns docstrings. *)
     Attribute.attach ~extra_nest:pre_nest ~attrs (group constr)
-    ^^ alignment_point
+    |> cell
     |> Doc.attach ~extra_nest:pre_nest ?post_doc
     |> group
   ;;

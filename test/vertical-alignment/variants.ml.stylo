@@ -1,7 +1,7 @@
 type t =
   | Int   of int   (** foo *)
   | Float of float (** bar *)
-  | None           (** baz *)
+  | None     (** baz *)
 
 type u =
   | A

@@ -63,7 +63,7 @@ type t = private
   | Group of Requirement.t * int * flatness option * t
   | Alignment_context of Requirement.t * t
   | Alignment_row of Requirement.t * t
-  | Alignment_point
+  | Alignment_cell of Requirement.t * t
 and pseudo_token = private
   | Trivial of Requirement.t * string
   | Verbatim of Requirement.t * string list * int
@@ -183,10 +183,10 @@ val group : ?margin:int -> ?flatness:flatness -> t -> t
     columns of the rows aligned with each other when the printer's output buffer
     supports it (cf. [Print.to_string]).
 
-    Columns are delimited by {!alignment_point}s. Only the first line of each
-    row is aligned; points on the following lines are ignored. When more than
-    two lines (e.g. comments) separate two rows, the rows above and below them
-    are aligned independently.
+    Columns are delimited by {!cell}s. Only the first line of each row is
+    aligned; cells ending on the following lines are ignored. When more than two
+    lines (e.g. comments) separate two rows, the rows above and below them are
+    aligned independently.
 
     Padding is added after the layout has been decided, so it can make lines go
     past the width limit.
@@ -194,9 +194,10 @@ val group : ?margin:int -> ?flatness:flatness -> t -> t
     Alignment is disabled if the rows are printed in flat mode. *)
 val vertically_aligned : ?sep:t -> t list -> t
 
-(** Marks the end of a column, cf. {!vertically_aligned}. Outside of a
-    [vertically_aligned] document, it has no effect. *)
-val alignment_point : t
+(** [cell d] is a column of a row, ending right after [d], cf.
+    {!vertically_aligned}. Outside of a [vertically_aligned] document, it is
+    equivalent to [d]. *)
+val cell : t -> t
 
 (**/**)
 

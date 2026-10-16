@@ -81,8 +81,9 @@ let rec first_is_space = function
   | Group (_, _, _, d)
   | Nest (_, _, _, d)
   | Alignment_context (_, d)
-  | Alignment_row (_, d) -> first_is_space d
-  | Empty | Comments_flushing_hint _ | Alignment_point -> `maybe
+  | Alignment_row (_, d)
+  | Alignment_cell (_, d) -> first_is_space d
+  | Empty | Comments_flushing_hint _ -> `maybe
   | Cat (_, d1, d2) ->
     match first_is_space d1 with
     | `maybe -> first_is_space d2
@@ -100,8 +101,9 @@ let rec first_is_flushhint ?pulls_before = function
   | Group (_, _, _, d)
   | Nest (_, _, _, d)
   | Alignment_context (_, d)
-  | Alignment_row (_, d) -> first_is_flushhint ?pulls_before d
-  | Empty | Alignment_point -> `maybe
+  | Alignment_row (_, d)
+  | Alignment_cell (_, d) -> first_is_flushhint ?pulls_before d
+  | Empty -> `maybe
   | Cat (_, d1, d2) ->
     match first_is_flushhint ?pulls_before d1 with
     | `maybe -> first_is_flushhint ?pulls_before d2
@@ -115,9 +117,11 @@ let first_is_flushhint ?pulls_before d =
 let rec nest_before_leaf = function
   | Doc.Nest _ -> `yes
   | Token _ | Comment _ | Directive _ -> `no
-  | Group (_, _, _, d) | Alignment_context (_, d) | Alignment_row (_, d) ->
-    nest_before_leaf d
-  | Empty | Whitespace _ | Comments_flushing_hint _ | Alignment_point -> `maybe
+  | Group (_, _, _, d)
+  | Alignment_context (_, d)
+  | Alignment_row (_, d)
+  | Alignment_cell (_, d) -> nest_before_leaf d
+  | Empty | Whitespace _ | Comments_flushing_hint _ -> `maybe
   | Cat (_, d1, d2) ->
     match nest_before_leaf d1 with
     | `maybe -> nest_before_leaf d2
@@ -326,7 +330,7 @@ let rec walk_both ~render_comment state seq doc =
       insert_comments_before_subtree ~render_comment seq state doc
 
     (* Whitespace: don't consume token *)
-    | _, (Doc.Empty | Doc.Alignment_point) -> seq, doc, state
+    | _, Doc.Empty -> seq, doc, state
     | _, Doc.Whitespace ws ->
       let with_perhaps_a_bl =
         if not state.at_end_of_a_group
@@ -444,6 +448,9 @@ let rec walk_both ~render_comment state seq doc =
     | _, Doc.Alignment_row (_, doc) ->
       let rest, doc, state' = walk_both ~render_comment state seq doc in
       rest, Doc.alignment_row doc, state'
+    | _, Doc.Alignment_cell (_, doc) ->
+      let rest, doc, state' = walk_both ~render_comment state seq doc in
+      rest, Doc.cell doc, state'
     | _, Doc.Group (_, margin, flatness, doc) ->
       traverse_group ~render_comment seq state margin flatness doc
     | (* [Child_node] doesn't appear in linearized token stream *)

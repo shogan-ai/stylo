@@ -124,7 +124,8 @@ module Make (Buffer : Printing_buffer_intf.S) = struct
       let state = pretty buf state indent flat t in
       Buffer.end_alignment_row buf;
       state
-    | Alignment_point ->
+    | Alignment_cell (_, t) ->
+      let state = pretty buf state indent flat t in
       Buffer.alignment_point buf;
       state
 

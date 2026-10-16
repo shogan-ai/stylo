@@ -18,16 +18,23 @@ let foldli f init l =
 
 let ( ^/^ ) t1 t2 = t1 ^^ break 1 ^^ t2
 
+(* Documents which print nothing, but which can't be dropped as they might
+   matter for vertical alignment (e.g. empty cells). *)
+let rec prints_nothing = function
+  | Empty -> true
+  | Alignment_cell (_, d) -> prints_nothing d
+  | Cat (_, d1, d2) -> prints_nothing d1 && prints_nothing d2
+  | _ -> false
+;;
+
 let ( ^?^ ) d1 d2 =
-  match d1, d2 with
-  | Empty, d | d, Empty -> d
-  | _ -> d1 ^/^ d2
+  if prints_nothing d1 || prints_nothing d2 then d1 ^^ d2 else d1 ^/^ d2
 ;;
 
 let ( ^?/^ ) d1 d2 =
-  match d1, d2 with
-  | Empty, d | d, Empty -> d
-  | _ -> d1 ^^ hardline ^^ d2
+  if prints_nothing d1 || prints_nothing d2
+  then d1 ^^ d2
+  else d1 ^^ hardline ^^ d2
 ;;
 
 let separate_map sep f xs =

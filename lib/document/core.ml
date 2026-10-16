@@ -136,7 +136,7 @@ type t =
   | Group of Req.t * int * flatness option * t
   | Alignment_context of Req.t * t
   | Alignment_row of Req.t * t
-  | Alignment_point
+  | Alignment_cell of Req.t * t
 and pseudo_token =
   | Trivial of Req.t * string
   | Verbatim of Req.t * string list * int
@@ -174,12 +174,13 @@ let requirement = function
   | Whitespace { vanishing_cond; value = ws } ->
     let ws_req = ws_req ws in
     Req.if_ vanishing_cond ~then_:(Const 0) ~else_:ws_req.compact_req
-  | Comments_flushing_hint _ | Alignment_point -> Req.of_int 0
+  | Comments_flushing_hint _ -> Req.of_int 0
   | Cat (r, _, _)
   | Nest (r, _, _, _)
   | Group (r, _, _, _)
   | Alignment_context (r, _)
-  | Alignment_row (r, _) -> r
+  | Alignment_row (r, _)
+  | Alignment_cell (r, _) -> r
 ;;
 
 let ws value = Whitespace { vanishing_cond = False; value }
@@ -267,7 +268,7 @@ let vertically_aligned ?(sep = empty) = function
     |> alignment_context
 ;;
 
-let alignment_point = Alignment_point
+let cell t = Alignment_cell (requirement t, t)
 
 let flatness_tracker () =
   (* Setting this value to true initially let us assume flatness during the
