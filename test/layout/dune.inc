@@ -218,3 +218,13 @@
   (alias runtest)
   (action (diff %{dep:tuples.ml.stylo} %{dep:tuples.ml.out})))
 
+(rule
+  (target verbatim_unicode.70.ml.out)
+  (action
+    (with-stdout-to %{target}
+      (run %{project_root}/bin/main.exe style --idempotence-check --width 70 %{dep:verbatim_unicode.70.ml}))))
+
+(rule
+  (alias runtest)
+  (action (diff %{dep:verbatim_unicode.70.ml.stylo} %{dep:verbatim_unicode.70.ml.out})))
+

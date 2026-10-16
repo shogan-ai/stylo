@@ -1,0 +1,9 @@
+(* The width of the last line of a quoted string is measured in
+   characters, not bytes: this case fits on one line. *)
+let () =
+  match x with
+  |
+    {|first line
+éééééééééééééééééééé|} -> some_function argument_one argument_two
+  | _ -> ()
+;;

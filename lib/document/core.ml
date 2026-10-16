@@ -139,7 +139,7 @@ type t =
   | Alignment_point
 and pseudo_token =
   | Trivial of Req.t * string
-  | Verbatim of Req.t * string * int
+  | Verbatim of Req.t * string list * int
   | Complex of Req.t * t
 
 let ws_req = function
@@ -279,7 +279,8 @@ let flatness_tracker () =
 let pp_pseudo ppf pt =
   let s =
     match pt with
-    | Trivial (_, s) | Verbatim (_, s, _) -> s
+    | Trivial (_, s) -> s
+    | Verbatim (_, lines, _) -> String.concat "\n" lines
     | Complex _ -> "<complex>"
   in
   Format.pp_print_string ppf s
@@ -290,7 +291,7 @@ let pseudo_of_string s =
   then
     let lines = String.split_on_char '\n' s in
     let last = Std.List.last lines in
-    Verbatim (Req.infinity, s, String.length last)
+    Verbatim (Req.infinity, lines, strlen last)
   else Trivial (Req.of_int (strlen s), s)
 ;;
 

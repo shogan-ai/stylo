@@ -66,7 +66,9 @@ type t = private
   | Alignment_point
 and pseudo_token = private
   | Trivial of Requirement.t * string
-  | Verbatim of Requirement.t * string * int
+  | Verbatim of Requirement.t * string list * int
+    (** The lines of a token containing newlines, and the length of the last
+        one. *)
   | Complex of Requirement.t * t
 
 val requirement : t -> Requirement.t

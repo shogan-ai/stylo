@@ -5,8 +5,14 @@ module type S = sig
 
   val create : int -> t
   val newline : t -> unit
+
+  (** Spaces are delayed: the ones which are not followed by some text on their
+      line are dropped. *)
   val add_spaces : t -> int -> unit
+
+  (** The string is never empty, and doesn't contain newlines. *)
   val add_string : t -> string -> unit
+
   val contents : t -> string
 
   (** {2 Vertical alignment}

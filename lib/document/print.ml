@@ -28,7 +28,18 @@ module Make (Buffer : Printing_buffer_intf.S) = struct
       { st with column = 0; line }
   ;;
 
-  let text buf state indent len s =
+  let rec add_lines buf = function
+    | [] -> ()
+    | line :: lines ->
+      if line <> "" then Buffer.add_string buf line;
+      (match lines with
+       | [] -> ()
+       | _ ->
+         Buffer.newline buf;
+         add_lines buf lines)
+  ;;
+
+  let text buf state indent content =
     (let state =
        match state.line with
        | Has_text -> state
@@ -36,11 +47,13 @@ module Make (Buffer : Printing_buffer_intf.S) = struct
          Buffer.add_spaces buf indent;
          { state with column = indent }
      in
-     Buffer.add_string buf s;
-     (match len with
-      | `Full slen -> incr_col state (Requirement.to_int slen)
-      | `Last len -> { state with column = len });
-    )
+     match content with
+     | `Full (slen, s) ->
+       Buffer.add_string buf s;
+       incr_col state (Requirement.to_int slen)
+     | `Lines (lines, len) ->
+       add_lines buf lines;
+       { state with column = len })
     |> has_text
   ;;
 
@@ -116,8 +129,8 @@ module Make (Buffer : Printing_buffer_intf.S) = struct
       state
 
   and pp_pseudo buf state indent flat = function
-    | Trivial (len, s) -> text buf state indent (`Full len) s
-    | Verbatim (_, s, len) -> text buf state indent (`Last len) s
+    | Trivial (len, s) -> text buf state indent (`Full (len, s))
+    | Verbatim (_, lines, len) -> text buf state indent (`Lines (lines, len))
     | Complex (_, t) -> pretty buf state indent flat t
   ;;
 
