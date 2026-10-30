@@ -115,7 +115,10 @@ module Make (Buffer : Printing_buffer_intf.S) = struct
       pretty buf state indent flat t
     | Alignment_context (_, t) ->
       (* N.B. the padding is not accounted for in [state.column]. *)
-      Buffer.open_alignment_context buf ~enabled:(not flat);
+      Buffer.open_alignment_context
+        buf
+        ~enabled:(not flat)
+        ~width:state.max_width;
       let state = pretty buf state indent flat t in
       Buffer.close_alignment_context buf;
       state

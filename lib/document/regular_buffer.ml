@@ -33,7 +33,7 @@ let add_string t s =
 let contents t = Buffer.contents t.buf
 
 (* No vertical alignment. *)
-let open_alignment_context _ ~enabled:_ = ()
+let open_alignment_context _ ~enabled:_ ~width:_ = ()
 let close_alignment_context _ = ()
 let start_alignment_row _ = ()
 let end_alignment_row _ = ()

@@ -1,4 +1,4 @@
-(* Padding can make lines go past the width limit. *)
+(* Padding doesn't make lines go past the width limit. *)
 let f = function
   | A -> some_function argument_one
   | Bbbbbbbbbbbbbbbb -> 2

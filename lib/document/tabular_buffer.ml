@@ -1,8 +1,3 @@
-(* The content of tables (enabled alignment contexts) is recorded as a tree,
-   which is rendered when the table is closed, and then replayed into the
-   enclosing context (or the output) as if it had been printed with its padding.
-   *)
-
 module Line_segment = struct
   type t =
     | Text of string
@@ -21,239 +16,200 @@ module Line_segment = struct
         | Spaces n -> acc + n)
       0
   ;;
+
+  (** The width without the trailing spaces, which are not printed. *)
+  let visible_width segs =
+    List.fold_left
+      (fun (visible, width) -> function
+        | Text s ->
+          let width = width + Core.strlen s in
+          width, width
+        | Spaces n -> visible, width + n)
+      (0, 0)
+      segs
+    |> fst
+  ;;
 end
 
-type item =
-  | Seg of Line_segment.t
-  | Newline
-  | Row of item list
-  | Cell of Core.alignment * item list
+module Tree = struct
+  type ('a, 'b) t =
+    | Leaf of 'a * 'b list
+    | Node of 'a * ('a, 'b) t list
 
-(** {1 Rendering of a table} *)
+  (** Iterates over the elements of the leaves, from left to right. *)
+  let rec iter_elements f = function
+    | Leaf (_, l) -> List.iter f l
+    | Node (_, children) -> List.iter (iter_elements f) children
+  ;;
+end
 
-(* A cell of a row, its anonymous cells (see below) being represented as
-   ['anon]s.
+module Cells : sig
+  type alignment =
+    | Right
+    | Left of { followed : bool }
 
-   The sub-cells of a subdivided cell are its explicit cells (the recorded
-   [Cell]s), and the pieces of text around them: these are "anonymous" cells,
-   aligned just like the explicit ones, but which can't be subdivided. They
-   alternate, starting and ending with an anonymous cell (possibly empty):
-   {v a0 c1 a1 ... cn an v}
-   which is represented as [first = a0] and [rest = [(c1, a1); ...; (cn, an)]],
-   [rest] being non-empty. The alternation is what makes the sub-cells of
-   different rows line up.
+  (* The children of a node alternate between anonymous cells (the text around
+     explicit cells) and explicit cells, starting and ending with an anonymous
+     one (possibly empty):
+     {v a0 c1 a1 ... cn an v}
+     That is what makes the cells of different rows line up. *)
+  type t = (alignment, Line_segment.t) Tree.t
 
-   A cell without explicit cells is atomic: its content is a single anonymous
-   cell, which spans the whole cell, and is aligned within it. The content of a
-   subdivided cell can't be aligned: its sub-cells are. *)
-type 'anon cell =
-  | Atomic of Core.alignment * 'anon
-  | Subdivided of
-      { first : 'anon
-      ; rest : ('anon cell * 'anon) list
-      }
+  val of_core_alignment : Core.alignment -> alignment
 
-type anon =
-  { segs : Line_segment.t list
-  ; followed : bool
-  }
+  (** An anonymous cell. *)
+  val anon : Line_segment.t list -> t
 
-type line =
-  | Plain of Line_segment.t list
-  | Aligned of anon cell (** The first line of a row. *)
+  (** {2 Reversed cells}
 
-module Lines : sig
-  val of_items : item list -> line list
-  val blocks : line list -> line list list
+      Cells are accumulated reversed: the lists of children and segments are in
+      reverse order, the head child of a node being the anonymous cell currently
+      being filled. *)
+
+  val add_seg : Line_segment.t -> t -> t
+  val add_cell : t -> t -> t
+
+  (** Cells cut by a newline: only their beginning is on the line, they can't be
+      aligned to the right. *)
+  val cut : t -> t
+
+  (** [finish rev_cells] is the cells of a complete line, in order, each of them
+      telling whether some text follows it on the line. The alignment of
+      subdivided cells doesn't matter. *)
+  val finish : t -> t
 end = struct
+  type alignment =
+    | Right
+    | Left of { followed : bool }
 
-  (* [split_first_line align items] is the cell made of the [items] preceding
-     the first newline, and the items following it, if there is one. *)
-  let rec split_first_line align items =
-    let add_cell c (first, rev_rest) = first, (c, []) :: rev_rest in
-    let add_seg s = function
-      | rev_first, [] -> s :: rev_first, []
-      | rev_first, (c, rev_a) :: rev_rest ->
-        rev_first, (c, s :: rev_a) :: rev_rest
-    in
-    let to_cell align = function
-      | rev_segs, [] -> Atomic (align, List.rev rev_segs)
-      | rev_first, rev_rest ->
-        Subdivided
-          { first = List.rev rev_first
-          ; rest = List.rev_map (fun (c, rev_a) -> c, List.rev rev_a) rev_rest
-          }
-    in
-    let rec loop acc = function
-      | Row _ :: _ ->
-        (* Rows are only recorded directly in tables. *)
-        assert false
-      | [] -> to_cell align acc, None
-      | Seg s :: items -> loop (add_seg s acc) items
-      | Newline :: items ->
-        (* Only the beginning of the cell is on the line, it can't be aligned to
-           the right. *)
-        to_cell Core.Left acc, Some items
-      | Cell (cell_align, cell_items) :: items ->
-        let cell, next_lines = split_first_line cell_align cell_items in
-        let acc = add_cell cell acc in
-        match next_lines with
-        | None -> loop acc items
-        | Some next_items -> to_cell Core.Left acc, Some (next_items @ items)
-    in
-    loop ([], []) items
+  type t = (alignment, Line_segment.t) Tree.t
+
+  let of_core_alignment : Core.alignment -> alignment = function
+    | Left -> Left { followed = false }
+    | Right -> Right
   ;;
 
-  let prepend_spaces spaces cell =
-    let spaces = Line_segment.Spaces spaces in
-    match cell with
-    | Atomic (align, a) -> Atomic (align, spaces :: a)
-    | Subdivided cell -> Subdivided { cell with first = spaces :: cell.first }
+  let anon segs = Tree.Leaf (Left { followed = false }, segs)
+
+  let add_seg_children seg = function
+    | Tree.Leaf (align, segs) :: children ->
+      Tree.Leaf (align, seg :: segs) :: children
+    | _ -> assert false
   ;;
 
-  let append_segments segs = function
-    | Atomic (align, a) -> Atomic (align, a @ segs)
-    | Subdivided cell ->
-      Subdivided
-        { cell with
-          rest = Std.List.map_last ~f:(fun (c, a) -> c, a @ segs) cell.rest
-        }
+  let add_cell_children cell children = anon [] :: cell :: children
+
+  let add_seg seg = function
+    | Tree.Leaf (align, segs) -> Tree.Leaf (align, seg :: segs)
+    | Node (align, children) -> Node (align, add_seg_children seg children)
   ;;
 
-  (* [with_followed row] is [row], its anonymous cells telling whether some text
-     follows them on their line. *)
-  let with_followed row =
-    let rec aux ~followed = function
-      | Atomic (align, segs) ->
-        ( Atomic (align, { segs; followed })
-        , followed || Line_segment.has_text segs )
-      | Subdivided cell ->
-        let rest, first_followed =
-          List.fold_right
-            (fun (c, a) (rest, followed) ->
-              let a = { segs = a; followed } in
-              let c, followed =
-                aux ~followed:(followed || Line_segment.has_text a.segs) c
-              in
-              (c, a) :: rest, followed)
-            cell.rest
-            ([], followed)
+  let add_cell cell = function
+    | Tree.Leaf (align, segs) ->
+      Tree.Node (align, add_cell_children cell [ anon segs ])
+    | Node (align, children) -> Node (align, add_cell_children cell children)
+  ;;
+
+  let cut = function
+    | Tree.Leaf (_, segs) -> Tree.Leaf (Left { followed = false }, segs)
+    | Node (_, children) -> Node (Left { followed = false }, children)
+  ;;
+
+  let finish rev_cells =
+    let rec aux followed = function
+      | Tree.Leaf (align, rev_segs) ->
+        let align =
+          match align with
+          | Right -> Right
+          | Left _ -> Left { followed }
         in
-        ( Subdivided
-            { first = { segs = cell.first; followed = first_followed }; rest }
-        , first_followed || Line_segment.has_text cell.first )
+        ( Tree.Leaf (align, List.rev rev_segs)
+        , followed || Line_segment.has_text rev_segs )
+      | Node (_, rev_children) ->
+        let children, first_followed =
+          List.fold_left
+            (fun (children, followed) c ->
+              let c, followed = aux followed c in
+              c :: children, followed)
+            ([], followed)
+            rev_children
+        in
+        Node (Left { followed }, children), first_followed
     in
-    fst (aux ~followed:false row)
-  ;;
-
-  let of_items items =
-    let aligned row = Aligned (with_followed row) in
-    let mk_line row rev_segs =
-      let segs = List.rev rev_segs in
-      match row with
-      | None -> Plain segs
-      | Some row -> aligned (append_segments segs row)
-    in
-    let rec at_bol rev_lines spaces = function
-      | Seg (Line_segment.Spaces s) :: items ->
-        at_bol rev_lines (s + spaces) items
-      | Row row_items :: items ->
-        let row, next = split_first_line Core.Left row_items in
-        let row = prepend_spaces spaces row in
-        (match next with
-         | None -> rest_of_line rev_lines (Some row) [] items
-         | Some next -> at_bol (aligned row :: rev_lines) 0 (next @ items))
-      | otherwise ->
-        rest_of_line rev_lines None [ Line_segment.Spaces spaces ] otherwise
-    and rest_of_line rev_lines row rev_segs = function
-      | [] -> List.rev (mk_line row rev_segs :: rev_lines)
-      | Seg s :: items -> rest_of_line rev_lines row (s :: rev_segs) items
-      | Newline :: items -> at_bol (mk_line row rev_segs :: rev_lines) 0 items
-      | (Row content | Cell (_, content)) :: items ->
-        (* Rows which can't be aligned, and the cells of the following lines of
-           rows: only their content matters. *)
-        rest_of_line rev_lines row rev_segs (content @ items)
-    in
-    at_bol [] 0 items
-  ;;
-
-  (* Maximum number of lines between two aligned lines (e.g. comments, or the
-     following lines of a multi-line row) for them to still be part of the same
-     block. *)
-  let max_lines_between_rows = 2
-
-  let blocks lines =
-    let ( ++ ) rb rbs = List.rev rb :: rbs in
-    let rec aux rev_blocks rev_block lines_between = function
-      | [] -> List.rev (rev_block ++ rev_blocks)
-      | line :: lines ->
-        match line with
-        | Plain _ ->
-          aux rev_blocks (line :: rev_block) (lines_between + 1) lines
-        | Aligned _ ->
-          if lines_between > max_lines_between_rows
-          then aux (rev_block ++ rev_blocks) [ line ] 0 lines
-          else aux rev_blocks (line :: rev_block) 0 lines
-    in
-    aux [] [] 0 lines
+    fst (aux false rev_cells)
   ;;
 end
 
 module Layout : sig
+  type width =
+    { when_followed : int (** used to compute required padding *)
+    ; longest_content : int
+         (** used when deciding whether some line goes over the max width. *)
+    }
 
-  (* The widths of the cells of the rows of a block, with the same shape as the
-     cells ([cell]): the cells at the same position in the rows get the same
-     width. The [width] of a subdivided cell is at least the width of its
-     sub-cells, more if the cell is wider in the rows where it is atomic. *)
-  type t =
-    | Atomic of int
-    | Subdivided of
-        { width : int
-        ; first : int
-        ; rest : (t * int) list
-        }
+  (* The width of an internal node encompasses the width of its children: the
+     [longest_content] of the root is the width of the widest line. *)
+  type t = (width, unit) Tree.t
 
-  val of_block : line list -> t
-  val width : t -> int
+  val empty : t
+  val width : t -> width
+  val of_cells : Cells.t -> t
+
+  (** as fine grained as both inputs. each node being as wide as the widest of
+      the inputs corresponding nodes *)
+  val merge : t -> t -> t
 end = struct
-  type t =
-    | Atomic of int
-    | Subdivided of
-        { width : int
-        ; first : int
-        ; rest : (t * int) list
-        }
+  type width =
+    { when_followed : int
+    ; longest_content : int
+    }
 
-  let empty = Atomic 0
+  type t = (width, unit) Tree.t
+
+  let zero = { when_followed = 0; longest_content = 0 }
+  let empty = Tree.Leaf (zero, [])
 
   let width = function
-    | Atomic width | Subdivided { width; _ } -> width
+    | Tree.Leaf (w, _) | Node (w, _) -> w
   ;;
 
-  let rest_width =
-    List.fold_left (fun acc (layout, a) -> acc + width layout + a) 0
+  let max_width w1 w2 =
+    { when_followed = max w1.when_followed w2.when_followed
+    ; longest_content = max w1.longest_content w2.longest_content
+    }
   ;;
 
-  let subdivided ?(min_width = 0) first rest =
-    Subdivided { width = max min_width (first + rest_width rest); first; rest }
+  (* [min] accounts for the rows where the node is a leaf. The content of a
+     child extends from the sum of the widths of the preceding ones. *)
+  let node ?(min = zero) children =
+    let sum, longest =
+      List.fold_left
+        (fun (offset, longest) c ->
+          let w = width c in
+          (offset + w.when_followed, max longest (offset + w.longest_content)))
+        (0, 0)
+        children
+    in
+    Tree.Node
+      ( { when_followed = max min.when_followed sum
+        ; longest_content = max min.longest_content longest
+        }
+      , children )
   ;;
 
-  let anon_width a = if a.followed then Line_segment.width a.segs else 0
-
-  (* Cells which are not followed by any text don't constrain the layout: they
-     don't need to be padded. Unless they are right aligned. *)
-  let rec of_cell : anon cell -> t = function
-    | Atomic (Core.Right, a) -> Atomic (Line_segment.width a.segs)
-    | Atomic (Core.Left, a) -> Atomic (anon_width a)
-    | Subdivided { first; rest; _ } ->
-      subdivided
-        (anon_width first)
-        (List.map (fun (c, a) -> of_cell c, anon_width a) rest)
-  ;;
-
-  let of_line = function
-    | Plain _ -> empty
-    | Aligned row -> of_cell row
+  (* Cells which are not followed by any text don't need to be padded. Unless
+     they are right aligned. *)
+  let rec of_cells : Cells.t -> t = function
+    | Tree.Leaf (align, segs) ->
+      let when_followed =
+        match align with
+        | Cells.Right | Left { followed = true } -> Line_segment.width segs
+        | Left { followed = false } -> 0
+      in
+      Tree.Leaf
+        ( { when_followed; longest_content = Line_segment.visible_width segs }
+        , [] )
+    | Node (_, children) -> node (List.map of_cells children)
   ;;
 
   let rec zip_with f xs ys =
@@ -264,245 +220,391 @@ end = struct
 
   let rec merge l1 l2 =
     match l1, l2 with
-    | Atomic w1, Atomic w2 -> Atomic (max w1 w2)
-    | Atomic w, Subdivided l | Subdivided l, Atomic w ->
-      (* The atomic cell spans the whole cell, the sub-cells aren't affected. *)
-      Subdivided { l with width = max w l.width }
-    | Subdivided l1, Subdivided l2 ->
-      (* N.B. the merged sub-cells are at least as wide as the ones of [l1] and
-         of [l2], so the widths of [l1] and [l2] are enough to account for the
-         rows where the cell is atomic. *)
-      subdivided
-        ~min_width:(max l1.width l2.width)
-        (max l1.first l2.first)
-        (zip_with
-           (fun (l1, a1) (l2, a2) -> merge l1 l2, max a1 a2)
-           l1.rest
-           l2.rest)
-  ;;
-
-  let of_block =
-    List.fold_left (fun layout line -> merge layout (of_line line)) empty
+    | Tree.Leaf (w1, _), Tree.Leaf (w2, _) -> Tree.Leaf (max_width w1 w2, [])
+    | Leaf (w, _), Node (w', children) | Node (w', children), Leaf (w, _) ->
+      (* The leaf spans the whole node, the children aren't affected. *)
+      Node (max_width w w', children)
+    | Node (w1, children1), Node (w2, children2) ->
+      (* N.B. the merged children are at least as wide as the ones of [l1] and
+         of [l2], so [w1] and [w2] are enough to account for the rows where the
+         node is a leaf. *)
+      node ~min:(max_width w1 w2) (zip_with merge children1 children2)
   ;;
 end
 
-module Render : sig
+module Line = struct
+  type t =
+    | First_of_row of Cells.t
+    | Plain of Line_segment.t list
+    | Aligned of Cells.t
+      (** A [First_of_row] padded according to the layout of its block. Only
+          produced by [Block.add]. *)
 
-  (* The content of a table, aligned. Only made of [Seg]s and [Newline]s. *)
-  val table : item list -> item list
+end
+
+module Block : sig
+  type t = Layout.t * Line.t list
+  type incomplete
+
+  val create : max_width:int -> max_consecutive_plain_lines:int -> incomplete
+  val add : incomplete -> Line.t -> (incomplete, t * incomplete) Either.t
+  val close : incomplete -> t
+
+  (* [emit_nl] is called before each line. *)
+  val render
+    :  t
+    -> emit_seg:(Line_segment.t -> unit)
+    -> emit_nl:(unit -> unit)
+    -> unit
 end = struct
+  type t = Layout.t * Line.t list
 
-  (* The rendered items are accumulated in reverse order, in [acc]. *)
+  type incomplete =
+    { lines : Line.t list
+    ; nb_plain_since_last_aligned : int
+    ; max_width : int
+    ; max_consecutives_plain : int
+    ; layout : Layout.t
+    }
 
-  let add_segs segs acc = List.fold_left (fun acc s -> Seg s :: acc) acc segs
-
-  let add_spaces n acc =
-    if n > 0 then Seg (Line_segment.Spaces n) :: acc else acc
+  let create ~max_width ~max_consecutive_plain_lines =
+    { lines = []
+    ; nb_plain_since_last_aligned = 0
+    ; max_width
+    ; max_consecutives_plain = max_consecutive_plain_lines
+    ; layout = Layout.empty
+    }
   ;;
 
-  let render_anonymous a width acc =
-    let acc = add_segs a.segs acc in
-    if a.followed
-    then add_spaces (width - Line_segment.width a.segs) acc
-    else acc
+  let close b = b.layout, List.rev b.lines
+
+  let add_plain b line =
+    let nb_plain = b.nb_plain_since_last_aligned + 1 in
+    if nb_plain > b.max_consecutives_plain
+    then
+      Either.Right
+        ( close b
+        , { b with
+            lines = [ line ]
+          ; nb_plain_since_last_aligned = 1
+          ; layout = Layout.empty
+          } )
+    else
+      Either.Left
+        { b with
+          lines = line :: b.lines
+        ; nb_plain_since_last_aligned = nb_plain
+        }
   ;;
 
-  let rec render_cell cell layout acc =
-    match cell, layout with
-    | Atomic (Core.Left, a), _ -> render_anonymous a (Layout.width layout) acc
-    | Atomic (Core.Right, a), _ ->
-      acc
-      |> add_spaces (Layout.width layout - Line_segment.width a.segs)
-      |> add_segs a.segs
-    | Subdivided _, Layout.Atomic _ ->
-      (* The layout was computed from this cell, among others. *)
+  let add b (line : Line.t) =
+    match line with
+    | Line.Plain _ -> add_plain b line
+    | Aligned _ -> invalid_arg "Tabular_buffer.Block.add"
+    | First_of_row cells ->
+      let layout = Layout.merge b.layout (Layout.of_cells cells) in
+      (* N.B. the lines which are too wide without any padding are not aligned
+         either: padding them wouldn't make them fit, but could make the other
+         lines go past [max_width]. *)
+      if (Layout.width layout).longest_content > b.max_width
+      then add_plain b line
+      else
+        Either.Left
+          { b with
+            lines = Aligned cells :: b.lines
+          ; nb_plain_since_last_aligned = 0
+          ; layout
+          }
+  ;;
+
+  let emit_spaces ~emit_seg n = if n > 0 then emit_seg (Line_segment.Spaces n)
+
+  let rec render_cells ~emit_seg (cells : Cells.t) layout =
+    let width = (Layout.width layout).when_followed in
+    match cells, layout with
+    | Tree.Leaf (Cells.Left { followed }, segs), _ ->
+      List.iter emit_seg segs;
+      if followed then emit_spaces ~emit_seg (width - Line_segment.width segs)
+    | Leaf (Right, segs), _ ->
+      emit_spaces ~emit_seg (width - Line_segment.width segs);
+      List.iter emit_seg segs
+    | Node _, Tree.Leaf _ ->
+      (* The layout was computed from these cells, among others. *)
       assert false
-    | Subdivided cell, Layout.Subdivided l ->
-      (* [remaining] is the width of the cell after the sub-cells rendered so
-         far, [followed] tells whether the last of them is followed: once all
-         the sub-cells are rendered, whether [cell] is. If it is, so are all the
-         sub-cells, which were therefore padded to their widths. *)
-      let rec aux ~followed ~remaining rest rest_layouts acc =
-        match rest, rest_layouts with
-        | (c, a) :: rest, (c_layout, w) :: rest_layouts ->
-          acc
-          |> render_cell c c_layout
-          |> render_anonymous a w
-          |> aux
-               ~followed:a.followed
-               ~remaining:(remaining - Layout.width c_layout - w)
-               rest
-               rest_layouts
-        | [], _ -> if followed then add_spaces remaining acc else acc
-        | _ :: _, [] ->
-          (* The layout was computed from this cell, among others. *)
-          assert false
+    | Node (align, children), Tree.Node (_, layouts) ->
+      (* If the node is followed, so are all its children, which were therefore
+         padded to their widths. *)
+      let rec aux children layouts used =
+        match children, layouts with
+        | [], _ ->
+          (match align with
+           | Left { followed = true } -> emit_spaces ~emit_seg (width - used)
+           | _ -> ())
+        | c :: children, l :: layouts ->
+          render_cells ~emit_seg c l;
+          aux children layouts (used + (Layout.width l).when_followed)
+        | _ :: _, [] -> assert false
       in
-      acc
-      |> render_anonymous cell.first l.first
-      |> aux
-           ~followed:cell.first.followed
-           ~remaining:(l.width - l.first)
-           cell.rest
-           l.rest
+      aux children layouts 0
   ;;
 
-  let render_blocks blocks =
-    (* Each line is preceded by a newline, including the first one. *)
-    let render_block acc block =
-      let layout = Layout.of_block block in
-      List.fold_left
-        (fun acc line ->
-          let acc = Newline :: acc in
-          match line with
-          | Plain segs -> add_segs segs acc
-          | Aligned row -> render_cell row layout acc)
-        acc
-        block
-    in
-    match List.rev (List.fold_left render_block [] blocks) with
-    | Newline :: items -> items
-    | _ -> (* There is always at least one line. *) assert false
+  let render (layout, lines) ~emit_seg ~emit_nl =
+    List.iter
+      (fun line ->
+        emit_nl ();
+        match (line : Line.t) with
+        | Plain segs -> List.iter emit_seg segs
+        | First_of_row cells -> Tree.iter_elements emit_seg cells
+        | Aligned cells -> render_cells ~emit_seg cells layout)
+      lines
   ;;
-
-  let table items = Lines.of_items items |> Lines.blocks |> render_blocks
 end
 
-(** {1 Recording} *)
+(* Maximum number of lines between two aligned lines (e.g. comments, or the
+   following lines of a multi-line row) for them to still be part of the same
+   block. *)
+let max_consecutive_plain_lines = 2
 
-type kind =
-  | Table
-  | Aligned_row
-  | Aligned_cell of Core.alignment
-  | Transparent
-    (** Alignment contexts printed in flat mode (their rows are all on the same
-        line, so they wouldn't be aligned anyway), rows which can't be aligned,
-        and cells which are not part of an aligned row: their content is kept,
-        but not their structure. *)
-
-type context =
-  { kind : kind
-  ; mutable rev_items : item list
+(* The rendered lines of a block are written to [parent]. *)
+type block =
+  { mutable b : Block.incomplete
+  ; mutable current_line : Line.t
+       (** Reversed: [Plain] segments, or the [First_of_row] cells of a row
+           which ended on this line (cf. {!Cells}), the rest of the line going
+           into their last anonymous cell. Never [Aligned]. *)
+  ; mutable started : bool (** Some line was written to [parent]. *)
+  ; parent : destination
   }
+and destination =
+  | Block of block
+  | Buffer
+  | Cells of cells
+    (** The (anonymous) cell being filled, in the first line of an aligned row.
+        *)
+
+(* Reversed, cf. {!Cells}. *)
+and cells = { mutable rev_cells : Cells.t }
+
+(* The first line of an aligned row, and its explicit cells (the cells opened
+   directly in the row or in another explicit cell) are [Accumulating]. The
+   other frames are [Passthrough]: in the first line of an aligned row, they are
+   not aligned (no other row can start on that line), only their content is
+   kept. *)
+type alignment_frame =
+  | Accumulating of cells
+  | Passthrough of destination
+
+type alignement_context =
+  | Row of alignment_frame
+  | Cell of alignment_frame
+  | Table of int option * destination
+    (** The maximal width of the lines of enabled tables. Enabled tables only
+        have a block when they are not in the first line of an aligned row. *)
 
 type t =
-  { out : Regular_buffer.t (* Written to when [alignment_context] is empty. *)
-  ; alignment_context : context Stack.t
+  { output : Regular_buffer.t
+  ; context : alignement_context Stack.t
   ; mutable line_has_text : bool
   }
 
 let create n =
-  { out = Regular_buffer.create n
-  ; alignment_context = Stack.create ()
+  { output = Regular_buffer.create n
+  ; context = Stack.create ()
   ; line_has_text = false
   }
 ;;
 
 let contents t =
-  assert (Stack.is_empty t.alignment_context);
-  Regular_buffer.contents t.out
+  assert (Stack.is_empty t.context);
+  Regular_buffer.contents t.output
 ;;
 
-let record context item = context.rev_items <- item :: context.rev_items
+(** {1 Destinations} *)
+
+let new_block ~parent ~width =
+  { b = Block.create ~max_width:width ~max_consecutive_plain_lines
+  ; current_line = Line.Plain []
+  ; started = false
+  ; parent
+  }
+;;
+
+let add_segment_to t dest seg =
+  match dest, (seg : Line_segment.t) with
+  | Buffer, Text s -> Regular_buffer.add_string t.output s
+  | Buffer, Spaces n -> Regular_buffer.add_spaces t.output n
+  | Block blk, _ ->
+    blk.current_line
+    <- (match blk.current_line with
+        | Plain segs -> Plain (seg :: segs)
+        | First_of_row cells -> First_of_row (Cells.add_seg seg cells)
+        | Aligned _ -> assert false)
+  | Cells c, _ -> c.rev_cells <- Cells.add_seg seg c.rev_cells
+;;
+
+let rec newline_to t = function
+  | Buffer -> Regular_buffer.newline t.output
+  | Cells _ ->
+    (* Blocks are never written to the first line of an aligned row. *)
+    assert false
+  | Block blk ->
+    let line : Line.t =
+      match blk.current_line with
+      | Plain rev_segs -> Plain (List.rev rev_segs)
+      | First_of_row rev_cells -> First_of_row (Cells.finish rev_cells)
+      | Aligned _ -> assert false
+    in
+    blk.current_line <- Plain [];
+    add_line t blk line
+
+and add_line t blk line =
+  match Block.add blk.b line with
+  | Either.Left b -> blk.b <- b
+  | Either.Right (block, b) ->
+    blk.b <- b;
+    render t blk block
+
+and render t blk block =
+  Block.render block ~emit_seg:(add_segment_to t blk.parent) ~emit_nl:(fun () ->
+    if blk.started then newline_to t blk.parent else blk.started <- true)
+;;
+
+(* Adds the current line (which isn't followed by a newline) to the block, and
+   renders it. *)
+let flush t blk =
+  newline_to t (Block blk);
+  render t blk (Block.close blk.b)
+;;
+
+(** {1 Frames} *)
+
+let destination t =
+  match Stack.top_opt t.context with
+  | None -> Buffer
+  | Some (Row (Passthrough d) | Cell (Passthrough d) | Table (_, d)) -> d
+  | Some (Row (Accumulating c) | Cell (Accumulating c)) -> Cells c
+;;
+
+(* A newline in the first line of an aligned row: the explicit cells are folded
+   into the row, which is then added to its table, and the frames become
+   [Passthrough] the destination of the row. *)
+let cut t =
+  let rec pop_frames popped =
+    let frame = Stack.pop t.context in
+    match frame, Stack.top_opt t.context with
+    | Row (Accumulating c), Some (Table (_, Block blk)) ->
+      blk.current_line <- First_of_row c.rev_cells;
+      Stack.push (Row (Passthrough (Block blk))) t.context;
+      List.fold_left
+        (fun dest frame ->
+          let frame, dest =
+            match frame with
+            | Row _ -> Row (Passthrough dest), dest
+            | Cell _ -> Cell (Passthrough dest), dest
+            | Table ((None as width), _) -> Table (width, dest), dest
+            | Table ((Some w as width), _) ->
+              let dest = Block (new_block ~parent:dest ~width:w) in
+              Table (width, dest), dest
+          in
+          Stack.push frame t.context;
+          dest)
+        (Block blk)
+        popped
+      |> ignore
+    | ( Cell (Accumulating c)
+      , Some (Row (Accumulating parent) | Cell (Accumulating parent)) ) ->
+      parent.rev_cells
+      <- Cells.add_cell (Cells.cut c.rev_cells) parent.rev_cells;
+      pop_frames (frame :: popped)
+    | (Row (Passthrough _) | Cell (Passthrough _) | Table _), _ ->
+      pop_frames (frame :: popped)
+    | (Row (Accumulating _) | Cell (Accumulating _)), _ -> assert false
+  in
+  pop_frames []
+;;
+
+(** {1 Printing buffer API} *)
 
 let add_spaces t n =
-  if n > 0
-  then (
-    match Stack.top_opt t.alignment_context with
-    | None -> Regular_buffer.add_spaces t.out n
-    | Some
-        ({ rev_items = Seg (Line_segment.Spaces m) :: rev_items; _ } as context)
-      -> context.rev_items <- Seg (Line_segment.Spaces (m + n)) :: rev_items
-    | Some context -> record context (Seg (Line_segment.Spaces n)))
-;;
-
-let newline t =
-  t.line_has_text <- false;
-  match Stack.top_opt t.alignment_context with
-  | None -> Regular_buffer.newline t.out
-  | Some context -> record context Newline
+  if n > 0 then add_segment_to t (destination t) (Line_segment.Spaces n)
 ;;
 
 let add_string t s =
   t.line_has_text <- true;
-  match Stack.top_opt t.alignment_context with
-  | None -> Regular_buffer.add_string t.out s
-  | Some context -> record context (Seg (Line_segment.Text s))
+  add_segment_to t (destination t) (Line_segment.Text s)
 ;;
 
-let push_context t kind =
-  Stack.push { kind; rev_items = [] } t.alignment_context
+let newline t =
+  t.line_has_text <- false;
+  match destination t with
+  | Cells _ ->
+    cut t;
+    newline_to t (destination t)
+  | dest -> newline_to t dest
 ;;
 
-let pop t =
-  let context = Stack.pop t.alignment_context in
-  List.rev context.rev_items, context.kind
-;;
-
-(* Adds [items], which only contain [Seg]s and [Newline]s, to the enclosing
-   context (or the output). That is the case of the rendered tables, and of the
-   content of the contexts which don't keep their structure: the rows and cells
-   they contain don't keep their structure either, and tables are rendered when
-   they are closed. *)
-let splice t items =
-  match Stack.top_opt t.alignment_context with
-  | None ->
-    List.iter
-      (function
-        | Seg (Line_segment.Text s) -> add_string t s
-        | Seg (Line_segment.Spaces n) -> add_spaces t n
-        | Newline -> newline t
-        | Row _ | Cell _ -> assert false)
-      items
-  | Some parent -> parent.rev_items <- List.rev_append items parent.rev_items
-;;
-
-(** {1 Alignment API} *)
-
-let open_alignment_context t ~enabled =
-  push_context t (if enabled then Table else Transparent)
+let open_alignment_context t ~enabled ~width =
+  let dest = destination t in
+  let table =
+    match dest, enabled with
+    | (Block _ | Buffer), true ->
+      Table (Some width, Block (new_block ~parent:dest ~width))
+    | Cells _, true -> Table (Some width, dest)
+    | _, false -> Table (None, dest)
+  in
+  Stack.push table t.context
 ;;
 
 let close_alignment_context t =
-  match pop t with
-  | items, Table -> splice t (Render.table items)
-  | items, Transparent -> splice t items
-  | _ -> invalid_arg "Tabular_buffer.close_alignment_context"
+  match Stack.pop t.context with
+  | Table (Some _, Block blk) -> flush t blk
+  | Table (Some _, Cells _) | Table (None, _) -> ()
+  | Table (Some _, Buffer) | Row _ | Cell _ ->
+    invalid_arg "Tabular_buffer.close_alignment_context"
 ;;
 
 let start_alignment_row t =
-  let kind =
-    (* Rows starting after some text (e.g. sharing a line with another row) are
-       not aligned. *)
-    match t.line_has_text, Stack.top_opt t.alignment_context with
-    | false, Some { kind = Table; _ } -> Aligned_row
-    | _ -> Transparent
+  let frame =
+    match Stack.top_opt t.context with
+    | Some (Table (Some _, Block ({ current_line = Plain segs; _ } as blk)))
+      when not t.line_has_text ->
+      (* Rows starting after some text (e.g. sharing a line with another row)
+         are not aligned. The spaces preceding the row are part of its first
+         cell. *)
+      blk.current_line <- Plain [];
+      Accumulating { rev_cells = Cells.anon segs }
+    | _ -> Passthrough (destination t)
   in
-  push_context t kind
+  Stack.push (Row frame) t.context
 ;;
 
 let end_alignment_row t =
-  match pop t with
-  | items, Aligned_row -> record (Stack.top t.alignment_context) (Row items)
-  | items, Transparent -> splice t items
-  | _ -> invalid_arg "Tabular_buffer.end_alignment_row"
+  match Stack.pop t.context with
+  | Row (Passthrough _) -> ()
+  | Row (Accumulating c) ->
+    (match Stack.top t.context with
+     | Table (_, Block blk) -> blk.current_line <- First_of_row c.rev_cells
+     | _ -> assert false)
+  | Table _ | Cell _ -> invalid_arg "Tabular_buffer.end_alignment_row"
 ;;
 
 let open_cell t ~align =
-  let kind =
-    (* Cells are only aligned in aligned rows: the innermost context is enough
-       to tell. *)
-    match Stack.top_opt t.alignment_context with
-    | Some { kind = Aligned_row | Aligned_cell _; _ } -> Aligned_cell align
-    | _ -> Transparent
+  let frame =
+    match Stack.top_opt t.context with
+    | Some (Row (Accumulating _) | Cell (Accumulating _)) ->
+      Accumulating { rev_cells = Tree.Leaf (Cells.of_core_alignment align, []) }
+    | _ -> Passthrough (destination t)
   in
-  push_context t kind
+  Stack.push (Cell frame) t.context
 ;;
 
 let close_cell t =
-  match pop t with
-  | items, Aligned_cell align ->
-    record (Stack.top t.alignment_context) (Cell (align, items))
-  | items, Transparent -> splice t items
-  | _ -> invalid_arg "Tabular_buffer.close_cell"
+  match Stack.pop t.context with
+  | Cell (Passthrough _) -> ()
+  | Cell (Accumulating c) ->
+    (match Stack.top t.context with
+     | Row (Accumulating parent) | Cell (Accumulating parent) ->
+       parent.rev_cells <- Cells.add_cell c.rev_cells parent.rev_cells
+     | _ -> assert false)
+  | Table _ | Row _ -> invalid_arg "Tabular_buffer.close_cell"
 ;;

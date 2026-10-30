@@ -24,7 +24,7 @@ module type S = sig
       A buffer is free to ignore these. *)
 
   (** [enabled] is [false] when the rows are printed in flat mode. *)
-  val open_alignment_context : t -> enabled:bool -> unit
+  val open_alignment_context : t -> enabled:bool -> width:int -> unit
 
   val close_alignment_context : t -> unit
   val start_alignment_row : t -> unit
