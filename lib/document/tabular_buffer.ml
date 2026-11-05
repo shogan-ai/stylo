@@ -1,34 +1,40 @@
-module Line_segment = struct
+module Line_segment : sig
   type t =
     | Text of string
     | Spaces of int
 
-  let has_text =
-    List.exists (function
-      | Text _ -> true
-      | Spaces _ -> false)
-  ;;
-
-  let width =
-    List.fold_left
-      (fun acc -> function
-        | Text s -> acc + Core.strlen s
-        | Spaces n -> acc + n)
-      0
-  ;;
+  val has_text : t list -> bool
+  val width : t list -> int
 
   (** The width without the trailing spaces, which are not printed. *)
-  let visible_width segs =
-    List.fold_left
-      (fun (visible, width) -> function
-        | Text s ->
-          let width = width + Core.strlen s in
-          width, width
-        | Spaces n -> visible, width + n)
-      (0, 0)
-      segs
-    |> fst
+  val visible_width : t list -> int
+end = struct
+  type t =
+    | Text of string
+    | Spaces of int
+
+  let is_text = function
+    | Text _ -> true
+    | Spaces _ -> false
   ;;
+
+  let has_text = List.exists is_text
+
+  let add_width acc = function
+    | Text s -> acc + Core.strlen s
+    | Spaces n -> acc + n
+  ;;
+
+  let width = List.fold_left add_width 0
+
+  let add_visible_width (visible, width) = function
+    | Text s ->
+      let width = width + Core.strlen s in
+      width, width
+    | Spaces n -> visible, width + n
+  ;;
+
+  let visible_width segs = fst (List.fold_left add_visible_width (0, 0) segs)
 end
 
 module Tree = struct
@@ -44,50 +50,31 @@ module Tree = struct
 end
 
 module Cells : sig
-  type alignment =
+  type alignment = private
     | Right
     | Left of { followed : bool }
 
   (* The children of a node alternate between anonymous cells (the text around
      explicit cells) and explicit cells, starting and ending with an anonymous
      one (possibly empty):
-     {v a0 c1 a1 ... cn an v}
-     That is what makes the cells of different rows line up. *)
+     {v a0 c1 a1 ... cn an v} *)
   type t = (alignment, Line_segment.t) Tree.t
 
-  (** {2 Reversed cells}
-
-      Cells are accumulated reversed: the lists of children and segments are in
-      reverse order, the head child of a node being the anonymous cell currently
-      being filled. *)
-
-  (** Used for the text following a row on its line. *)
-  val add_seg : Line_segment.t -> t -> t
-
-  (** Cells being accumulated, the segments of the anonymous cell being filled
-      being kept apart: adding a segment doesn't rebuild the cells. *)
   module Acc : sig
-    type cells := t
+    type cell := t
     type t
 
     (** [create align rev_segs] is a cell starting with [rev_segs]. *)
     val create : Core.alignment -> Line_segment.t list -> t
 
     val add_seg : t -> Line_segment.t -> unit
-    val add_cell : t -> cells -> unit
-
-    (** The reversed cells. *)
-    val contents : t -> cells
-
-    (** [contents], for a cell cut by a newline: only its beginning is on the
-        line, it can't be aligned to the right. *)
-    val cut : t -> cells
+    val add_cell : t -> cell -> unit
+    val freeze : reason:[ `explicit_close | `newline ] -> t -> cell
   end
 
-  (** [finish rev_cells] is the cells of a complete line, in order, each of them
-      telling whether some text follows it on the line. The alignment of
-      subdivided cells doesn't matter. *)
-  val finish : t -> t
+  (** [complete_line acc] is the cells of a complete line, in order, each of
+      them telling whether some text follows it on the line. *)
+  val complete_line : Acc.t -> t
 end = struct
   type alignment =
     | Right
@@ -102,24 +89,13 @@ end = struct
 
   let anon segs = Tree.Leaf (Left { followed = false }, segs)
 
-  let add_seg_children seg = function
-    | Tree.Leaf (align, segs) :: children ->
-      Tree.Leaf (align, seg :: segs) :: children
-    | _ -> assert false
-  ;;
-
-  let add_seg seg = function
-    | Tree.Leaf (align, segs) -> Tree.Leaf (align, seg :: segs)
-    | Node (align, children) -> Node (align, add_seg_children seg children)
-  ;;
-
   module Acc = struct
     type cells = t
 
     type t =
       { align : alignment
       ; mutable rev_children : cells list
-           (** All the children, but the anonymous one being filled. *)
+           (** All the children, except for the anonymous one being filled. *)
       ; mutable rev_segs : Line_segment.t list
            (** The segments of the anonymous cell being filled. *)
       }
@@ -131,25 +107,28 @@ end = struct
     let add_seg acc seg = acc.rev_segs <- seg :: acc.rev_segs
 
     let add_cell acc cell =
+      (* an explicit cell closes the anonymous one before it and opens a new one
+         after. *)
       acc.rev_children <- cell :: anon acc.rev_segs :: acc.rev_children;
       acc.rev_segs <- []
     ;;
 
-    let contents acc =
+    let freeze ~reason acc =
       match acc.rev_children with
-      | [] -> Tree.Leaf (acc.align, acc.rev_segs)
+      | [] ->
+        (match reason with
+         | `explicit_close -> Tree.Leaf (acc.align, acc.rev_segs)
+         | `newline ->
+           anon
+             acc.rev_segs
+             (* we can't right-align if we don't have all the content, so we
+                always left-align. *)
+        )
       | children -> Node (acc.align, anon acc.rev_segs :: children)
-    ;;
-
-    (* N.B. the alignment of nodes doesn't matter. *)
-    let cut acc =
-      match acc.rev_children with
-      | [] -> anon acc.rev_segs
-      | _ -> contents acc
     ;;
   end
 
-  let finish rev_cells =
+  let complete_line acc =
     let rec aux followed = function
       | Tree.Leaf (align, rev_segs) ->
         let align =
@@ -170,12 +149,12 @@ end = struct
         in
         Node (Left { followed }, children), first_followed
     in
-    fst (aux false rev_cells)
+    fst (aux false (Acc.freeze ~reason:`newline acc))
   ;;
 end
 
 module Layout : sig
-  type width =
+  type width = private
     { when_followed : int (** used to compute required padding *)
     ; longest_content : int
          (** used when deciding whether some line goes over the max width. *)
@@ -264,34 +243,55 @@ end = struct
 end
 
 module Line = struct
-  type t =
-    | First_of_row of Cells.t
-    | Plain of Line_segment.t list
-    | Aligned of Cells.t
-      (** A [First_of_row] padded according to the layout of its block. Only
-          produced by [Block.add]. *)
 
+  (** A complete line of a nested block, whose layout is final. *)
+  type rendered =
+    | Plain of Line_segment.t list
+    | Unpadded of Cells.t
+    | Aligned of Layout.t * Cells.t
+    | Nested of rendered * Line_segment.t list
+
+  type 'a t =
+    | First_of_row of 'a
+    | Plain of Line_segment.t list
+    | Nested of rendered * Line_segment.t list
+      (** A line starting with the line of a nested block. *)
+
+  (** the line is complete, everything is in the order of the input *)
+  type complete = Cells.t t
+
+  (** the line is incomplete, parts are stored in reverse order *)
+  type accumulating = Cells.Acc.t t
 end
 
 module Block : sig
-  type t = Layout.t * Line.t list
+  type t
   type incomplete
 
   val create : max_width:int -> max_consecutive_plain_lines:int -> incomplete
-  val add : incomplete -> Line.t -> (incomplete, t * incomplete) Either.t
+  val add : incomplete -> Line.complete -> (incomplete, t * incomplete) Either.t
   val close : incomplete -> t
 
   (* [emit_nl] is called before each line. *)
   val render
     :  t
-    -> emit_seg:(Line_segment.t -> unit)
+    -> emit_line:(Line.rendered -> unit)
     -> emit_nl:(unit -> unit)
     -> unit
+
+  val iter_rendered : (Line_segment.t -> unit) -> Line.rendered -> unit
 end = struct
-  type t = Layout.t * Line.t list
+  type line =
+    | Plain of Line_segment.t list
+    | Nested of Line.rendered * Line_segment.t list
+    | Unpadded of Cells.t
+      (** A row which is not aligned with the other ones of its block. *)
+    | Aligned of Cells.t (** Padded according to the layout of its block. *)
+
+  type t = Layout.t * line list
 
   type incomplete =
-    { lines : Line.t list
+    { lines : line list
     ; nb_plain_since_last_aligned : int
     ; max_width : int
     ; max_consecutives_plain : int
@@ -328,17 +328,17 @@ end = struct
         }
   ;;
 
-  let add b (line : Line.t) =
+  let add b (line : Line.complete) =
     match line with
-    | Line.Plain _ -> add_plain b line
-    | Aligned _ -> invalid_arg "Tabular_buffer.Block.add"
+    | Plain segs -> add_plain b (Plain segs)
+    | Nested (line, segs) -> add_plain b (Nested (line, segs))
     | First_of_row cells ->
       let layout = Layout.update b.layout cells in
       (* N.B. the lines which are too wide without any padding are not aligned
          either: padding them wouldn't make them fit, but could make the other
          lines go past [max_width]. *)
       if (Layout.width layout).longest_content > b.max_width
-      then add_plain b line
+      then add_plain b (Unpadded cells)
       else
         Either.Left
           { b with
@@ -379,14 +379,28 @@ end = struct
       aux children layouts 0
   ;;
 
-  let render (layout, lines) ~emit_seg ~emit_nl =
+  let rendered_of_line layout : line -> Line.rendered = function
+    | Plain segs -> Plain segs
+    | Nested (line, []) -> line
+    | Nested (line, segs) -> Nested (line, segs)
+    | Unpadded cells -> Unpadded cells
+    | Aligned cells -> Aligned (layout, cells)
+  ;;
+
+  let rec iter_rendered f : Line.rendered -> unit = function
+    | Plain segs -> List.iter f segs
+    | Unpadded cells -> Tree.iter_elements f cells
+    | Aligned (layout, cells) -> render_cells ~emit_seg:f cells layout
+    | Nested (line, segs) ->
+      iter_rendered f line;
+      List.iter f segs
+  ;;
+
+  let render (layout, lines) ~emit_line ~emit_nl =
     List.iter
       (fun line ->
         emit_nl ();
-        match (line : Line.t) with
-        | Plain segs -> List.iter emit_seg segs
-        | First_of_row cells -> Tree.iter_elements emit_seg cells
-        | Aligned cells -> render_cells ~emit_seg cells layout)
+        emit_line (rendered_of_line layout line))
       lines
   ;;
 end
@@ -399,10 +413,7 @@ let max_consecutive_plain_lines = 2
 (* The rendered lines of a block are written to [parent]. *)
 type block =
   { mutable b : Block.incomplete
-  ; mutable current_line : Line.t
-       (** Reversed: [Plain] segments, or the [First_of_row] cells of a row
-           which ended on this line (cf. {!Cells}), the rest of the line going
-           into their last anonymous cell. Never [Aligned]. *)
+  ; mutable current_line : Line.accumulating
   ; mutable started : bool (** Some line was written to [parent]. *)
   ; parent : destination
   }
@@ -450,7 +461,7 @@ let contents t =
 
 let new_block ~parent ~width =
   { b = Block.create ~max_width:width ~max_consecutive_plain_lines
-  ; current_line = Line.Plain []
+  ; current_line = Plain []
   ; started = false
   ; parent
   }
@@ -461,12 +472,21 @@ let add_segment_to t dest seg =
   | Buffer, Text s -> Regular_buffer.add_string t.output s
   | Buffer, Spaces n -> Regular_buffer.add_spaces t.output n
   | Block blk, _ ->
-    blk.current_line
-    <- (match blk.current_line with
-        | Plain segs -> Plain (seg :: segs)
-        | First_of_row cells -> First_of_row (Cells.add_seg seg cells)
-        | Aligned _ -> assert false)
+    (match blk.current_line with
+     | Plain segs -> blk.current_line <- Plain (seg :: segs)
+     | Nested (line, segs) -> blk.current_line <- Nested (line, seg :: segs)
+     | First_of_row c -> Cells.Acc.add_seg c seg)
   | Cells c, _ -> Cells.Acc.add_seg c seg
+;;
+
+(* A line of a nested block is only kept as is when it starts the line of its
+   parent. Otherwise it is copied: that only happens to the first line of a
+   nested block, which is on a line where rows aren't aligned. *)
+let add_rendered_to t dest (line : Line.rendered) =
+  match dest with
+  | Block ({ current_line = Plain []; _ } as blk) ->
+    blk.current_line <- Nested (line, [])
+  | _ -> Block.iter_rendered (add_segment_to t dest) line
 ;;
 
 let rec newline_to t = function
@@ -475,11 +495,11 @@ let rec newline_to t = function
     (* Blocks are never written to the first line of an aligned row. *)
     assert false
   | Block blk ->
-    let line : Line.t =
+    let line : Line.complete =
       match blk.current_line with
       | Plain rev_segs -> Plain (List.rev rev_segs)
-      | First_of_row rev_cells -> First_of_row (Cells.finish rev_cells)
-      | Aligned _ -> assert false
+      | Nested (line, rev_segs) -> Nested (line, List.rev rev_segs)
+      | First_of_row c -> First_of_row (Cells.complete_line c)
     in
     blk.current_line <- Plain [];
     add_line t blk line
@@ -492,8 +512,11 @@ and add_line t blk line =
     render t blk block
 
 and render t blk block =
-  Block.render block ~emit_seg:(add_segment_to t blk.parent) ~emit_nl:(fun () ->
-    if blk.started then newline_to t blk.parent else blk.started <- true)
+  Block.render
+    block
+    ~emit_line:(add_rendered_to t blk.parent)
+    ~emit_nl:(fun () ->
+      if blk.started then newline_to t blk.parent else blk.started <- true)
 ;;
 
 (* Adds the current line (which isn't followed by a newline) to the block, and
@@ -520,7 +543,7 @@ let cut t =
     let frame = Stack.pop t.context in
     match frame, Stack.top_opt t.context with
     | Row (Accumulating c), Some (Table (_, Block blk)) ->
-      blk.current_line <- First_of_row (Cells.Acc.contents c);
+      blk.current_line <- First_of_row c;
       Stack.push (Row (Passthrough (Block blk))) t.context;
       List.fold_left
         (fun dest frame ->
@@ -540,7 +563,7 @@ let cut t =
       |> ignore
     | ( Cell (Accumulating c)
       , Some (Row (Accumulating parent) | Cell (Accumulating parent)) ) ->
-      Cells.Acc.add_cell parent (Cells.Acc.cut c);
+      Cells.Acc.add_cell parent (Cells.Acc.freeze ~reason:`newline c);
       pop_frames (frame :: popped)
     | (Row (Passthrough _) | Cell (Passthrough _) | Table _), _ ->
       pop_frames (frame :: popped)
@@ -599,6 +622,15 @@ let start_alignment_row t =
          cell. *)
       blk.current_line <- Plain [];
       Accumulating (Cells.Acc.create Left segs)
+    | Some
+        (Table
+           (Some _, Block ({ current_line = Nested (line, segs); _ } as blk)))
+      when not t.line_has_text ->
+      (* A nested line without any text. *)
+      let rev_segs = ref [] in
+      Block.iter_rendered (fun seg -> rev_segs := seg :: !rev_segs) line;
+      blk.current_line <- Plain [];
+      Accumulating (Cells.Acc.create Left (segs @ !rev_segs))
     | _ -> Passthrough (destination t)
   in
   Stack.push (Row frame) t.context
@@ -609,8 +641,7 @@ let end_alignment_row t =
   | Row (Passthrough _) -> ()
   | Row (Accumulating c) ->
     (match Stack.top t.context with
-     | Table (_, Block blk) ->
-       blk.current_line <- First_of_row (Cells.Acc.contents c)
+     | Table (_, Block blk) -> blk.current_line <- First_of_row c
      | _ -> assert false)
   | Table _ | Cell _ -> invalid_arg "Tabular_buffer.end_alignment_row"
 ;;
@@ -631,7 +662,7 @@ let close_cell t =
   | Cell (Accumulating c) ->
     (match Stack.top t.context with
      | Row (Accumulating parent) | Cell (Accumulating parent) ->
-       Cells.Acc.add_cell parent (Cells.Acc.contents c)
+       Cells.Acc.add_cell parent (Cells.Acc.freeze ~reason:`explicit_close c)
      | _ -> assert false)
   | Table _ | Row _ -> invalid_arg "Tabular_buffer.close_cell"
 ;;
