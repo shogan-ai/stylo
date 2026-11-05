@@ -55,23 +55,34 @@ module Cells : sig
      That is what makes the cells of different rows line up. *)
   type t = (alignment, Line_segment.t) Tree.t
 
-  val of_core_alignment : Core.alignment -> alignment
-
-  (** An anonymous cell. *)
-  val anon : Line_segment.t list -> t
-
   (** {2 Reversed cells}
 
       Cells are accumulated reversed: the lists of children and segments are in
       reverse order, the head child of a node being the anonymous cell currently
       being filled. *)
 
+  (** Used for the text following a row on its line. *)
   val add_seg : Line_segment.t -> t -> t
-  val add_cell : t -> t -> t
 
-  (** Cells cut by a newline: only their beginning is on the line, they can't be
-      aligned to the right. *)
-  val cut : t -> t
+  (** Cells being accumulated, the segments of the anonymous cell being filled
+      being kept apart: adding a segment doesn't rebuild the cells. *)
+  module Acc : sig
+    type cells := t
+    type t
+
+    (** [create align rev_segs] is a cell starting with [rev_segs]. *)
+    val create : Core.alignment -> Line_segment.t list -> t
+
+    val add_seg : t -> Line_segment.t -> unit
+    val add_cell : t -> cells -> unit
+
+    (** The reversed cells. *)
+    val contents : t -> cells
+
+    (** [contents], for a cell cut by a newline: only its beginning is on the
+        line, it can't be aligned to the right. *)
+    val cut : t -> cells
+  end
 
   (** [finish rev_cells] is the cells of a complete line, in order, each of them
       telling whether some text follows it on the line. The alignment of
@@ -97,23 +108,46 @@ end = struct
     | _ -> assert false
   ;;
 
-  let add_cell_children cell children = anon [] :: cell :: children
-
   let add_seg seg = function
     | Tree.Leaf (align, segs) -> Tree.Leaf (align, seg :: segs)
     | Node (align, children) -> Node (align, add_seg_children seg children)
   ;;
 
-  let add_cell cell = function
-    | Tree.Leaf (align, segs) ->
-      Tree.Node (align, add_cell_children cell [ anon segs ])
-    | Node (align, children) -> Node (align, add_cell_children cell children)
-  ;;
+  module Acc = struct
+    type cells = t
 
-  let cut = function
-    | Tree.Leaf (_, segs) -> Tree.Leaf (Left { followed = false }, segs)
-    | Node (_, children) -> Node (Left { followed = false }, children)
-  ;;
+    type t =
+      { align : alignment
+      ; mutable rev_children : cells list
+           (** All the children, but the anonymous one being filled. *)
+      ; mutable rev_segs : Line_segment.t list
+           (** The segments of the anonymous cell being filled. *)
+      }
+
+    let create align rev_segs =
+      { align = of_core_alignment align; rev_children = []; rev_segs }
+    ;;
+
+    let add_seg acc seg = acc.rev_segs <- seg :: acc.rev_segs
+
+    let add_cell acc cell =
+      acc.rev_children <- cell :: anon acc.rev_segs :: acc.rev_children;
+      acc.rev_segs <- []
+    ;;
+
+    let contents acc =
+      match acc.rev_children with
+      | [] -> Tree.Leaf (acc.align, acc.rev_segs)
+      | children -> Node (acc.align, anon acc.rev_segs :: children)
+    ;;
+
+    (* N.B. the alignment of nodes doesn't matter. *)
+    let cut acc =
+      match acc.rev_children with
+      | [] -> anon acc.rev_segs
+      | _ -> contents acc
+    ;;
+  end
 
   let finish rev_cells =
     let rec aux followed = function
@@ -153,11 +187,11 @@ module Layout : sig
 
   val empty : t
   val width : t -> width
-  val of_cells : Cells.t -> t
 
-  (** as fine grained as both inputs. each node being as wide as the widest of
-      the inputs corresponding nodes *)
-  val merge : t -> t -> t
+  (** [update t cells] is [t] updated to take [cells] into account: as fine
+      grained as both, each node being as wide as the widest of the
+      corresponding node of [t] and cell of [cells]. *)
+  val update : t -> Cells.t -> t
 end = struct
   type width =
     { when_followed : int
@@ -181,7 +215,7 @@ end = struct
 
   (* [min] accounts for the rows where the node is a leaf. The content of a
      child extends from the sum of the widths of the preceding ones. *)
-  let node ?(min = zero) children =
+  let node ~min children =
     let sum, longest =
       List.fold_left
         (fun (offset, longest) c ->
@@ -199,36 +233,33 @@ end = struct
 
   (* Cells which are not followed by any text don't need to be padded. Unless
      they are right aligned. *)
-  let rec of_cells : Cells.t -> t = function
-    | Tree.Leaf (align, segs) ->
-      let when_followed =
-        match align with
-        | Cells.Right | Left { followed = true } -> Line_segment.width segs
-        | Left { followed = false } -> 0
-      in
-      Tree.Leaf
-        ( { when_followed; longest_content = Line_segment.visible_width segs }
-        , [] )
-    | Node (_, children) -> node (List.map of_cells children)
+  let leaf_width (align : Cells.alignment) segs =
+    let when_followed =
+      match align with
+      | Right | Left { followed = true } -> Line_segment.width segs
+      | Left { followed = false } -> 0
+    in
+    { when_followed; longest_content = Line_segment.visible_width segs }
   ;;
 
-  let rec zip_with f xs ys =
-    match xs, ys with
-    | [], l | l, [] -> l
-    | x :: xs, y :: ys -> f x y :: zip_with f xs ys
-  ;;
-
-  let rec merge l1 l2 =
-    match l1, l2 with
-    | Tree.Leaf (w1, _), Tree.Leaf (w2, _) -> Tree.Leaf (max_width w1 w2, [])
-    | Leaf (w, _), Node (w', children) | Node (w', children), Leaf (w, _) ->
+  let rec update layout (cells : Cells.t) =
+    match layout, cells with
+    | Tree.Leaf (w, _), Tree.Leaf (align, segs) ->
+      Tree.Leaf (max_width w (leaf_width align segs), [])
+    | Node (w, children), Leaf (align, segs) ->
       (* The leaf spans the whole node, the children aren't affected. *)
-      Node (max_width w w', children)
-    | Node (w1, children1), Node (w2, children2) ->
-      (* N.B. the merged children are at least as wide as the ones of [l1] and
-         of [l2], so [w1] and [w2] are enough to account for the rows where the
-         node is a leaf. *)
-      node ~min:(max_width w1 w2) (zip_with merge children1 children2)
+      Node (max_width w (leaf_width align segs), children)
+    | Leaf (w, _), Node (_, cells) -> node ~min:w (update_children [] cells)
+    | Node (w, children), Node (_, cells) ->
+      (* N.B. the updated children are at least as wide as the ones of [layout],
+         so [w] is enough to account for the rows where the node is a leaf. *)
+      node ~min:w (update_children children cells)
+
+  and update_children children cells =
+    match children, cells with
+    | children, [] -> children
+    | [], c :: cells -> update empty c :: update_children [] cells
+    | l :: children, c :: cells -> update l c :: update_children children cells
   ;;
 end
 
@@ -302,7 +333,7 @@ end = struct
     | Line.Plain _ -> add_plain b line
     | Aligned _ -> invalid_arg "Tabular_buffer.Block.add"
     | First_of_row cells ->
-      let layout = Layout.merge b.layout (Layout.of_cells cells) in
+      let layout = Layout.update b.layout cells in
       (* N.B. the lines which are too wide without any padding are not aligned
          either: padding them wouldn't make them fit, but could make the other
          lines go past [max_width]. *)
@@ -378,12 +409,8 @@ type block =
 and destination =
   | Block of block
   | Buffer
-  | Cells of cells
-    (** The (anonymous) cell being filled, in the first line of an aligned row.
-        *)
-
-(* Reversed, cf. {!Cells}. *)
-and cells = { mutable rev_cells : Cells.t }
+  | Cells of Cells.Acc.t
+    (** The cell being filled, in the first line of an aligned row. *)
 
 (* The first line of an aligned row, and its explicit cells (the cells opened
    directly in the row or in another explicit cell) are [Accumulating]. The
@@ -391,7 +418,7 @@ and cells = { mutable rev_cells : Cells.t }
    not aligned (no other row can start on that line), only their content is
    kept. *)
 type alignment_frame =
-  | Accumulating of cells
+  | Accumulating of Cells.Acc.t
   | Passthrough of destination
 
 type alignement_context =
@@ -439,7 +466,7 @@ let add_segment_to t dest seg =
         | Plain segs -> Plain (seg :: segs)
         | First_of_row cells -> First_of_row (Cells.add_seg seg cells)
         | Aligned _ -> assert false)
-  | Cells c, _ -> c.rev_cells <- Cells.add_seg seg c.rev_cells
+  | Cells c, _ -> Cells.Acc.add_seg c seg
 ;;
 
 let rec newline_to t = function
@@ -493,7 +520,7 @@ let cut t =
     let frame = Stack.pop t.context in
     match frame, Stack.top_opt t.context with
     | Row (Accumulating c), Some (Table (_, Block blk)) ->
-      blk.current_line <- First_of_row c.rev_cells;
+      blk.current_line <- First_of_row (Cells.Acc.contents c);
       Stack.push (Row (Passthrough (Block blk))) t.context;
       List.fold_left
         (fun dest frame ->
@@ -513,8 +540,7 @@ let cut t =
       |> ignore
     | ( Cell (Accumulating c)
       , Some (Row (Accumulating parent) | Cell (Accumulating parent)) ) ->
-      parent.rev_cells
-      <- Cells.add_cell (Cells.cut c.rev_cells) parent.rev_cells;
+      Cells.Acc.add_cell parent (Cells.Acc.cut c);
       pop_frames (frame :: popped)
     | (Row (Passthrough _) | Cell (Passthrough _) | Table _), _ ->
       pop_frames (frame :: popped)
@@ -572,7 +598,7 @@ let start_alignment_row t =
          are not aligned. The spaces preceding the row are part of its first
          cell. *)
       blk.current_line <- Plain [];
-      Accumulating { rev_cells = Cells.anon segs }
+      Accumulating (Cells.Acc.create Left segs)
     | _ -> Passthrough (destination t)
   in
   Stack.push (Row frame) t.context
@@ -583,7 +609,8 @@ let end_alignment_row t =
   | Row (Passthrough _) -> ()
   | Row (Accumulating c) ->
     (match Stack.top t.context with
-     | Table (_, Block blk) -> blk.current_line <- First_of_row c.rev_cells
+     | Table (_, Block blk) ->
+       blk.current_line <- First_of_row (Cells.Acc.contents c)
      | _ -> assert false)
   | Table _ | Cell _ -> invalid_arg "Tabular_buffer.end_alignment_row"
 ;;
@@ -592,7 +619,7 @@ let open_cell t ~align =
   let frame =
     match Stack.top_opt t.context with
     | Some (Row (Accumulating _) | Cell (Accumulating _)) ->
-      Accumulating { rev_cells = Tree.Leaf (Cells.of_core_alignment align, []) }
+      Accumulating (Cells.Acc.create align [])
     | _ -> Passthrough (destination t)
   in
   Stack.push (Cell frame) t.context
@@ -604,7 +631,7 @@ let close_cell t =
   | Cell (Accumulating c) ->
     (match Stack.top t.context with
      | Row (Accumulating parent) | Cell (Accumulating parent) ->
-       parent.rev_cells <- Cells.add_cell c.rev_cells parent.rev_cells
+       Cells.Acc.add_cell parent (Cells.Acc.contents c)
      | _ -> assert false)
   | Table _ | Row _ -> invalid_arg "Tabular_buffer.close_cell"
 ;;
