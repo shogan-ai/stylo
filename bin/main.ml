@@ -135,9 +135,7 @@ module Arg = struct
 end
 
 let do_style run options kind fname ?(lnum = 1) source =
-  let input =
-    { Ocaml_syntax.Source.fname; source; start_line = lnum; kind }
-  in
+  let input = { Ocaml_syntax.Source.fname; source; start_line = lnum; kind } in
   (run options input
    : (string, Stylo.Pipeline.error) result
    :> (string, [> Stylo.Pipeline.error ]) result)

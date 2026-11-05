@@ -434,7 +434,11 @@ let tokenizer =
     method! toplevel_directive dir =
       let sub_tokens = super#toplevel_directive dir in
       let node_toks = dir.pdir_tokens in
-      combine_children "toplevel_directive" ~loc:dir.pdir_loc node_toks sub_tokens
+      combine_children
+        "toplevel_directive"
+        ~loc:dir.pdir_loc
+        node_toks
+        sub_tokens
 
     method! use_file uf =
       let sub_tokens = super#use_file uf in
