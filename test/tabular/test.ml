@@ -9,6 +9,8 @@ let print name ?(width = 80) d =
 (* Rows are separated by hardlines, so they are never flat. *)
 let table rows = vertically_aligned ~sep:hardline rows
 
+let row a b = cell (string a) ^^ nbsp ^^ cell (string b)
+
 let () =
   print
     "nested cells"
@@ -89,5 +91,47 @@ let () =
        [ cell (string "a =") ^^ string " " ^^ right (string "1")
        ; cell (string "b =") ^^ string " " ^^ right (string "[ 100" ^^ hardline ^^ string "    ]")
        ]);
+  print
+    "text after a table: the last row isn't aligned if it would overflow"
+    ~width:14
+    (table [ row "aaaaaaaaaa" "b"; row "a" "b" ] ^^ string ")))))");
+  print
+    "text after a table: the last row is still aligned if it fits"
+    ~width:17
+    (table [ row "aaaaaaaaaa" "b"; row "a" "b" ] ^^ string ")))))");
+  print
+    "text after a table: trailing spaces don't count"
+    ~width:14
+    (table [ row "aaaaaaaaaa" "b"; row "a" "b" ] ^^ nbsp ^^ nbsp ^^ nbsp);
+  print
+    "text after a table: only the last row is affected"
+    ~width:14
+    (table [ row "a" "b"; row "aaaaaaaaaa" "b"; row "a" "b" ] ^^ string ")))))");
+  print
+    "text after nested tables, closed on the same line"
+    ~width:16
+    (table
+       [ string "x"
+         ^^ hardline
+         ^^ table [ row "aaaaaaaaaa" "b"; row "a" "b" ]
+         ^^ string ")))"
+       ]
+     ^^ string ")))");
+  print
+    "text after a table, in a row of the parent table"
+    ~width:14
+    (table
+       [ string "x"
+         ^^ hardline
+         ^^ table [ row "aaaaaaaaaa" "b"; row "a" "b" ]
+         ^^ string ")))))"
+       ; string "y"
+       ]);
+  print
+    "text after a table, before another table on the same line"
+    ~width:14
+    (table [ row "aaaaaaaaaa" "b"; row "a" "b" ]
+     ^^ string ")))))"
+     ^^ table [ row "c" "d"; row "ccc" "d" ]);
   print "flat contexts are not aligned" (group (vertically_aligned ~sep:(break 1) [ cell (string "a") ^^ string "1"; cell (string "bbb") ^^ string "2" ]))
 ;;

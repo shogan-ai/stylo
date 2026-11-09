@@ -243,25 +243,31 @@ end = struct
 end
 
 module Line = struct
-
-  (** A complete line of a nested block, whose layout is final. *)
-  type rendered =
-    | Plain of Line_segment.t list
-    | Unpadded of Cells.t
-    | Aligned of Layout.t * Cells.t
-    | Nested of rendered * Line_segment.t list
+  type row =
+    { cells : Cells.t
+    ; aligned : bool (** Padded according to the layout of its block. *)
+    ; tail : Line_segment.t list
+         (** What follows the row once its table is closed: not part of any
+             cell, and only the last row of a table can have some. *)
+    }
 
   type 'a t =
-    | First_of_row of 'a
+    | Tabular of 'a (** A line holding the cells of a row, in some form. *)
     | Plain of Line_segment.t list
     | Nested of rendered * Line_segment.t list
       (** A line starting with the line of a nested block. *)
+
+  (** A complete line of a nested block, whose layout is final. *)
+  and rendered = (Layout.t * row) t
 
   (** the line is complete, everything is in the order of the input *)
   type complete = Cells.t t
 
   (** the line is incomplete, parts are stored in reverse order *)
   type accumulating = Cells.Acc.t t
+
+  (** its block has decided how to lay it out *)
+  type placed = row t
 end
 
 module Block : sig
@@ -269,7 +275,16 @@ module Block : sig
   type incomplete
 
   val create : max_width:int -> max_consecutive_plain_lines:int -> incomplete
-  val add : incomplete -> Line.complete -> (incomplete, t * incomplete) Either.t
+
+  (** [add b line ~tail] adds [line] to [b], followed by [tail]. [tail] isn't
+      part of any cell: it doesn't affect the layout, but a row is only aligned
+      if [tail] still fits. *)
+  val add
+    :  incomplete
+    -> Line.complete
+    -> tail:Line_segment.t list
+    -> (incomplete, t * incomplete) Either.t
+
   val close : incomplete -> t
 
   (* [emit_nl] is called before each line. *)
@@ -281,17 +296,10 @@ module Block : sig
 
   val iter_rendered : (Line_segment.t -> unit) -> Line.rendered -> unit
 end = struct
-  type line =
-    | Plain of Line_segment.t list
-    | Nested of Line.rendered * Line_segment.t list
-    | Unpadded of Cells.t
-      (** A row which is not aligned with the other ones of its block. *)
-    | Aligned of Cells.t (** Padded according to the layout of its block. *)
-
-  type t = Layout.t * line list
+  type t = Layout.t * Line.placed list
 
   type incomplete =
-    { lines : line list
+    { lines : Line.placed list
     ; nb_plain_since_last_aligned : int
     ; max_width : int
     ; max_consecutives_plain : int
@@ -309,7 +317,7 @@ end = struct
 
   let close b = b.layout, List.rev b.lines
 
-  let add_plain b line =
+  let add_unaligned b line =
     let nb_plain = b.nb_plain_since_last_aligned + 1 in
     if nb_plain > b.max_consecutives_plain
     then
@@ -326,26 +334,6 @@ end = struct
           lines = line :: b.lines
         ; nb_plain_since_last_aligned = nb_plain
         }
-  ;;
-
-  let add b (line : Line.complete) =
-    match line with
-    | Plain segs -> add_plain b (Plain segs)
-    | Nested (line, segs) -> add_plain b (Nested (line, segs))
-    | First_of_row cells ->
-      let layout = Layout.update b.layout cells in
-      (* N.B. the lines which are too wide without any padding are not aligned
-         either: padding them wouldn't make them fit, but could make the other
-         lines go past [max_width]. *)
-      if (Layout.width layout).longest_content > b.max_width
-      then add_plain b (Unpadded cells)
-      else
-        Either.Left
-          { b with
-            lines = Aligned cells :: b.lines
-          ; nb_plain_since_last_aligned = 0
-          ; layout
-          }
   ;;
 
   let emit_spaces ~emit_seg n = if n > 0 then emit_seg (Line_segment.Spaces n)
@@ -379,21 +367,59 @@ end = struct
       aux children layouts 0
   ;;
 
-  let rendered_of_line layout : line -> Line.rendered = function
+  let rendered_width layout cells =
+    let width = ref 0 in
+    render_cells
+      ~emit_seg:(fun seg -> width := !width + Line_segment.width [ seg ])
+      cells
+      layout;
+    !width
+  ;;
+
+  let add_row b cells ~tail =
+    let layout = Layout.update b.layout cells in
+    (* N.B. the lines which are too wide without any padding are not aligned
+       either: padding them wouldn't make them fit, but could make the other
+       lines go past [max_width]. A row with a [tail] is the last one of the
+       block: the layout is final, so we know where [tail] starts. *)
+    if (Layout.width layout).longest_content > b.max_width
+       || (Line_segment.has_text tail
+           && rendered_width layout cells + Line_segment.visible_width tail
+              > b.max_width)
+    then add_unaligned b (Tabular { cells; aligned = false; tail })
+    else
+      Either.Left
+        { b with
+          lines = Tabular { cells; aligned = true; tail } :: b.lines
+        ; nb_plain_since_last_aligned = 0
+        ; layout
+        }
+  ;;
+
+  let add b (line : Line.complete) ~tail =
+    match line with
+    | Plain segs -> add_unaligned b (Plain (segs @ tail))
+    | Nested (line, segs) -> add_unaligned b (Nested (line, segs @ tail))
+    | Tabular cells -> add_row b cells ~tail
+  ;;
+
+  let rendered_of_line layout : Line.placed -> Line.rendered = function
     | Plain segs -> Plain segs
     | Nested (line, []) -> line
-    | Nested (line, segs) -> Nested (line, segs)
-    | Unpadded cells -> Unpadded cells
-    | Aligned cells -> Aligned (layout, cells)
+    | Nested (line, tail) -> Nested (line, tail)
+    | Tabular row -> Tabular (layout, row)
   ;;
 
   let rec iter_rendered f : Line.rendered -> unit = function
     | Plain segs -> List.iter f segs
-    | Unpadded cells -> Tree.iter_elements f cells
-    | Aligned (layout, cells) -> render_cells ~emit_seg:f cells layout
     | Nested (line, segs) ->
       iter_rendered f line;
       List.iter f segs
+    | Tabular (layout, { cells; aligned; tail }) ->
+      if aligned
+      then render_cells ~emit_seg:f cells layout
+      else Tree.iter_elements f cells;
+      List.iter f tail
   ;;
 
   let render (layout, lines) ~emit_line ~emit_nl =
@@ -443,18 +469,23 @@ type t =
   { output : Regular_buffer.t
   ; context : alignement_context Stack.t
   ; mutable line_has_text : bool
+  ; mutable closed : block list
+       (** The blocks of the tables closed on the current line, which are
+           therefore not rendered yet: what follows might not fit next to their
+           last row. The most recently closed one, which is the outermost, comes
+           first. *)
+  ; mutable rev_tail : Line_segment.t list
+       (** What was printed on the current line since the first table of
+           [closed] was closed. *)
   }
 
 let create n =
   { output = Regular_buffer.create n
   ; context = Stack.create ()
   ; line_has_text = false
+  ; closed = []
+  ; rev_tail = []
   }
-;;
-
-let contents t =
-  assert (Stack.is_empty t.context);
-  Regular_buffer.contents t.output
 ;;
 
 (** {1 Destinations} *)
@@ -475,7 +506,7 @@ let add_segment_to t dest seg =
     (match blk.current_line with
      | Plain segs -> blk.current_line <- Plain (seg :: segs)
      | Nested (line, segs) -> blk.current_line <- Nested (line, seg :: segs)
-     | First_of_row c -> Cells.Acc.add_seg c seg)
+     | Tabular c -> Cells.Acc.add_seg c seg)
   | Cells c, _ -> Cells.Acc.add_seg c seg
 ;;
 
@@ -494,18 +525,19 @@ let rec newline_to t = function
   | Cells _ ->
     (* Blocks are never written to the first line of an aligned row. *)
     assert false
-  | Block blk ->
-    let line : Line.complete =
-      match blk.current_line with
-      | Plain rev_segs -> Plain (List.rev rev_segs)
-      | Nested (line, rev_segs) -> Nested (line, List.rev rev_segs)
-      | First_of_row c -> First_of_row (Cells.complete_line c)
-    in
-    blk.current_line <- Plain [];
-    add_line t blk line
+  | Block blk -> add_current_line t blk ~tail:[]
 
-and add_line t blk line =
-  match Block.add blk.b line with
+and add_current_line t blk ~tail =
+  let line : Line.complete =
+    match blk.current_line with
+    | Plain rev_segs -> Plain (List.rev rev_segs)
+    | Nested (line, rev_segs) -> Nested (line, List.rev rev_segs)
+    | Tabular c -> Tabular (Cells.complete_line c)
+  in
+  blk.current_line <- Plain [];
+  update_block t blk (Block.add blk.b line ~tail)
+
+and update_block t blk = function
   | Either.Left b -> blk.b <- b
   | Either.Right (block, b) ->
     blk.b <- b;
@@ -519,11 +551,25 @@ and render t blk block =
       if blk.started then newline_to t blk.parent else blk.started <- true)
 ;;
 
-(* Adds the current line (which isn't followed by a newline) to the block, and
-   renders it. *)
-let flush t blk =
-  newline_to t (Block blk);
+(* Adds the current line (which isn't followed by a newline), continued by
+   [tail], to the block, and renders it. *)
+let flush t ~tail blk =
+  add_current_line t blk ~tail;
   render t blk (Block.close blk.b)
+;;
+
+(* Renders the blocks of the tables closed on the current line, from the
+   innermost one, whose last line is the one being printed. That's the line
+   [t.rev_tail] continues, the other blocks have nothing to add to it. *)
+let render_closed t =
+  match List.rev t.closed with
+  | [] -> ()
+  | innermost :: others ->
+    let tail = List.rev t.rev_tail in
+    t.closed <- [];
+    t.rev_tail <- [];
+    flush t ~tail innermost;
+    List.iter (flush t ~tail:[]) others
 ;;
 
 (** {1 Frames} *)
@@ -543,7 +589,7 @@ let cut t =
     let frame = Stack.pop t.context in
     match frame, Stack.top_opt t.context with
     | Row (Accumulating c), Some (Table (_, Block blk)) ->
-      blk.current_line <- First_of_row c;
+      blk.current_line <- Tabular c;
       Stack.push (Row (Passthrough (Block blk))) t.context;
       List.fold_left
         (fun dest frame ->
@@ -574,17 +620,32 @@ let cut t =
 
 (** {1 Printing buffer API} *)
 
-let add_spaces t n =
-  if n > 0 then add_segment_to t (destination t) (Line_segment.Spaces n)
+(* N.B. [t.closed] is always empty when there is an [Accumulating] frame:
+   opening one renders them, and tables only have a block once the frame is cut.
+   *)
+
+let contents t =
+  assert (Stack.is_empty t.context);
+  render_closed t;
+  Regular_buffer.contents t.output
 ;;
+
+let add_segment t seg =
+  match t.closed with
+  | [] -> add_segment_to t (destination t) seg
+  | _ :: _ -> t.rev_tail <- seg :: t.rev_tail
+;;
+
+let add_spaces t n = if n > 0 then add_segment t (Line_segment.Spaces n)
 
 let add_string t s =
   t.line_has_text <- true;
-  add_segment_to t (destination t) (Line_segment.Text s)
+  add_segment t (Line_segment.Text s)
 ;;
 
 let newline t =
   t.line_has_text <- false;
+  render_closed t;
   match destination t with
   | Cells _ ->
     cut t;
@@ -593,6 +654,8 @@ let newline t =
 ;;
 
 let open_alignment_context t ~enabled ~width =
+  (* The block of the new table would need to know about the closed ones. *)
+  if enabled then render_closed t;
   let dest = destination t in
   let table =
     match dest, enabled with
@@ -606,13 +669,15 @@ let open_alignment_context t ~enabled ~width =
 
 let close_alignment_context t =
   match Stack.pop t.context with
-  | Table (Some _, Block blk) -> flush t blk
+  | Table (Some _, Block blk) -> t.closed <- blk :: t.closed
   | Table (Some _, Cells _) | Table (None, _) -> ()
   | Table (Some _, Buffer) | Row _ | Cell _ ->
     invalid_arg "Tabular_buffer.close_alignment_context"
 ;;
 
 let start_alignment_row t =
+  (* With nothing but spaces on the line, the row is possibly aligned. *)
+  if not t.line_has_text then render_closed t;
   let frame =
     match Stack.top_opt t.context with
     | Some (Table (Some _, Block ({ current_line = Plain segs; _ } as blk)))
@@ -641,7 +706,7 @@ let end_alignment_row t =
   | Row (Passthrough _) -> ()
   | Row (Accumulating c) ->
     (match Stack.top t.context with
-     | Table (_, Block blk) -> blk.current_line <- First_of_row c
+     | Table (_, Block blk) -> blk.current_line <- Tabular c
      | _ -> assert false)
   | Table _ | Cell _ -> invalid_arg "Tabular_buffer.end_alignment_row"
 ;;

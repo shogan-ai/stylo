@@ -54,6 +54,39 @@ a = 1
 b = [ 100
     ]
 
+=== text after a table: the last row isn't aligned if it would overflow
+aaaaaaaaaa b
+a b)))))
+
+=== text after a table: the last row is still aligned if it fits
+aaaaaaaaaa b
+a          b)))))
+
+=== text after a table: trailing spaces don't count
+aaaaaaaaaa b
+a          b
+
+=== text after a table: only the last row is affected
+a          b
+aaaaaaaaaa b
+a b)))))
+
+=== text after nested tables, closed on the same line
+x
+aaaaaaaaaa b
+a b))))))
+
+=== text after a table, in a row of the parent table
+x
+aaaaaaaaaa b
+a b)))))
+y
+
+=== text after a table, before another table on the same line
+aaaaaaaaaa b
+a b)))))c d
+ccc d
+
 === flat contexts are not aligned
 a1 bbb2
 
