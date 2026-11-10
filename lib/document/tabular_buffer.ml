@@ -1,3 +1,54 @@
+(** {1 Pipeline}
+
+    The printer's output goes through a stack of frames (tables, rows, cells),
+    each writing to a destination: the final [Buffer], the current line of an
+    enclosing table's [Block], or the [Cells] of the row being aligned.
+
+    Each enabled table has a block, which holds its lines until its layout is
+    final. Only the first line of a row is aligned, and only if the row starts
+    its line: that line is accumulated as a tree of cells, until the first
+    newline [cut]s it and hands it to the block. Everything else is passed
+    through. A block is rendered into its parent when the table is closed, or
+    earlier when too many unaligned lines follow its last aligned row.
+
+    The block of a closed table is held back until the end of the line: what
+    follows (e.g. a closing bracket) might not fit next to its last row.
+
+    {2 Complexity}
+
+    Each line goes through every enclosing block, which is quadratic when the
+    nesting depth grows with the size of the document. This is known, but not a
+    problem in practice: real code doesn't nest that deeply.
+
+    {1 Padding}
+
+    A row is a tree of cells: explicit cells, and anonymous ones for the text
+    between them, so that text is aligned too. Children are matched by position
+    across rows.
+
+    The layout of a block merges the trees of its rows, keeping the finest
+    subdivision: a column split into sub-columns in one row, but not in another,
+    is split in the layout. For each column, it records:
+    - its width: the widest of its cells which need padding, i.e. right aligned
+      cells, and left aligned ones followed by some text on the line. For a
+      split column, it is at least the sum of the widths of its sub-columns.
+    - its reach: the furthest any content in it goes once padded, trailing
+      spaces excluded. For a split column, that's the furthest reach of a
+      sub-column, offset by the widths of the ones before it.
+
+    When rendering, a left aligned cell is followed by spaces up to the width of
+    its column, unless nothing follows it. A right aligned one is preceded by
+    them. A split column renders each sub-column at its own width then, if
+    followed, pads up to its full width, which can be larger due to the rows
+    where it isn't split.
+
+    A row is only aligned if, once it is added, the reach of the layout is
+    within the maximal width. Widths only grow, so the reach bounds the width of
+    all the aligned rows, including the ones added before. Rows that don't fit
+    are printed without padding, and don't affect the layout. The last row of a
+    table can be followed by some text on its line (cf. above): that text must
+    fit as well, after the row padded with the final layout. *)
+
 module Line_segment : sig
   type t =
     | Text of string
@@ -149,6 +200,9 @@ end = struct
         in
         Node (Left { followed }, children), first_followed
     in
+    (* N.B. the text following the row once its table is closed (its [tail],
+       e.g. a closing bracket) isn't taken into account: the last cell isn't
+       padded before it. That might be worth reconsidering. *)
     fst (aux false (Acc.freeze ~reason:`newline acc))
   ;;
 end
@@ -171,6 +225,10 @@ module Layout : sig
       grained as both, each node being as wide as the widest of the
       corresponding node of [t] and cell of [cells]. *)
   val update : t -> Cells.t -> t
+
+  (** [render t cells ~emit_seg] emits the segments of [cells], padded according
+      to [t]. *)
+  val render : t -> Cells.t -> emit_seg:(Line_segment.t -> unit) -> unit
 end = struct
   type width =
     { when_followed : int
@@ -240,6 +298,37 @@ end = struct
     | [], c :: cells -> update empty c :: update_children [] cells
     | l :: children, c :: cells -> update l c :: update_children children cells
   ;;
+
+  let emit_spaces ~emit_seg n = if n > 0 then emit_seg (Line_segment.Spaces n)
+
+  let rec render layout (cells : Cells.t) ~emit_seg =
+    let total = (width layout).when_followed in
+    match cells, layout with
+    | Tree.Leaf (Cells.Left { followed }, segs), _ ->
+      List.iter emit_seg segs;
+      if followed then emit_spaces ~emit_seg (total - Line_segment.width segs)
+    | Leaf (Right, segs), _ ->
+      emit_spaces ~emit_seg (total - Line_segment.width segs);
+      List.iter emit_seg segs
+    | Node _, Tree.Leaf _ ->
+      (* The layout was computed from these cells, among others. *)
+      assert false
+    | Node (align, children), Tree.Node (_, layouts) ->
+      (* If the node is followed, so are all its children, which were therefore
+         padded to their widths. *)
+      let rec aux children layouts used =
+        match children, layouts with
+        | [], _ ->
+          (match align with
+           | Left { followed = true } -> emit_spaces ~emit_seg (total - used)
+           | _ -> ())
+        | c :: children, l :: layouts ->
+          render l c ~emit_seg;
+          aux children layouts (used + (width l).when_followed)
+        | _ :: _, [] -> assert false
+      in
+      aux children layouts 0
+  ;;
 end
 
 module Line = struct
@@ -254,11 +343,11 @@ module Line = struct
   type 'a t =
     | Tabular of 'a (** A line holding the cells of a row, in some form. *)
     | Plain of Line_segment.t list
-    | Nested of rendered * Line_segment.t list
+    | Nested of laid_out * Line_segment.t list
       (** A line starting with the line of a nested block. *)
 
   (** A complete line of a nested block, whose layout is final. *)
-  and rendered = (Layout.t * row) t
+  and laid_out = (Layout.t * row) t
 
   (** the line is complete, everything is in the order of the input *)
   type complete = Cells.t t
@@ -266,8 +355,19 @@ module Line = struct
   (** the line is incomplete, parts are stored in reverse order *)
   type accumulating = Cells.Acc.t t
 
-  (** its block has decided how to lay it out *)
-  type placed = row t
+  (** [render ~emit_seg line] emits the segments of [line] as printed, including
+      the padding of its aligned rows. *)
+  let rec render ~emit_seg : laid_out -> unit = function
+    | Plain segs -> List.iter emit_seg segs
+    | Nested (line, segs) ->
+      render ~emit_seg line;
+      List.iter emit_seg segs
+    | Tabular (layout, { cells; aligned; tail }) ->
+      if aligned
+      then Layout.render layout cells ~emit_seg
+      else Tree.iter_elements emit_seg cells;
+      List.iter emit_seg tail
+  ;;
 end
 
 module Block : sig
@@ -290,16 +390,14 @@ module Block : sig
   (* [emit_nl] is called before each line. *)
   val render
     :  t
-    -> emit_line:(Line.rendered -> unit)
+    -> emit_line:(Line.laid_out -> unit)
     -> emit_nl:(unit -> unit)
     -> unit
-
-  val iter_rendered : (Line_segment.t -> unit) -> Line.rendered -> unit
 end = struct
-  type t = Layout.t * Line.placed list
+  type t = Line.laid_out list
 
   type incomplete =
-    { lines : Line.placed list
+    { lines : Line.row Line.t list
     ; nb_plain_since_last_aligned : int
     ; max_width : int
     ; max_consecutives_plain : int
@@ -315,7 +413,15 @@ end = struct
     }
   ;;
 
-  let close b = b.layout, List.rev b.lines
+  let lay_out layout : Line.row Line.t -> Line.laid_out = function
+    | Plain segs -> Plain segs
+    | Nested (line, []) -> line
+    | Nested (line, tail) -> Nested (line, tail)
+    | Tabular row -> Tabular (layout, row)
+  ;;
+
+  (* The layout is final: it is attached to the lines. *)
+  let close b = List.rev_map (lay_out b.layout) b.lines
 
   let add_unaligned b line =
     let nb_plain = b.nb_plain_since_last_aligned + 1 in
@@ -336,43 +442,10 @@ end = struct
         }
   ;;
 
-  let emit_spaces ~emit_seg n = if n > 0 then emit_seg (Line_segment.Spaces n)
-
-  let rec render_cells ~emit_seg (cells : Cells.t) layout =
-    let width = (Layout.width layout).when_followed in
-    match cells, layout with
-    | Tree.Leaf (Cells.Left { followed }, segs), _ ->
-      List.iter emit_seg segs;
-      if followed then emit_spaces ~emit_seg (width - Line_segment.width segs)
-    | Leaf (Right, segs), _ ->
-      emit_spaces ~emit_seg (width - Line_segment.width segs);
-      List.iter emit_seg segs
-    | Node _, Tree.Leaf _ ->
-      (* The layout was computed from these cells, among others. *)
-      assert false
-    | Node (align, children), Tree.Node (_, layouts) ->
-      (* If the node is followed, so are all its children, which were therefore
-         padded to their widths. *)
-      let rec aux children layouts used =
-        match children, layouts with
-        | [], _ ->
-          (match align with
-           | Left { followed = true } -> emit_spaces ~emit_seg (width - used)
-           | _ -> ())
-        | c :: children, l :: layouts ->
-          render_cells ~emit_seg c l;
-          aux children layouts (used + (Layout.width l).when_followed)
-        | _ :: _, [] -> assert false
-      in
-      aux children layouts 0
-  ;;
-
   let rendered_width layout cells =
     let width = ref 0 in
-    render_cells
-      ~emit_seg:(fun seg -> width := !width + Line_segment.width [ seg ])
-      cells
-      layout;
+    Layout.render layout cells ~emit_seg:(fun seg ->
+      width := !width + Line_segment.width [ seg ]);
     !width
   ;;
 
@@ -403,30 +476,11 @@ end = struct
     | Tabular cells -> add_row b cells ~tail
   ;;
 
-  let rendered_of_line layout : Line.placed -> Line.rendered = function
-    | Plain segs -> Plain segs
-    | Nested (line, []) -> line
-    | Nested (line, tail) -> Nested (line, tail)
-    | Tabular row -> Tabular (layout, row)
-  ;;
-
-  let rec iter_rendered f : Line.rendered -> unit = function
-    | Plain segs -> List.iter f segs
-    | Nested (line, segs) ->
-      iter_rendered f line;
-      List.iter f segs
-    | Tabular (layout, { cells; aligned; tail }) ->
-      if aligned
-      then render_cells ~emit_seg:f cells layout
-      else Tree.iter_elements f cells;
-      List.iter f tail
-  ;;
-
-  let render (layout, lines) ~emit_line ~emit_nl =
+  let render lines ~emit_line ~emit_nl =
     List.iter
       (fun line ->
         emit_nl ();
-        emit_line (rendered_of_line layout line))
+        emit_line line)
       lines
   ;;
 end
@@ -513,11 +567,11 @@ let add_segment_to t dest seg =
 (* A line of a nested block is only kept as is when it starts the line of its
    parent. Otherwise it is copied: that only happens to the first line of a
    nested block, which is on a line where rows aren't aligned. *)
-let add_rendered_to t dest (line : Line.rendered) =
+let add_line_to t dest (line : Line.laid_out) =
   match dest with
   | Block ({ current_line = Plain []; _ } as blk) ->
     blk.current_line <- Nested (line, [])
-  | _ -> Block.iter_rendered (add_segment_to t dest) line
+  | _ -> Line.render ~emit_seg:(add_segment_to t dest) line
 ;;
 
 let rec newline_to t = function
@@ -544,11 +598,8 @@ and update_block t blk = function
     render t blk block
 
 and render t blk block =
-  Block.render
-    block
-    ~emit_line:(add_rendered_to t blk.parent)
-    ~emit_nl:(fun () ->
-      if blk.started then newline_to t blk.parent else blk.started <- true)
+  Block.render block ~emit_line:(add_line_to t blk.parent) ~emit_nl:(fun () ->
+    if blk.started then newline_to t blk.parent else blk.started <- true)
 ;;
 
 (* Adds the current line (which isn't followed by a newline), continued by
@@ -693,7 +744,7 @@ let start_alignment_row t =
       when not t.line_has_text ->
       (* A nested line without any text. *)
       let rev_segs = ref [] in
-      Block.iter_rendered (fun seg -> rev_segs := seg :: !rev_segs) line;
+      Line.render ~emit_seg:(fun seg -> rev_segs := seg :: !rev_segs) line;
       blk.current_line <- Plain [];
       Accumulating (Cells.Acc.create Left (segs @ !rev_segs))
     | _ -> Passthrough (destination t)

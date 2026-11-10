@@ -189,15 +189,10 @@ val group : ?margin:int -> ?flatness:flatness -> t -> t
     columns of the rows aligned with each other when the printer's output buffer
     supports it (cf. [Print.to_string]).
 
-    Columns are delimited by {!cell}s, which can be nested to subdivide a column
-    (cf. HACKING.md). Only the first line of each row is aligned; cells ending
-    on the following lines are ignored. When more than two lines (e.g. comments,
-    or the following lines of a row) separate the first lines of two rows, the
-    rows above and below them are aligned independently.
+    Columns are delimited by {!cell}s, which can be nested to subdivide a
+    column.
 
-    Padding is added after the layout has been decided, so it can make lines go
-    past the width limit.
-
+    N.B. line breaks are decided without taking the padding into account.
     Alignment is disabled if the rows are printed in flat mode. *)
 val vertically_aligned : ?sep:t -> t list -> t
 
