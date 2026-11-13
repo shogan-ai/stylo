@@ -241,9 +241,7 @@ val foo : unit
 (** Some modules to support references. *)
 
 module X : sig
-
 end
 
 module Y : sig
-
 end

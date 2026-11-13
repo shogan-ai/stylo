@@ -1,0 +1,5 @@
+let first query_result =
+  match Value.instant_vector_exn query_result with
+  | [::] -> None
+  | instant_vector -> Some instant_vector.:(0)
+;;

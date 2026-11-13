@@ -104,7 +104,15 @@ let whitespace buf state indent flat = function
     then (
       Buffer.add_spaces buf spaces;
       incr_col state spaces)
-    else newline state soft buf
+    else (
+      (* A break point is never meant to introduce a blank line: if the current
+         line is already empty, the break is already taken. *)
+      let soft =
+        match soft with
+        | Hard -> Softest
+        | Soft | Softest -> soft
+      in
+      newline state soft buf)
   | Line_break soft ->
     assert (not flat);
     newline state soft buf
@@ -153,7 +161,9 @@ and pp_pseudo buf state indent flat = function
 let to_string ~width d =
   let sz = min (1024 * 1024) (Requirement.to_int @@ requirement d) in
   let buf = Buffer.create sz in
-  let init = { max_width = width; column = 0; line = Is_empty } in
+  (* The start of the output counts as following a blank line, so that soft line
+     breaks don't add blank lines at the top of the file. *)
+  let init = { max_width = width; column = 0; line = Follows_blank_line } in
   let _final_state = pretty buf init 0 false d in
   Buffer.contents buf
 ;;

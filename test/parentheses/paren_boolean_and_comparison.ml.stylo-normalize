@@ -29,7 +29,7 @@ let y = 2
 let redundant_6 = x < y && c (* x < y && c already means this *)
 
 let necessary_5 = x < (y && true)
-;; (* without parens: (x < y) && true - and wouldn't typecheck *)
+(* without parens: (x < y) && true - and wouldn't typecheck *)
 
 (* comparisons chain left-to-right at their own precedence level; chaining them is rarely
    what you want (`x = y = z` compares `x = y` against `z`). In `(x = y) = (y = x)`, only

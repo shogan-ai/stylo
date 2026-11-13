@@ -19,7 +19,6 @@ let necessary_2 = (a ** b) ** c (* without parens: a ** (b ** c) *)
 let ( +++ ) x y = x + y
 
 let redundant_4 = a +++ b + c
-;;
 (* +++ and + share a precedence level, both left-assoc: a +++ b + c already means this *)
 
 let necessary_3 = a +++ (b + c) (* without parens: (a +++ b) + c *)

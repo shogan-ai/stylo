@@ -1,6 +1,7 @@
 (* `if`, `match`, `fun`, `try`, and `let ... in` are all "extend as far right as possible"
    constructs. Where parens are needed around them depends on *where* they sit, and the
    rule has three distinct cases - not two:
+
    - as the function-application ARGUMENT to another expression: parens are always
      mandatory (a hard parse error without them), because application arguments are parsed
      at a tight "simple expression" level that excludes all of these constructs outright.
@@ -19,7 +20,7 @@ let y = 2
 
 (* as an application argument: always mandatory *)
 let necessary_1 = ignore (if b then x else y)
-;; (* `ignore if b then x else y` doesn't parse *)
+(* `ignore if b then x else y` doesn't parse *)
 
 let necessary_2 =
   ignore
@@ -32,7 +33,7 @@ let necessary_3 = List.map (fun n -> n + 1) [ x; y ] (* likewise *)
 
 (* as the right operand of an infix operator: redundant *)
 let redundant_1 = 1 + (if b then x else y)
-;; (* `1 + if b then x else y` already means this *)
+(* `1 + if b then x else y` already means this *)
 
 let redundant_2 =
   1
@@ -47,7 +48,7 @@ let redundant_3 = ignore (fun () -> 1) (* app-argument case again, kept for cont
 let necessary_4 = (if b then x else y) + 1 (* without parens: if b then x else (y + 1) *)
 
 let necessary_5 = (fun n -> n) x
-;; (* without parens: fun n -> (n x), a different function *)
+(* without parens: fun n -> (n x), a different function *)
 
 let necessary_6 =
   (match x with

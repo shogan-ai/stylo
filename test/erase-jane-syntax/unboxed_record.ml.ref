@@ -220,7 +220,7 @@ let bar =
   ; l28 = (42 :> int)
   ; l29 = (42 : int :> bool)
   ; l30 = foo#bar
-  ; l31 = foo #~# bar
+  ; l31 = foo#~#bar
   ; l32 = new M.c
   ; l33 = x <- 2
   ; l34 = {< x = 42; y = false >}
@@ -253,8 +253,7 @@ let _ = [%ext { a = 1; b = 2; c = 3 }]
 
 let _ =
   [%ext
-    {
-      loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
+    { loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
     ; y =
         loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
     ; z = 3

@@ -1,5 +1,4 @@
 module _ : sig
-
   (** x ds *)
   val x : int
 
@@ -19,26 +18,21 @@ module _ : sig
   type ext = ..
 
   (** ext ext ds *)
-  type ext +=
-    | A
-    | B (**)
+  type ext += A | B (**)
 
   (** Exn ds *)
   exception Exn
 
   (** M ds *)
   module M : sig
-
   end
 
   (** N ds *)
   module rec N : sig
-
   end
 
   (** O ds *)
   and O : sig
-
   end
 
   (** S ds *)
@@ -76,13 +70,11 @@ module _ : sig
       method m : int -> int
     end
 end = struct
-
   (** x ds *)
   let x = 3
 
   (** y ds *)
   and y = ()
-  ;;
 
   (** whatever ds *)
   val whatever : int
@@ -100,9 +92,7 @@ end = struct
   type ext = ..
 
   (** ext ext ds *)
-  type ext +=
-    | A
-    | B (**)
+  type ext += A | B (**)
 
   (** Exn ds *)
   exception Exn
@@ -112,12 +102,10 @@ end = struct
 
   (** N ds *)
   module rec N : sig
-
   end = N
 
   (** O ds *)
   and O : sig
-
   end = O
 
   (** S ds *)

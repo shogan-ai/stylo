@@ -1,0 +1,12 @@
+module type S = sig
+  module Arity : sig
+    type ('arity, 'args, 'a, 'value) t =
+      | [] : (unit, unit, 'a, 'a map_value) t
+      | ( :: ) :
+          x
+          *
+          ('arity, 'args, 'a, 'value) t
+          ->
+          (unit -> 'arity, 'a1 -> 'args, 'a, 'a1 map_value -> 'value) t
+  end
+end

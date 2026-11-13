@@ -1,0 +1,4 @@
+module type S = sig
+  (** The type of things. *)
+  type t
+end

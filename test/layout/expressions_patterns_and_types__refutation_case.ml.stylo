@@ -1,0 +1,7 @@
+let choose (x : Nothing.t option) =
+  match x with
+  | None -> 1
+  | Some n ->
+    (match n with
+     | _ -> .)
+;;

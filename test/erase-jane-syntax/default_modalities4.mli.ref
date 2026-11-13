@@ -25,13 +25,11 @@
 type t
 
 module type T = sig
-
   (* cmt *)
 
   type t
 
   module T : sig
-
     (* cmt *)
 
     type t

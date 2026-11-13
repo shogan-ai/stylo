@@ -1,0 +1,4 @@
+module Example_line = struct
+  (* Somebody can run the Example Line report filtering for these particulars. *)
+  let x = 1
+end

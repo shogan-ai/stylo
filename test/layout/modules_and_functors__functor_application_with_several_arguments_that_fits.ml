@@ -1,0 +1,3 @@
+include
+  Example_functor_library_name.Make (Some_argument_.Settings) (Some_argument_.Sidecar)
+    (Some_third_argument_name)

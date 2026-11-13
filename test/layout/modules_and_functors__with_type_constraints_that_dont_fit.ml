@@ -1,0 +1,13 @@
+module type S = sig
+  module Subscriptions : sig
+    module Subscribe : sig
+      include
+        Aria_client_rpc
+        with type query := Query.t
+        with type response :=
+          Aria_types.Topic_subscription_params.Message_parts.t Aria_topic.Name.Map.t
+            Or_error.t
+         and type conn := t Connection.t
+    end
+  end
+end

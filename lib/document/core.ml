@@ -9,6 +9,7 @@ module Condition = struct
     | Var of bool ref
     | And of t * t
     | Or of t * t
+    | Not of t
 
   let rec eval = function
     | True -> true
@@ -16,13 +17,25 @@ module Condition = struct
     | Var r -> !r
     | And (a, b) -> eval a && eval b
     | Or (a, b) -> eval a || eval b
+    | Not a -> not (eval a)
   ;;
 
   let always = True
+  let never = False
   let flat r = Var r
+  let not_ t = Not t
   let ( && ) t1 t2 = And (t1, t2)
   let ( || ) t1 t2 = Or (t1, t2)
   let check = eval
+
+  (* A [False] that can be recognized physically. *)
+  let item_mark = Or (False, False)
+  let mark_item t = Or (t, item_mark)
+
+  let is_item_marked = function
+    | Or (_, m) -> m == item_mark
+    | _ -> false
+  ;;
 end
 
 module Requirement

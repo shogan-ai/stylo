@@ -26,8 +26,7 @@ let b =
   { (* foo
 
        bar *)
-    { { a
-  =
+    { { a =
           (let b = 3 in
            b)
       }
@@ -42,13 +41,10 @@ let b =
 ;;
 
 let c =
-  {
-    {
-      { (* foo
+  { { { (* foo
 
            bar *)
-        a
-  =
+        a =
           (let b = 3 in
            b)
       }
@@ -63,12 +59,10 @@ let c =
 ;;
 
 let d =
-  {
-    { (* foo
+  { { (* foo
 
          bar *)
-      { a
-  =
+      { a =
           (let b = 3 in
            b)
       }
@@ -83,7 +77,10 @@ let d =
 ;;
 
 let a' =
-  { (* a *) { (* b *) { (* c *) a =
+  { (* a *)
+    { (* b *)
+      { (* c *)
+        a =
           (let b = 3 in
            b)
       }

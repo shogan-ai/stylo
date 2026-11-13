@@ -1,0 +1,5 @@
+type t =
+  { unknown_widgets_totalval : Big_numbers.t
+       [@delimited.to_string Utils.big_numbers_to_string_rounded]
+  ; big_widgets_totalval : Big_numbers.t [@delimited.to_string Utils.to_string]
+  }

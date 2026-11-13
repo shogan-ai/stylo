@@ -69,7 +69,6 @@ let a = choose_pt true (~y:6, ~x:5)
 let rec a = (1, ~lbl:b)
 
 and b = (2, ~lbl:a)
-;;
 
 let rec l = (~lbl:5, ~lbl2:10) :: l
 
@@ -307,41 +306,27 @@ let _ =
 let _ =
   match () with
   | abcdefghijklmnopqrstuvwxyz
-    ,
-    abcdefghijklmnopqrstuvwxyz
-    ,
-    abcdefghijklmnopqrstuvwxyz
-    ,
-    abcdefghijklmnopqrstuvwxyz
-    ,
-    abcdefghijklmnopqrstuvwxyz -> ()
+    , abcdefghijklmnopqrstuvwxyz
+    , abcdefghijklmnopqrstuvwxyz
+    , abcdefghijklmnopqrstuvwxyz
+    , abcdefghijklmnopqrstuvwxyz -> ()
 ;;
 
 type t =
   t
-  *
-  (abcdefghijklmnopqrstuvwxyz
-   *
-   abcdefghijklmnopqrstuvwxyz
-   *
-   abcdefghijklmnopqrstuvwxyz
-   *
-   abcdefghijklmnopqrstuvwxyz
-   *
-   abcdefghijklmnopqrstuvwxyz)
+  * (abcdefghijklmnopqrstuvwxyz
+     * abcdefghijklmnopqrstuvwxyz
+     * abcdefghijklmnopqrstuvwxyz
+     * abcdefghijklmnopqrstuvwxyz
+     * abcdefghijklmnopqrstuvwxyz)
 
 type t =
   t
-  *
-  (abcdefghijklmnopqrstuvwxyz
-   *
-   abcdefghijklmnopqrstuvwxyz
-   *
-   abcdefghijklmnopqrstuvwxyz
-   *
-   abcdefghijklmnopqrstuvwxyz
-   *
-   abcdefghijklmnopqrstuvwxyz)
+  * (abcdefghijklmnopqrstuvwxyz
+     * abcdefghijklmnopqrstuvwxyz
+     * abcdefghijklmnopqrstuvwxyz
+     * abcdefghijklmnopqrstuvwxyz
+     * abcdefghijklmnopqrstuvwxyz)
 
 let x =
   match foo with
@@ -351,40 +336,23 @@ let x =
 let foo a =
   match a with
   | None
-    ,
-    Some _
-    ,
-    [ 1; 2 ]
-    ,
-    3 :: []
-    ,
-    { x : _; y : _ }
-    ,
-    42
-    ,
-    _
-    ,
-    `Baz
-    ,
-    `Bar _
-    ,
-    (1 | 2)
-    ,
-    [| 1; 2 |]
-    ,
-    (3 : int)
-    ,
-    lazy _
-    ,
-    (module M)
-    ,
-    exception _
-    ,
-    [%bar baz]
-    ,
-    M.(A)
-    ,
-    M.(A 42) -> false
+    , Some _
+    , [ 1; 2 ]
+    , 3 :: []
+    , { x : _; y : _ }
+    , 42
+    , _
+    , `Baz
+    , `Bar _
+    , (1 | 2)
+    , [| 1; 2 |]
+    , (3 : int)
+    , lazy _
+    , (module M)
+    , exception _
+    , [%bar baz]
+    , M.(A)
+    , M.(A 42) -> false
 ;;
 
 let bar =
@@ -427,7 +395,7 @@ let bar =
   , (42 :> int)
   , (42 : int :> bool)
   , foo#bar
-  , foo #~# bar
+  , foo#~#bar
   , new M.c
   , (x <- 2)
   , {< x = 42; y = false >}
@@ -470,10 +438,8 @@ let _ = [%ext (1, 2, 3)]
 
 let _ =
   [%ext
-    (
-      loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
-    ,
-      loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
+    ( loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
+    , loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
     , 3 )]
 ;;
 

@@ -63,14 +63,14 @@ let redundant_function =
    left-to-right, so an un-parenthesized dangling construct there would swallow the
    operator into its own body/branches *)
 let necessary_left = (if a then x else y) + x
-;; (* without parens: if a then x else (y + x) *)
+(* without parens: if a then x else (y + x) *)
 
 (* `::`'s tail is a rightmost position too (right-associative, extends the same way); the
    head is not *)
 let redundant_cons_tail = x :: (if a then rest else rest)
 
 let necessary_cons_head = (if a then x else y) :: rest
-;; (* without parens: if a then x else (y :: rest) *)
+(* without parens: if a then x else (y :: rest) *)
 
 (* unary +/-'s operand is rightmost - nothing can follow a unary prefix *)
 let redundant_unary_minus = -(if a then x else y)
@@ -90,13 +90,13 @@ let necessary_unary_function_cases =
 let redundant_tuple_last = x, (if a then x else y)
 
 let necessary_tuple_nonlast = (if a then x else y), z
-;; (* without parens: if a then x else (y, z), a pair, not a triple *)
+(* without parens: if a then x else (y, z), a pair, not a triple *)
 
 (* for comparison: a position that LOOKS similar but is NOT part of this gap
    - application arguments are genuinely mandatory (a hard parse error without parens),
      not merely an unimplemented optimization *)
 let necessary_app_arg = ignore (if a then x else y)
-;; (* application args: hard parse error *)
+(* application args: hard parse error *)
 
 (* and for contrast, `:=`'s RHS is NOT part of this gap either: unlike the infix operator
    ladder above, [Pexp_setvar]'s own child call already uses the `free` threshold directly

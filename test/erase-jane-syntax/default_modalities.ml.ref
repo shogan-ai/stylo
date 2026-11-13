@@ -46,20 +46,16 @@ end = struct
 end
 
 module type T = sig
-
 end
 
 module type T = sig
-
 end
 
 module T : sig
-
 end = struct
 end
 
 module T : sig
-
 end = struct
 end
 
@@ -88,7 +84,6 @@ module type T =
   type u]
 
 module type T = sig
-
   (** cmt *)
   type t
 end

@@ -50,13 +50,13 @@ let _ = { z; y : int } (* baz *)
 
 (* Attrs around types *)
 type t =
-  { x : (int[@attr])
+  { x : (int [@attr])
   ; y : bool
   }
 
 type t =
   { x : int
-  ; y : (bool[@attr])
+  ; y : (bool [@attr])
   }
 
 type t =
@@ -72,12 +72,14 @@ type t =
 
 (* Comments around types *)
 type t =
-  { (* baz *) x : int
+  { (* baz *)
+    x : int
   ; y : bool
   }
 
 type t =
-  { (* baz *) x : int
+  { (* baz *)
+    x : int
   ; y : bool
   }
 
@@ -98,7 +100,8 @@ type t =
 
 type t =
   { x : int
-  ; (* baz *) y : bool
+  ; (* baz *)
+    y : bool
   }
 
 type t =

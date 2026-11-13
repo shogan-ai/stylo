@@ -320,7 +320,8 @@ let style_files ~options check_idempotence inplace fns =
       | Ok output ->
         let pp oc =
           output_string oc output;
-          output_char oc '\n';
+          (* An empty file stays empty. *)
+          if output <> "" then output_char oc '\n';
           flush oc
         in
         if not inplace then pp stdout else Out_channel.with_open_text fn pp)

@@ -1,0 +1,7 @@
+type t =
+  | Manual of
+      { who : string [@bork.id 1]
+      ; message : string [@bork.id 2]
+      } [@bork.id 3]
+  | Box_heartbeat [@bork.id 4]
+[@@deriving bork]

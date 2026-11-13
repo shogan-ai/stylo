@@ -1,0 +1,16 @@
+module State_as_datasets = struct
+  let of_source_state aggregators =
+    let aggregator_servers =
+      Incr_map.mapi
+        aggregators
+        ~f:
+          (fun
+            ~key:name
+            ~data:aggregator
+            : Merged_state.Point_configuration.Aggregator_server.t
+          -> { name; aggregator })
+      |> rekey_to_raw_path ~f:Aggregator.Name.to_raw_path
+    in
+    aggregator_servers
+  ;;
+end

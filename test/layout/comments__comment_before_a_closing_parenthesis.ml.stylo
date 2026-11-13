@@ -1,0 +1,3 @@
+let watch () =
+  watch_file ~on_status_change:(Fn.const Deferred.unit (* Using mvar instead *)) ()
+;;

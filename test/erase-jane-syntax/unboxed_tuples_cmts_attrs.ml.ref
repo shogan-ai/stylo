@@ -42,14 +42,14 @@ let _ = (z (* baz *), (y : int))
 let _ = (z, (* baz *) (y : int))
 let _ = (z, ((* baz *) y : int))
 let _ = (z, (y : (* baz *) int))
-let _ = (z, (y : int (* baz *) ))
+let _ = (z, (y : int (* baz *)))
 let _ = (z, (y : int) (* baz *))
 let _ = (z, (y : int)) (* baz *)
 
 (* Attrs around types *)
-type t = (int[@attr]) * bool
-type t = int * (bool[@attr])
-type t = ((int * bool)[@attr])
+type t = (int [@attr]) * bool
+type t = int * (bool [@attr])
+type t = ((int * bool) [@attr])
 type t = int * bool [@@attr]
 
 (* Comments around types *)
@@ -79,6 +79,6 @@ let (* baz *) 42, (y : int) = ()
 let 42 (* baz *), (y : int) = ()
 let 42, ((* baz *) y : int) = ()
 let 42, (y : (* baz *) int) = ()
-let 42, (y : int (* baz *) ) = ()
+let 42, (y : int (* baz *)) = ()
 let 42, (y : int) (* baz *) = ()
 let 42, (y : int) (* baz *) = ()
