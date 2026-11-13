@@ -1,6 +1,4 @@
-
 (** Maximum length of a dev instance name. *)
 let max_dev_instance_name_length = 33
-;;
 
 let x = 1

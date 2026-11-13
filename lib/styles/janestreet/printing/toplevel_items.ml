@@ -7,11 +7,44 @@ let flush_hint ~ws_before ~ws_after =
   flush_comments ~pull_preceeding_comments:false ~ws_before ~ws_after
 ;;
 
+(* To put at the end of the items of a [struct] or [sig]: comments between the
+   last item and [end] stay indented with the items. *)
+let end_of_body_hint () =
+  snd (flush_hint ~ws_before:softline ~ws_after:empty)
+;;
+
+(* Removes the [softline]s at the start of [doc] (e.g. the blank line before a
+   docstring), up to its first token. The second component says whether [doc]
+   has no token. *)
+let rec drop_leading_softlines doc =
+  match doc with
+  | Whitespace { value = Line_break Soft; _ } -> empty, true
+  | Empty -> doc, true
+  | Cat (_, a, b) ->
+    let a, a_is_blank = drop_leading_softlines a in
+    if a_is_blank
+    then (
+      let b, b_is_blank = drop_leading_softlines b in
+      a ^^ b, b_is_blank)
+    else a ^^ b, false
+  | Nest (_, i, vanish, d) ->
+    let d, is_blank = drop_leading_softlines d in
+    nest ~vanish i d, is_blank
+  | Group (_, margin, flatness, d) ->
+    let d, is_blank = drop_leading_softlines d in
+    group ~margin ?flatness d, is_blank
+  | Whitespace _ | Token _ | Comment _ | Directive _ | Comments_flushing_hint _ ->
+    doc, false
+;;
+
 let add_item ?flatness last_in_group doc item =
   let post_break = if last_in_group then empty else break 0 in
   match doc with
   | Empty ->
     let _, hint = flush_hint ~ws_before:empty ~ws_after:softline in
+    (* Nothing precedes the first item of a group: no blank line before it.
+       Groups are separated by blank lines by [separate_groups]. *)
+    let item = fst (drop_leading_softlines item) in
     hint ^^ group ?flatness (item ^^ post_break)
   | _ ->
     let comments_inserted, hint =
@@ -70,17 +103,21 @@ let pp_keeping_semi pp_item =
     match items, cont with
     | [], _ -> doc, cont
     | item :: items, Child_followed_by tokens ->
-      let item = pp_item item in
       let last = items = [] in
       (match advance_tokens tokens with
        | Semi_followed_by (false, tokens) ->
-         let item = item ^/^ Syntax.semisemi in
+         let item = pp_item None item ^/^ Syntax.semisemi in
          perhaps_semi (add_item last doc item) items tokens
        | Semi_followed_by (true, tokens) ->
+         (* [pp_item] decides which part of the item must be flat for the [;;]
+            to vanish: docstrings around a binding don't count. *)
          let flatness = flatness_tracker () in
-         let item = item ^^ opt_semisemi_doc (Condition.flat flatness) in
-         perhaps_semi (add_item ~flatness last doc item) items tokens
-       | cont -> expect_item (add_item last doc item) items cont)
+         let item =
+           pp_item (Some flatness) item
+           ^^ opt_semisemi_doc (Condition.flat flatness)
+         in
+         perhaps_semi (add_item last doc item) items tokens
+       | cont -> expect_item (add_item last doc (pp_item None item)) items cont)
     | _ -> assert false
   in
   perhaps_semi
@@ -115,7 +152,7 @@ let pp_grouped_keeping_semi pp_item groups tokens =
   | tokens, [] ->
     (* Here we have an empty struct/sig with potential semis. This code could be
        simplified for the special case, but meh. *)
-    (match pp_keeping_semi Fun.id empty [] tokens with
+    (match pp_keeping_semi (fun _ x -> x) empty [] tokens with
      | doc, Done -> doc
      | _ -> assert false)
   | _ -> assert false

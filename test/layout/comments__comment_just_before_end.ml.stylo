@@ -1,6 +1,6 @@
 module type S = sig
   val compute_response : state:t -> query:query -> response
 
-(* Once there are multiple versions of an RPC, it will probably make more sense for RPCs
-   to generate their own implementations. *)
+  (* Once there are multiple versions of an RPC, it will probably make more sense for RPCs
+     to generate their own implementations. *)
 end

@@ -98,15 +98,12 @@ module type Sig_items = sig
   module type [@bar] M := Foo
 
   module%foo [@bar] M : sig
-
   end
 
   module%foo M : sig
-
   end
 
   module [@bar] M : sig
-
   end
 
   module%foo [@bar] M := Foo

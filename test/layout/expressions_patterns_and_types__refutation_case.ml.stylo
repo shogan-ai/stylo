@@ -3,5 +3,5 @@ let choose (x : Nothing.t option) =
   | None -> 1
   | Some n ->
     (match n with
-     | _ -> . )
+     | _ -> .)
 ;;

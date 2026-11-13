@@ -8,11 +8,9 @@ type t2
    wrapping a tuple to be the constructor's argument is mandatory *)
 type redundant_1 = t1 * (t2 list)
 
-type necessary_1 =
-  (t1 * t2)
-    list
-    (* without parens: t1 * (t2 list), a tuple whose second component is a list, not a
-       list of pairs *)
+type necessary_1 = (t1 * t2) list
+  (* without parens: t1 * (t2 list), a tuple whose second component is a list, not a list
+     of pairs *)
 
 (* application binds tighter than `->` too *)
 type redundant_2 = t1 -> t2 list

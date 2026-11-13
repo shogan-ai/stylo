@@ -141,17 +141,65 @@ type state =
        (** [true] if the the next leaf is a [Comments_flushing_hint fh] which
            pulls comments that would otherwise be attached to the token
            preceeding it. *)
+  ; pending_nests : (int * Doc.Condition.t) list
+       (** When [at_end_of_a_group], the [Nest]s (innermost first) entered
+           since the start of the rightmost branch of the outermost such
+           group. Empty otherwise. *)
+  ; delayed_nests : (int * Doc.Condition.t) list
+       (** [pending_nests] at the last token. Comments attached to that token
+           whose insertion was delayed until we left some groups get wrapped in
+           the outermost of these nests (cf [wrap_in_nests]). *)
   }
 
 let init_state =
   { space_handling = Nothing_special
   ; at_end_of_a_group = false
   ; next_is_pulling_flush_hint = false
+  ; pending_nests = []
+  ; delayed_nests = []
   }
 ;;
 
-let under_nest st = { st with at_end_of_a_group = false }
-let exit_nest prev st = { st with at_end_of_a_group = prev.at_end_of_a_group }
+(* Entering a nest doesn't stop comments attached at the end of a group from
+   being delayed until we leave the group: inserting them inside it would
+   prevent it from being flat (cf [attach_before_comments]). We remember the
+   nest instead. *)
+let under_nest i vanish st =
+  if st.at_end_of_a_group
+  then { st with pending_nests = (i, vanish) :: st.pending_nests }
+  else st
+;;
+
+let exit_nest prev st =
+  { st with
+    at_end_of_a_group = prev.at_end_of_a_group
+  ; pending_nests = prev.pending_nests
+  }
+;;
+
+(* The comment goes at the indentation of the item it follows (e.g. two past a
+   [;] or [|]) rather than at the indentation of the token it is attached to: we
+   keep the nests from the outermost one marked as indenting an item (cf
+   [Doc.Condition.mark_item]), or else just the outermost one. *)
+let wrap_in_nests nests doc =
+  let outermost_first = List.rev nests in
+  (* [outermost_first] up to and including its first marked nest. *)
+  let rec up_to_marked acc = function
+    | [] -> None
+    | ((_, vanish) as n) :: rest ->
+      if Doc.Condition.is_item_marked vanish
+      then Some (n :: acc)
+      else up_to_marked (n :: acc) rest
+  in
+  let kept =
+    match up_to_marked [] outermost_first, outermost_first with
+    | Some kept, _ -> kept
+    | None, [] -> []
+    | None, outermost :: _ -> [ outermost ]
+  in
+  List.fold_left (fun doc (i, vanish) -> Doc.nest ~vanish i doc) doc kept
+;;
+
 let no_space st = { st with space_handling = Nothing_special }
 
 let saw_leaf st =
@@ -199,7 +247,7 @@ let attach_before_comments ~render_comment state tokens doc =
     match Std.List.split_at is_comment_attaching_before tokens with
     | [], _ -> (* no comment to attach *) tokens, doc, state
     | to_append, tokens ->
-      let doc, actually_inserted, last_blank_after =
+      let cmts, actually_inserted, last_blank_after =
         List.fold_left
           (fun (acc, actually_inserted, last_blank_after) cmt ->
             match cmt.T.desc with
@@ -220,9 +268,10 @@ let attach_before_comments ~render_comment state tokens doc =
                 in
                 Doc.(acc ^^ cmt), true, c.blank_line_after
             | _ -> assert false)
-          (doc, false, false)
+          (Doc.empty, false, false)
           to_append
       in
+      let doc = Doc.(doc ^^ wrap_in_nests state.delayed_nests cmts) in
       if not actually_inserted
       then tokens, doc, state
       else
@@ -232,13 +281,17 @@ let attach_before_comments ~render_comment state tokens doc =
           Insert_before_leaf
             (if last_blank_after then blank_line else Doc.break 1)
         in
-        tokens, Doc.group doc, { state with space_handling }
+        tokens, Doc.group doc, { state with space_handling; delayed_nests = [] }
 ;;
 
 let insert_space_if_required ?(inserting_comment = false) state doc =
   let brk =
     match state.space_handling, inserting_comment with
     | Insert_before_leaf doc, _ -> doc
+    | Insert_before_inserting_comment { after_non_spaced_break = true }, true ->
+      (* There is a [break 0] right before: if it turned into a newline, don't
+         add a second one (which would print as a blank line). *)
+      Doc.softest_break
     | Insert_before_inserting_comment _, true -> Doc.break 1
     | Insert_before_inserting_comment _, false
     | Next_before_leaf_is_blank_line, _
@@ -247,12 +300,21 @@ let insert_space_if_required ?(inserting_comment = false) state doc =
   Doc.(brk ^^ doc)
 ;;
 
-let prepend_comments_to_doc state comments ~blank_line_after doc =
+let prepend_comments_to_doc
+  ?(before_closing = false)
+  state
+  comments
+  ~blank_line_after
+  doc
+  =
   let doc =
     if first_is_space doc
     then Doc.(comments ^^ doc)
     else if blank_line_after
     then Doc.(comments ^^ blank_line ^^ doc)
+    else if before_closing
+    then (* As in [attach_before_comments]: [(f x (* cmt *))]. *)
+      Doc.(comments ^^ doc)
     else
       let space =
         match state.space_handling with
@@ -305,12 +367,21 @@ let rec walk_both ~render_comment state seq doc =
   | first :: rest ->
     match first.T.desc, doc with
     (* Synchronized, advance *)
-    | T.Token _, Doc.Token { value = p; _ } ->
+    | T.Token (tok, _), Doc.Token { value = p; _ } ->
       ignore p;
       (* dprintf "assume %a synced at %d:%d with << %a >>@." Tokens.pp_elt first
          first.pos.pos_lnum (first.pos.pos_cnum - first.pos.pos_bol)
          Document.pp_pseudo p; *)
+      let state =
+        match tok, state.space_handling with
+        | (RPAREN | SEMI | COMMA), Insert_before_leaf ws when ws != blank_line ->
+          (* A closing delimiter or a separator directly after a comment hugs it,
+             as in [(f x (* cmt *))] or [f x (* cmt *);]. *)
+          no_space state
+        | _ -> state
+      in
       let doc = insert_space_if_required state doc in
+      let state = { state with delayed_nests = state.pending_nests } in
       attach_before_comments ~render_comment (saw_leaf state) rest doc
 
     (* Whitespace: don't consume token *)
@@ -344,7 +415,10 @@ let rec walk_both ~render_comment state seq doc =
     (* Skip explicitely inserted comments *)
     | _, Doc.Comment d ->
       mark_as_seen d.source_comment_id;
-      seq, doc, state
+      (* Comments attached to the token before a docstring may be delayed past
+         the docstring (and are then laid out like comments after it): they
+         don't keep that token's indentation. *)
+      seq, doc, { state with delayed_nests = [] }
     | T.Comment c, Doc.Token _ when explicitely_inserted c ->
       walk_both ~render_comment state rest doc
 
@@ -406,7 +480,11 @@ let rec walk_both ~render_comment state seq doc =
       let restl, left, mid_state =
         walk_both
           ~render_comment
-          { state with at_end_of_a_group = false; next_is_pulling_flush_hint }
+          { state with
+            at_end_of_a_group = false
+          ; next_is_pulling_flush_hint
+          ; pending_nests = []
+          }
           seq
           left
       in
@@ -416,6 +494,7 @@ let rec walk_both ~render_comment state seq doc =
           { mid_state with
             at_end_of_a_group = state.at_end_of_a_group
           ; next_is_pulling_flush_hint = state.next_is_pulling_flush_hint
+          ; pending_nests = state.pending_nests
           }
           restl
           right
@@ -423,7 +502,7 @@ let rec walk_both ~render_comment state seq doc =
       restr, Doc.(left ^^ right), final_state
     | _, Doc.Nest (_, i, vanish, doc) ->
       let rest, doc, state' =
-        walk_both ~render_comment (under_nest state) seq doc
+        walk_both ~render_comment (under_nest i vanish state) seq doc
       in
       rest, Doc.nest ~vanish i doc, exit_nest state state'
     | _, Doc.Group (_, margin, flatness, doc) ->
@@ -450,12 +529,17 @@ and traverse_group ~render_comment tokens state margin flatness grouped_doc =
              Next_before_leaf_is_blank_line
            | _ -> Nothing_special)
       ; at_end_of_a_group = true
+      ; pending_nests =
+          (if state.at_end_of_a_group then state.pending_nests else [])
       }
       tokens
       grouped_doc
   in
   let return_state =
-    { state' with at_end_of_a_group = state.at_end_of_a_group }
+    { state' with
+      at_end_of_a_group = state.at_end_of_a_group
+    ; pending_nests = state.pending_nests
+    }
   in
   let doc =
     (* Inserting now rather than in the group so as to not break it, but...
@@ -470,9 +554,15 @@ and insert_comments_before_subtree ~render_comment tokens state doc =
   let (to_prepend, last_blank_after), rest =
     consume_leading_comments ~render_comment tokens
   in
+  let before_closing =
+    match rest with
+    | { T.desc = Token (RPAREN, _); _ } :: _ -> true
+    | _ -> false
+  in
   let rest, doc, state' = walk_both ~render_comment (no_space state) rest doc in
   let doc =
     prepend_comments_to_doc
+      ~before_closing
       state
       to_prepend
       ~blank_line_after:last_blank_after

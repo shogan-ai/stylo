@@ -53,7 +53,7 @@ type 'a r =
 type 'a r =
   | Foo of ('a [@globalized])
   | Bar of 'a * ('a [@globalized])
-  | Baz of (int[@globalized]) * string * ('a [@globalized])
+  | Baz of (int [@globalized]) * string * ('a [@globalized])
 
 type ('a, 'b) cfn = a:'a -> ?b:b -> 'a -> int -> 'b
 
@@ -111,12 +111,7 @@ let x = (* a *) (* b *) (* c *) (* d *)
   y
 ;;
 
-module type S =
-  S
-  ->
-  S
-  ->
-  S
+module type S = S -> S -> S
   (* this is here to make sure we pass the AST equality checks even when the
      extended AST is different *)
 
@@ -132,14 +127,18 @@ let f
 type 'a r =
   { mutable a : 'a
   ; b : 'a
-  ; (* a *) (* b *) (* c *) (* d *) c : ('a [@globalized])
+  ; (* a *)
+    (* b *)
+    (* c *)
+    (* d *)
+    c : ('a [@globalized])
   }
 
 type 'a r =
   | Foo of (* a *) (* b *) (* c *) (* d *) ('a [@globalized])
   | Bar of 'a * (* e *) (* f *) (* g *) (* h *) ('a [@globalized])
   | Baz of
-      (int[@globalized])
+      (int [@globalized])
       *
       string
       * (* i *) (* j *) (* k *) (* l *)
@@ -230,7 +229,10 @@ let _ =
     l
     (* 1 *)
     ~f:( (* 2 *) (* 3 *)
-    fun (* 4 *) xxxxx -> (* 5 *)
+    fun
+      (* 4 *)
+      xxxxx
+      -> (* 5 *)
       Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
         (module struct
           type nonrec t = M.t
@@ -310,11 +312,16 @@ let _ =
 ;;
 
 let _ =
-  List.iter l ~f:(fun (* x *) xxxxx (* y *) -> (* z *) (* w *)
-    Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
-      (module struct
-        type nonrec t = M.t
-      end))
+  List.iter
+    l
+    ~f:(fun
+      (* x *)
+      xxxxx (* y *)
+      -> (* z *) (* w *)
+      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
+        (module struct
+          type nonrec t = M.t
+        end))
 ;;
 
 let _ =

@@ -1,6 +1,6 @@
 type t =
   { first_owner : Username.t
-  ; (* [member_names] is guaranteed to contain [first_owner] *) member_names :
-      Username.Set.t
+  ; (* [member_names] is guaranteed to contain [first_owner] *)
+    member_names : Username.Set.t
   ; associated_others : Some_name.Set.t
   }

@@ -105,6 +105,7 @@ The main difference is these don't get syntax highlighting.
       into a shorthand list item using a double line break
 
     just creates a paragraph outside the list.
+
     - Similarly, inserting a blank line between two list items
 
     - creates two separate lists.
@@ -221,9 +222,7 @@ val foo : unit
 (** Some modules to support references. *)
 
 module X : sig
-
 end
 
 module Y : sig
-
 end

@@ -15,7 +15,6 @@ type also_redundant_1 = < area: float > as 'a (* means the same thing *)
    are mandatory concrete syntax, exactly like a type constraint `(e : t)` on the
    expression side. Bare `module S` is not a valid type at all. *)
 module type S = sig
-
 end
 
 type necessary_1 = (module S)

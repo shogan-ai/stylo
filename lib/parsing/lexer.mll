@@ -1293,15 +1293,19 @@ and skip_hash_bang = parse
     type t = {
       rev_cmts: cmt_info list;
       before: newline_state;
+      blank_before: bool;
+        (* Whether the source really has a blank line before the block.
+           [before] can claim one that isn't there, cf [lines_init_state]. *)
       indent: Line_indent.t;
     }
 
-    let init before loc txt id =
+    let init ~real_before before loc txt id =
       let info = { loc; txt; id } in
       let indent = Line_indent.copy () in
-      { before; indent; rev_cmts = [ info ] }
+      { before; blank_before = real_before = BlankLine; indent;
+        rev_cmts = [ info ] }
 
-    let unstage newline_after t =
+    let unstage ?(before_rparen = false) newline_after t =
       let cmts = List.rev t.rev_cmts in
       (* A staged block spans several lines if its first comment starts on a
          different line than the one its last comment ends on. *)
@@ -1321,6 +1325,13 @@ and skip_hash_bang = parse
       in
       let attachement : Tokens.attachment =
         match t.before, newline_after with
+        | _ when before_rparen ->
+          (* A comment right before a [)] is about what's inside the
+             parentheses. Attaching it to the [)] would make the output
+             unstable, as the printer puts it right before the [)] either way:
+             [(f x (* cmt *))]. *)
+          dprintf "before (followed by a closing parenthesis)@.";
+          Before
         | NoLine, NoLine ->
           (* The block shares a line with both the preceeding and the following
              token. If it fits on a single line, we attach it to what follows;
@@ -1366,7 +1377,7 @@ and skip_hash_bang = parse
          (a blank line splits the block, cf [add]), so only the first comment
          of the block can be preceded by one, and only the last one followed
          by one. *)
-      let blank_line_before = t.before = BlankLine in
+      let blank_line_before = t.blank_before in
       let blank_line_after = newline_after = BlankLine in
       begin match blank_line_before, blank_line_after with
       | true, true -> dprintf " and is surrounded by blank lines"
@@ -1387,9 +1398,9 @@ and skip_hash_bang = parse
         Tokens.add ~pos:loc.loc_start (Comment cmt)
       ) cmts
 
-    let add t before loc txt id =
+    let add t ~real_before before loc txt id =
       match t with
-      | None -> init before loc txt id
+      | None -> init ~real_before before loc txt id
       | Some t ->
         (* If there is a blank line between the comment about to be staged and
            the previous ones, we decide their attachement separately (and so we
@@ -1397,7 +1408,7 @@ and skip_hash_bang = parse
            keep accumulating and we'll decide for the whole block. *)
         if before = BlankLine then (
           unstage before t;
-          init before loc txt id
+          init ~real_before before loc txt id
         ) else (
           let info = { loc; txt; id } in
           { t with rev_cmts = info :: t.rev_cmts }
@@ -1405,20 +1416,38 @@ and skip_hash_bang = parse
   end
 
   let previous_token = ref None
+
+  (* For attachment purposes, a comment on the line after [struct] or [sig] is
+     treated as if it followed a blank line. *)
   let lines_init_state = function
     | Some (STRUCT | SIG) -> NewLine
     | _ -> NoLine
 
   let token_updating_indexed_list lexbuf =
     let post_pos = lexeme_end_p lexbuf in
-    let rec loop lines_for_comments lines_for_docstrings docs sc_opt lexbuf =
+    (* [real_lines] is like [lines_for_comments], without the pretend newline of
+       [lines_init_state]. It decides whether a comment has a blank line before
+       it. *)
+    let rec loop ?(real_lines = NoLine) lines_for_comments lines_for_docstrings
+        docs sc_opt lexbuf =
+      let next_lines = function
+        | NoLine ->
+          if !previous_token = None
+          then BlankLine (* at the start of the file \n = a blank line *)
+          else NewLine
+        | NewLine -> BlankLine
+        | BlankLine -> BlankLine
+      in
       let tok = token_with_comments lexbuf in
       match tok with
       | COMMENT (s, loc, id) ->
           previous_token := Some tok;
           Line_indent.new_info lines_for_comments loc.loc_start;
           add_comment (s, loc);
-          let sc = Staged_comments.add sc_opt lines_for_comments loc s id in
+          let sc =
+            Staged_comments.add sc_opt ~real_before:real_lines
+              lines_for_comments loc s id
+          in
           let lines_for_comments' = NoLine in
           let lines_for_docstrings' =
             match lines_for_docstrings with
@@ -1428,22 +1457,16 @@ and skip_hash_bang = parse
           in
           loop lines_for_comments' lines_for_docstrings' docs (Some sc) lexbuf
       | EOL ->
-          let lines_for_comments' =
-            match lines_for_comments with
-            | NoLine ->
-              if !previous_token = None
-              then BlankLine (* at the start of the file \n = a blank line *)
-              else NewLine
-            | NewLine -> BlankLine
-            | BlankLine -> BlankLine
-          in
+          let lines_for_comments' = next_lines lines_for_comments in
+          let real_lines = next_lines real_lines in
           let lines_for_docstrings' =
             match lines_for_docstrings with
             | NoLine -> NewLine
             | NewLine -> BlankLine
             | BlankLine -> BlankLine
           in
-          loop lines_for_comments' lines_for_docstrings' docs sc_opt lexbuf
+          loop ~real_lines lines_for_comments' lines_for_docstrings' docs sc_opt
+            lexbuf
       | DOCSTRING doc ->
           previous_token := Some tok;
           let doc_loc = Docstrings.docstring_loc doc in
@@ -1453,7 +1476,8 @@ and skip_hash_bang = parse
           (* docstrings don't get grouped like usual comments. *)
           Option.iter (Staged_comments.unstage lines_for_comments) sc_opt;
           let sc =
-            Staged_comments.init lines_for_comments doc_loc
+            Staged_comments.init ~real_before:real_lines lines_for_comments
+              doc_loc
               (Docstrings.docstring_body doc)
               doc.ds_id
           in
@@ -1463,7 +1487,10 @@ and skip_hash_bang = parse
           previous_token := Some tok;
           let start_pos = lexeme_start_p lexbuf in
           Line_indent.new_info lines_for_comments start_pos;
-          Option.iter (Staged_comments.unstage lines_for_comments) sc_opt;
+          Option.iter
+            (Staged_comments.unstage ~before_rparen:(tok = RPAREN)
+               lines_for_comments)
+            sc_opt;
           attach lines_for_docstrings docs post_pos start_pos;
           match tok with
           | LEXER_DIRECTIVE dir ->

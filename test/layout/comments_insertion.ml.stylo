@@ -52,15 +52,13 @@ let foo = function
    attachement decision once per group. There can however be successive groups as well, a
    group ends at the first blank line or non-comment token. *)
 
-let foo
-  = (* before: same line *) (* after: same indent as exp *)
+let foo = (* before: same line *) (* after: same indent as exp *)
   (* also after, despite the confusing indentation! *)
   exp
 ;;
 
 (* slight variation on the above, to illustrate *)
-let foo
-  = (* before: same line *) (* before: same indent *)
+let foo = (* before: same line *) (* before: same indent *)
   (* this time around this one also attaches before! *)
   exp
 ;;

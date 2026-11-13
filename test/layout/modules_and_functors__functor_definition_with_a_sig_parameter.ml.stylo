@@ -3,6 +3,7 @@ module Make
        type query [@@deriving bin_io]
 
        include Description
-     end) = struct
+     end) =
+struct
   include M
 end

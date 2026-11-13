@@ -13,7 +13,7 @@ let redundant_1 = a + b * c (* * already binds tighter; same either way *)
 let necessary_2 = a / (b * c) (* without parens: a / b * c = (a / b) * c *)
 
 let redundant_2 = a * b / c
-;; (* same precedence, left-assoc: a * b / c already means this *)
+(* same precedence, left-assoc: a * b / c already means this *)
 
 (* `+`/`-` are left-associative, so only right-grouping needs parens *)
 let redundant_3 = a - b - c (* a - b - c already means this *)

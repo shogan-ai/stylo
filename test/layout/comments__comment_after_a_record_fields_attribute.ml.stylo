@@ -1,9 +1,7 @@
 type t =
   { action_type : Type.V1.t [@bork.id 3]
-  ; quantity : Bignum.V3.t option
-       [@bork.id
-         4]
-         (* The Or_error here isn't necessary, so look into removing it the next time this
-            type gets a new version *)
+  ; quantity : Bignum.V3.t option [@bork.id 4]
+    (* The Or_error here isn't necessary, so look into removing it the next time this type
+       gets a new version *)
   ; peer_account : String.V1.t option Or_error.V1.t [@bork.id 5]
   }

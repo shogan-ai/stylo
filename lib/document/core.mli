@@ -16,9 +16,19 @@ module Condition : sig
   type t
 
   val always : t
+  val never : t
   val ( && ) : t -> t -> t
   val flat : flatness -> t
+  val not_ : t -> t
   val check : t -> bool (* false when None *)
+
+  (** [mark_item t] is equivalent to [t], and recognized by [is_item_marked].
+      It is used as the vanishing condition of the [Nest] that indents an item of
+      a list, record, variant, etc. after its separator, so that comment
+      insertion can find the item's indentation. *)
+  val mark_item : t -> t
+
+  val is_item_marked : t -> bool
 end
 
 type softness =

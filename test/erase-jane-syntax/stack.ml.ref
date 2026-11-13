@@ -61,7 +61,6 @@ let f () = lazy "hello"
 module M = struct end
 
 module type S = sig
-
 end
 
 let f () = (module M : S)
@@ -220,7 +219,10 @@ let _ =
     l
     (* 1 *)
     ~f: (* 2 *) ( (* 3 *)
-    fun (* 5 *) xxxxx -> (* 6 *)
+    fun
+      (* 5 *)
+      xxxxx
+      -> (* 6 *)
       Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
         (module struct
           type nonrec t = M.t
@@ -300,11 +302,16 @@ let _ =
 ;;
 
 let _ =
-  List.iter l ~f:(fun (* x *) xxxxx (* y *) -> (* z *) (* w *)
-    Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
-      (module struct
-        type nonrec t = M.t
-      end))
+  List.iter
+    l
+    ~f:(fun
+      (* x *)
+      xxxxx (* y *)
+      -> (* z *) (* w *)
+      Xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxx
+        (module struct
+          type nonrec t = M.t
+        end))
 ;;
 
 let _ =

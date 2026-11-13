@@ -1,8 +1,7 @@
 let make_rec ~an_item_object_name ~the_date ~kind_of_thing ~extras =
   { an_item_object_name
   ; the_date
-  ;
-    kind_of_thing
+  ; kind_of_thing
     (* There is no field in it to distinguish these. For certain objects, the program can
        choose whether to do one thing or the other, as the user prefers. *)
   ; extras

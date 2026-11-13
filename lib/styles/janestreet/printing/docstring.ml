@@ -292,9 +292,18 @@ module Odoc = struct
        ;;
      ]} *)
 
+  let blank_line_in_source_between elt1 elt2 =
+    (Loc.location elt2).start.line > (Loc.location elt1).end_.line + 1
+  ;;
+
   let extra_spacing_between elt1 elt2 =
     match Loc.value elt1, Loc.value elt2 with
     | `Tag _, `Tag _ -> false
+    (* Whether a list is separated from the paragraph introducing it is up to
+       the author. *)
+    | `Paragraph _, `List _ -> blank_line_in_source_between elt1 elt2
+    (* Likewise for a tag such as [@inline] following text. *)
+    | `Paragraph _, `Tag _ -> blank_line_in_source_between elt1 elt2
     | (`Heading _ | `Tag _), _
     | _, (`Heading _ | `Tag _)
     | `List (_, _, _), _

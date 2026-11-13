@@ -6,7 +6,6 @@ let shows msg =
         { name : Immediate.String.t
         ; size : Immediate.String.t
         ; kind_of_widget_x
-            :
-            Example_library.Generated_types_for_a_very_long_example_module_name.Kind_of_widget_x.t
+          : Example_library.Generated_types_for_a_very_long_example_module_name.Kind_of_widget_x.t
         }]
 ;;

@@ -22,11 +22,9 @@
 
 val foo
   :  'k 'cmp
-  .  (module
-     S
-     with type Id_and_repr.t = 'k
-      and type Id_and_repr.comparator_witness = 'cmp
-     )
+  .  (module S
+       with type Id_and_repr.t = 'k
+        and type Id_and_repr.comparator_witness = 'cmp)
   -> 'k Jane_symbol.Map.t
   -> ('k, Sockaddr.t, 'cmp) Map.t
 
@@ -279,15 +277,11 @@ let f_gadt : 'a. 'a -> 'a g -> 'a = fun x MkG -> f_imm x
 
 (* comments *)
 val foo
-  : (* comment 1 *)  'k (* comment 2 *) (* comment 3 *)
-     (* comment 4 *)
-     (* comment 5 *)
-     'cmp
-  .  (module
-     S
-     with type Id_and_repr.t = 'k
-      and type Id_and_repr.comparator_witness = 'cmp
-     )
+  : (* comment 1 *)  'k (* comment 2 *) (* comment 3 *) (* comment 4 *)
+     (* comment 5 *) 'cmp
+  .  (module S
+       with type Id_and_repr.t = 'k
+        and type Id_and_repr.comparator_witness = 'cmp)
   -> 'k Jane_symbol.Map.t
   -> ('k, Sockaddr.t, 'cmp) Map.t
 

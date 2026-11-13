@@ -7,17 +7,14 @@
 type r = { mutable x : int }
 
 let f (r : r) a b = r.x <- (a + b)
-;;
 (* REDUNDANT: `<-` already extends over the whole right-hand side; `r.x <- a + b` means
    the same *)
 
 let g (r : r) a b = (r.x <- a) + b
-;;
 (* NECESSARY: without parens, `r.x <- a + b` assigns `a + b` to [r.x], not [a] followed by
    [+ b] *)
 
 let set_indexed arr a b = arr.(a + b) <- 1
-;;
 (* REDUNDANT: the index expression [a + b] needs no parens, [.( )] already delimits it *)
 
 (* field access is tighter than application: `a b.x` reads `.x` off of [b] first, then

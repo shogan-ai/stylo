@@ -2,9 +2,9 @@ module Update_task_spec_request : sig
   type t =
     { task_suite : string
     ; task_spec_id : string
-         (** For each editable field, [None] = leave unchanged, [Some s] = set the field
-             to [s] (an empty string clears the column). Today edits apply to every row
-             matching [(task_suite, task_spec_id)]. *)
+    (** For each editable field, [None] = leave unchanged, [Some s] = set the field to [s]
+        (an empty string clears the column). Today edits apply to every row matching
+        [(task_suite, task_spec_id)]. *)
     ; grader_configs : string option
     }
 end

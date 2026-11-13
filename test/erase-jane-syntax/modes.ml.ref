@@ -46,7 +46,6 @@ module Let_bindings = struct
   and y = y
 
   and z : typ = z
-  ;;
 
   let () =
     let x = y in
@@ -497,7 +496,11 @@ module LATs = struct
       .  (* fff *) b (* ggg *) (* hhh *) (* iii *)
       -> (* jjj *) c (* kkk *) (* lll *) (* mmm *) (* nnn *) (* ooo *)
     = (* ppp *)
-    fun (* qqq *) x -> y
+    fun
+      (* qqq *)
+      x
+      ->
+    y
   ;;
 end
 
@@ -539,8 +542,7 @@ module Line_breaking = struct
     let x : arg -> arg -> arg -> arg -> arg -> arg -> arg = y
 
     let x
-      :
-        long_arg_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      : long_arg_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         -> label:long_arg_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         -> ?label:long_arg_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         -> long_result_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -612,8 +614,7 @@ module Line_breaking = struct
       (long_arg_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)
       (long_arg_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa : t)
       (long_arg_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-       :
-       long_type_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)
+       : long_type_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)
       =
       a
     ;;
@@ -621,7 +622,6 @@ module Line_breaking = struct
 end
 
 module Interaction_with_existing_syntax = struct
-
   (* let bindings *)
 
   let x = y
@@ -636,18 +636,18 @@ module Interaction_with_existing_syntax = struct
 
   (* modalities on record fields *)
 
-  type t = { x : (t[@globalized]) }
-  type t = A of { x : (t[@globalized]) }
+  type t = { x : (t [@globalized]) }
+  type t = A of { x : (t [@globalized]) }
 
   (* modalities on constructor arguments *)
 
   type t =
-    | A of (typ[@globalized])
-    | B of (typ1[@globalized]) * (typ2[@globalized])
+    | A of (typ [@globalized])
+    | B of (typ1 [@globalized]) * (typ2 [@globalized])
 
   type t =
-    | A : (typ[@globalized]) -> t
-    | B : (typ1[@globalized]) * (typ2[@globalized]) -> t
+    | A : (typ [@globalized]) -> t
+    | B : (typ1 [@globalized]) * (typ2 [@globalized]) -> t
 end
 
 module Regressions = struct

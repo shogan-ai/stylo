@@ -16,7 +16,6 @@ let necessary_1 = (-a) b (* without parens: - (a b), a call with a negated resul
 let redundant_2 = -a * b (* `- a * b` already means this *)
 
 let necessary_2 = -(a * b)
-;;
 (* without parens: (- a) * b, a different (if numerically equal) tree - `-` distributes
    differently over `*` *)
 
