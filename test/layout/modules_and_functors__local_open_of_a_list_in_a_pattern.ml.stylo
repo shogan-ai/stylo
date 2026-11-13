@@ -1,0 +1,9 @@
+let is_detailed = function
+  | Section.[ Overall
+    ; By_entity
+    ; By_first_group__
+    ; By_first_group_and_entity__
+    ; By_some_region___
+    ] -> true
+  | _ -> false
+;;

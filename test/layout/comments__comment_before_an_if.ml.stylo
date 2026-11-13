@@ -1,0 +1,11 @@
+let effects ~pruned_some_dirs ~some_dirs =
+  [ save_the_state
+  ; (* [filter_keys] only removes entries, so if the length is unchanged then nothing was
+       pruned. *)
+    (if Map.length
+          pruned_some_dirs
+        = Map.length some_dirs
+     then Effect.Ignore
+     else set_some_dirs pruned_some_dirs)
+  ]
+;;

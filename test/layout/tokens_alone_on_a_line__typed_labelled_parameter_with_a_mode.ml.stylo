@@ -1,0 +1,13 @@
+let initialize_item_event_handlers
+  (type k)
+  (t : k t)
+  ~(local_
+   item_handlers
+   :
+   [ `Legacy of (k Properties.t * (k Item_event.t @ local -> unit)) Modes.Global.t
+   | `New of (k Properties.t * index:Immediate.Int.Option.t) Modes.Global.t
+   ]
+     iarray)
+  =
+  ignore (t, item_handlers)
+;;

@@ -1,0 +1,2 @@
+let go_to l = Dom_html.window ##. location ##. href := Js.string l.target
+let alert s = Dom_html.window ## alert (Js.string s)

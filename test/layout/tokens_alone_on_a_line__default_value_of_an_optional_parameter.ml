@@ -1,0 +1,8 @@
+let make_query_tables_union
+  ?(databases =
+    (Some_db.Which_example_database.all
+      :> Other_client.Which_others_example_database.t list))
+  ()
+  =
+  databases
+;;

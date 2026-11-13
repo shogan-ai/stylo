@@ -1,0 +1,8 @@
+module Make
+    (M : sig
+       type query [@@deriving bin_io]
+
+       include Description
+     end) = struct
+  include M
+end

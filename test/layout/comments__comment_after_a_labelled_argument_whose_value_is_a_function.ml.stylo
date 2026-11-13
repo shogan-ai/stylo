@@ -1,0 +1,10 @@
+let app ~versioned_parser =
+  Url_var.create_exn
+    (module Route)
+    versioned_parser
+    ~trailing_slash_behavior:Keep_trailing_slashes
+    ~fallback:(fun _ _ -> Route.Home)
+    (* Consider passing [`Intercept]. More details here:
+       https://example.com/url-var-default-intercept__ *)
+    ~navigation:`Ignore
+;;

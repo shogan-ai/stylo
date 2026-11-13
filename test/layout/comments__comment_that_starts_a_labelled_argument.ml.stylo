@@ -1,0 +1,9 @@
+let values t =
+  create
+    ~first:(Some_calc.Values.first t)
+    ~the_second:
+
+      (* Plumb through the packed float option *)
+      (Some_calc.Values.the_second t |> Float.of_packed)
+    ()
+;;

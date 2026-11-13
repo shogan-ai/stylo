@@ -1,0 +1,6 @@
+type packed =
+  (module
+  Storable_messages_intf.S
+  with type Stable.With_bork.Wrapped_message.Latest.t = wrapped_msg_t
+   and type t = int
+  )

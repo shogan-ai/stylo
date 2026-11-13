@@ -1,0 +1,9 @@
+let daemon_commands ~start_param =
+  Command.async
+    (let%map_open.Command start_args = start_param in
+     fun
+       ({ mode; instance; appdir; rundir; _ } :
+         Instance_id.Name.t App_harness.runtime_environment) ()
+       ->
+       main ~mode ~instance ~appdir ~rundir start_args)
+;;

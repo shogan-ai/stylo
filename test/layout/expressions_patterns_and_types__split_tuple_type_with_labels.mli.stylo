@@ -1,0 +1,7 @@
+val get_example_snapshot_
+  :  sample_client:Sample_client.Client.Slow_example_stream_.t
+  -> (by_account:int Some_symbol.Map.t Account.Map.t
+      *
+      by_inventory:
+      int Some_symbol.Map.t Inventory.Map.t)
+       Deferred.t

@@ -1,0 +1,7 @@
+module type S = sig
+  module Topic_permissions :
+    Aria_admin_rpc
+    with type query := unit
+    with type response := Sexp.t Or_error.t
+     and type conn := t Connection.t
+end

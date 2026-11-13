@@ -1,0 +1,11 @@
+let implementations ~read_pool =
+  [ Some_rpc.implement_rpc
+      Rpcs.Get_example_items.rpc
+      (fun
+        (_conn : unit Some_rpc.Connection_state.t) (_description : Rpc.Description.t)
+        `Authorized query
+        ->
+        Sample_example_items_reader.Example_reader.get_example_items read_pool ~query
+        >>| Example.Or_example_error.to_or_error)
+  ]
+;;

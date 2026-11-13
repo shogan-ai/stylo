@@ -1,0 +1,6 @@
+module Storage_record (Data : sig
+    type t [@@deriving csv_t ~write_only, sexp_of]
+  end) =
+struct
+  type t = { data : Data.t }
+end

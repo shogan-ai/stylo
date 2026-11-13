@@ -1,0 +1,10 @@
+let classify = function
+  | First_constructor
+  | Second_constructor (* the first two *)
+  | Third_constructor
+  | Fourth_constructor -> 1
+  | Fifth_constructor
+  | Sixth_constructor (* a comment that is long enough that it doesn't fit *)
+  | Seventh_constructor -> 2
+  | Other -> 3
+;;

@@ -1,0 +1,9 @@
+include
+  Binable.Of_binable_with_uuid
+    (Serializable)
+    (struct
+      type nonrec t = t
+
+      let to_binable = serialize
+      let of_binable = deserialize
+    end)

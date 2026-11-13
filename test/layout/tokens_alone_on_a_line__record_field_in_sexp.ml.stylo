@@ -1,0 +1,12 @@
+let shows msg =
+  match msg with
+  | Thing { name; size; kind_of_widget_x } ->
+    Printing_lib.print_record_sideways
+      [%sexp
+        { name : Immediate.String.t
+        ; size : Immediate.String.t
+        ; kind_of_widget_x
+            :
+            Example_library.Generated_types_for_a_very_long_example_module_name.Kind_of_widget_x.t
+        }]
+;;

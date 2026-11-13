@@ -1,0 +1,7 @@
+let parse buf =
+  if Iobuf.length buf >= 4
+  then (
+    let t = Iobuf.Consume.int32_le buf in
+    stack_ (`Ok t))
+  else `Need_more_data
+;;

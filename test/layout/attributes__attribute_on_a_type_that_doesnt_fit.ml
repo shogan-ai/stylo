@@ -1,0 +1,13 @@
+module Some_example = struct
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { a_field :
+            (* Make the upstream type derive stable_witness. *)
+            (Some.Sample.Long_type_name_to_split.t option
+            [@stable_witness.custom Stable_witness.assert_stable])
+             [@bork.id 41]
+        }
+    end
+  end
+end
